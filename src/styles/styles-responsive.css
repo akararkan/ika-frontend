@@ -1,0 +1,525 @@
+/* =============================================================
+   IKA — Responsive refinement layer  ·  loaded LAST
+   Builds on the breakpoints already in styles.css (1180 / 720).
+   Desktop stays pixel-identical (clamp() upper bounds = current
+   sizes; safe-area insets resolve to 0px off mobile). Adds:
+     · notch / home-indicator safe areas
+     · fluid display headings
+     · sheet-style modals on phones
+     · overflow & tap-zoom guards
+     · phone-size tuning (600 / 460 / 380)
+   ============================================================= */
+
+:root{
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+}
+
+/* ---------- 0 · Global guards (every size) ---------- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{overflow-x:clip}                              /* kill stray sideways scroll, keeps sticky working */
+*{-webkit-tap-highlight-color:transparent}         /* no grey flash on tap */
+button,a,label,.tab,.chip,.nav-item{touch-action:manipulation}  /* drop 300ms tap delay, keep pinch-zoom */
+img,video{max-width:100%;height:auto}
+
+/* Fluid display headings — smoothly smaller on phones, no breakpoint jump */
+.phead h1{font-size:clamp(23px,6vw,32px)}
+.qd-head h1{font-size:clamp(22px,5.4vw,28px)}
+.rd-overlay h1{font-size:clamp(21px,5.4vw,30px)}
+.prof-meta h1{font-size:clamp(22px,6vw,30px)}
+.auth-hero{font-size:clamp(26px,3.4vw,42px)}   /* ~30px at the 880 panel breakpoint, fluid below */
+.section-label{font-size:clamp(17px,4.6vw,20px)}
+
+/* Tab rows: scroll sideways instead of overflowing the page */
+.tabs,.auth-tabs{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar,.auth-tabs::-webkit-scrollbar{display:none}
+.tab{white-space:nowrap}
+
+/* ---------- 1 · Safe-area chrome (fixed overlays, harmless on desktop) ---------- */
+/* The botnav's height is now content-driven (icon + label).
+   Only extend the bottom padding to clear the home-indicator. */
+.botnav{
+  padding-bottom:calc(10px + var(--safe-b));
+  padding-left:calc(8px + var(--safe-l));
+  padding-right:calc(8px + var(--safe-r));
+}
+
+/* Reels viewer — keep controls clear of notch & home indicator */
+.rv-top{padding-top:calc(18px + var(--safe-t));padding-left:calc(22px + var(--safe-l));padding-right:calc(22px + var(--safe-r))}
+.rv-rail{bottom:calc(24px + var(--safe-b));right:calc(16px + var(--safe-r))}
+.rv-meta{padding-bottom:calc(20px + var(--safe-b));padding-left:calc(24px + var(--safe-l))}
+.rv-seek{padding-bottom:calc(7px + var(--safe-b))}
+.rv-close{margin-right:var(--safe-r)}
+
+/* ============================================================
+   2 · TABLET & BELOW  (≤900px)
+   ============================================================ */
+@media(max-width:900px){
+  .phead{margin-bottom:18px}
+  .rd-figs{gap:8px}
+}
+
+/* ============================================================
+   3 · PHONE  (≤720px) — bottom-nav mode begins here
+   ============================================================ */
+@media(max-width:720px){
+  /* Topbar respects the notch (sidebar is hidden at this width, so no alignment clash) */
+  .topbar{
+    height:calc(56px + var(--safe-t));
+    padding:var(--safe-t) calc(14px + var(--safe-r)) 0 calc(14px + var(--safe-l));
+    gap:10px;
+  }
+
+  /* Clear the bottom nav + home indicator under every page */
+  .main{padding:14px 14px calc(88px + var(--safe-b))}
+  .main.center{padding:14px 14px calc(88px + var(--safe-b))}
+
+  /* Prevent iOS auto-zoom on focus (needs ≥16px on the control) */
+  .field,.field.lg,textarea.field,
+  .tb-search input,.explore-search input,.msg-search input,
+  .mt-compose input,.auth-card input{font-size:16px}
+
+  /* Page header: title + subtitle wrap tidy; CTA stays right */
+  .phead{margin-bottom:14px;gap:10px}
+  .phead h1{line-height:1.12}
+  .phead .sub{font-size:14px;margin-top:3px}
+  .phead .btn{height:38px;padding:0 14px;font-size:13.5px}
+
+  /* Toast floats above the bottom nav */
+  .toast{bottom:calc(96px + var(--safe-b))}
+
+  /* Stories switch to round-avatar layout — see §7.5 .stories block */
+
+  /* Tabs row: horizontally scrollable, no scrollbar (already done in §0)
+     but add bottom-border alignment hug on mobile */
+  .tabs{margin-bottom:14px;padding-bottom:1px;-webkit-overflow-scrolling:touch}
+  .tab{padding:10px 14px;font-size:13.5px}
+
+  /* Chips: scroll the row sideways instead of wrapping (m-chips pattern) */
+  .chips{
+    flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+    margin:0 -14px 14px;padding:2px 14px;
+  }
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;padding:7px 12px;font-size:12.5px}
+
+  /* Feed list breathes a touch tighter to match m-feed density */
+  .feed-list{gap:14px}
+
+  /* Post card density (m-post pattern) */
+  .pc-head{padding:13px 14px 8px;gap:10px}
+  .pc-body{padding:0 14px 11px;font-size:14.5px;line-height:1.55}
+  .pc-loc{margin:0 14px 11px;font-size:12px}
+  .pc-stats{padding:6px 14px;font-size:12.5px}
+  .pc-actions{padding:5px 6px}
+  .pca{padding:10px;font-size:13px;gap:6px}
+  .post-voice{margin:0 14px 12px;padding:12px}
+
+  /* Q&A cards a touch tighter */
+  .qna-list{gap:12px}
+  .qna-card h3{font-size:17px;line-height:1.28}
+  .qna-card .qna-body{font-size:13.5px}
+
+  /* Research cards stack 1-up cleanly on phones */
+  .r-list{grid-template-columns:1fr;gap:12px}
+  .r-cover{height:140px}
+  .r-body h3{font-size:18px;line-height:1.25}
+
+  /* Explore: don't fight the grid — single column */
+  .explore-grid{grid-template-columns:1fr;gap:14px}
+  .explore-search input{font-size:16px}
+
+  /* Section labels condense */
+  .section-label{margin:14px 0 10px}
+
+  /* Topbar: tighten the search field, drop label on me-chip is already in §6 */
+  .tb-search input{height:38px}
+
+  /* Right-rail cards never needed on phones (already hidden via .col-side) */
+}
+
+/* ============================================================
+   4 · MODALS AS BOTTOM SHEETS  (≤600px)
+   ============================================================ */
+@media(max-width:600px){
+  .overlay{padding:0;align-items:flex-end}
+  /* Modal is already flex-column (styles.css §modal) — keep the flex layout,
+     drop max-width and corner the top, animate a slide-up. The .mbody from
+     styles.css handles the internal scrolling. Safe-area pads the body
+     bottom so a long form clears the home indicator. */
+  .modal,.cm-modal{
+    width:100%;max-width:none;
+    max-height:92dvh;
+    border-radius:20px 20px 0 0;
+    animation:sheet .3s cubic-bezier(.2,.8,.3,1);
+  }
+  .mbody{padding-bottom:calc(18px + var(--safe-b))}
+}
+@keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
+
+/* ============================================================
+   5 · SMALL PHONE  (≤600px) — content tuning
+   ============================================================ */
+@media(max-width:600px){
+  /* PROFILE — fix the two real overflow bugs */
+  .prof-cover{height:150px;margin-bottom:-46px}
+  .prof-avatar{width:96px!important;height:96px!important;font-size:32px!important;border-width:4px!important}
+  .prof-head{flex-wrap:wrap;align-items:flex-end;gap:12px}
+  .prof-actions{margin-left:auto;padding-bottom:0;flex-wrap:wrap;gap:6px}
+  .prof-actions .btn{height:36px;padding:0 12px;font-size:13px}
+  /* 6 stat tiles → tidy 3×2 grid instead of an unreadable single row */
+  .prof-counts{display:grid;grid-template-columns:repeat(3,1fr)}
+  .prof-counts b{font-size:18px}
+  .prof-meta h1{line-height:1.15}
+
+  /* Cards: a hair less padding so text gets more room */
+  .card-pad{padding:16px}
+  .qna-card,.r-body{padding:16px}
+  .pc-head{padding:13px 14px 8px}
+  .pc-body{padding:0 14px 12px}
+
+  /* Research detail figures stack cleaner */
+  .rd-figs{grid-template-columns:1fr}
+  .rd-overlay{left:18px;right:18px;bottom:18px}
+
+  /* Reel-history thumbnails always 2-up (looks better than one big tile) */
+  .watched-grid{grid-template-columns:repeat(2,1fr)}
+
+  /* Q&A / research detail headline spacing */
+  .qd-head h1{margin:12px 0 6px}
+}
+
+/* ============================================================
+   6 · COMPACT PHONE  (≤460px)
+   ============================================================ */
+@media(max-width:460px){
+  .me-chip .nm{display:none}              /* avatar alone in the top bar */
+  .me-chip{padding:4px}
+  .phead{gap:10px}
+  .phead h1{font-size:clamp(22px,6.5vw,28px)}
+
+  /* Topbar: drop the search field entirely; bell + compose + avatar only.
+     Users tap the Explore tab to search — matches the prototype top bar. */
+  .topbar{gap:6px}
+  .tb-actions{margin-left:auto;gap:2px}
+
+  /* Brand: subtitle gone; logo + wordmark only */
+  .brand small{display:none}
+
+  /* Story avatar shrinks slightly on compact phones */
+  .story-add .avatar,.story-item .ring,.story-item .avatar{width:56px !important;height:56px !important}
+  .story-add,.story-item{width:68px}
+  .story-add span,.story-nm{max-width:64px}
+
+  /* Mobile post card: tighter still */
+  .pc-head{padding:12px 13px 7px}
+  .pc-body{padding:0 13px 10px;font-size:14px}
+  .pc-stats{padding:6px 13px}
+
+  /* Chip / tab paddings */
+  .chip{padding:6px 11px;font-size:12px}
+  .tab{padding:10px 12px;font-size:13px}
+
+  /* Profile counts */
+  .prof-counts{grid-template-columns:repeat(2,1fr)}
+  .post-media.count-1 .pm-cell.pm-reel{height:380px}
+  .vp{padding:16px}
+  .vp-play{width:48px;height:48px}
+  .modal .mbody,.cm-modal .mbody{padding:16px}
+
+  /* Page heads sit a touch closer to the screen edge */
+  .main,.main.center{padding-left:12px;padding-right:12px}
+
+  /* Explore search bar tightens */
+  .explore-search{padding:8px 12px}
+}
+
+/* ============================================================
+   7 · TINY PHONE  (≤380px)
+   ============================================================ */
+@media(max-width:380px){
+  .brand small{display:none}               /* drop the subtitle, keep "IKA." */
+  .brand .word{font-size:18px}
+  .topbar{gap:6px;padding-left:calc(10px + var(--safe-l));padding-right:calc(10px + var(--safe-r))}
+  .tb-actions .icon-btn{width:34px;height:34px}
+  .prof-counts b{font-size:17px}
+  .btn{padding:0 14px}
+  .tab{padding:10px 11px;font-size:12.5px}
+
+  /* Bottom nav: drop labels at this width so icons don't crush together */
+  .botnav a small{display:none}
+  .botnav a{gap:0}
+  .botnav a.mid .plus{width:44px;height:36px}
+
+  /* Tiniest phone: round avatars shrink to 52px */
+  .story-add .avatar,.story-item .ring,.story-item .avatar{width:52px !important;height:52px !important}
+  .story-add,.story-item{width:62px}
+  .story-add span,.story-nm{max-width:58px;font-size:10.5px}
+
+  /* Page header h1 doesn't dominate the screen */
+  .phead h1{font-size:clamp(20px,6.5vw,24px)}
+}
+
+/* ============================================================
+   7.5 · MOBILE POLISH — mirrors the prototype's `.m-*` patterns
+   onto IKA's existing class names. Applied as a layer ≤720px so
+   desktop is untouched. Source: design prototype m-screen tokens.
+   ============================================================ */
+@media(max-width:720px){
+  /* ---------- Top bar (matches .m-top density) ---------- */
+  .topbar{padding-bottom:10px}
+  .brand .mark{width:30px;height:30px;border-radius:9px}
+  .brand .mark svg{width:16px;height:16px}
+  .brand .word{font-size:19px}
+  .tb-actions .icon-btn{width:36px;height:36px}
+
+  /* ---------- Page head (matches .m-head) ---------- */
+  .phead{
+    padding:0; margin-bottom:14px;
+    display:flex; align-items:flex-end; justify-content:space-between; gap:10px;
+  }
+  .phead h1{font-family:var(--serif);font-weight:600;letter-spacing:-.5px;line-height:1.12}
+  .phead .sub{font-size:13px;color:var(--ink-soft);margin-top:3px}
+
+  /* ---------- Stories (matches .m-stories) ----------
+     Convert the rectangular desktop tile into the prototype's
+     round-avatar pattern: gradient ring + name caption below. */
+  .stories{
+    gap:11px; padding:12px 0 10px; margin:0 -2px 4px;
+    overflow-x:auto; scrollbar-width:none;
+  }
+  .stories::-webkit-scrollbar{display:none}
+  .story-add,.story-item{
+    flex:none; width:72px; height:auto; min-height:0;
+    background:transparent !important; border:0 !important;
+    box-shadow:none !important; border-radius:0;
+    display:flex; flex-direction:column; align-items:center;
+    gap:6px; padding:0;
+  }
+  .story-add:hover,.story-item:hover{transform:none;box-shadow:none}
+  /* Round 60×60 avatar inside a 2.5px gradient ring */
+  .story-add .avatar,.story-item .ring,.story-item .avatar{
+    width:60px !important; height:60px !important;
+    border-radius:50% !important;
+    padding:2.5px; box-sizing:border-box;
+    background:linear-gradient(135deg,var(--brass-soft),var(--emerald-glow));
+    position:relative; margin:0;
+  }
+  .story-add .avatar{
+    background:var(--line);  /* "Your story" ring is muted */
+    display:grid; place-items:center;
+  }
+  .story-add .avatar > *,.story-item .avatar > *{
+    width:100% !important; height:100% !important;
+    border:2px solid var(--paper); border-radius:50% !important;
+  }
+  /* "+" badge on the user's own story slot */
+  .story-add i{
+    position:absolute; bottom:-2px; right:-2px;
+    width:22px; height:22px; border-radius:50%;
+    background:var(--emerald-deep); color:#fff;
+    border:2.5px solid var(--paper);
+    display:grid; place-items:center;
+  }
+  .story-add i .ico{width:11px;height:11px;stroke-width:2.6}
+  /* Name caption sits below the ring, ellipsised */
+  .story-add span,.story-nm{
+    position:static !important; color:var(--ink-soft) !important;
+    text-shadow:none !important; font-size:11px; font-weight:500;
+    max-width:68px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    text-align:center; margin-top:0; padding:0;
+  }
+
+  /* ---------- Post card (matches .m-post) ---------- */
+  .post-card{border-radius:var(--r-lg)}
+  .pc-head{padding:13px 14px 8px;gap:10px}
+  .pc-line{font-size:14px}
+  .pc-meta{font-size:11.5px;gap:6px}
+  .pc-meta .ico{width:12px;height:12px}
+  .pc-body{padding:0 14px 11px;font-size:14.5px;line-height:1.55}
+  .pc-loc{margin:0 14px 11px;font-size:12px;padding:5px 11px}
+
+  /* Voice player gradient (.m-voice / .post-voice) */
+  .post-voice{
+    margin:0 14px 12px; padding:13px;
+    border-radius:14px; gap:12px;
+  }
+  .vp-play{width:46px;height:46px}
+  .vp-play .ico{width:20px;height:20px}
+  .vp-wave{height:30px;gap:2.5px}
+  .vp-meta{font-size:11.5px}
+
+  /* Repost embed tighter */
+  .post-repost{margin:0 14px 12px;padding:12px 13px;border-radius:12px}
+  .rp-name{font-size:13px}
+  .rp-body{font-size:13.5px;line-height:1.5}
+
+  /* Stats row (.m-pstats) */
+  .pc-stats{padding:9px 14px 4px;font-size:12px;gap:7px}
+  .ps-heart{width:20px;height:20px}
+  .ps-heart .ico{width:11px;height:11px}
+  .ps-right{gap:11px}
+
+  /* Action row (.m-pact) — labels stay visible per prototype */
+  .pc-actions{padding:5px 6px;border-top:1px solid var(--line-soft)}
+  .pca{padding:10px;gap:7px;font-size:13.5px;font-weight:600}
+  .pca .ico{width:20px;height:20px}
+
+  /* Comment box / comment preview tighter */
+  .pc-comments{padding:8px 14px 14px}
+  .cmt-bubble{padding:8px 13px;border-radius:13px}
+  .cmt-bubble p{font-size:13.5px}
+  .cmt-meta{padding:5px 13px 0;font-size:11.5px;gap:14px}
+  .cmt-field{height:38px;padding:0 14px;font-size:13.5px}
+
+  /* ---------- Q&A card (matches .m-qcard) ---------- */
+  .qna-card{padding:15px 16px;border-radius:var(--r)}
+  .qna-card > header{margin-bottom:10px;gap:9px}
+  .qna-name{font-size:13px}
+  .qna-sub{font-size:11px}
+  .qna-card h3{font-size:17px;line-height:1.3;letter-spacing:-.2px}
+  .qna-body{font-size:13px;margin-top:6px;line-height:1.5;-webkit-line-clamp:2}
+  .qna-tags{margin-top:10px;gap:6px}
+  .qna-tags a{font-size:11px;padding:3px 9px}
+  .qna-card footer{margin-top:11px;padding-top:11px;font-size:12px;gap:15px}
+
+  /* ---------- Research card (matches .m-rcard) ---------- */
+  .r-card{border-radius:var(--r-lg)}
+  .r-cover{height:142px}
+  .r-irc{top:11px;left:11px;font-size:10px;padding:3px 8px;border-radius:6px}
+  .r-play{width:48px;height:48px}
+  .r-play .ico{width:22px;height:22px}
+  .r-body{padding:14px 16px}
+  .r-body h3{font-size:18px;line-height:1.25}
+  .r-abs{font-size:13px;line-height:1.5;-webkit-line-clamp:2;margin-top:6px}
+  .r-foot{margin-top:12px;padding-top:11px;font-size:12px;gap:14px}
+
+  /* ---------- Research detail (matches .m-rd-hero) ---------- */
+  .rd-hero{min-height:220px;border-radius:var(--r);margin-bottom:14px}
+  .rd-hero::after{background:linear-gradient(180deg,rgba(8,20,16,.25) 0%,transparent 30%,rgba(8,20,16,.9) 100%)}
+  .rd-ids{top:14px;left:14px;gap:6px}
+  .rd-ids span{font-size:10px;padding:5px 9px;border-radius:7px}
+  .rd-play{width:62px;height:62px}
+  .rd-play .ico{width:26px;height:26px}
+  .rd-overlay{left:16px;right:16px;bottom:16px}
+  .rd-overlay h1{line-height:1.18}
+  .rd-by{font-size:13px;gap:8px;margin-top:8px}
+
+  /* Section heads in research detail */
+  .rd-sec{padding:16px 0}
+  .rd-sec h4{font-size:16px;margin-bottom:8px;gap:7px}
+  .rd-sec p{font-size:14px;line-height:1.65}
+
+  /* Metrics strip (matches .m-rd-metrics) */
+  .rd-metrics{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+    background:var(--line-soft);border-radius:14px;
+    overflow:hidden;border:1px solid var(--line);
+  }
+  .rd-metrics .c{background:var(--card);padding:12px 6px;text-align:center}
+  .rd-metrics b{font-family:var(--serif);font-size:18px;display:block}
+  .rd-metrics small{font-size:9px;font-weight:700;letter-spacing:.3px}
+
+  /* Source row (matches .m-src) */
+  .src-row{
+    display:flex;align-items:center;gap:11px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:12px;background:var(--card-2);
+    margin-bottom:8px;
+  }
+  .src-row .src-ic{width:34px;height:34px;border-radius:9px;flex:none}
+
+  /* ---------- Profile (matches .m-pcover/m-prow/m-pinfo) ---------- */
+  .prof-cover{height:150px;margin-bottom:-46px;border-radius:0 0 var(--r-lg) var(--r-lg)}
+  .prof-avatar{width:96px!important;height:96px!important;font-size:32px!important;border-width:4px!important}
+  .prof-head{padding:0 16px;flex-wrap:wrap;align-items:flex-end;gap:12px}
+  .prof-actions{margin-left:auto;padding-bottom:0;flex-wrap:wrap;gap:6px}
+  .prof-actions .btn{height:36px;padding:0 12px;font-size:13px;border-radius:10px}
+  .prof-meta{padding:12px 16px 0}
+  .prof-meta h1{font-size:23px;line-height:1.15}
+  .prof-handle{font-size:13px;gap:9px;margin-top:3px}
+  .prof-bio{font-size:13.5px;margin-top:10px;line-height:1.5}
+  .prof-facts{gap:14px;font-size:12.5px;margin-top:11px}
+
+  /* Counts strip — 4 cells with hairline dividers (matches .m-pcounts) */
+  .prof-counts{margin:16px;border-radius:14px}
+  .prof-counts button{padding:11px 8px;text-align:center;align-items:center;gap:1px}
+  .prof-counts b{font-family:var(--serif);font-size:18px}
+  .prof-counts small{font-size:9.5px;letter-spacing:.4px}
+
+  /* Profile sub-tabs (matches .m-ptabs) */
+  .prof-tabs{display:flex;border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto;scrollbar-width:none}
+  .prof-tabs::-webkit-scrollbar{display:none}
+  .prof-tabs button{flex:none;padding:11px 14px;font-size:13px}
+
+  /* Profile grid (matches .m-pgrid) */
+  .prof-media-grid{grid-template-columns:repeat(3,1fr);gap:3px;padding:3px}
+
+  /* ---------- Notifications (matches .m-nrow / .m-nbadge) ---------- */
+  .ntf-group{margin:14px 18px 7px;font-size:11px;letter-spacing:.5px}
+  .ntf-row{padding:12px 16px;gap:12px}
+  .ntf-row.unread::before{display:none}     /* unread dot consumes width; use bg tint only */
+  .ntf-row.unread{background:rgba(21,154,118,.05)}
+  .ntf-badge{width:21px;height:21px;border-width:2px}
+  .ntf-badge .ico{width:11px;height:11px}
+  .ntf-body p{font-size:13.5px;line-height:1.45}
+  .ntf-body p b{font-weight:600}
+  .ntf-snippet{font-size:12.5px;margin-top:5px;padding:7px 11px;border-radius:10px}
+  .ntf-body small{font-size:11px;margin-top:3px}
+
+  /* ---------- Compose modal as bottom sheet (matches .m-cmp) ---------- */
+  .cm-modal{max-width:none}
+  .cm-tabs{padding:12px 16px;gap:6px;border-bottom:1px solid var(--line-soft)}
+  .cm-tab{padding:8px 13px;font-size:12.5px}
+  .cm-author{margin-bottom:12px;gap:10px}
+  .cm-vis{font-size:11.5px;padding:4px 11px}
+  .cm-area{font-family:var(--serif);font-size:18px;min-height:150px;line-height:1.55}
+  .cm-area::placeholder{font-style:italic}
+  .cm-drop{margin-top:10px;border:2px dashed var(--line);border-radius:14px;padding:26px 14px}
+
+  /* ---------- Auth page (matches .m-auth gradient hero) ---------- */
+  .auth-page{display:flex;flex-direction:column;min-height:100vh}
+  .auth-left{
+    padding:64px 24px 30px;border-radius:0 0 28px 28px;min-height:auto;
+    background:linear-gradient(165deg,#0a4a3c,#0e6b54 55%,#0a3328);
+  }
+  .auth-mark{width:44px;height:44px;border-radius:12px}
+  .auth-mark svg{width:28px;height:28px}
+  .auth-name{font-size:21px}
+  .auth-tag{font-size:10px;margin-top:2px}
+  .auth-hero{font-size:clamp(24px,7vw,30px);margin-top:26px;line-height:1.18}
+  .auth-sub{font-size:13.5px;margin-top:12px;line-height:1.55}
+  .auth-bullets{margin-top:22px;gap:10px}
+  .auth-bullets li{font-size:13px}
+  .auth-bullets li span{width:28px;height:28px;border-radius:7px}
+  .auth-right{padding:22px 22px 26px}
+  .auth-card{max-width:none}
+  .auth-tab{font-size:14px;padding:9px 0}
+
+  /* ---------- Explore search bar (matches .m-cmp/m-cmp-vis density) ---------- */
+  .explore-search{padding:10px 14px;gap:10px;border-radius:13px}
+  .explore-search input{font-size:16px}
+
+  /* ---------- Section labels ---------- */
+  .section-label{margin:14px 0 10px;font-size:clamp(15px,4.4vw,18px)}
+}
+
+/* ============================================================
+   8 · LANDSCAPE PHONES — reclaim vertical space
+   ============================================================ */
+@media(max-height:480px) and (orientation:landscape){
+  .prof-cover{height:120px;margin-bottom:-40px}
+  .modal,.cm-modal{max-height:96dvh}
+  .auth-left{min-height:auto}
+}
+
+/* ============================================================
+   9 · Respect reduced-motion preference
+   ============================================================ */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important;
+  }
+}
