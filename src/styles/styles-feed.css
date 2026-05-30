@@ -198,10 +198,14 @@
 .pca.on .ico{fill:var(--rose);stroke:var(--rose)}
 .pca.saved{color:var(--brass)}
 .pca.saved .ico{fill:var(--brass);stroke:var(--brass)}
+.pca.active{color:var(--emerald)}
+.pca.active .ico{stroke:var(--emerald)}
 @media(max-width:520px){.pca span{display:none}}
 
 /* comment preview */
 .pc-comments{padding:8px 16px 16px;border-top:1px solid var(--line-soft)}
+.pc-viewall{display:block;width:100%;text-align:left;padding:10px 2px 2px;font-size:13px;font-weight:600;color:var(--emerald)}
+.pc-viewall:hover{text-decoration:underline}
 .cmt{display:flex;gap:10px;margin-top:11px}
 .cmt-col{flex:1;min-width:0}
 .cmt-bubble{background:var(--card-2);border-radius:14px;padding:9px 14px}

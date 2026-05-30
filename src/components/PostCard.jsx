@@ -239,6 +239,31 @@ export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComme
     io.observe(el)
     return () => { clearTimeout(timer); io.disconnect() }
   }, [post.id, observeView])
+
+  // Inline comments + comment reactions — expand under the card (lazy-loaded).
+  const [showC, setShowC] = React.useState(false)
+  const [comments, setComments] = React.useState(null)     // null = not loaded yet
+  const [cText, setCText] = React.useState('')
+  const [cBusy, setCBusy] = React.useState(false)
+  const [cCount, setCCount] = React.useState(post.comments || 0)
+  React.useEffect(() => { setCCount(post.comments || 0) }, [post.comments])
+  const toggleComments = () => {
+    setShowC(s => !s)
+    if (comments == null) api.posts.comments(post.id, { pageSize: 20 }).then(r => setComments(r || [])).catch(() => setComments([]))
+  }
+  const postComment = () => {
+    const v = cText.trim(); if (!v || cBusy) return
+    setCBusy(true)
+    api.posts.addComment(post.id, { text: v })
+      .then(saved => { setComments(cs => [saved, ...(cs || [])]); setCText(''); setCCount(n => n + 1) })
+      .catch(() => showToast('Could not post comment'))
+      .finally(() => setCBusy(false))
+  }
+  const reactComment = (cid) => {
+    const flip = () => setComments(cs => (cs || []).map(c => c.id === cid ? { ...c, liked: !c.liked, likes: (c.likes || 0) + (c.liked ? -1 : 1) } : c))
+    flip(); api.posts.toggleCommentReaction(post.id, cid).catch(flip)
+  }
+
   return (
     <article ref={cardRef} className="post-card rise" style={{ animationDelay: `${index * 60}ms` }}>
       <header className="pc-head">
@@ -279,7 +304,7 @@ export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComme
           <span>{fmt(post.likes)}</span>
         </span>
         <span className="ps-right">
-          <span>{fmt(post.comments)} comments</span>
+          <span role="button" style={{ cursor:'pointer' }} onClick={toggleComments}>{fmt(cCount)} comments</span>
           <span>{fmt(views)} views</span>
           <span>{fmt(post.shares)} shares</span>
         </span>
@@ -289,7 +314,7 @@ export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComme
         <button className={'pca ' + (post.liked ? 'on' : '')} onClick={() => onLike?.(post.id)}>
           <Icon name="heart"/><span>Like</span>
         </button>
-        <button className="pca" onClick={() => onOpenComments?.(post.id)}>
+        <button className={'pca ' + (showC ? 'active' : '')} onClick={toggleComments}>
           <Icon name="comment"/><span>Comment</span>
         </button>
         <button className="pca" onClick={() => doRepost(post)}>
@@ -302,6 +327,45 @@ export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComme
           <Icon name="bookmark"/><span>Save</span>
         </button>
       </div>
+
+      {showC && (
+        <div className="pc-comments">
+          <div className="cmt-box" style={{ marginTop:0 }}>
+            <input className="field" placeholder="Write a comment…" value={cText}
+              onChange={e => setCText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') postComment() }}/>
+            <button className="icon-btn tint" disabled={cBusy || !cText.trim()} onClick={postComment} aria-label="Post comment"><Icon name="send" className="sm"/></button>
+          </div>
+          {comments == null ? <div className="muted text-sm" style={{ padding:'10px 2px' }}>Loading comments…</div>
+            : !comments.length ? <div className="muted text-sm" style={{ padding:'10px 2px' }}>No comments yet — be the first.</div>
+            : comments.map(c => {
+              const cu = authorOf(c)
+              return (
+                <div key={c.id} className="cmt">
+                  <span role="button" style={{ cursor:'pointer' }} onClick={() => c.author && navigate(`/u/${c.author}`)}>
+                    <Avatar initials={cu.initials} color={cu.avc} size={32} src={cu.profileImage}/>
+                  </span>
+                  <div className="cmt-col">
+                    <div className="cmt-bubble">
+                      <div className="cmt-name"><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role === 'SCHOLAR'}/>}</div>
+                      <p>{linkify(c.body)}</p>
+                    </div>
+                    <div className="cmt-meta">
+                      <button onClick={() => reactComment(c.id)} style={c.liked ? { color:'var(--rose)' } : undefined}>
+                        <Icon name="heart" className="xs" style={c.liked ? { fill:'var(--rose)', stroke:'var(--rose)' } : undefined}/>{c.likes || 0}
+                      </button>
+                      <button onClick={() => onOpenComments?.(post.id)}>Reply</button>
+                      <span>{c.time}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          {comments && cCount > comments.length && (
+            <button className="pc-viewall" onClick={() => onOpenComments?.(post.id)}>View all {fmt(cCount)} comments</button>
+          )}
+        </div>
+      )}
 
       {lightbox !== null && <Lightbox images={imgs} index={lightbox} onClose={() => setLightbox(null)}/>}
     </article>

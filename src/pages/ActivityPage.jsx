@@ -98,7 +98,10 @@ export function ActivityPage() {
             <h1>Your <em>activity</em></h1>
             <p className="sub">Everything you’ve posted, liked, saved, shared, watched, asked, and searched.</p>
           </div>
-          {items.length > 0 && <button className="btn btn-secondary" onClick={clearAll}><Icon name="trash" className="sm"/>Clear all</button>}
+          <div className="flex gap-8" style={{ flexWrap:'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => navigate('/reels/watched')}><Icon name="reels" className="sm"/>Watch history</button>
+            {items.length > 0 && <button className="btn btn-secondary" onClick={clearAll}><Icon name="trash" className="sm"/>Clear all</button>}
+          </div>
         </div>
 
         <div className="tabs">
