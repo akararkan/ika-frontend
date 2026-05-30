@@ -8,7 +8,6 @@ import { Icon, Avatar } from './ui.jsx'
 import { ToastHost } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
-import { MoreSheet } from './MoreSheet.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -47,20 +46,20 @@ export function Layout() {
   const [editPost, setEditPost] = React.useState(null)
   const [search, setSearch] = React.useState('')
   const [unread, setUnread] = React.useState(0)
-  const [moreOpen, setMoreOpen] = React.useState(false)
+  const [navOpen, setNavOpen] = React.useState(false)
 
-  // Routes that live in the mobile "More" sheet (everything not a botnav cell).
-  const overflowNav = NAV.filter(n => !BOTNAV_ROUTES.includes(n.to))
-  const isOverflowActive = overflowNav.some(n => location.pathname === n.to || location.pathname.startsWith(n.to + '/'))
+  // On mobile the full sidebar slides in as a left drawer (hamburger + the
+  // bottom "More" slot both open it). Highlight the slot on overflow routes.
+  const isOverflowActive = NAV.some(n => !BOTNAV_ROUTES.includes(n.to) && (location.pathname === n.to || location.pathname.startsWith(n.to + '/')))
 
-  // Close the sheet whenever navigation happens, and on Escape.
-  React.useEffect(() => { setMoreOpen(false) }, [location.pathname])
+  // Close the drawer on navigation and on Escape.
+  React.useEffect(() => { setNavOpen(false) }, [location.pathname])
   React.useEffect(() => {
-    if (!moreOpen) return
-    const onKey = (e) => { if (e.key === 'Escape') setMoreOpen(false) }
+    if (!navOpen) return
+    const onKey = (e) => { if (e.key === 'Escape') setNavOpen(false) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [moreOpen])
+  }, [navOpen])
 
   // any page can open the composer by dispatching window 'ika:compose'.
   // detail is a postType string (create) OR { editPost } (edit, §6.4).
@@ -122,6 +121,7 @@ export function Layout() {
   return (
     <div className="app">
       <header className="topbar">
+        <button className="topbar-menu" onClick={() => setNavOpen(true)} aria-label="Open menu"><Icon name="menu"/></button>
         <div className="brand" onClick={() => navigate('/')} style={{ cursor:'pointer' }}>
           <div className="mark"><BrandMark/></div>
           <div>
@@ -148,10 +148,10 @@ export function Layout() {
         </div>
       </header>
 
-      <aside className="sidebar">
+      <aside className={'sidebar' + (navOpen ? ' open' : '')}>
         <nav className="nav">
           {NAV.map(n => (
-            <NavLink key={n.to} to={n.to} end={n.end}
+            <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setNavOpen(false)}
               className={({ isActive }) => 'nav-item ' + (isActive ? 'active' : '')}>
               <Icon name={n.icon}/><span>{n.label}</span>
               {n.to === '/notifications' && unread > 0 && <span className="badge">{unread}</span>}
@@ -159,7 +159,7 @@ export function Layout() {
           ))}
         </nav>
 
-        <button className="cta-compose" onClick={() => setComposeType('TEXT')}>
+        <button className="cta-compose" onClick={() => { setNavOpen(false); setComposeType('TEXT') }}>
           <Icon name="compose" className="sm"/><span>Create</span>
         </button>
 
@@ -189,8 +189,8 @@ export function Layout() {
         <a className="mid" onClick={() => setComposeType('TEXT')} aria-label="Create">
           <span className="plus"><Icon name="compose"/></span>
         </a>
-        <a className={'more ' + ((isOverflowActive || moreOpen) ? 'active' : '') + (moreOpen ? ' on' : '')}
-          onClick={() => setMoreOpen(true)} role="button" aria-label="More" aria-haspopup="dialog" aria-expanded={moreOpen}>
+        <a className={'more ' + ((isOverflowActive || navOpen) ? 'active' : '') + (navOpen ? ' on' : '')}
+          onClick={() => setNavOpen(true)} role="button" aria-label="More" aria-haspopup="dialog" aria-expanded={navOpen}>
           <Icon name="more"/><small>More</small>
         </a>
         <NavLink to="/profile" className={({ isActive }) => isActive ? 'active' : ''}>
@@ -204,10 +204,7 @@ export function Layout() {
           editPost={composeType === 'EDIT' ? editPost : null}
           onClose={closeCompose} onPublished={onPublished} onEdited={onEdited}/>
       )}
-      {moreOpen && (
-        <MoreSheet nav={overflowNav} pathname={location.pathname} unread={unread}
-          onClose={() => setMoreOpen(false)} onSignOut={() => { setMoreOpen(false); signOut() }}/>
-      )}
+      {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)}/>}
       <ToastHost/>
       <DialogHost/>
     </div>

@@ -531,6 +531,7 @@ img,video{max-width:100%;height:auto}
    ============================================================ */
 
 /* ---------- 10.0 · Base hooks (all sizes) ---------- */
+.topbar-menu{display:none}                                 /* hamburger → phones only (10.1) */
 .rv-mtabbar{display:none}                                  /* phones only (10.2) */
 .cmt-reply{margin-left:34px;margin-top:8px}                /* replaces inline marginLeft:34 on reply rows */
 .ntf-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:18px}
@@ -550,16 +551,26 @@ img,video{max-width:100%;height:auto}
   .botnav a.more.active,.botnav a.more.on{color:var(--emerald)}
   .botnav a.more.active .ico,.botnav a.more.on .ico{color:var(--emerald)}
 
-  .m-more-overlay{position:fixed;inset:0;z-index:110;background:rgba(11,26,22,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;animation:fade .2s}
-  .m-more-sheet{width:100%;background:var(--card);border-radius:20px 20px 0 0;box-shadow:var(--shadow-lg);padding:8px 10px calc(14px + var(--safe-b));max-height:80dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;animation:sheet .3s cubic-bezier(.2,.8,.3,1)}
-  .m-more-grab{width:38px;height:4px;border-radius:999px;background:var(--line);margin:6px auto 10px}
-  .m-more-sheet h5{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:6px 14px 4px}
-  .m-more-row{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:12px 14px;border-radius:12px;color:var(--ink-2);font-weight:500;font-size:15px;text-align:left;background:transparent;border:0;cursor:pointer}
-  .m-more-row .ico{width:22px;height:22px;color:var(--ink-soft)}
-  .m-more-row.active{background:var(--ink-2);color:#fdf8ec}
-  .m-more-row.active .ico{color:var(--brass-soft)}
-  .m-more-row .badge{margin-left:auto;min-width:22px;height:22px;padding:0 8px;border-radius:999px;background:var(--brass);color:#3a2c0c;font-size:11px;font-weight:700;display:grid;place-items:center}
-  .m-more-row.danger,.m-more-row.danger .ico{color:var(--rose)}
+  /* Full sidebar as a slide-in LEFT DRAWER (hamburger + bottom "More" open it),
+     so Reels / Research / Notifications / Activity / Saved / Settings + sign-out
+     are all reachable on phones. */
+  .topbar-menu{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;color:var(--ink-soft);flex:none;margin-left:-4px;background:transparent}
+  .topbar-menu:active{background:var(--card-2)}
+  .sidebar{
+    display:flex;position:fixed;top:0;left:0;bottom:0;z-index:118;
+    width:min(82vw,300px);height:100dvh;align-self:stretch;
+    padding:calc(16px + var(--safe-t)) 14px calc(16px + var(--safe-b)) calc(14px + var(--safe-l));
+    background:var(--paper);border-right:1px solid var(--line);box-shadow:var(--shadow-lg);
+    transform:translateX(-100%);transition:transform .28s cubic-bezier(.2,.8,.3,1);
+    overflow-y:auto;overscroll-behavior:contain;
+  }
+  .sidebar.open{transform:none}
+  /* Re-show labels/text that the ≤1180 icon-only collapse hides — the drawer is full-width. */
+  .sidebar .nav-item{justify-content:flex-start;gap:13px;padding:12px;font-size:15px}
+  .sidebar .nav-item span,.sidebar .cta-compose span{display:inline}
+  .sidebar .you-card .who{display:block}
+  .sidebar .side-section h5{display:block}
+  .nav-scrim{position:fixed;inset:0;z-index:115;background:rgba(11,26,22,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:fade .2s}
 
   /* ----- Reels & Stories: operable, not a dead-end ----- */
   .reels-view{height:100dvh;--mreel-bar:64px}
@@ -594,6 +605,8 @@ img,video{max-width:100%;height:auto}
   .post-media.count-3 .pm-cell,.post-media.count-4 .pm-cell{aspect-ratio:1/1}
   .post-media.count-3 .pm-cell:first-child{aspect-ratio:auto}
   .post-media.count-1 .pm-cell.pm-reel{height:auto;aspect-ratio:9/13;max-height:440px}
+  /* Surface the "Who to follow" / trending rail on phones (it was hidden ≤1180). */
+  .main > .col-side{display:flex;position:static;top:auto;width:100%;margin-top:18px}
 
   /* ----- Post detail + Q&A comment composer / threads ----- */
   .card-pad > .cmt-box{position:sticky;bottom:calc(8px + var(--safe-b));z-index:5;background:var(--card);padding:8px 0;margin:0 -2px}

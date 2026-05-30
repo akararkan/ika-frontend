@@ -69,6 +69,7 @@ export const ICON_PATHS = {
   scholar:'<path d="M12 2L2 7l10 5 10-5z"/><path d="M6 9v5a8 8 0 0 0 12 0V9"/><path d="M12 12v9"/>',
   paperclip:'<path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L13 5a3.5 3.5 0 0 1 5 5l-8 8a1.5 1.5 0 0 1-2-2l7.5-7.5"/>',
   trash:  '<path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/>',
+  menu:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
 
   /* ---- rich-text editor glyphs ---- */
   bold:        '<path d="M7 5h6.5a3 3 0 0 1 0 6H7zM7 11h7.5a3.5 3.5 0 0 1 0 7H7z"/>',
