@@ -252,7 +252,7 @@ export function ResearchDetailPage() {
 
         {/* author lifecycle toolbar (§6.2-6.7) */}
         {isAuthor && (
-          <div className="flex gap-8 mb-12" style={{ flexWrap:'wrap', marginBottom:12 }}>
+          <div className="flex gap-8 mb-12 rd-author-bar" style={{ flexWrap:'wrap', marginBottom:12 }}>
             <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}><Icon name="compose" className="xs"/>Edit</button>
             {r.status === 'DRAFT' && <button className="btn btn-primary btn-sm" onClick={publish}><Icon name="upload" className="xs"/>Publish</button>}
             {r.status === 'PUBLISHED' && <button className="btn btn-secondary btn-sm" onClick={unpublish}><Icon name="download" className="xs"/>Unpublish</button>}

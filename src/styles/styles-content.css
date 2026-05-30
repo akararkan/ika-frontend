@@ -462,7 +462,8 @@
 .rv-progress{position:absolute;top:62px;left:22px;right:22px;z-index:5;display:flex;gap:4px}
 .rv-progress i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden;display:block}
 .rv-progress i.done{background:rgba(255,255,255,.7)}
-.rv-progress i.cur::after{content:"";display:block;height:100%;width:40%;background:#fff;animation:reelp 6s linear infinite}
+.rv-progress i.cur::after{content:"";display:block;height:100%;width:0;background:#fff;animation:reelp 6s linear forwards}
+.reels-view.is-story .rv-progress i.cur::after{width:0}
 @keyframes reelp{from{width:0}to{width:100%}}
 
 .rv-stage{flex:1;display:grid;place-items:center;position:relative;overflow:hidden}

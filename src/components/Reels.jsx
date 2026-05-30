@@ -6,7 +6,7 @@
    records reel-watch views, toggles reactions/saves through the API.
    ========================================================= */
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, NavLink } from 'react-router-dom'
 import { Icon, Avatar, Verify, linkify, fmt, showToast } from './ui.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import { authorOf } from '../lib/userView.js'
@@ -145,6 +145,17 @@ export function Reels({ onClose, initialId }) {
       .catch(() => showToast('Could not repost'))
   }
   const step = (d) => setIdx(i => Math.max(0, Math.min(reels.length - 1, i + d)))
+  // Vertical swipe → next/prev (the chevron .rv-nav is hidden on phones). A small
+  // delta is a tap (handled by the video's togglePlay), so only act past ~44px.
+  const touchY = React.useRef(null)
+  const onTouchStart = (e) => { touchY.current = e.touches[0]?.clientY ?? null }
+  const onTouchEnd = (e) => {
+    if (touchY.current == null) return
+    const dy = (e.changedTouches[0]?.clientY ?? touchY.current) - touchY.current
+    touchY.current = null
+    if (dy < -44) step(1)            // swipe up → next reel
+    else if (dy > 44) step(-1)       // swipe down → previous reel
+  }
   const isSelf = !!(reel && user?.id && String(reel.author) === String(user.id))
   const goAuthor = () => { if (reel?.author) { navigate(`/u/${reel.author}`); onClose?.() } }
   const followAuthor = () => {
@@ -168,7 +179,7 @@ export function Reels({ onClose, initialId }) {
           <div style={{ textAlign:'center' }}>{tab === 'FOLLOWING' ? 'No reels from people you follow yet.' : 'No reels yet.'}</div>
         </div>
       ) : (
-        <div className="rv-stage">
+        <div className="rv-stage" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="rv-card">
             {videoUrl && !videoErr ? (
               <video
@@ -194,8 +205,7 @@ export function Reels({ onClose, initialId }) {
 
             {/* mute toggle */}
             {videoUrl && !videoErr && (
-              <button onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'}
-                style={{ position:'absolute', top:14, right:14, zIndex:6, width:38, height:38, borderRadius:'50%', background:'rgba(0,0,0,.5)', color:'#fff', display:'grid', placeItems:'center' }}>
+              <button className="rv-mute" onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'}>
                 <Icon name={muted ? 'mute' : 'volume'} className="sm"/>
               </button>
             )}
@@ -245,6 +255,18 @@ export function Reels({ onClose, initialId }) {
           </div>
         </div>
       )}
+
+      {/* Mobile-only glass tab bar — the real botnav is covered by this overlay,
+          so mirror it here so reels is never a navigational dead-end. */}
+      <nav className="rv-mtabbar">
+        <NavLink to="/" end aria-label="Home"><Icon name="home"/><small>Home</small></NavLink>
+        <NavLink to="/explore" aria-label="Explore"><Icon name="search"/><small>Explore</small></NavLink>
+        <a className="mid" onClick={() => window.dispatchEvent(new CustomEvent('ika:compose', { detail:'TEXT' }))} aria-label="Create">
+          <span className="plus"><Icon name="compose"/></span>
+        </a>
+        <NavLink to="/qna" aria-label="Q&A"><Icon name="qna"/><small>Q&amp;A</small></NavLink>
+        <NavLink to="/profile" aria-label="Profile"><Icon name="user"/><small>You</small></NavLink>
+      </nav>
     </div>
   )
 }

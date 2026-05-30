@@ -76,7 +76,7 @@ function HitRow({ hit, onOpen }) {
             {hit.time && <> · {hit.time}</>}
           </div>
         </div>
-        <span className="status" style={{ marginLeft:'auto', background:'transparent', color:meta.color, fontWeight:700 }}>
+        <span className="status hit-type-pill" style={{ marginLeft:'auto', background:'transparent', color:meta.color, fontWeight:700 }}>
           {meta.label}
         </span>
       </header>

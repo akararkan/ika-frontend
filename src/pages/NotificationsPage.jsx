@@ -76,7 +76,7 @@ export function NotificationsPage() {
 
   return (
     <div className="main center">
-      <div className="col-main">
+      <div className="col-main ntf-page">
         <div className="phead">
           <div>
             <h1>Notifications</h1>
@@ -85,11 +85,13 @@ export function NotificationsPage() {
           <button className="btn btn-secondary" onClick={markAll}><Icon name="check" className="sm"/>Mark all as read</button>
         </div>
 
-        <div className="tabs">
-          {TABS.map(([k, label]) => (
-            <button key={k} className={'tab ' + (tab === k ? 'on' : '')} onClick={() => setTab(k)}>{label}</button>
-          ))}
-          <button className={'tab ' + (unreadOnly ? 'on' : '')} style={{ marginLeft:'auto' }} onClick={() => setUnreadOnly(v => !v)} title="Show only unread (composes with the selected tab)">
+        <div className="ntf-toolbar">
+          <div className="tabs">
+            {TABS.map(([k, label]) => (
+              <button key={k} className={'tab ' + (tab === k ? 'on' : '')} onClick={() => setTab(k)}>{label}</button>
+            ))}
+          </div>
+          <button className={'tab ntf-unread-toggle ' + (unreadOnly ? 'on' : '')} onClick={() => setUnreadOnly(v => !v)} title="Show only unread (composes with the selected tab)">
             <Icon name="bell" className="xs"/>Unread{unreadOnly ? ' ✓' : ''}
           </button>
         </div>
@@ -115,7 +117,7 @@ export function NotificationsPage() {
                       {isTrending && tags.length ? (
                         <>
                           <p><b>{n.title || 'Trending in scholarship'}</b></p>
-                          <div className="flex gap-8" style={{ flexWrap:'wrap', margin:'4px 0' }}>
+                          <div className="chips" style={{ margin:'6px 0 2px' }}>
                             {tags.map(t => (
                               <button key={t} className="chip" onClick={(e) => { e.stopPropagation(); navigate(`/tags/${encodeURIComponent(t.slice(1))}`) }}>
                                 <span style={{ color:'var(--brass)' }}>#</span>{t.slice(1)}

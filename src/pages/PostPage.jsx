@@ -266,7 +266,7 @@ export function PostPage() {
                           const rOwner = !!me.id && r.author === me.id && !String(r.id).startsWith('tmp-')
                           const rEditing = editingId === r.id
                           return (
-                            <div key={r.id || ri} className="cmt" style={{ marginLeft:34, marginTop:8 }}>
+                            <div key={r.id || ri} className="cmt cmt-reply">
                               <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><Avatar initials={ru.initials} color={ru.avc} size={28}/></span>
                               <div className="cmt-col">
                                 {rEditing ? (

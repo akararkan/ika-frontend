@@ -155,7 +155,19 @@ export function StoryViewer({ authorId, author, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id])
 
-  if (loading) return <div className="reels-view" style={{ display:'grid', placeItems:'center', color:'#fff' }}>Loading…<button className="rv-close" onClick={onClose} style={{ position:'absolute', top:18, right:22 }}><Icon name="close"/></button></div>
+  // Auto-advance like a real story tray (6s, synced with the .rv-progress bar).
+  // Poll stories don't auto-advance so viewers have time to vote.
+  React.useEffect(() => {
+    if (!item || poll) return
+    const t = setTimeout(() => {
+      if (idx + 1 >= items.length) onClose()
+      else setIdx(idx + 1)
+    }, 6000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx, items.length, poll])
+
+  if (loading) return <div className="reels-view is-story" style={{ display:'grid', placeItems:'center', color:'#fff' }}>Loading…<button className="rv-close" onClick={onClose} style={{ position:'absolute', top:18, right:22 }}><Icon name="close"/></button></div>
   if (!item) { onClose(); return null }
 
   const step = (d) => { const n = idx + d; if (n < 0) return; if (n >= items.length) { onClose(); return } setIdx(n) }
@@ -175,7 +187,7 @@ export function StoryViewer({ authorId, author, onClose }) {
   }
 
   return (
-    <div className="reels-view">
+    <div className="reels-view is-story">
       <div className="rv-top">
         <div className="rvm-author" style={{ margin:0 }}>
           <Avatar initials={u.initials} color={u.avc} size={36}/>

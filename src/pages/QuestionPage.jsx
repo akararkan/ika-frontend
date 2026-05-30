@@ -477,7 +477,7 @@ export function QuestionPage() {
                 {own && <button className={'btn btn-secondary btn-sm ' + (openManage[a.id] ? 'on-brass' : '')} onClick={() => toggleManage(a)}><Icon name="book" className="xs"/>Sources &amp; files</button>}
                 {own && <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={() => deleteA(a)}><Icon name="close" className="xs"/>Delete</button>}
                 {isAuthor && (
-                  <button className={'btn btn-sm ' + (a.accepted ? 'btn-secondary' : 'btn-primary')} style={{marginLeft:'auto'}} onClick={() => accept(a)}>
+                  <button className={'btn btn-sm ans-accept ' + (a.accepted ? 'btn-secondary' : 'btn-primary')} onClick={() => accept(a)}>
                     <Icon name="check" className="xs"/>{a.accepted ? 'Accepted' : 'Accept'}
                   </button>
                 )}
@@ -558,7 +558,7 @@ export function QuestionPage() {
                   if (tgt) replyingTo = authorOf(tgt).handle
                 }
                 return (
-                  <div key={r.id} className="cmt" style={{ marginLeft:34, marginTop:10 }}>
+                  <div key={r.id} className="cmt cmt-reply">
                     <Avatar initials={ru.initials} color={ru.avc} size={28} src={ru.profileImage}/>
                     <div className="cmt-col">
                       <div className="cmt-bubble">
@@ -637,7 +637,7 @@ export function QuestionPage() {
               <button className={'icon-btn ' + (recording ? 'on-rose' : '')} title={recording ? 'Stop recording' : ansVoice ? 'Remove voice' : 'Record a voice note'} onClick={voiceTap}><Icon name={recording ? 'pause' : 'mic'} className="sm"/></button>
               <button className="icon-btn" title="Add a source / reference" onClick={() => setSrcOpen(v => !v)}><Icon name="book" className="sm"/></button>
               {recording && <span className="muted text-xs">Recording… tap ❚❚ to stop</span>}
-              <button className="btn btn-primary" style={{marginLeft:'auto'}} disabled={posting || (!text.trim() && !ansMedia && !ansVoice)} onClick={postAnswer}>{posting ? 'Posting…' : 'Post answer'}</button>
+              <button className="btn btn-primary ans-post-btn" disabled={posting || (!text.trim() && !ansMedia && !ansVoice)} onClick={postAnswer}>{posting ? 'Posting…' : 'Post answer'}</button>
             </div>
           </div>
         )}

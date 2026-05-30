@@ -3,11 +3,12 @@
    Uses the router (NavLink/useNavigate) and renders <Outlet/>.
    ========================================================= */
 import React from 'react'
-import { NavLink, useNavigate, Outlet } from 'react-router-dom'
+import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { Icon, Avatar } from './ui.jsx'
 import { ToastHost } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
+import { MoreSheet } from './MoreSheet.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -24,6 +25,10 @@ const NAV = [
   { to:'/settings',      icon:'settings', label:'Settings' },
 ]
 
+// The destinations already present as bottom-nav cells (besides the FAB + More).
+// Everything else falls into the mobile "More" sheet so all routes stay reachable.
+const BOTNAV_ROUTES = ['/', '/explore', '/profile']
+
 function BrandMark() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -35,12 +40,27 @@ function BrandMark() {
 
 export function Layout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
   const me = user || { full: 'You', handle: 'you', initials: 'Y', avc: 'linear-gradient(135deg,#159a76,#0a4a3c)' }
   const [composeType, setComposeType] = React.useState(null)
   const [editPost, setEditPost] = React.useState(null)
   const [search, setSearch] = React.useState('')
   const [unread, setUnread] = React.useState(0)
+  const [moreOpen, setMoreOpen] = React.useState(false)
+
+  // Routes that live in the mobile "More" sheet (everything not a botnav cell).
+  const overflowNav = NAV.filter(n => !BOTNAV_ROUTES.includes(n.to))
+  const isOverflowActive = overflowNav.some(n => location.pathname === n.to || location.pathname.startsWith(n.to + '/'))
+
+  // Close the sheet whenever navigation happens, and on Escape.
+  React.useEffect(() => { setMoreOpen(false) }, [location.pathname])
+  React.useEffect(() => {
+    if (!moreOpen) return
+    const onKey = (e) => { if (e.key === 'Escape') setMoreOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moreOpen])
 
   // any page can open the composer by dispatching window 'ika:compose'.
   // detail is a postType string (create) OR { editPost } (edit, §6.4).
@@ -169,9 +189,10 @@ export function Layout() {
         <a className="mid" onClick={() => setComposeType('TEXT')} aria-label="Create">
           <span className="plus"><Icon name="compose"/></span>
         </a>
-        <NavLink to="/qna" className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name="qna"/><small>Q&amp;A</small>
-        </NavLink>
+        <a className={'more ' + ((isOverflowActive || moreOpen) ? 'active' : '') + (moreOpen ? ' on' : '')}
+          onClick={() => setMoreOpen(true)} role="button" aria-label="More" aria-haspopup="dialog" aria-expanded={moreOpen}>
+          <Icon name="more"/><small>More</small>
+        </a>
         <NavLink to="/profile" className={({ isActive }) => isActive ? 'active' : ''}>
           <Icon name="user"/><small>You</small>
         </NavLink>
@@ -182,6 +203,10 @@ export function Layout() {
           type={composeType === 'EDIT' ? undefined : composeType}
           editPost={composeType === 'EDIT' ? editPost : null}
           onClose={closeCompose} onPublished={onPublished} onEdited={onEdited}/>
+      )}
+      {moreOpen && (
+        <MoreSheet nav={overflowNav} pathname={location.pathname} unread={unread}
+          onClose={() => setMoreOpen(false)} onSignOut={() => { setMoreOpen(false); signOut() }}/>
       )}
       <ToastHost/>
       <DialogHost/>
