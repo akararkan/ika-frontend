@@ -480,7 +480,9 @@
 .rvm-author{display:flex;align-items:center;gap:10px;margin-bottom:11px}
 .rvm-name{font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:5px}
 .rvm-time{font-size:12px;opacity:.75;margin-top:1px}
-.rvm-follow{margin-left:auto;padding:5px 14px;border:1.5px solid #fff;border-radius:999px;color:#fff;font-size:12.5px;font-weight:600}
+.rvm-follow{margin-left:auto;padding:5px 14px;border:1.5px solid #fff;border-radius:999px;color:#fff;font-size:12.5px;font-weight:600;transition:.15s}
+.rvm-follow:active{transform:scale(.95)}
+.rvm-follow.on{background:rgba(255,255,255,.18);border-color:transparent;color:#fff}
 .rvm-caption{font-size:14px;line-height:1.55;margin-bottom:10px;text-shadow:0 1px 6px rgba(0,0,0,.6)}
 .rvm-sound{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;background:rgba(0,0,0,.32);padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px)}
 

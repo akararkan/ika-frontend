@@ -11,7 +11,7 @@ import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
 import { openCompose, openComposeEdit } from '../lib/openCompose.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { api } from '../api/index.js'
+import { api, adapters, assetUrl } from '../api/index.js'
 
 function ComposerBar({ me }) {
   return (
@@ -121,6 +121,7 @@ export function FeedPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState(false)
   const [myStories, setMyStories] = React.useState([])
+  const [tray, setTray] = React.useState([])          // followed/close-friend rings (SSE-driven)
   const [storyOpen, setStoryOpen] = React.useState(null)
   const [more, setMore] = React.useState(false)
   const [end, setEnd] = React.useState(false)
@@ -155,6 +156,15 @@ export function FeedPage() {
     window.addEventListener('ika:story-deleted', loadStories)
     return () => { window.removeEventListener('ika:story-created', loadStories); window.removeEventListener('ika:story-deleted', loadStories) }
   }, [loadStories])
+  // Live tray: a followed/close-friend posting lights a ring (new_story); a delete
+  // or expiry greys it (story_removed). Tap a ring to open that author's stories.
+  React.useEffect(() => api.stories.trayStream({
+    onNewStory: (ev) => {
+      if (!ev?.authorId || ev.authorId === me.id) return
+      setTray(arr => [{ authorId: ev.authorId, username: ev.authorUsername, avatarUrl: ev.authorAvatarUrl, thumbnailUrl: ev.thumbnailUrl }, ...arr.filter(x => x.authorId !== ev.authorId)])
+    },
+    onStoryRemoved: (ev) => { if (ev?.authorId) setTray(arr => arr.filter(x => x.authorId !== ev.authorId)) },
+  }), [me.id])
   React.useEffect(() => {
     const onCreated = (e) => { if (e.detail) setPosts(ps => [e.detail, ...ps]) }
     const onUpdated = (e) => { if (e.detail) setPosts(ps => ps.map(p => p.id === e.detail.id ? e.detail : p)) }
@@ -201,6 +211,15 @@ export function FeedPage() {
               <span className="story-nm">{me.full.split(' ')[0]}</span>
             </button>
           )}
+          {tray.map(t => {
+            const a = adapters.authorFrom({ id: t.authorId, username: t.username, profileImage: t.avatarUrl })
+            return (
+              <button key={t.authorId} className="story-item" style={{ background: t.thumbnailUrl ? `center/cover no-repeat url("${assetUrl(t.thumbnailUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }} onClick={() => setStoryOpen({ authorId: t.authorId, author: a })}>
+                <span className="ring"><Avatar initials={a.initials} color={a.avc} size={50} src={a.profileImage}/></span>
+                <span className="story-nm">{a.handle}</span>
+              </button>
+            )
+          })}
         </section>
 
         <ComposerBar me={me}/>

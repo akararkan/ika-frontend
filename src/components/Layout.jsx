@@ -24,9 +24,13 @@ const NAV = [
   { to:'/settings',      icon:'settings', label:'Settings' },
 ]
 
-// The destinations already present as bottom-nav cells (besides the FAB + More).
-// Everything else falls into the mobile "More" sheet so all routes stay reachable.
-const BOTNAV_ROUTES = ['/', '/explore', '/profile']
+// Main pages → bottom tab bar; every page (incl. these) → the sidebar drawer.
+const BOTTOM_TABS = [
+  { to:'/',      icon:'home',  label:'Home', end:true },
+  { to:'/reels', icon:'reels', label:'Reels' },
+  { to:'/qna',   icon:'qna',   label:'Q&A' },
+  { to:'/profile', icon:'user', label:'You' },
+]
 
 function BrandMark() {
   return (
@@ -48,10 +52,8 @@ export function Layout() {
   const [unread, setUnread] = React.useState(0)
   const [navOpen, setNavOpen] = React.useState(false)
 
-  // On mobile the full sidebar slides in as a left drawer (hamburger + the
-  // bottom "More" slot both open it). Highlight the slot on overflow routes.
-  const isOverflowActive = NAV.some(n => !BOTNAV_ROUTES.includes(n.to) && (location.pathname === n.to || location.pathname.startsWith(n.to + '/')))
-
+  // On mobile the full sidebar slides in as a left drawer (the topbar hamburger
+  // opens it); the bottom bar carries the main pages.
   // Close the drawer on navigation and on Escape.
   React.useEffect(() => { setNavOpen(false) }, [location.pathname])
   React.useEffect(() => {
@@ -149,6 +151,13 @@ export function Layout() {
       </header>
 
       <aside className={'sidebar' + (navOpen ? ' open' : '')}>
+        <div className="sidebar-head">
+          <div className="brand">
+            <div className="mark"><BrandMark/></div>
+            <div><div className="word">IKA<b>.</b></div><small>Islamic Knowledge Archive</small></div>
+          </div>
+          <button className="icon-btn" aria-label="Close menu" onClick={() => setNavOpen(false)}><Icon name="close"/></button>
+        </div>
         <nav className="nav">
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setNavOpen(false)}
@@ -180,21 +189,20 @@ export function Layout() {
       </main>
 
       <nav className="botnav">
-        <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name="home"/><small>Home</small>
+        <NavLink to={BOTTOM_TABS[0].to} end className={({ isActive }) => isActive ? 'active' : ''}>
+          <Icon name={BOTTOM_TABS[0].icon}/><small>{BOTTOM_TABS[0].label}</small>
         </NavLink>
-        <NavLink to="/explore" className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name="search"/><small>Explore</small>
+        <NavLink to={BOTTOM_TABS[1].to} className={({ isActive }) => isActive ? 'active' : ''}>
+          <Icon name={BOTTOM_TABS[1].icon}/><small>{BOTTOM_TABS[1].label}</small>
         </NavLink>
         <a className="mid" onClick={() => setComposeType('TEXT')} aria-label="Create">
           <span className="plus"><Icon name="compose"/></span>
         </a>
-        <a className={'more ' + ((isOverflowActive || navOpen) ? 'active' : '') + (navOpen ? ' on' : '')}
-          onClick={() => setNavOpen(true)} role="button" aria-label="More" aria-haspopup="dialog" aria-expanded={navOpen}>
-          <Icon name="more"/><small>More</small>
-        </a>
-        <NavLink to="/profile" className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name="user"/><small>You</small>
+        <NavLink to={BOTTOM_TABS[2].to} className={({ isActive }) => isActive ? 'active' : ''}>
+          <Icon name={BOTTOM_TABS[2].icon}/><small>{BOTTOM_TABS[2].label}</small>
+        </NavLink>
+        <NavLink to={BOTTOM_TABS[3].to} className={({ isActive }) => isActive ? 'active' : ''}>
+          <Icon name={BOTTOM_TABS[3].icon}/><small>{BOTTOM_TABS[3].label}</small>
         </NavLink>
       </nav>
 

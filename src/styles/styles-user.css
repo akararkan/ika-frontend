@@ -8,6 +8,15 @@
   position:relative;height:200px;border-radius:var(--r-lg);overflow:hidden;
   margin-bottom:-60px;box-shadow:var(--shadow-sm);
 }
+.prof-cover-edit{
+  position:absolute;right:12px;bottom:12px;z-index:3;
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 13px;border-radius:10px;
+  background:rgba(11,26,22,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:#fff;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.2);transition:.15s;
+}
+.prof-cover-edit:hover{background:rgba(11,26,22,.68)}
+.prof-cover-edit:active{transform:scale(.97)}
 .prof-cover-grad{
   position:absolute;inset:0;
   background:linear-gradient(135deg,#0a4a3c 0%,#159a76 40%,#bd9344 100%);

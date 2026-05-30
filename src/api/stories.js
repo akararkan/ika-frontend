@@ -27,20 +27,35 @@ export const stories = {
   // author-only: who voted for a given choice (backed by the poll_by_id reverse index)
   voters(pollId, choice)  { return http.get(`/api/v1/polls/${pollId}/voters/${choice}`) },
 
-  /** Open the author's story-tray SSE stream. Fires onPollVote({ pollId, voteA,
-      voteB, voteTotal }) on every POLL_VOTE_CAST. Returns an unsubscribe fn. */
-  trayStream({ onPollVote, onConnected, onError } = {}) {
+  /** Open the story-tray SSE stream. Event names are the LOWERCASED
+      StoryTrayEventType enum. Fires:
+        onNewStory(ev)     — a followed/close-friend posted → light the ring
+        onStoryRemoved(ev) — author deleted / all expired → grey the ring
+        onPollVote(ev)     — author-only live poll tally { pollId, voteA, voteB, voteTotal }
+      Returns an unsubscribe fn. */
+  trayStream({ onNewStory, onStoryRemoved, onPollVote, onConnected, onError } = {}) {
     const token = session.getToken()
     const url = `${API_BASE}${TRAY_PATH}` + (token ? `?token=${encodeURIComponent(token)}` : '')
     const es = new EventSource(url, { withCredentials: true })
     const parse = (e) => { try { return JSON.parse(e.data) } catch { return {} } }
     es.addEventListener('connected', (e) => onConnected?.(parse(e)))
     es.addEventListener('heartbeat', () => {})
-    // Event names are the lowercased StoryTrayEventType enum (e.g. POLL_VOTE_CAST → 'poll_vote_cast').
+    es.addEventListener('new_story', (e) => onNewStory?.(parse(e)))
+    es.addEventListener('story_removed', (e) => onStoryRemoved?.(parse(e)))
     es.addEventListener('poll_vote_cast', (e) => onPollVote?.(parse(e)))
     es.onerror = () => onError?.(es.readyState)
     return () => es.close()
   },
+}
+
+/* Story-scoped close-friends circle — /api/v1/close-friends. This is the list
+   the backend enforces for CLOSE_FRIENDS story visibility. (The hydrated
+   management list lives at /users/me/close-friends — see users.closeFriends.) */
+export const closeCircle = {
+  list()                { return http.get('/api/v1/close-friends') },                                 // [{ ownerId, friendId, addedAt }]
+  add(friendId)         { return http.post('/api/v1/close-friends', {}, { query: { friendId } }) },    // 204
+  remove(friendId)      { return http.del('/api/v1/close-friends', { query: { friendId } }) },         // 204
+  isMember(candidateId) { return http.get('/api/v1/close-friends/is-member', { candidateId }) },       // true/false
 }
 
 export const highlights = {

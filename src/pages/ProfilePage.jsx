@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Badges, fmt, showToast } from '../components/ui.jsx'
 import { uiConfirm, uiPrompt } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
+import { HighlightViewer } from '../components/HighlightViewer.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { openComposeEdit } from '../lib/openCompose.js'
@@ -13,8 +14,11 @@ import { api, assetUrl } from '../api/index.js'
 
 export function ProfilePage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#159a76,#0a4a3c)', role:'MEMBER', bio:'', field:'', followers:0, following:0, posts:0, contributions:0 }
+  const coverRef = React.useRef(null)
+  const pickCover = (e) => { const f = e.target.files?.[0]; e.target.value=''; if (!f) return; api.users.uploadCover(f).then(() => { showToast('Cover updated'); refreshUser?.() }).catch(() => showToast('Could not upload cover')) }   // §10.6
+  const [hlOpen, setHlOpen] = React.useState(null)   // open highlight archive viewer
   const [tab, setTab] = React.useState('POSTS')
   const [posts, setPosts] = React.useState([])
   const [research, setResearch] = React.useState([])
@@ -68,7 +72,7 @@ export function ProfilePage() {
   const addHighlight = async () => {
     const title = (await uiPrompt({ title:'New highlight', label:'Name', initial:'' }))?.trim()
     if (!title) return
-    try { const h = await api.highlights.create({ title }); setHighlights(hs => [...hs, h]); showToast('Highlight created') }
+    try { const h = await api.highlights.create({ authorId: me.id, title }); setHighlights(hs => [...hs, h]); showToast('Highlight created') }   // §17 authorId is read from the body
     catch { showToast('Could not create highlight') }
   }
   const dropHighlight = (toIx) => {
@@ -89,6 +93,10 @@ export function ProfilePage() {
         <div className="prof-cover">
           <div className="prof-cover-grad" style={me.coverImage ? { background:`center/cover no-repeat url("${me.coverImage}")` } : undefined}/>
           {!me.coverImage && <div className="prof-cover-pattern"/>}
+          <input ref={coverRef} type="file" hidden accept="image/*" onChange={pickCover}/>
+          <button className="prof-cover-edit" onClick={() => coverRef.current?.click()} title="Change cover photo">
+            <Icon name="image" className="sm"/><span>{me.coverImage ? 'Change cover' : 'Add cover'}</span>
+          </button>
         </div>
         <div className="prof-head">
           <Avatar initials={me.initials} color={me.avc} size={132} className="prof-avatar" src={me.profileImage}/>
@@ -104,7 +112,8 @@ export function ProfilePage() {
           {me.bio && <p className="prof-bio">{me.bio}</p>}
           <div className="prof-facts">
             {me.field && <span><Icon name="scholar" className="xs"/>{me.field}</span>}
-            <span><Icon name="pin" className="xs"/>—</span>
+            {me.location && <span><Icon name="pin" className="xs"/>{me.location}</span>}
+            {me.website && <a href={me.website} target="_blank" rel="noreferrer"><Icon name="link" className="xs"/>{me.website.replace(/^https?:\/\//, '')}</a>}
           </div>
           <div className="prof-counts">
             <button onClick={() => setTab('POSTS')}><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>POSTS</small></button>
@@ -128,7 +137,8 @@ export function ProfilePage() {
                 onDragStart={() => { dragIx.current = i }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => dropHighlight(i)}
-                title={`${h.title} — drag to reorder`}
+                onClick={() => setHlOpen({ id: hid(h), title: h.title })}
+                title={`${h.title} — tap to view, drag to reorder`}
                 style={{ background:h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
                 <span className="story-nm">{h.title}</span>
               </button>
@@ -165,6 +175,7 @@ export function ProfilePage() {
           </>
         )}
       </div>
+      {hlOpen && <HighlightViewer highlight={hlOpen} author={me} owner onClose={() => setHlOpen(null)}/>}
     </div>
   )
 }

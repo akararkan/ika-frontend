@@ -5,7 +5,7 @@
    ========================================================= */
 import React from 'react'
 import { Icon, Avatar, Verify, showToast } from './ui.jsx'
-import { uiConfirm } from './Dialog.jsx'
+import { uiConfirm, uiPrompt } from './Dialog.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api, adapters, assetUrl } from '../api/index.js'
 
@@ -50,6 +50,74 @@ function VotersSheet({ poll, onClose }) {
         <div style={{ display:'flex', gap:16, padding:16 }}>
           {col(poll.optionA, sides.A)}
           {col(poll.optionB, sides.B)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// "Seen by" — author-only viewer list. Hydrates each viewerId into a user row.
+function ViewersSheet({ storyId, onClose }) {
+  const [list, setList] = React.useState(null)
+  React.useEffect(() => {
+    let alive = true
+    api.stories.viewers(storyId).then(async rows => {
+      const ids = (rows?.content || rows || []).map(v => v.viewerId || v.id).filter(Boolean).slice(0, 50)
+      const users = await Promise.all(ids.map(id => api.users.get(id).catch(() => null)))
+      if (alive) setList(users.filter(Boolean))
+    }).catch(() => { if (alive) setList([]) })
+    return () => { alive = false }
+  }, [storyId])
+  return (
+    <div className="overlay open" onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ zIndex:62 }}>
+      <div className="modal" style={{ maxWidth:440, width:'92%' }} onClick={e => e.stopPropagation()}>
+        <div className="phead" style={{ padding:'14px 16px 4px' }}>
+          <h3 style={{ margin:0 }}><Icon name="eye" className="sm"/> Seen by{list ? ` ${list.length}` : ''}</h3>
+          <button className="icon-btn" onClick={onClose}><Icon name="close" className="sm"/></button>
+        </div>
+        <div style={{ padding:'4px 16px 16px', maxHeight:'60vh', overflowY:'auto' }}>
+          {list == null ? <div className="muted text-sm" style={{ padding:'12px 0' }}>Loading…</div>
+            : !list.length ? <div className="muted text-sm" style={{ padding:'12px 0' }}>No views yet.</div>
+            : list.map(v => (
+              <div key={v.id} className="rail-row">
+                <Avatar initials={v.initials} color={v.avc} size={38} src={v.profileImage}/>
+                <div className="rail-info"><div className="rail-name"><b>{v.full}</b></div><div className="rail-sub">@{v.handle}</div></div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Author-only: archive the current story into a highlight (create new or pick one).
+function AddToHighlightSheet({ storyId, authorId, onClose }) {
+  const [hls, setHls] = React.useState(null)
+  React.useEffect(() => { api.highlights.byAuthor(authorId).then(r => setHls(r || [])).catch(() => setHls([])) }, [authorId])
+  const addTo = (hid) => { api.highlights.addStory(hid, storyId, authorId).then(() => showToast('Added to highlight')).catch(() => showToast('Could not add')); onClose() }
+  const newHl = async () => {
+    const title = (await uiPrompt({ title:'New highlight', label:'Name', initial:'' }))?.trim()
+    if (!title) { onClose(); return }
+    try { const h = await api.highlights.create({ authorId, title }); await api.highlights.addStory(h.highlightId || h.id, storyId, authorId); showToast('Highlight created') }
+    catch { showToast('Could not create highlight') }
+    onClose()
+  }
+  return (
+    <div className="overlay open" onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ zIndex:62 }}>
+      <div className="modal" style={{ maxWidth:440, width:'92%' }} onClick={e => e.stopPropagation()}>
+        <div className="phead" style={{ padding:'14px 16px 4px' }}><h3 style={{ margin:0 }}><Icon name="star" className="sm"/> Add to highlight</h3><button className="icon-btn" onClick={onClose}><Icon name="close" className="sm"/></button></div>
+        <div style={{ padding:'4px 16px 16px', maxHeight:'60vh', overflowY:'auto' }}>
+          <button className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={newHl}>
+            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#bd9344' }}><Icon name="compose" className="sm"/></span>
+            <div className="rail-info"><div className="rail-name"><b>New highlight</b></div></div>
+          </button>
+          {hls == null ? <div className="muted text-sm" style={{ padding:'10px 0' }}>Loading…</div>
+            : hls.map(h => (
+              <button key={h.highlightId || h.id} className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={() => addTo(h.highlightId || h.id)}>
+                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}/>
+                <div className="rail-info"><div className="rail-name"><b>{h.title}</b></div></div>
+              </button>
+            ))}
         </div>
       </div>
     </div>
@@ -118,6 +186,8 @@ export function StoryViewer({ authorId, author, onClose }) {
   const [idx, setIdx] = React.useState(0)
   const [poll, setPoll] = React.useState(null)
   const [liveTally, setLiveTally] = React.useState(null)   // latest POLL_VOTE_CAST from the tray stream
+  const [showViewers, setShowViewers] = React.useState(false)
+  const [addHl, setAddHl] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const u = author || { full: 'Member', handle: 'member', initials: '··', avc: gradientFor(authorId) }
 
@@ -149,9 +219,19 @@ export function StoryViewer({ authorId, author, onClose }) {
 
   React.useEffect(() => {
     if (!item) return
+    let alive = true
     api.stories.recordView(item.id).catch(() => {})
     setPoll(null)
-    api.stories.getPoll(item.id).then(p => p && setPoll(p)).catch(() => {})
+    // getPoll only returns question/options — hydrate live tallies (results) and
+    // my prior choice (vote/me) so the widget shows the true state, not 0/0.
+    api.stories.getPoll(item.id).then(async p => {
+      if (!alive || !p) return
+      const [res, mine] = await Promise.allSettled([api.stories.results(p.pollId), api.stories.myVote(p.pollId)])
+      const r = res.status === 'fulfilled' ? (res.value || {}) : {}
+      const mv = mine.status === 'fulfilled' ? (mine.value || {}) : {}
+      if (alive) setPoll({ ...p, voteA: r.voteA ?? 0, voteB: r.voteB ?? 0, myChoice: mv.choice ?? null })
+    }).catch(() => {})
+    return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id])
 
@@ -196,9 +276,11 @@ export function StoryViewer({ authorId, author, onClose }) {
             <div className="rvm-time">{item.time} ago · {item.visibility?.toLowerCase?.() || 'public'}</div>
           </div>
         </div>
-        {isOwner && <button className="rv-close" style={{ marginLeft:'auto' }} onClick={removeCurrent} title="Delete story" aria-label="Delete story"><Icon name="trash"/></button>}
+        {isOwner && <button className="rv-close" style={{ marginLeft:'auto' }} onClick={() => setAddHl(true)} title="Add to highlight" aria-label="Add to highlight"><Icon name="star"/></button>}
+        {isOwner && <button className="rv-close" onClick={removeCurrent} title="Delete story" aria-label="Delete story"><Icon name="trash"/></button>}
         <button className="rv-close" onClick={onClose}><Icon name="close"/></button>
       </div>
+      {addHl && <AddToHighlightSheet storyId={item.id} authorId={authorId} onClose={() => setAddHl(false)}/>}
 
       <div className="rv-progress">
         {items.map((_, i) => <i key={i} className={i < idx ? 'done' : i === idx ? 'cur' : ''}/>)}
@@ -217,10 +299,17 @@ export function StoryViewer({ authorId, author, onClose }) {
             </div>
           )}
           <div className="rv-meta">
-            <div className="rvm-sound" onClick={() => showToast('Reply sent')}>
-              <Icon name="send" className="xs"/>Reply to {u.full.split(' ')[0]}…
-            </div>
+            {isOwner ? (
+              <button className="rvm-sound" onClick={() => setShowViewers(true)}>
+                <Icon name="eye" className="xs"/>Seen by — view
+              </button>
+            ) : (
+              <div className="rvm-sound" onClick={() => showToast('Reply sent')}>
+                <Icon name="send" className="xs"/>Reply to {u.full.split(' ')[0]}…
+              </div>
+            )}
           </div>
+          {showViewers && <ViewersSheet storyId={item.id} onClose={() => setShowViewers(false)}/>}
         </div>
         <div className="rv-nav">
           <button onClick={() => step(-1)} disabled={idx === 0}><Icon name="chevup"/></button>

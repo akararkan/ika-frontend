@@ -10,16 +10,6 @@ import { EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
-function Toggle({ title, desc, on: initial }) {
-  const [on, setOn] = React.useState(initial)
-  return (
-    <div className="set-toggle">
-      <div><b>{title}</b><small className="muted">{desc}</small></div>
-      <button className={'sw ' + (on ? 'on' : '')} onClick={() => setOn(v => !v)}/>
-    </div>
-  )
-}
-
 function ProfilePanel({ me }) {
   const { refreshUser } = useAuth()
   const [full, setFull] = React.useState(me.full || '')
@@ -246,14 +236,11 @@ export function SettingsPage() {
           <aside className="set-side">
             {[
               ['PROFILE','user','Profile'],
-              ['ACCOUNT','settings','Account'],
-              ['PRIVACY','lock','Privacy'],
               ['CLOSE_FRIENDS','users','Close friends'],
               ['NOTIFICATIONS','bell','Emails'],
               ['BLOCKED','block','Blocked users'],
               ['RESTRICTED','eye','Restricted'],
               ['SECURITY','shield','Security'],
-              ['VERIFICATION','award','Verification'],
             ].map(([k,ic,lab]) => (
               <button key={k} className={'set-item ' + (tab===k?'on':'')} onClick={() => setTab(k)}><Icon name={ic} className="sm"/>{lab}</button>
             ))}
@@ -261,37 +248,11 @@ export function SettingsPage() {
 
           <div>
             {tab==='PROFILE' && <ProfilePanel me={me}/>}
-            {tab==='ACCOUNT' && (
-              <div className="card card-pad"><h3 className="title">Account</h3>
-                <div className="set-grid">
-                  <div><label className="field-label">Email</label><input className="field" placeholder="you@example.com"/></div>
-                  <div><label className="field-label">Phone</label><input className="field" placeholder="+964 …"/></div>
-                  <div><label className="field-label">Language</label><select className="field"><option>English</option><option>العربية</option><option>کوردی</option></select></div>
-                  <div><label className="field-label">Time zone</label><select className="field"><option>Asia/Baghdad (GMT+3)</option></select></div>
-                </div>
-                <div className="set-actions"><button className="btn btn-primary" onClick={() => showToast('Saved')}>Save</button></div>
-              </div>
-            )}
-            {tab==='PRIVACY' && (
-              <div className="card card-pad"><h3 className="title">Privacy</h3>
-                <Toggle title="Make profile public" desc="Anyone can see your posts and research." on={true}/>
-                <Toggle title="Show activity status" desc="Let others see when you were last active." on={true}/>
-                <Toggle title="Index in search engines" desc="Allow others to surface your profile." on={true}/>
-              </div>
-            )}
             {tab==='CLOSE_FRIENDS' && <CloseFriendsPanel/>}
             {tab==='NOTIFICATIONS' && <EmailPrefsPanel/>}
             {tab==='BLOCKED' && <BlockedPanel/>}
             {tab==='RESTRICTED' && <RestrictedPanel/>}
             {tab==='SECURITY' && <SecurityPanel/>}
-            {tab==='VERIFICATION' && (
-              <div className="card card-pad"><h3 className="title">Verification</h3>
-                <p className="text-sm">IKA verifies scholars and researchers via their institutional affiliation. Submit your credentials and our review team will respond within 5–7 working days.</p>
-                <div className="ver-step ver-current"><span className="ver-num">1</span><div><b>Account in good standing</b><small className="muted">Your account meets minimum requirements.</small></div><Icon name="check" className="sm" style={{color:'var(--emerald)',marginLeft:'auto'}}/></div>
-                <div className="ver-step"><span className="ver-num">2</span><div><b>Submit credentials</b><small className="muted">Upload your ijaza, degree certificate, or institutional ID.</small></div><button className="btn btn-primary btn-sm" style={{marginLeft:'auto'}} onClick={() => showToast('Submitted for review')}>Submit</button></div>
-                <div className="ver-step"><span className="ver-num">3</span><div><b>Review</b><small className="muted">Our scholars panel reviews submissions weekly.</small></div></div>
-              </div>
-            )}
           </div>
         </div>
       </div>

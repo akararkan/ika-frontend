@@ -532,6 +532,7 @@ img,video{max-width:100%;height:auto}
 
 /* ---------- 10.0 · Base hooks (all sizes) ---------- */
 .topbar-menu{display:none}                                 /* hamburger → phones only (10.1) */
+.sidebar-head{display:none}                                /* drawer header → phones only (10.1) */
 .rv-mtabbar{display:none}                                  /* phones only (10.2) */
 .cmt-reply{margin-left:34px;margin-top:8px}                /* replaces inline marginLeft:34 on reply rows */
 .ntf-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:18px}
@@ -546,10 +547,12 @@ img,video{max-width:100%;height:auto}
   /* ----- Navigation: "More" sheet so every section is reachable ----- */
   .topbar .icon-btn.tint{display:none}                     /* FAB is the single compose entry */
   .tb-actions{gap:4px;margin-left:auto}
-  .botnav a{flex:1;width:auto;max-width:84px;min-width:0}  /* equal cols → FAB dead-center */
+  .botnav a{flex:1;width:auto;max-width:84px;min-width:0;position:relative;transition:color .15s}  /* equal cols → FAB dead-center */
   .botnav a.mid{flex:0 0 auto;width:auto}
-  .botnav a.more.active,.botnav a.more.on{color:var(--emerald)}
-  .botnav a.more.active .ico,.botnav a.more.on .ico{color:var(--emerald)}
+  .botnav a:active{transform:scale(.93)}
+  .botnav a small{transition:opacity .15s}
+  /* active-tab indicator riding the top edge of the bar */
+  .botnav a.active::after{content:"";position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:26px;height:3px;border-radius:0 0 3px 3px;background:var(--emerald)}
 
   /* Full sidebar as a slide-in LEFT DRAWER (hamburger + bottom "More" open it),
      so Reels / Research / Notifications / Activity / Saved / Settings + sign-out
@@ -565,6 +568,11 @@ img,video{max-width:100%;height:auto}
     overflow-y:auto;overscroll-behavior:contain;
   }
   .sidebar.open{transform:none}
+  /* Drawer header: brand + close */
+  .sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .sidebar-head .brand{display:flex;align-items:center;gap:10px;width:auto}
+  .sidebar-head .brand .word,.sidebar-head .brand small{display:block}
+  .sidebar-head .brand .word{font-size:19px}
   /* Re-show labels/text that the ≤1180 icon-only collapse hides — the drawer is full-width. */
   .sidebar .nav-item{justify-content:flex-start;gap:13px;padding:12px;font-size:15px}
   .sidebar .nav-item span,.sidebar .cta-compose span{display:inline}
@@ -746,4 +754,23 @@ img,video{max-width:100%;height:auto}
   .se-bar-btn.ghost span{display:none}
   .se-bar-btn.primary span{display:inline}
   .se-poll-grid{grid-template-columns:1fr}
+}
+
+/* ============================================================
+   10.5 · MICRO-INTERACTIONS — tactile press feedback & accents
+   ============================================================ */
+.ntf-row.static{cursor:default}
+.ntf-row.static:hover{background:transparent}
+@media(max-width:720px){
+  .btn:active,.chip:active,.tab:active,.set-item:active,.pca:active,.icon-btn:active,.cb-quick:active{transform:scale(.96)}
+  .post-card,.qna-card,.r-card{transition:transform .12s ease}
+  .post-card:active,.qna-card:active,.r-card:active{transform:scale(.99)}
+  .ntf-row{transition:background .12s}
+  .ntf-row:active{background:var(--card-2)}
+  .story-item:active,.story-add:active{transform:scale(.95)}
+  .botnav a.mid .plus{transition:transform .15s}
+  .botnav a.mid:active .plus{transform:scale(.92)}
+  /* in-reel glass-bar active indicator */
+  .rv-mtabbar a{position:relative}
+  .rv-mtabbar a.active::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:20px;height:2.5px;border-radius:0 0 3px 3px;background:#fff}
 }

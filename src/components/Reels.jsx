@@ -144,6 +144,16 @@ export function Reels({ onClose, initialId }) {
       .then(() => showToast('Reposted to your profile'))
       .catch(() => showToast('Could not repost'))
   }
+  // Reflect the REAL follow state for the current reel's author (so the button
+  // reads "Following" when you already follow them, "Follow" otherwise).
+  React.useEffect(() => {
+    const id = reel?.author
+    if (!id || !user?.id || String(id) === String(user.id)) return
+    if (followed[id] !== undefined) return                        // already known
+    api.users.socialStatus(id).then(s => setFollowed(f => ({ ...f, [id]: !!s.isFollowing }))).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reel?.author, user?.id])
+
   const step = (d) => setIdx(i => Math.max(0, Math.min(reels.length - 1, i + d)))
   // Vertical swipe → next/prev (the chevron .rv-nav is hidden on phones). A small
   // delta is a tap (handled by the video's togglePlay), so only act past ~44px.
@@ -217,7 +227,7 @@ export function Reels({ onClose, initialId }) {
                   <div className="rvm-name"><b>@{u.handle}</b>{u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
                   <div className="rvm-time">{reel.time} · {fmt(reel.views)} views</div>
                 </div>
-                {!isSelf && <button className="rvm-follow" onClick={followAuthor}>{followed[reel.author] ? 'Following' : 'Follow'}</button>}
+                {!isSelf && <button className={'rvm-follow' + (followed[reel.author] ? ' on' : '')} onClick={followAuthor}>{followed[reel.author] ? 'Following' : 'Follow'}</button>}
               </div>
               <p className="rvm-caption">{linkify(reel.body)}</p>
               <div className="rvm-sound"><Icon name="music" className="xs"/>Original audio</div>

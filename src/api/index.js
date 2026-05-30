@@ -11,7 +11,7 @@ import { auth } from './auth.js'
 import { users, closeFriends } from './users.js'
 import { posts } from './posts.js'
 import { reels } from './reels.js'
-import { stories, highlights } from './stories.js'
+import { stories, highlights, closeCircle } from './stories.js'
 import { sounds } from './sounds.js'
 import { qna } from './qna.js'
 import { research } from './research.js'
@@ -22,6 +22,6 @@ import { mentions } from './mentions.js'
 import { notifications } from './notifications.js'
 
 export const api = {
-  auth, users, posts, reels, stories, closeFriends, highlights, sounds,
+  auth, users, posts, reels, stories, closeFriends, closeCircle, highlights, sounds,
   qna, research, search, tags, activity, mentions, notifications,
 }
