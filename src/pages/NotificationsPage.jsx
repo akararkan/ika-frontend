@@ -24,6 +24,11 @@ const CAT_OF = Object.fromEntries(TABS.map(([k, , c]) => [k, c]))
 const CAT_ICON = { POSTS:'heart', QNA:'qna', RESEARCH:'research', MENTIONS:'at', SOCIAL:'follow', SYSTEM:'bell' }
 const CAT_TINT = { POSTS:'#c2453f', QNA:'#159a76', RESEARCH:'#bd9344', MENTIONS:'#bd9344', SOCIAL:'#3f6a8a', SYSTEM:'#3c4f49' }
 
+// The daily trending digest (NOTIFICATIONS_API §11.6) has no actor and its body is a
+// comma-joined hashtag list. Parse the #tags so each can route to its tag feed.
+const TAG_RE = /#[\p{L}\p{N}_-]+/gu
+const trendingTags = (body) => body?.match(TAG_RE) ?? []
+
 export function NotificationsPage() {
   const navigate = useNavigate()
   const [tab, setTab] = React.useState('ALL')
@@ -95,14 +100,32 @@ export function NotificationsPage() {
             <div className="card" style={{ overflow:'hidden' }}>
               {items.map(n => {
                 const u = n._actor || authorOf(n)
+                // TRENDING_DIGEST: no actor — render a system tile + tag chips instead of a user avatar (§11.6)
+                const isTrending = n.type === 'TRENDING_DIGEST'
+                const tags = isTrending ? trendingTags(n.body) : []
                 return (
                   <div key={n.id} className={'ntf-row ' + (n.unread ? 'unread' : '')} style={{ cursor: n.deepLink ? 'pointer' : 'default' }} onClick={() => open(n)}>
                     <div className="ntf-avatar">
-                      <Avatar initials={u.initials} color={u.avc} size={42} src={u.profileImage}/>
-                      <span className="ntf-badge" style={{ background: CAT_TINT[n.category] || '#3c4f49' }}><Icon name={CAT_ICON[n.category] || 'bell'} className="xs"/></span>
+                      {isTrending
+                        ? <span className="ntf-tile" style={{ background: CAT_TINT.SYSTEM }}><Icon name="trending"/></span>
+                        : <Avatar initials={u.initials} color={u.avc} size={42} src={u.profileImage}/>}
+                      <span className="ntf-badge" style={{ background: isTrending ? '#bd9344' : (CAT_TINT[n.category] || '#3c4f49') }}><Icon name={isTrending ? 'trending' : (CAT_ICON[n.category] || 'bell')} className="xs"/></span>
                     </div>
                     <div className="ntf-body">
-                      <p><b>{n.title || u.full}</b> {n.body && <span className="muted">{n.body}</span>}</p>
+                      {isTrending && tags.length ? (
+                        <>
+                          <p><b>{n.title || 'Trending in scholarship'}</b></p>
+                          <div className="flex gap-8" style={{ flexWrap:'wrap', margin:'4px 0' }}>
+                            {tags.map(t => (
+                              <button key={t} className="chip" onClick={(e) => { e.stopPropagation(); navigate(`/tags/${encodeURIComponent(t.slice(1))}`) }}>
+                                <span style={{ color:'var(--brass)' }}>#</span>{t.slice(1)}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <p><b>{n.title || u.full}</b> {n.body && <span className="muted">{n.body}</span>}</p>
+                      )}
                       <small className="muted">{n.time} ago{n.aggregateCount > 1 ? ` · ${n.aggregateCount} people` : ''}</small>
                     </div>
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); api.notifications.remove(n.id).catch(() => {}); setItems(arr => arr.filter(x => x.id !== n.id)) }}><Icon name="close" className="sm"/></button>

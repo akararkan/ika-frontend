@@ -18,7 +18,8 @@ export function notifFrom(dto) {
     aggregateCount: dto.aggregateCount || 1,
     resourceId: dto.resourceId,
     resourceType: dto.resourceType,
-    deepLink: dto.deepLink || null,
+    // TRENDING_DIGEST has no backend deepLink yet — resolve to our trending landing page (NOTIFICATIONS_API §11.6)
+    deepLink: dto.deepLink || (dto.type === 'TRENDING_DIGEST' ? '/explore' : null),
     unread: dto.isRead === false,
     time: timeAgo(dto.createdAt),
   }

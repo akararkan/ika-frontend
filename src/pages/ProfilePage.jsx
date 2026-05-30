@@ -4,7 +4,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Badges, fmt, showToast } from '../components/ui.jsx'
-import { uiConfirm } from '../components/Dialog.jsx'
+import { uiConfirm, uiPrompt } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -61,6 +61,25 @@ export function ProfilePage() {
     api.posts.remove(id).then(() => showToast('Post deleted')).catch(() => showToast('Could not delete post'))
   }
   const cardOwnership = (p) => ({ owner: !!me.id && p.author === me.id, onEdit: () => openComposeEdit(p), onDelete: del })
+
+  // Highlights: create + drag-to-reorder (persisted via PATCH /highlights/order)
+  const hid = (h) => h.highlightId || h.id
+  const dragIx = React.useRef(null)
+  const addHighlight = async () => {
+    const title = (await uiPrompt({ title:'New highlight', label:'Name', initial:'' }))?.trim()
+    if (!title) return
+    try { const h = await api.highlights.create({ title }); setHighlights(hs => [...hs, h]); showToast('Highlight created') }
+    catch { showToast('Could not create highlight') }
+  }
+  const dropHighlight = (toIx) => {
+    const from = dragIx.current; dragIx.current = null
+    if (from == null || from === toIx) return
+    setHighlights(hs => {
+      const next = [...hs]; const [moved] = next.splice(from, 1); next.splice(toIx, 0, moved)
+      api.highlights.reorder(next.map(hid)).catch(() => showToast('Could not save order'))   // foreign/missing ids skipped server-side
+      return next
+    })
+  }
   // POSTS tab excludes reels (reels come from the dedicated §17.2 list); counts from stats
   const onlyPosts = posts.filter(p => p.type !== 'REEL')
 
@@ -97,12 +116,20 @@ export function ProfilePage() {
           </div>
 
           <section className="stories" style={{ marginTop:18 }}>
-            <button className="story-add" onClick={() => showToast('New highlight')}>
+            <button className="story-add" onClick={addHighlight}>
               <Avatar initials="+" color="linear-gradient(135deg,#cdc4ad,#a8a08c)" size={48}/>
               <span>New</span><i><Icon name="compose" className="xs"/></i>
             </button>
-            {highlights.map(h => (
-              <button key={h.highlightId || h.id} className="story-item" style={{ background:h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
+            {highlights.map((h, i) => (
+              <button
+                key={hid(h)}
+                className="story-item"
+                draggable
+                onDragStart={() => { dragIx.current = i }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => dropHighlight(i)}
+                title={`${h.title} — drag to reorder`}
+                style={{ background:h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
                 <span className="story-nm">{h.title}</span>
               </button>
             ))}

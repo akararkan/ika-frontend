@@ -152,7 +152,8 @@ export function FeedPage() {
   // a freshly-added story shows up in the tray immediately (no reload)
   React.useEffect(() => {
     window.addEventListener('ika:story-created', loadStories)
-    return () => window.removeEventListener('ika:story-created', loadStories)
+    window.addEventListener('ika:story-deleted', loadStories)
+    return () => { window.removeEventListener('ika:story-created', loadStories); window.removeEventListener('ika:story-deleted', loadStories) }
   }, [loadStories])
   React.useEffect(() => {
     const onCreated = (e) => { if (e.detail) setPosts(ps => [e.detail, ...ps]) }

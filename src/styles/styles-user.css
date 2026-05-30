@@ -69,6 +69,11 @@
   background:var(--emerald);flex:none;
 }
 .ntf-avatar{position:relative;flex:none}
+.ntf-tile{
+  width:42px;height:42px;border-radius:12px;color:#fff;
+  display:grid;place-items:center;
+}
+.ntf-tile .ico{width:22px;height:22px;stroke-width:2}
 .ntf-badge{
   position:absolute;bottom:-2px;right:-2px;
   width:22px;height:22px;border-radius:50%;color:#fff;
@@ -325,3 +330,315 @@
   width:38px;height:38px;border-radius:9px;display:grid;place-items:center;transition:.14s;
 }
 .cm-attach-row button:hover{background:var(--card-2)}
+
+/* =========================================================
+   Research compose modal — .cm-research
+   --------------------------------------------------------- */
+.cm-research{
+  /* Narrower than the generic .modal cap (was 960, now 760) for
+     better focus + reading width on this long form. */
+}
+.cm-research-body{
+  padding:18px 22px 22px;
+  scroll-padding-top:60px;            /* anchors land below the sticky head */
+}
+/* Tighter labels in the research modal — feels less shouty than the
+   generic .field-label uppercase pattern. */
+.cm-research-body .field-label{
+  font-size:11.5px;font-weight:600;letter-spacing:.45px;
+  text-transform:uppercase;color:var(--muted);
+  margin:0 0 6px;
+}
+.cm-research-body .field.lg{height:48px;font-size:16px}
+
+/* Compact the set-grid gap inside the modal */
+.cm-research-body .set-grid{gap:12px;margin-top:14px}
+
+/* --- Section head (.cm-section) ----------------------------------
+   Visual divider between form regions. Sticky-style brass icon
+   chip + serif title + optional hint floats right. */
+.cm-section{
+  display:flex;align-items:center;gap:10px;
+  margin:24px 0 12px;padding-top:18px;
+  border-top:1px solid var(--line-soft);
+}
+.cm-section.first{border-top:none;padding-top:0;margin-top:4px}
+.cm-section-ic{
+  display:grid;place-items:center;flex:none;
+  width:30px;height:30px;border-radius:9px;
+  background:linear-gradient(180deg,#f8edd0,#f4ead0);
+  color:#7a5a1a;border:1px solid #ecdfb4;
+}
+.cm-section-ic .ico{width:15px;height:15px;stroke-width:1.9}
+.cm-section-title{
+  font-family:var(--serif);font-size:16.5px;font-weight:600;
+  color:var(--emerald-deep);letter-spacing:-.2px;line-height:1.2;
+}
+.cm-section-hint{margin-left:auto;font-size:12px;color:var(--muted)}
+
+/* --- Compact RTE inside the research modal ----------------------
+   Default toolbar is fine on its own but feels crowded inside a
+   narrower scrolling sheet. Trim button size & padding. */
+.cm-research-body .rte{border-radius:12px;margin-top:0}
+.cm-research-body .rte-bar{padding:7px 10px;gap:10px}
+.cm-research-body .rte-tools{padding:5px 8px;gap:1px;flex-wrap:wrap}
+.cm-research-body .rte-tool{width:28px;height:28px;border-radius:7px}
+.cm-research-body .rte-tool .ico{width:15px;height:15px}
+.cm-research-body .rte-tool-text{font-size:12.5px}
+.cm-research-body .rte-tool-sep{height:18px;margin:0 4px}
+.cm-research-body .rte-area{padding:13px 15px;font-size:14.5px;line-height:1.65;font-family:var(--sans)}
+.cm-research-body .rte-area::placeholder{
+  color:#b3aa93;font-style:normal;font-weight:500;font-size:14px;
+}
+.cm-research-body .rte-preview{padding:14px 16px}
+.cm-research-body .rte-hint{padding:7px 12px;font-size:11px}
+
+/* Drop zones (cover / video / files) — tighten and make them more
+   inviting on this form */
+.cm-research-body .cm-drop{
+  margin-top:10px;padding:22px 14px;border-radius:14px;
+  border:2px dashed var(--line);background:var(--card-2);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  color:var(--ink-soft);transition:.16s;
+}
+.cm-research-body .cm-drop:hover{border-color:var(--emerald-bright);background:#fbfaf2}
+.cm-research-body .cm-drop .ico{color:var(--emerald)}
+.cm-research-body .cm-drop b{color:var(--ink-2);font-size:14px}
+.cm-research-body .cm-drop .text-xs{font-size:12px;color:var(--muted)}
+
+/* Sticky footer feels less floaty when the body content is dense */
+.cm-research .mfoot{padding:14px 22px 18px;background:rgba(255,253,247,.94);backdrop-filter:blur(10px)}
+
+/* Mobile: full-bleed sheet (the generic ≤600 sheet rule already kicks in;
+   here we just trim inner padding so the form breathes on phones). */
+@media(max-width:600px){
+  .cm-research-body{padding:14px 14px 18px}
+  .cm-section{gap:8px;margin:20px 0 10px;padding-top:16px}
+  .cm-section-ic{width:26px;height:26px}
+  .cm-section-title{font-size:15.5px}
+  .cm-section-hint{display:none}                     /* save horizontal room */
+  .cm-research-body .rte-tools{gap:0}
+  .cm-research-body .rte-tool{width:30px;height:30px} /* easier tap targets */
+}
+
+/* =========================================================
+   Story Editor — Instagram/Facebook-style story composer
+   --------------------------------------------------------- */
+.story-editor{
+  position:fixed; inset:0; z-index:200;
+  background:#0a1a16;
+  display:flex; flex-direction:column;
+  color:#fff; touch-action:none;
+}
+
+/* ---------- Top bar ---------- */
+.se-bar{
+  flex:none;
+  display:flex; align-items:center; gap:8px;
+  padding:calc(14px + env(safe-area-inset-top,0px)) 14px 12px;
+  background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.se-bar-spacer{flex:1}
+.se-bar-btn{
+  display:inline-flex; align-items:center; gap:6px;
+  height:38px; padding:0 12px; border-radius:11px;
+  background:rgba(255,255,255,.14); color:#fff;
+  font-size:13.5px; font-weight:600;
+}
+.se-bar-btn:hover{background:rgba(255,255,255,.22)}
+.se-bar-btn.ghost{background:transparent}
+.se-bar-btn.ghost:hover{background:rgba(255,255,255,.12)}
+.se-bar-btn.primary{
+  background:linear-gradient(135deg,#159a76,#0a4a3c);
+  box-shadow:0 8px 18px -7px rgba(14,107,84,.6);
+}
+.se-bar-btn .ico{width:18px;height:18px;stroke-width:2}
+
+/* ---------- Stage (9:16 preview canvas) ---------- */
+.se-stage-wrap{
+  flex:1; min-height:0;
+  display:grid; place-items:center;
+  padding:14px;
+  overflow:hidden;
+}
+.se-stage{
+  position:relative;
+  width:min(86vw, calc((100dvh - 320px) * 9/16));
+  aspect-ratio:9/16;
+  max-height:calc(100dvh - 220px);
+  border-radius:24px;
+  overflow:hidden;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,.6);
+}
+.se-stage > * { pointer-events:auto }
+.se-stage > img,.se-stage > video{ pointer-events:none }
+
+/* ---------- Background preset strip (gradient pickers) ---------- */
+.se-bg-row{
+  flex:none;
+  display:flex; gap:8px; padding:0 14px 12px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.se-bg-row::-webkit-scrollbar{display:none}
+.se-bg-tile{
+  flex:none; width:42px; height:42px; border-radius:50%;
+  border:2px solid transparent; transition:.15s;
+  box-shadow:0 4px 10px -4px rgba(0,0,0,.5);
+}
+.se-bg-tile.on{border-color:#fff; transform:scale(1.06)}
+
+/* ---------- Tools panel ---------- */
+.se-tools{
+  flex:none;
+  display:flex; flex-direction:column; gap:10px;
+  padding:12px 14px calc(16px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(180deg,transparent,rgba(0,0,0,.6) 30%);
+}
+.se-tools-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+
+/* Font picker (Aa Aa Aa Aa) */
+.se-fonts{display:flex; gap:4px; padding:3px; background:rgba(0,0,0,.45); border-radius:12px}
+.se-font{
+  width:42px; height:34px; border-radius:9px;
+  color:#fff; font-size:18px; font-weight:600;
+  background:transparent; transition:.14s;
+}
+.se-font.on{background:rgba(255,255,255,.95); color:#0b1a16}
+
+/* Color swatches */
+.se-colors{display:flex; gap:6px; margin-left:auto}
+.se-color{
+  width:26px; height:26px; border-radius:50%;
+  border:2px solid transparent; transition:.14s;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+}
+.se-color.on{outline:2px solid #fff; outline-offset:2px}
+
+/* Format chips (B / I / L C R / Pill) */
+.se-chip{
+  height:34px; min-width:42px; padding:0 12px; border-radius:9px;
+  background:rgba(255,255,255,.12); color:#fff;
+  font-size:13.5px; font-weight:700; letter-spacing:.2px;
+  display:inline-flex; align-items:center; justify-content:center; gap:4px;
+}
+.se-chip:hover{background:rgba(255,255,255,.2)}
+.se-chip.on{background:#fff; color:#0b1a16}
+.se-chip .ico{width:14px; height:14px}
+
+/* Slider rows */
+.se-sliders{flex-wrap:wrap}
+.se-slider{
+  flex:1 1 200px; display:flex; align-items:center; gap:9px;
+  padding:7px 11px; border-radius:10px;
+  background:rgba(0,0,0,.45);
+  font-size:12px; color:rgba(255,255,255,.78);
+}
+.se-slider span{font-weight:600; min-width:46px}
+.se-slider input[type=range]{
+  flex:1; accent-color:#bd9344; height:18px;
+}
+.se-slider i{min-width:38px; text-align:right; color:rgba(255,255,255,.6)}
+
+/* ---------- Inline text editor overlay ---------- */
+.se-edit{
+  position:absolute; inset:0; z-index:10;
+  background:rgba(8,20,16,.78); backdrop-filter:blur(14px);
+  display:grid; place-items:center; padding:24px;
+}
+.se-edit-area{
+  width:min(92vw, 560px); min-height:160px;
+  background:transparent; border:0; outline:0; resize:none;
+  font-family:var(--serif); font-size:30px; line-height:1.25;
+  color:#fff; text-align:center; padding:20px;
+  text-shadow:0 4px 14px rgba(0,0,0,.5);
+}
+.se-edit-area::placeholder{color:rgba(255,255,255,.5); font-style:italic}
+.se-edit-done{
+  position:absolute; right:16px; top:calc(16px + env(safe-area-inset-top,0px));
+  padding:0 18px; height:38px; border-radius:11px;
+}
+
+/* Poll sticker — bar active state, draggable on-stage sticker, editor card */
+.se-bar-btn.on{background:rgba(189,147,68,.32)}
+
+/* Draggable sticker: positioned by % like a text layer, centred on its point. */
+.se-poll-sticker{
+  position:absolute; transform:translate(-50%,-50%);
+  width:min(74%,290px); padding:14px 16px 15px; border-radius:20px;
+  background:linear-gradient(152deg, rgba(20,48,40,.86), rgba(8,19,15,.86));
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 16px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.10);
+  color:#fff; cursor:grab; touch-action:none; user-select:none;
+  transition:outline-color .12s ease;
+}
+.se-poll-sticker.on{cursor:grabbing; outline:2px dashed rgba(189,147,68,.9); outline-offset:6px}
+.se-poll-sticker-head{
+  display:inline-flex; align-items:center; gap:5px; margin-bottom:9px;
+  font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#e8d6a8;
+}
+.se-poll-sticker-head .ico{width:13px; height:13px; stroke-width:2.2}
+.se-poll-sticker-q{
+  font-family:var(--serif); font-size:17px; font-weight:600; line-height:1.3;
+  margin-bottom:13px; text-shadow:0 1px 8px rgba(0,0,0,.45); word-break:break-word;
+}
+.se-poll-sticker-opts{display:flex; align-items:center; gap:9px}
+.se-poll-sticker-opts > span{
+  flex:1; min-width:0; padding:11px 12px; border-radius:14px;
+  background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.14);
+  font-size:13.5px; font-weight:600; text-align:center;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.se-poll-or{
+  flex:none; font-family:var(--serif); font-style:italic;
+  font-size:12px; font-weight:500; color:rgba(255,255,255,.6);
+}
+.se-poll-fab{
+  position:absolute; top:-13px; width:30px; height:30px; border-radius:50%;
+  color:#fff; border:2px solid #fff; display:grid; place-items:center;
+  box-shadow:0 3px 10px rgba(0,0,0,.4); z-index:5;
+}
+.se-poll-fab.del{right:-13px; background:#0b1a16}
+.se-poll-fab.edit{right:24px; background:linear-gradient(150deg,#bd9344,#9a7322)}
+.se-poll-card{
+  width:min(92vw,440px); background:var(--card); border-radius:16px; padding:18px;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+}
+.se-poll-card .field{margin-bottom:10px}
+.se-poll-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.se-poll-actions{display:flex; align-items:center; gap:8px; margin-top:14px}
+
+/* Mobile compaction */
+@media(max-width:480px){
+  .se-stage{width:88vw; max-height:calc(100dvh - 240px)}
+  .se-font{width:38px; height:32px; font-size:16px}
+  .se-color{width:22px; height:22px}
+  .se-chip{height:32px; min-width:38px; padding:0 10px; font-size:12.5px}
+  .se-slider{flex-basis:160px; font-size:11.5px}
+}
+
+/* Compose modal — story draft preview chip ----------------- */
+.cm-story-draft{
+  display:flex; gap:14px; margin-top:12px;
+  padding:12px; border-radius:14px;
+  border:1px solid var(--line); background:var(--card-2);
+}
+.cm-story-draft-cover{
+  flex:none; width:84px; aspect-ratio:9/16; border-radius:10px;
+  background:linear-gradient(160deg,#0a4a3c,#159a76) center/cover no-repeat;
+  position:relative; overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(11,26,22,.08);
+}
+.cm-story-draft-pill{
+  position:absolute; left:6px; bottom:6px;
+  display:inline-flex; align-items:center; gap:4px;
+  background:rgba(8,20,16,.55); color:#fff;
+  padding:3px 7px; border-radius:6px;
+  font-size:10px; font-weight:600;
+  backdrop-filter:blur(4px);
+}
+.cm-story-draft-meta{flex:1; display:flex; flex-direction:column; justify-content:center; gap:2px}
+.cm-story-draft-meta b{font-size:14px; color:var(--ink-2)}
+.cm-story-draft-meta small{font-size:12px}

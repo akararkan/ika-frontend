@@ -143,7 +143,7 @@ function BlockedPanel() {
 
 function EmailPrefsPanel() {
   const [prefs, setPrefs] = React.useState(null)
-  React.useEffect(() => { api.users.emailPrefs().then(setPrefs).catch(() => setPrefs({ master:true, social:true, mentions:true, system:true })) }, [])
+  React.useEffect(() => { api.users.emailPrefs().then(setPrefs).catch(() => setPrefs({ master:true, social:true, mentions:true, system:true, trending:true })) }, [])
   const toggle = (key) => {
     setPrefs(p => {
       const next = { ...p, [key]: !p[key] }
@@ -157,6 +157,7 @@ function EmailPrefsPanel() {
     ['social', 'Social', 'Follows, blocks, and other social interactions.'],
     ['mentions', 'Mentions', 'When someone @mentions you.'],
     ['system', 'System', 'Announcements and account warnings.'],
+    ['trending', 'Trending digest', 'Daily roundup of what scholars and researchers are talking about.'],
   ]
   const test = () => api.users.testEmail().then(r => showToast(r?.queued ? `Test email sent to ${r.to}` : (r?.reason || 'No email on file'))).catch(() => showToast('Could not send'))   // §16.3
   const unsub = () => api.users.unsubscribeAll().then(() => { showToast('Unsubscribed from all emails'); setPrefs(p => ({ ...p, master:false })) }).catch(() => {})   // §16.4

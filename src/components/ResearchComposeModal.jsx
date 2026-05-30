@@ -76,12 +76,12 @@ function Toggle({ title, desc, on, onChange, disabled }) {
   )
 }
 
-function SectionHead({ icon, title, hint }) {
+function SectionHead({ icon, title, hint, first }) {
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'22px 0 10px' }}>
-      <Icon name={icon} className="sm" style={{ color:'var(--brass)' }}/>
-      <b style={{ fontFamily:'var(--serif)', fontSize:16, color:'var(--emerald-deep)', letterSpacing:'-.2px' }}>{title}</b>
-      {hint && <span className="muted text-xs" style={{ marginLeft:'auto' }}>{hint}</span>}
+    <div className={'cm-section' + (first ? ' first' : '')}>
+      <span className="cm-section-ic"><Icon name={icon} className="sm"/></span>
+      <b className="cm-section-title">{title}</b>
+      {hint && <span className="muted text-xs cm-section-hint">{hint}</span>}
     </div>
   )
 }
@@ -459,13 +459,13 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
 
   return (
     <div className="overlay open" onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
-      <div className="modal" style={{ maxWidth: 960 }}>
+      <div className="modal cm-research" style={{ maxWidth: 760 }}>
         <div className="mhead">
           <h3>{isEdit ? 'Edit research' : 'Publish research'}</h3>
           <button className="x" onClick={onClose} disabled={busy} aria-label="Close"><Icon name="close" className="sm"/></button>
         </div>
 
-        <div className="mbody" style={{ position:'relative' }}>
+        <div className="mbody cm-research-body" style={{ position:'relative' }}>
           {/* ---- progress overlay (active while saving) ---- */}
           {busy && (
             <div className="cm-saving">
@@ -527,6 +527,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           {/* ---- the form (hidden while a save is in progress so the progress panel reads cleanly) ---- */}
           {!busy && (<>
           {/* ---- core text ---- */}
+          <SectionHead icon="doc" title="Essentials" hint="title, abstract, body, taxonomy" first/>
           <label className="field-label">Title</label>
           <input className="field lg" placeholder="The effects of X on Y" value={title} onChange={e => setTitle(e.target.value)}/>
 

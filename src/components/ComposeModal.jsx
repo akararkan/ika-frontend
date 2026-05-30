@@ -10,6 +10,7 @@ import React from 'react'
 import { Icon, Avatar, showToast } from './ui.jsx'
 import { SoundPicker } from './SoundPicker.jsx'
 import { TagInput } from './TagInput.jsx'
+import { StoryEditor } from './StoryEditor.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 import { normalizeTags } from '../api/tags.js'
@@ -54,6 +55,33 @@ function composeError(e) {
   return e?.message || 'Could not publish'
 }
 
+/* Story preview chip inside the compose modal — shown after the user has
+   designed something via <StoryEditor>. Clicking it reopens the editor. */
+function StoryDraftPreview({ draft, onEdit, onClear }) {
+  const [url, setUrl] = React.useState(null)
+  React.useEffect(() => {
+    if (!draft?.media) return
+    const u = URL.createObjectURL(draft.media)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [draft?.media])
+  return (
+    <div className="cm-story-draft">
+      <div className="cm-story-draft-cover" style={{ backgroundImage: url ? `url("${url}")` : undefined }}>
+        {draft?.kind === 'VIDEO' && <span className="cm-story-draft-pill"><Icon name="video" className="xs"/>Video</span>}
+      </div>
+      <div className="cm-story-draft-meta">
+        <b>Story ready</b>
+        <small className="muted">Tap to keep editing, or hit Publish.</small>
+        <div className="flex gap-8" style={{ marginTop:8 }}>
+          <button className="btn btn-secondary btn-sm" onClick={onEdit}><Icon name="compose" className="xs"/>Edit</button>
+          <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={onClear}><Icon name="close" className="xs"/>Discard</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublished, onEdited }) {
   const { user } = useAuth()
   const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#159a76,#0a4a3c)' }
@@ -71,6 +99,8 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const [sound, setSound] = React.useState(null)
   const [recording, setRecording] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  const [storyEditor, setStoryEditor] = React.useState(false)   // STORY: open the rich editor
+  const [storyDraft, setStoryDraft] = React.useState(null)      // editor result: { kind, media, thumbnail, textContent }
 
   const fileRef = React.useRef(null)
   const recRef = React.useRef(null)
@@ -146,7 +176,28 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
 
       } else if (tab === 'STORY') {
         let created
-        if (files.length) {
+        // Prefer the rich-editor result (flattened PNG with text layers baked
+        // in) over a raw file. Falls back to a text-only story if nothing was
+        // designed.
+        if (storyDraft?.media) {
+          const fd = new FormData()
+          fd.append('storyType', storyDraft.kind || 'IMAGE')
+          fd.append('visibility', vis)
+          const caption = (storyDraft.textContent || text || '').trim()
+          if (caption) fd.append('textContent', caption)
+          fd.append('media', storyDraft.media)
+          if (storyDraft.thumbnail) fd.append('thumbnail', storyDraft.thumbnail)
+          created = await api.stories.createMultipart(fd)
+          // Attach the poll sticker (if any) once the story exists — best-effort,
+          // a failed poll shouldn't sink the published story. posX/posY carry the
+          // authored placement so the viewer can honour it once the backend stores them.
+          if (storyDraft.poll && (created?.storyId || created?.id)) {
+            const { question, optionA, optionB, x, y } = storyDraft.poll
+            const req = { question, optionA, optionB, posX: Math.round(x), posY: Math.round(y) }
+            await api.stories.attachPoll(created.storyId || created.id, req).catch(() => {})
+          }
+        } else if (files.length) {
+          // Legacy path — user attached a file without opening the editor.
           const fd = new FormData()
           fd.append('storyType', files[0].type.startsWith('video') ? 'VIDEO' : 'IMAGE')
           fd.append('visibility', vis)
@@ -192,8 +243,24 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
     tab === 'TEXT'     ? !text.trim() :
     tab === 'REEL'     ? !files.length :
     tab === 'VOICE_POST' ? !files.length :
-    /* EMBEDDED / STORY */ !files.length && !text.trim()
+    tab === 'STORY'    ? !storyDraft?.media :       // editor must produce a design
+    /* EMBEDDED */ !files.length && !text.trim()
   )
+
+  // Story editor is a separate full-screen surface; render it instead of the
+  // compose modal while it's open so the canvas gets the whole viewport.
+  if (storyEditor) {
+    return (
+      <StoryEditor
+        initialMedia={storyDraft?.media || files[0] || null}
+        onCancel={() => setStoryEditor(false)}
+        onSave={(draft) => {
+          setStoryDraft(draft)
+          setStoryEditor(false)
+        }}
+      />
+    )
+  }
 
   return (
     <div className="overlay open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -229,7 +296,12 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             <input className="field lg" placeholder="What would you like to ask?" value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom:12 }}/>
           )}
 
-          <textarea className="cm-area" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+          {/* STORY tab: all text is added INSIDE the StoryEditor design surface
+              (baked into the image), so the modal's plain textarea would be
+              redundant and confusing. Hide it. Every other tab keeps it. */}
+          {tab !== 'STORY' && (
+            <textarea className="cm-area" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+          )}
 
           {/* hidden file input shared by drop zone + attach buttons */}
           {!isEdit && <input ref={fileRef} type="file" hidden accept={ACCEPT[tab] || (tab === 'VOICE_POST' ? 'audio/*' : '*/*')}
@@ -252,12 +324,23 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             </div>
           )}
 
-          {!isEdit && (tab === 'EMBEDDED' || tab === 'STORY') && (
+          {!isEdit && tab === 'EMBEDDED' && (
             <div className="cm-drop" onClick={pickFiles} style={{ cursor:'pointer' }}>
               <Icon name="image" className="lg"/>
               <b>Click to add photos or video</b>
               <span className="text-xs">JPG, PNG, WebP or MP4 · up to 10 files</span>
             </div>
+          )}
+          {!isEdit && tab === 'STORY' && (
+            storyDraft?.media ? (
+              <StoryDraftPreview draft={storyDraft} onEdit={() => setStoryEditor(true)} onClear={() => setStoryDraft(null)}/>
+            ) : (
+              <div className="cm-drop" onClick={() => setStoryEditor(true)} style={{ cursor:'pointer' }}>
+                <Icon name="image" className="lg"/>
+                <b>Design your story</b>
+                <span className="text-xs">Photo or gradient · add draggable text, fonts, colours, rotation</span>
+              </div>
+            )
           )}
           {!isEdit && tab === 'REEL' && (
             <div className="cm-drop" onClick={pickFiles} style={{ cursor:'pointer' }}>
