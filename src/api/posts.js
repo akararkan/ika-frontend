@@ -81,6 +81,10 @@ export const posts = {
   },
   share(id, caption)  { return http.post(`/api/v1/posts/${id}/shares`, caption ? { caption } : {}) },
   sharesList(id, pageSize = 20) { return http.get(`/api/v1/posts/${id}/shares`, { pageSize }) },   // §16.2 recent shares
+  // ShareLinkInfo {shortUrl, canonicalUrl, token, shareCount}. shareLink previews (no bump);
+  // recordShare bumps shareCount + writes the ledger + notifies the author (POST_SHARED).
+  shareLink(id)       { return http.get(`/api/v1/posts/${id}/share-link`) },
+  recordShare(id, caption) { return http.post(`/api/v1/posts/${id}/share`, caption ? { caption } : {}) },
   recordView(id)      { return http.post(`/api/v1/posts/${id}/views`, {}) },
 
   /* ---- Friend suggestions (FEED_API §7) ---- */

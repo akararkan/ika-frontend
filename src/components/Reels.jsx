@@ -8,6 +8,7 @@
 import React from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { Icon, Avatar, Verify, linkify, fmt, showToast } from './ui.jsx'
+import { openShare } from './ShareSheet.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import { authorOf } from '../lib/userView.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -186,13 +187,11 @@ export function Reels({ onClose, initialId }) {
       .then(res => { if (res && typeof res.saved === 'boolean') patch(r => ({ ...r, saved: res.saved })) })
       .catch(() => { patch(r => ({ ...r, saved: was, saves: r.saves + (was ? 1 : -1) })); showToast('Could not update saved') })
   }
-  // §16 — append-only share ledger + copy the reel link
-  const share = () => {
-    patch(r => ({ ...r, shares: r.shares + 1 }))
-    navigator.clipboard?.writeText(`${window.location.origin}/posts/${reel.id}`).catch(() => {})
-    showToast('Link copied & shared')
-    api.posts.share(reel.id).catch(() => {})
-  }
+  // §16 — open the share sheet (previews the real link, records on share)
+  const share = () => openShare({
+    kind: 'post', id: reel.id, title: reel.body ? reel.body.slice(0, 90) : 'this reel',
+    count: reel.shares, onShared: (c) => patch(r => ({ ...r, shares: c })),
+  })
   // REPOST — a new post that references this reel (§6.1); self-repost allowed (§28)
   const repost = async () => {
     const caption = await uiPrompt({ title:'Repost to your profile', label:'Add a note (optional)', placeholder:'Why is this worth sharing?', multiline:true, icon:'repost', confirmLabel:'Repost' })

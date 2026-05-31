@@ -248,6 +248,10 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
     /* EMBEDDED */ !files.length && !text.trim()
   )
 
+  // Footer affordances append to the body text (the @ / # then trigger the
+  // usual tag/mention flows as the user keeps typing).
+  const insertToken = (ch) => setText(t => { const s = t || ''; return (s && !/\s$/.test(s) ? s + ' ' : s) + ch })
+
   // Story editor is a separate full-screen surface; render it instead of the
   // compose modal while it's open so the canvas gets the whole viewport.
   if (storyEditor) {
@@ -264,11 +268,14 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   }
 
   return (
-    <div className="overlay open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="overlay open cm-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal cm-modal">
-        <div className="mhead">
+        <div className="cm-top">
+          <button className="cm-cancel" onClick={onClose}>Cancel</button>
           <h3>{heading}</h3>
-          <button className="x" onClick={onClose}><Icon name="close" className="sm"/></button>
+          <button className="btn btn-primary cm-publish" disabled={disabled} onClick={publish}>
+            {busy ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save' : tab === 'QUESTION' ? 'Post' : tab === 'STORY' ? 'Add' : 'Publish'}
+          </button>
         </div>
 
         {/* postType is immutable on edit (§6.4 has no postType field) — hide the picker */}
@@ -378,22 +385,16 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             </>
           )}
 
-          {!isEdit && (tab === 'TEXT' || tab === 'EMBEDDED' || tab === 'REEL') && (
-            <div className="cm-attach">
-              <div className="cm-attach-row">
-                <button title="Add photo / video" onClick={pickFiles}><Icon name="image" className="sm"/></button>
-                <button title="Add video" onClick={pickFiles}><Icon name="video" className="sm"/></button>
-              </div>
-              <span className="muted text-xs">{files.length ? `${files.length} file${files.length>1?'s':''} attached` : 'Add photos or a video'}</span>
-            </div>
-          )}
         </div>
 
-        <div className="mfoot">
-          <span className="muted text-xs">Posting as <b style={{ color:'var(--ink-2)' }}>{me.full}</b></span>
-          <button className="btn btn-primary" style={{ marginLeft:'auto' }} disabled={disabled} onClick={publish}>
-            {busy ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save changes' : tab === 'QUESTION' ? 'Post question' : tab === 'STORY' ? 'Add to story' : 'Publish'}
-          </button>
+        {/* Attach bar + character count (prototype .m-cmp footer) */}
+        <div className="cm-footbar">
+          <div className="cm-tools">
+            {!isEdit && <button style={{ color:'#3f9a6b' }} title="Add photo / video" onClick={pickFiles}><Icon name="image"/></button>}
+            <button style={{ color:'#bd9344' }} title="Mention someone" onClick={() => insertToken('@')}><Icon name="at"/></button>
+            <button style={{ color:'#0e6b54' }} title="Add hashtag" onClick={() => insertToken('#')}><Icon name="hash"/></button>
+          </div>
+          <span className="cm-count font-mono">{(tab === 'QUESTION' ? title : text).length}/5000</span>
         </div>
       </div>
     </div>

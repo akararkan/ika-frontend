@@ -2,7 +2,7 @@
    Research service — /api/v1/researches  (full RESEARCH_API coverage)
    ========================================================= */
 import { http } from './http.js'
-import { researchFrom } from './adapters.js'
+import { researchFrom, sourceFrom } from './adapters.js'
 
 export const research = {
   /* ---- read / feeds ---- */
@@ -48,7 +48,9 @@ export const research = {
   editMedia(id, mediaId, req)    { return http.patch(`/api/v1/researches/${id}/media/${mediaId}`, req) },
   deleteMedia(id, mediaId)       { return http.del(`/api/v1/researches/${id}/media/${mediaId}`) },
 
-  /* ---- sources / contributors (author) ---- */
+  /* ---- sources / contributors ---- */
+  // Public, block-aware, ordered by displayOrder asc → List<SourceResponse>.
+  async sources(id)              { const r = await http.get(`/api/v1/researches/${id}/sources`); return (r || []).map(sourceFrom) },
   editSource(id, sourceId, req)  { return http.patch(`/api/v1/researches/${id}/sources/${sourceId}`, req) },
   uploadSourceFile(id, sourceId, formData) { return http.upload(`/api/v1/researches/${id}/sources/${sourceId}/file`, formData) },
   contributors(id)               { return http.get(`/api/v1/researches/${id}/contributors`) },

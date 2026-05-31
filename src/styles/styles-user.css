@@ -284,8 +284,11 @@
     radial-gradient(700px 500px at 0% 100%,rgba(21,154,118,.22),transparent 60%);
 }
 .auth-brand{display:flex;align-items:center;gap:12px;position:relative;z-index:2}
-.auth-mark{width:48px;height:48px;border-radius:12px;background:rgba(189,147,68,.12);border:1px solid rgba(189,147,68,.4);display:grid;place-items:center}
+.auth-mark{width:48px;height:48px;border-radius:12px;background:rgba(189,147,68,.12);border:1px solid rgba(189,147,68,.4);display:grid;place-items:center;overflow:hidden}
 .auth-mark svg{width:32px;height:32px}
+/* real logo → clean white round badge on the emerald hero */
+.auth-mark:has(.brand-img){background:#fff;border-color:transparent;border-radius:50%;box-shadow:0 6px 16px -6px rgba(0,0,0,.4)}
+.auth-mark .brand-img{border-radius:50%}
 .auth-name{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.5px;color:#fdf8ec;line-height:1}
 .auth-name b{color:var(--brass-soft)}
 .auth-tag{font-size:11px;letter-spacing:.5px;color:rgba(253,248,236,.65);margin-top:2px;text-transform:uppercase}
@@ -323,6 +326,20 @@
 
 /* ---------- COMPOSE MODAL ---------- */
 .cm-modal{max-width:640px}
+/* Top bar — Cancel · Create post · Publish (prototype .m-cmp-top) */
+.cm-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--line)}
+.cm-top h3{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--emerald-deep)}
+.cm-cancel{font-size:15px;font-weight:600;color:var(--ink-soft);transition:.15s}
+.cm-cancel:hover{color:var(--ink)}
+.cm-publish{height:38px;padding:0 18px;border-radius:10px;font-size:14px}
+/* Footer — colourful attach icons + character count (prototype .m-cmp footer) */
+.cm-footbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--line)}
+.cm-tools{display:flex;gap:2px}
+.cm-tools button{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;transition:.14s}
+.cm-tools button:hover{background:var(--card-2)}
+.cm-tools button:active{transform:scale(.9)}
+.cm-tools .ico{width:20px;height:20px}
+.cm-count{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .cm-tabs{display:flex;gap:5px;padding:14px 18px 0;overflow-x:auto;scrollbar-width:none}
 .cm-tabs::-webkit-scrollbar{display:none}
 .cm-tab{

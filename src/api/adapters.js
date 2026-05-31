@@ -304,6 +304,8 @@ export function sourceFrom(s) {
     isbn: s.isbn || null,
     fileUrl: assetUrl(s.fileUrl || null),
     fileName: s.originalFileName || null,
+    fileSize: s.fileSize ?? null,
+    mimeType: s.mimeType || null,
     href: href ? assetUrl(href) : null,
     order: s.displayOrder ?? 0,
     createdAt: s.createdAt || null,

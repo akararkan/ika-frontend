@@ -160,6 +160,19 @@ export function Avatar({ initials, color, size = 38, square, className = '', src
   )
 }
 
+/* ----- Brand mark: the IKA logo image (public/ika-logo.png), with the
+   geometric mark as a graceful fallback until the file is in place. ----- */
+export function BrandMark() {
+  const [ok, setOk] = React.useState(true)
+  if (ok) return <img className="brand-img" src="/ika-logo.png" alt="" aria-hidden="true" onError={() => setOk(false)}/>
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3l2.2 2.2h3v3L19.4 10.5 17.2 12.7v3h-3L12 18l-2.2-2.3h-3v-3L4.6 10.5 6.8 8.2v-3h3z"/>
+      <circle cx="12" cy="10.5" r="1.6" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+}
+
 /* ----- Toast ----- */
 let toastTimer
 export function showToast(msg) {

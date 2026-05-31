@@ -6,6 +6,7 @@ import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, fmt, linkify, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
+import { openShare } from '../components/ShareSheet.jsx'
 import { uiPrompt, uiConfirm } from '../components/Dialog.jsx'
 import { SourceRow } from '../components/Source.jsx'
 import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
@@ -47,6 +48,7 @@ export function ResearchDetailPage() {
   const [editing, setEditing] = React.useState(false)
   const [showVideo, setShowVideo] = React.useState(false)
   const [lightbox, setLightbox] = React.useState(-1)         // index into image-only media (-1 = closed)
+  const [sources, setSources] = React.useState([])           // authoritative, ordered list (§ /sources endpoint)
 
   const loadComments = React.useCallback(() => {
     api.research.comments(id).then(res => setComments((res?.content || res || []).map(adapters.researchCommentFrom))).catch(() => {})
@@ -64,6 +66,8 @@ export function ResearchDetailPage() {
     let alive = true
     setLoading(true)
     loadResearch(true).then(() => { if (alive) loadComments() }).catch(() => { if (alive) setR(false) }).finally(() => { if (alive) setLoading(false) })
+    // Authoritative, displayOrder-sorted source list (public, block-aware).
+    api.research.sources(id).then(s => { if (alive && s?.length) setSources(s) }).catch(() => {})
     return () => { alive = false }
   }, [id, loadResearch, loadComments])
 
@@ -406,16 +410,19 @@ export function ResearchDetailPage() {
                 })}
               </section>
             )}
-            {!!r.sources?.length && (
-              <section className="card card-pad">
-                <h3 className="title"><Icon name="cite" className="sm"/>References</h3>
-                <ol className="rd-refs">
-                  {r.sources.map((s, i) => (
-                    <li key={s.id || i}><SourceRow s={s}/></li>
-                  ))}
-                </ol>
-              </section>
-            )}
+            {(() => {
+              const srcList = sources.length ? sources : (r.sources || [])
+              return !!srcList.length && (
+                <section className="card card-pad">
+                  <h3 className="title"><Icon name="cite" className="sm"/>Sources &amp; references<span className="rd-srcn">{srcList.length}</span></h3>
+                  <ol className="rd-refs">
+                    {srcList.map((s, i) => (
+                      <li key={s.id || i}><SourceRow s={s}/></li>
+                    ))}
+                  </ol>
+                </section>
+              )
+            })()}
           </div>
 
           <aside className="rd-rail">
@@ -424,7 +431,7 @@ export function ResearchDetailPage() {
               <div className="rd-rail-row">
                 <button className={'btn btn-secondary btn-sm ' + (me.liked ? 'on-rose' : '')} onClick={react}><Icon name="heart" className="xs"/>{me.liked ? 'Reacted' : 'React'}</button>
                 <button className={'btn btn-secondary btn-sm ' + (me.saved ? 'on-brass' : '')} onClick={save}><Icon name="bookmark" className="xs"/>{me.saved ? 'Saved' : 'Save'}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => { api.research.recordShare(id).catch(() => {}); showToast('Share link copied') }}><Icon name="share" className="xs"/></button>
+                <button className="btn btn-secondary btn-sm" onClick={() => openShare({ kind:'research', id, title: r.title })}><Icon name="share" className="xs"/></button>
               </div>
               <div className="rd-metrics">
                 <div className="rdm"><b>{fmt(r.metrics.views)}</b><small>VIEWS</small></div>

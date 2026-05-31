@@ -9,6 +9,7 @@ import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, fmt, linkify, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
+import { openShare } from '../components/ShareSheet.jsx'
 import { uiPrompt, uiConfirm } from '../components/Dialog.jsx'
 import { SourceRow } from '../components/Source.jsx'
 import { AddSourceForm } from '../components/SourceForm.jsx'
@@ -164,12 +165,7 @@ export function QuestionPage() {
     setQ(p => ({ ...p, saved:true, saves: p.saved ? p.saves : (p.saves||0)+1 }))
     api.qna.save(id, coll || undefined).then(() => showToast(`Saved to ${coll || 'Default'}`)).catch(e => showToast(qnaError(e, 'Could not save')))
   }
-  const share = async () => {
-    let url = `${window.location.origin}/qna/${id}`
-    try { const info = await api.qna.shareLink(id); if (info?.url) url = info.url } catch { /* fall back to local URL */ }
-    navigator.clipboard?.writeText(url).catch(() => {}); showToast('Link copied')
-    api.qna.recordShare(id).catch(() => {})
-  }
+  const share = () => openShare({ kind: 'question', id, title: q?.title || 'this question' })
   const startEditQ = () => { setQTitle(q.title); setQBody(q.body); setQTags((q.tags || []).join(', ')); setEditingQ(true) }
   const saveEditQ = async () => {
     const t = qTitle.trim(); if (!t) return

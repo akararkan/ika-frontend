@@ -106,8 +106,28 @@
 .src-info small{font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .src-tag{
   font-size:10px;font-weight:700;letter-spacing:.4px;
-  color:var(--muted);text-transform:uppercase;
+  color:var(--muted);text-transform:uppercase;flex:none;
 }
+/* clickable source rows (URL / file) get hover + a trailing open/download chip */
+a.src-row{cursor:pointer;text-decoration:none;color:inherit;transition:border-color .15s,background .15s}
+a.src-row:hover{border-color:#cbc4ab;background:var(--paper-2)}
+.src-action{
+  width:32px;height:32px;border-radius:50%;flex:none;
+  background:var(--card);border:1px solid var(--line);color:var(--ink-soft);
+  display:grid;place-items:center;transition:.15s;
+}
+a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.32);background:rgba(21,154,118,.06)}
+.src-action .ico{width:15px;height:15px}
+/* count chip on the references heading */
+.rd-srcn{
+  margin-left:8px;display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;
+  border-radius:999px;background:var(--card-2);border:1px solid var(--line);
+  font-size:11px;font-weight:700;color:var(--ink-soft);vertical-align:middle;
+}
+/* in the references list, citations wrap fully (readable) instead of truncating */
+.rd-refs .src-info small{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}
+.rd-refs .src-row{align-items:flex-start}
+.rd-refs .src-ic{margin-top:1px}
 
 .ans-composer textarea{min-height:90px}
 

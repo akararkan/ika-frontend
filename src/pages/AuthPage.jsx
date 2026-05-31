@@ -3,7 +3,7 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Icon } from '../components/ui.jsx'
+import { Icon, BrandMark } from '../components/ui.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 // Map the API's errorCode (§4) to a friendly message — never branch on message text (§18.1 #5).
@@ -51,9 +51,7 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
     <div className="auth-page">
       <div className="auth-left">
         <div className="auth-brand">
-          <div className="auth-mark">
-            <svg viewBox="0 0 48 48"><path d="M24 6l4.5 4.5h6V16L39 20.5 34.5 25v6h-6L24 35.5 19.5 31h-6v-6L9 20.5 13.5 16v-5.5h6z" fill="none" stroke="#bd9344" strokeWidth="2"/><circle cx="24" cy="20.5" r="3" fill="#bd9344"/></svg>
-          </div>
+          <div className="auth-mark"><BrandMark/></div>
           <div>
             <div className="auth-name">IKA<b>.</b></div>
             <div className="auth-tag">Islamic Knowledge Archive</div>

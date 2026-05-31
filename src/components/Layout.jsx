@@ -4,9 +4,10 @@
    ========================================================= */
 import React from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
-import { Icon, Avatar } from './ui.jsx'
+import { Icon, Avatar, BrandMark } from './ui.jsx'
 import { ToastHost } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
+import { ShareHost } from './ShareSheet.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
@@ -31,15 +32,6 @@ const BOTTOM_TABS = [
   { to:'/qna',   icon:'qna',   label:'Q&A' },
   { to:'/profile', icon:'user', label:'You' },
 ]
-
-function BrandMark() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3l2.2 2.2h3v3L19.4 10.5 17.2 12.7v3h-3L12 18l-2.2-2.3h-3v-3L4.6 10.5 6.8 8.2v-3h3z"/>
-      <circle cx="12" cy="10.5" r="1.6" fill="currentColor" stroke="none"/>
-    </svg>
-  )
-}
 
 export function Layout() {
   const navigate = useNavigate()
@@ -215,6 +207,7 @@ export function Layout() {
       {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)}/>}
       <ToastHost/>
       <DialogHost/>
+      <ShareHost/>
     </div>
   )
 }

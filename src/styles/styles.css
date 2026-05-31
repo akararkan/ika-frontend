@@ -252,6 +252,10 @@ textarea.field{height:auto;min-height:120px;padding:13px 14px;resize:vertical;li
   background:linear-gradient(180deg,rgba(255,255,255,.18),transparent 60%);
 }
 .brand .mark svg{width:18px;height:18px;position:relative;stroke:var(--brass-soft);stroke-width:1.8;fill:none}
+/* When the real logo image is present, the mark becomes a clean round badge. */
+.brand-img{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
+.brand .mark:has(.brand-img){background:#fff;border-radius:50%;box-shadow:0 4px 12px -5px rgba(11,26,22,.4),0 0 0 1px rgba(11,26,22,.06)}
+.brand .mark:has(.brand-img)::after{display:none}
 .brand .word{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.4px;color:var(--emerald-deep)}
 .brand .word b{color:var(--brass)}
 .brand small{font-size:10.5px;font-weight:500;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;display:block;line-height:1;margin-top:2px}

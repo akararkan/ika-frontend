@@ -6,6 +6,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, linkify, fmt, showToast } from './ui.jsx'
+import { openShare } from './ShareSheet.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import { VoicePlayer } from './VoicePlayer.jsx'
 import { authorOf } from '../lib/userView.js'
@@ -207,7 +208,8 @@ function PostMedia({ post, onOpenReel, onOpenImage }) {
   return null
 }
 
-export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true }) {
+export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true }) {
+  const [shares, setShares] = React.useState(post.shares)
   const u = authorOf(post)
   const navigate = useNavigate()
   const goAuthor = () => post.author && navigate(`/u/${post.author}`)
@@ -306,7 +308,7 @@ export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComme
         <span className="ps-right">
           <span role="button" style={{ cursor:'pointer' }} onClick={toggleComments}>{fmt(cCount)} comments</span>
           <span>{fmt(views)} views</span>
-          <span>{fmt(post.shares)} shares</span>
+          <span>{fmt(shares)} shares</span>
         </span>
       </div>
 
@@ -320,7 +322,7 @@ export function PostCard({ post, onLike, onSave, onShare, index = 0, onOpenComme
         <button className="pca" onClick={() => doRepost(post)}>
           <Icon name="repost"/><span>Repost</span>
         </button>
-        <button className="pca" onClick={() => onShare?.(post.id)}>
+        <button className="pca" onClick={() => openShare({ kind:'post', id:post.id, title: post.body ? post.body.slice(0, 90) : 'this post', count: shares, onShared: setShares })}>
           <Icon name="share"/><span>Share</span>
         </button>
         <button className={'pca ' + (post.saved ? 'saved' : '')} onClick={() => onSave?.(post.id)}>
