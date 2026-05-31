@@ -125,6 +125,7 @@ export function FeedPage() {
   const [storyOpen, setStoryOpen] = React.useState(null)
   const [more, setMore] = React.useState(false)
   const [end, setEnd] = React.useState(false)
+  const [feedTab, setFeedTab] = React.useState('FOR_YOU')   // For you · Following · Scholars (prototype .m-seg)
 
   // Feed responses are authoritative for textPreview / mediaUrl now —
   // PostHydrator bulk-loads posts_by_id at read time and overlays the live
@@ -199,9 +200,20 @@ export function FeedPage() {
   // Cover for your own story ring — the most recent frame that carries media.
   const myStoryCover = (() => { const s = myStories.find(x => x.mediaUrl); return s ? assetUrl(s.mediaUrl) : null })()
 
+  // Feed segmented control. The backend exposes one home (following) timeline, so
+  // For you / Following share it; Scholars filters the loaded feed to scholars.
+  const shown = feedTab === 'SCHOLARS'
+    ? posts.filter(p => { const a = authorOf(p); return a.role === 'SCHOLAR' || a.verified })
+    : posts
+
   return (
     <div className="main">
       <div className="col-main">
+        <div className="seg feed-seg rise">
+          {[['FOR_YOU', 'For you'], ['FOLLOWING', 'Following'], ['SCHOLARS', 'Scholars']].map(([k, label]) => (
+            <button key={k} className={feedTab === k ? 'on' : ''} onClick={() => setFeedTab(k)}>{label}</button>
+          ))}
+        </div>
         <section className="stories rise">
           {/* Your story — opens the composer. Cover shows your photo. */}
           <button className="story-card is-add" onClick={() => openCompose('STORY')}>
@@ -250,10 +262,10 @@ export function FeedPage() {
 
         {loading ? <Loader label="Loading your feed…"/>
           : error ? <EmptyState icon="feed" title="Couldn’t load the feed" sub="Check your connection to the backend and try again."/>
-          : !posts.length ? <EmptyState icon="feed" title="Your feed is quiet" sub="Follow scholars and creators, or create the first post."/>
+          : !shown.length ? <EmptyState icon="feed" title={feedTab === 'SCHOLARS' ? 'No scholar posts yet' : 'Your feed is quiet'} sub={feedTab === 'SCHOLARS' ? 'Posts from verified scholars will appear here.' : 'Follow scholars and creators, or create the first post.'}/>
           : (
             <div className="feed-list">
-              {posts.map((p, i) => (
+              {shown.map((p, i) => (
                 <PostCard key={p.id} post={p} index={i} onLike={like} onSave={save} onShare={share}
                   onOpenComments={() => navigate(`/posts/${p.id}`)}
                   owner={!!me.id && p.author === me.id} onEdit={() => openComposeEdit(p)} onDelete={del}/>

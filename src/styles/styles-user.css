@@ -308,13 +308,13 @@
 
 .auth-right{display:grid;place-items:center;padding:36px 28px}
 .auth-card{width:100%;max-width:420px}
-.auth-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px}
+/* Segmented track (matches the prototype's .m-auth-tabs / .m-seg) */
+.auth-tabs{display:flex;gap:3px;background:var(--paper-2);border-radius:12px;padding:3px;margin-bottom:20px}
 .auth-tab{
-  flex:1;padding:11px 0;font-weight:600;font-size:15px;
-  color:var(--muted);position:relative;
-  border-bottom:2px solid transparent;margin-bottom:-1px;text-align:center;
+  flex:1;padding:10px 0;font-weight:600;font-size:14.5px;
+  color:var(--ink-soft);text-align:center;border-radius:9px;transition:.15s;
 }
-.auth-tab.on{color:var(--ink);border-bottom-color:var(--emerald-deep)}
+.auth-tab.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(11,26,22,.12)}
 .auth-or{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--muted);font-size:12px}
 .auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:var(--line)}
 .auth-social{display:flex;flex-direction:column}

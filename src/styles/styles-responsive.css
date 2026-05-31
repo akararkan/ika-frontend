@@ -774,3 +774,27 @@ img,video{max-width:100%;height:auto}
   .rv-rail{gap:13px}
   .rv-segs .rv-tab{padding:7px 13px}
 }
+
+/* ============================================================
+   12 · PROTOTYPE-FAITHFUL TABS — the m-* style guide filters with
+   pills (filled-ink active), never desktop underlines. Convert the
+   content tab rows app-wide on phones to match m-chip / m-seg.
+   ============================================================ */
+@media(max-width:720px){
+  .tabs{border-bottom:0;gap:7px;margin-bottom:14px;padding:0}
+  .tab{
+    flex:none;border:1px solid var(--line);background:var(--card);
+    border-radius:999px;color:var(--ink-soft);
+    padding:8px 15px;margin-bottom:0;font-size:13px;font-weight:600;
+    transition:background .15s ease,color .15s ease,border-color .15s ease;
+  }
+  .tab:active{transform:scale(.96)}
+  .tab.on{background:var(--ink-2);color:#fff;border-color:var(--ink-2)}
+  .tab.on .ico{color:var(--brass-soft);opacity:1}
+  /* sticky content tab rows: breathing room, no underline seam */
+  .col-main > .tabs{padding:9px 0;top:calc(56px + var(--safe-t))}
+  .tabs + .tabs{margin-top:8px}
+  /* notification toolbar already lays out as a flex pill row */
+  .ntf-tabs .tab .ico{opacity:.65}
+  .ntf-tabs .tab.on .ico{opacity:1}
+}
