@@ -631,3 +631,28 @@
 .rv-seek-fill{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,var(--brass-soft),#fff);border-radius:3px}
 .rv-seek-thumb{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 7px rgba(0,0,0,.55);transform:translate(-50%,-50%);opacity:0;transition:opacity .15s ease}
 .rv-seek:hover .rv-seek-thumb,.rv-seek:active .rv-seek-thumb{opacity:1}
+
+/* ---------- @mention autocomplete (MentionBox) ---------- */
+/* The wrapper transparently takes the field's place in any layout (flex row
+   in .cmt-box, block in the compose modal) so the control keeps its width. */
+.mention-wrap{position:relative;width:100%;min-width:0}
+.mention-wrap > .field,.mention-wrap > .cm-area,.mention-wrap > textarea,.mention-wrap > input{width:100%}
+.mention-pop{
+  position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 14px 40px -10px rgba(8,20,16,.32),0 2px 8px rgba(8,20,16,.08);
+  padding:5px;max-height:266px;overflow-y:auto;overscroll-behavior:contain;
+  animation:mentionPop .14s ease;
+}
+@keyframes mentionPop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+/* comment composers sit low / sticky → float the list ABOVE the field instead */
+.cmt-box .mention-pop{top:auto;bottom:calc(100% + 6px)}
+.mention-opt{
+  display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;
+  border-radius:10px;text-align:left;transition:background .12s ease;
+}
+.mention-opt.on,.mention-opt:hover{background:var(--card-2)}
+.mention-opt .avatar{flex:none}
+.mention-meta{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.mention-meta b{font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mention-meta small{font-size:12px;color:var(--muted)}

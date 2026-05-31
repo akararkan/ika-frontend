@@ -61,43 +61,77 @@
 @media(max-width:520px){.prof-media-grid{grid-template-columns:repeat(2,1fr)}}
 
 /* ---------- NOTIFICATIONS ---------- */
-.ntf-group{
-  font-size:11.5px;font-weight:700;letter-spacing:.5px;
-  color:var(--muted);text-transform:uppercase;margin:14px 4px 8px;
+.ntf-head h1{display:inline-flex;align-items:center;gap:10px}
+.ntf-count{
+  display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;
+  border-radius:999px;background:var(--emerald);color:#fff;
+  font-family:var(--sans);font-size:12.5px;font-weight:700;letter-spacing:0;
 }
+/* category tabs get their icon; the unread filter is a pill toggle with a live dot */
+.ntf-tabs .tab{display:inline-flex;align-items:center;gap:6px}
+.ntf-tabs .tab .ico{opacity:.6}
+.ntf-tabs .tab.on .ico{opacity:1}
+.ntf-unread-toggle{
+  flex:none;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+  padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;
+  border:1px solid var(--line);background:var(--card);color:var(--ink-soft);transition:.15s;
+}
+.ntf-unread-toggle:hover{background:var(--card-2)}
+.ntf-unread-toggle .ntf-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:.15s}
+.ntf-unread-toggle.on{background:rgba(21,154,118,.1);border-color:rgba(21,154,118,.3);color:var(--emerald)}
+.ntf-unread-toggle.on .ntf-dot{background:var(--emerald);box-shadow:0 0 0 3px rgba(21,154,118,.18)}
+
+.ntf-section{margin-bottom:18px}
+.ntf-group{
+  font-size:11.5px;font-weight:700;letter-spacing:.6px;
+  color:var(--muted);text-transform:uppercase;margin:0 4px 9px;
+}
+.ntf-list{overflow:hidden;padding:0}
 .ntf-row{
-  display:flex;align-items:center;gap:13px;padding:13px 16px;
-  border-bottom:1px solid var(--line-soft);transition:.14s;
+  position:relative;display:flex;align-items:flex-start;gap:13px;
+  padding:14px 16px 14px 18px;border-bottom:1px solid var(--line-soft);
+  transition:background .14s ease;
 }
 .ntf-row:last-child{border-bottom:none}
 .ntf-row:hover{background:var(--card-2)}
-.ntf-row.unread{background:rgba(21,154,118,.04)}
-.ntf-row.unread:hover{background:rgba(21,154,118,.07)}
+/* unread: a soft wash + a category-coloured accent rail down the left edge */
+.ntf-row.unread{background:rgba(21,154,118,.05)}
+.ntf-row.unread:hover{background:rgba(21,154,118,.08)}
 .ntf-row.unread::before{
-  content:"";display:block;width:8px;height:8px;border-radius:50%;
-  background:var(--emerald);flex:none;
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--cat,var(--emerald));border-radius:0 3px 3px 0;
 }
-.ntf-avatar{position:relative;flex:none}
-.ntf-tile{
-  width:42px;height:42px;border-radius:12px;color:#fff;
-  display:grid;place-items:center;
-}
+.ntf-avatar{position:relative;flex:none;align-self:flex-start}
+.ntf-row .ntf-avatar[role=button]{cursor:pointer;transition:transform .12s}
+.ntf-row .ntf-avatar[role=button]:active{transform:scale(.93)}
+.ntf-tile{width:44px;height:44px;border-radius:13px;color:#fff;display:grid;place-items:center}
 .ntf-tile .ico{width:22px;height:22px;stroke-width:2}
 .ntf-badge{
-  position:absolute;bottom:-2px;right:-2px;
+  position:absolute;bottom:-3px;right:-3px;
   width:22px;height:22px;border-radius:50%;color:#fff;
-  display:grid;place-items:center;border:2px solid var(--card);
+  display:grid;place-items:center;border:2.5px solid var(--card);
+  box-shadow:0 2px 6px rgba(0,0,0,.18);
 }
-.ntf-badge .ico{width:11px;height:11px;stroke-width:2.2}
+.ntf-row:hover .ntf-badge{border-color:var(--card-2)}
+.ntf-badge .ico{width:11px;height:11px;stroke-width:2.3}
 .ntf-body{flex:1;min-width:0}
 .ntf-body p{font-size:14px;color:var(--ink-2);line-height:1.45}
 .ntf-body p b{font-weight:600;color:var(--ink)}
+.ntf-meta{display:flex;align-items:center;gap:10px;margin-top:5px;font-size:12px;color:var(--muted)}
+.ntf-agg{display:inline-flex;align-items:center;gap:4px}
+.ntf-agg .ico{width:12px;height:12px}
+.ntf-x{
+  flex:none;width:30px;height:30px;border-radius:50%;color:var(--muted);
+  display:grid;place-items:center;align-self:center;opacity:0;transition:.14s;
+}
+.ntf-row:hover .ntf-x{opacity:1}
+.ntf-x:hover{background:var(--paper-2);color:var(--ink)}
+@media(hover:none){.ntf-x{opacity:1}}                       /* touch: always reachable */
 .ntf-snippet{
   font-size:13.5px;color:var(--ink-soft);margin-top:6px;
   padding:8px 12px;background:var(--card-2);border-radius:10px;
   border-left:2px solid var(--brass);font-style:italic;
 }
-.ntf-body small{display:block;margin-top:4px}
 
 /* ---------- EXPLORE ---------- */
 .explore-search{

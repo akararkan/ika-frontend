@@ -6,6 +6,7 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, linkify, showToast } from '../components/ui.jsx'
+import { MentionBox } from '../components/MentionBox.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
@@ -206,7 +207,7 @@ export function PostPage() {
 
                 <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
                   <Avatar initials={me.initials} color={me.avc} size={32} src={me.profileImage}/>
-                  <input className="field" dir="auto" placeholder="Write a thoughtful reply…" value={text}
+                  <MentionBox className="field" placeholder="Write a thoughtful reply…" value={text}
                     onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submit() }}/>
                   <button className="icon-btn" disabled={busy || !text.trim()} onClick={submit}><Icon name="send" className="sm"/></button>
                 </div>
@@ -221,7 +222,7 @@ export function PostPage() {
                       <div className="cmt-col">
                         {editing ? (
                           <div className="cmt-box" style={{ marginTop:0 }}>
-                            <input className="field" dir="auto" value={editValue} autoFocus
+                            <input className="field" value={editValue} autoFocus
                               onChange={e => setEditValue(e.target.value)}
                               onKeyDown={e => { if (e.key==='Enter') saveEdit(c.id); if (e.key==='Escape') setEditingId(null) }}/>
                             <button className="icon-btn" disabled={!editValue.trim()} onClick={() => saveEdit(c.id)}><Icon name="check" className="sm"/></button>
@@ -246,7 +247,7 @@ export function PostPage() {
                         {replyTo === c.id && (
                           <div className="cmt-box" style={{ marginTop:8 }}>
                             <Avatar initials={me.initials} color={me.avc} size={28} src={me.profileImage}/>
-                            <input className="field" dir="auto" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText}
+                            <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText}
                               onChange={e => setReplyText(e.target.value)}
                               onKeyDown={e => { if (e.key==='Enter') submitReply(c.id); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
                             <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c.id)}><Icon name="send" className="sm"/></button>
@@ -271,7 +272,7 @@ export function PostPage() {
                               <div className="cmt-col">
                                 {rEditing ? (
                                   <div className="cmt-box" style={{ marginTop:0 }}>
-                                    <input className="field" dir="auto" value={editValue} autoFocus
+                                    <input className="field" value={editValue} autoFocus
                                       onChange={e => setEditValue(e.target.value)}
                                       onKeyDown={e => { if (e.key==='Enter') saveEdit(r.id, c.id); if (e.key==='Escape') setEditingId(null) }}/>
                                     <button className="icon-btn" disabled={!editValue.trim()} onClick={() => saveEdit(r.id, c.id)}><Icon name="check" className="sm"/></button>

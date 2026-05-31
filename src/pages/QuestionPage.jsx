@@ -8,6 +8,7 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, fmt, linkify, showToast } from '../components/ui.jsx'
+import { MentionBox } from '../components/MentionBox.jsx'
 import { uiPrompt, uiConfirm } from '../components/Dialog.jsx'
 import { SourceRow } from '../components/Source.jsx'
 import { AddSourceForm } from '../components/SourceForm.jsx'
@@ -535,7 +536,7 @@ export function QuestionPage() {
               {replyTo === a.id && (
                 <div className="cmt-box" style={{ marginTop:10 }}>
                   <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={28} src={user?.profileImage}/>
-                  <input className="field" dir="auto" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
+                  <MentionBox className="field" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
                     onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null) } }}/>
                   <input ref={replyFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setReplyFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={replyFile ? replyFile.name : 'Attach media'} onClick={() => replyFileRef.current?.click()} style={replyFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
@@ -597,7 +598,7 @@ export function QuestionPage() {
         ) : (
           <div className="card card-pad ans-composer">
             <h3 className="title"><Icon name="compose" className="sm"/>Contribute an answer</h3>
-            <textarea className="field" dir="auto" placeholder="Write a clear, sourced answer…" value={text} onChange={e => setText(e.target.value)}/>
+            <MentionBox as="textarea" className="field" dir="auto" placeholder="Write a clear, sourced answer…" value={text} onChange={e => setText(e.target.value)}/>
 
             {/* attached media / voice preview */}
             {(ansMedia || ansVoice) && (

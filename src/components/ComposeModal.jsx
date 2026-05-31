@@ -8,6 +8,7 @@
    ========================================================= */
 import React from 'react'
 import { Icon, Avatar, showToast } from './ui.jsx'
+import { MentionBox } from './MentionBox.jsx'
 import { SoundPicker } from './SoundPicker.jsx'
 import { TagInput } from './TagInput.jsx'
 import { StoryEditor } from './StoryEditor.jsx'
@@ -300,7 +301,7 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
               (baked into the image), so the modal's plain textarea would be
               redundant and confusing. Hide it. Every other tab keeps it. */}
           {tab !== 'STORY' && (
-            <textarea className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+            <MentionBox as="textarea" className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
           )}
 
           {/* hidden file input shared by drop zone + attach buttons */}

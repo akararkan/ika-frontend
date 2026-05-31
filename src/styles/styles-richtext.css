@@ -702,13 +702,23 @@
    ============================================================= */
 .pc-body,.rp-body,
 .qd-body,.ans-body,
-.cmt-bubble p,
 .rvm-caption,
 .prose,
 .prose p,.prose h1,.prose h2,.prose h3,.prose h4,.prose h5,.prose h6,
 .prose li,.prose blockquote,.prose td,.prose th,.prose pre,.prose dd,.prose dt{
   unicode-bidi:plaintext;
   text-align:start;
+  overflow-wrap:anywhere;
+}
+
+/* Comments & replies stay LEFT-aligned like English (Facebook style) — they
+   do NOT auto-flip to RTL. Arabic/Kurdish text still renders in correct
+   right-to-left order *within* the bubble; only the block alignment is pinned
+   left so the thread reads uniformly. `isolate` keeps each comment's bidi from
+   leaking into the name row / siblings. */
+.cmt-bubble p{
+  unicode-bidi:isolate;
+  text-align:left;
   overflow-wrap:anywhere;
 }
 
@@ -730,6 +740,6 @@ textarea.field,.cm-area,.rte-area{
 /* Arabic script reads more comfortably with a touch more leading; nudge it
    up only where the element actually resolves to RTL (modern browsers). */
 .pc-body:dir(rtl),.rp-body:dir(rtl),.qd-body:dir(rtl),.ans-body:dir(rtl),
-.cmt-bubble p:dir(rtl),.prose:dir(rtl),.prose p:dir(rtl){
+.prose:dir(rtl),.prose p:dir(rtl){
   line-height:1.8;
 }

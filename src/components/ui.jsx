@@ -3,6 +3,8 @@
    ========================================================= */
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
+import { api } from '../api/index.js'
 
 /* Inline-SVG icon component, paths registry */
 export const ICON_PATHS = {
@@ -176,13 +178,38 @@ export function fmt(n) {
   return String(n)
 }
 
-/* ----- Linkify body text (hashtags + mentions) ----- */
+/* ----- Clickable hashtag → tag feed ----- */
+export function TagLink({ tag }) {
+  const navigate = useNavigate()
+  const slug = tag.replace(/^#/, '')
+  return (
+    <a className="tk-tag" role="button" tabIndex={0}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/tags/${encodeURIComponent(slug)}`) }}>{tag}</a>
+  )
+}
+
+/* ----- Clickable @mention → resolves the handle to a profile on click ----- */
+export function MentionLink({ handle }) {
+  const navigate = useNavigate()
+  const un = handle.replace(/^@/, '')
+  const go = async (e) => {
+    e.preventDefault(); e.stopPropagation()
+    try { const u = await api.users.getByUsername(un); if (u?.id) return navigate(`/u/${u.id}`) } catch { /* fall through */ }
+    navigate(`/explore?q=${encodeURIComponent(un)}`)   // unknown handle → search
+  }
+  return (
+    <a className="tk-mention" role="button" tabIndex={0} onClick={go}
+      onKeyDown={(e) => { if (e.key === 'Enter') go(e) }}>{handle}</a>
+  )
+}
+
+/* ----- Linkify body text (clickable hashtags + mentions) ----- */
 export function linkify(text) {
   if (!text) return null
   const parts = text.split(/(\s|^)(#[\w]+|@[\w.]+)/g)
   return parts.map((p, i) => {
-    if (/^#/.test(p)) return <span key={i} className="tk-tag">{p}</span>
-    if (/^@/.test(p)) return <span key={i} className="tk-mention">{p}</span>
+    if (/^#/.test(p)) return <TagLink key={i} tag={p}/>
+    if (/^@/.test(p)) return <MentionLink key={i} handle={p}/>
     return <React.Fragment key={i}>{p}</React.Fragment>
   })
 }

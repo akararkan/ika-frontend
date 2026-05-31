@@ -22,6 +22,7 @@ export function notifFrom(dto) {
     deepLink: dto.deepLink || (dto.type === 'TRENDING_DIGEST' ? '/explore' : null),
     unread: dto.isRead === false,
     time: timeAgo(dto.createdAt),
+    createdAt: dto.createdAt,            // raw ISO — used for date grouping in the inbox
   }
 }
 
