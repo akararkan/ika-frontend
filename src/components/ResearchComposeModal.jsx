@@ -329,7 +329,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
         }))
         if (coverFile) ops.push({
           id: 'cover', name: 'Uploading cover image',
-          run: () => { const fd = new FormData(); fd.append('image', coverFile); return api.research.uploadCover(editResearch.id, fd) },
+          run: () => api.research.uploadCover(editResearch.id, coverFile),
           onSuccess: () => setCoverFile(null),
         })
         else if (coverRemoved && existingCover) ops.push({
@@ -383,7 +383,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
         }
         if (coverFile && created?.id) ops.push({
           id: 'cover', name: 'Uploading cover image',
-          run: () => { const cfd = new FormData(); cfd.append('image', coverFile); return api.research.uploadCover(created.id, cfd) },
+          run: () => api.research.uploadCover(created.id, coverFile),
           onSuccess: () => setCoverFile(null),
         })
         if (videoFile && created?.id) ops.push({

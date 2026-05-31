@@ -61,19 +61,19 @@ export function PostPage() {
       setPost(prev => applyPostDelta(prev, evt))
       // SAVE_COUNT_UPDATED carries no direction → debounce-re-read the true count (§7)
       if (evt.eventType === 'SAVE_COUNT_UPDATED') refreshSaveCountSoon()
-      if (evt.eventType === 'COMMENT_CREATED') {
-        setComments(cs => [...cs, {
-          id: evt.commentId || Math.random().toString(36),
+      if (evt.eventType === 'COMMENT_CREATED' && evt.commentId) {
+        setComments(cs => cs.some(c => c.id === evt.commentId) ? cs : [...cs, {   // dedup: never echo a comment we already have
+          id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
                      initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#159a76,#0a4a3c)' },
           body: evt.textContent || '', time: 'now', likes: 0,
         }])
       }
-      if (evt.eventType === 'REPLY_CREATED') {
+      if (evt.eventType === 'REPLY_CREATED' && evt.commentId) {
         const pid = evt.parentCommentId
         setComments(cs => cs.map(c => c.id === pid ? { ...c, replyCount: (c.replyCount || 0) + 1 } : c))
-        setRepliesMap(m => m[pid] ? { ...m, [pid]: [...m[pid], {
-          id: evt.commentId || Math.random().toString(36),
+        setRepliesMap(m => m[pid] ? { ...m, [pid]: m[pid].some(r => r.id === evt.commentId) ? m[pid] : [...m[pid], {
+          id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
                      initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#159a76,#0a4a3c)' },
           body: evt.textContent || '', time: 'now', likes: 0,

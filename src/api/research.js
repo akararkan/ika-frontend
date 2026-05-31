@@ -42,7 +42,21 @@ export const research = {
   /* ---- media / cover / promo (author) ---- */
   uploadVideoPromo(id, formData) { return http.upload(`/api/v1/researches/${id}/video-promo`, formData) },
   removeVideoPromo(id)           { return http.del(`/api/v1/researches/${id}/video-promo`) },
-  uploadCover(id, formData)      { return http.upload(`/api/v1/researches/${id}/cover-image`, formData) },
+  // Accepts a File (preferred) or a prebuilt FormData. The cover endpoint's
+  // multipart part name isn't documented, so a File is sent under the common
+  // names in turn (image → file → coverImage → cover); the first that the
+  // backend accepts wins, and a name mismatch (400/415) no longer silently
+  // drops the cover. A prebuilt FormData is posted as-is (legacy callers).
+  async uploadCover(id, fileOrForm) {
+    const path = `/api/v1/researches/${id}/cover-image`
+    if (typeof FormData !== 'undefined' && fileOrForm instanceof FormData) return http.upload(path, fileOrForm)
+    let lastErr
+    for (const field of ['image', 'file', 'coverImage', 'cover']) {
+      try { const fd = new FormData(); fd.append(field, fileOrForm); return await http.upload(path, fd) }
+      catch (e) { lastErr = e; if (e?.status !== 400 && e?.status !== 415) throw e }
+    }
+    throw lastErr
+  },
   removeCover(id)                { return http.del(`/api/v1/researches/${id}/cover-image`) },
   addMedia(id, formData, query)  { return http.upload(`/api/v1/researches/${id}/media`, formData, { query }) },
   editMedia(id, mediaId, req)    { return http.patch(`/api/v1/researches/${id}/media/${mediaId}`, req) },

@@ -60,6 +60,7 @@ export function QuestionPage() {
 
   const [q, setQ] = React.useState(null)
   const [answers, setAnswers] = React.useState([])
+  const seenAns = React.useRef(new Set())   // answer ids ever shown → dedup the optimistic post vs the server's own-action SSE echo
   const [loading, setLoading] = React.useState(true)
 
   // answer composer
@@ -90,8 +91,17 @@ export function QuestionPage() {
   const attachRef = React.useRef(null); const attachForRef = React.useRef(null)
 
   const loadAnswers = React.useCallback(() => {
-    api.qna.answers(id).then(setAnswers).catch(() => {})
+    api.qna.answers(id).then(list => { seenAns.current = new Set((list || []).map(a => a.id)); setAnswers(list || []) }).catch(() => {})
   }, [id])
+  // Add an answer exactly once. Returns true when genuinely new (so the caller
+  // bumps the count once), false when it's an echo/duplicate (patched in place).
+  const upsertAnswer = (a) => {
+    if (!a?.id) return false
+    const isNew = !seenAns.current.has(a.id)
+    seenAns.current.add(a.id)
+    setAnswers(arr => isNew ? [...arr, a] : arr.map(x => x.id === a.id ? a : x))
+    return isNew
+  }
 
   React.useEffect(() => {
     let alive = true
@@ -120,13 +130,13 @@ export function QuestionPage() {
       const fresh = evt.answer ? answerFrom(evt.answer) : null
 
       if (t === 'ANSWER_CREATED' && fresh && !root) {
-        setAnswers(arr => arr.some(x => x.id === fresh.id) ? arr : [...arr, fresh])
-        setQ(p => p && ({ ...p, answers: (p.answers || 0) + 1 }))
+        if (upsertAnswer(fresh)) setQ(p => p && ({ ...p, answers: (p.answers || 0) + 1 }))   // count only on a real add
       } else if (t === 'REANSWER_CREATED' && fresh) {
         const rid = root || fresh.parentAnswerId
         patchA(rid, x => ({ ...x, replyCount: (x.replyCount || 0) + 1 }))
         setRepliesMap(m => m[rid] ? ({ ...m, [rid]: m[rid].some(r => r.id === fresh.id) ? m[rid] : [...m[rid], fresh] }) : m)
       } else if (t === 'ANSWER_DELETED') {
+        seenAns.current.delete(aid)
         setAnswers(arr => arr.filter(x => x.id !== aid))
         if (root) { patchA(root, x => ({ ...x, replyCount: Math.max(0, (x.replyCount || 0) - 1) })); setRepliesMap(m => m[root] ? ({ ...m, [root]: m[root].filter(r => r.id !== aid) }) : m) }
         else setQ(p => p && ({ ...p, answers: Math.max(0, (p.answers || 0) - 1) }))
@@ -237,7 +247,8 @@ export function QuestionPage() {
         ? await api.qna.postAnswerUpload(id, buildAnswerForm(req, ansMedia, ansVoice))   // §11.3
         : await api.qna.postAnswer(id, req)                                              // §11.2
       if (fileSources.length) { await flushMediaFileSources(saved.id, fileSources); try { saved.sources = await api.qna.listSources(id, saved.id) } catch { /* keep inline */ } }
-      setAnswers(arr => [...arr, saved]); setQ(p => { if (!p) return p; const n = (p.answers || 0) + 1; return { ...p, answers: n, acceptsNewAnswers: p.maxAnswers ? n < p.maxAnswers : p.acceptsNewAnswers } })
+      const isNew = upsertAnswer(saved)   // dedup: the server may have already echoed this answer over SSE
+      setQ(p => { if (!p) return p; const n = (p.answers || 0) + (isNew ? 1 : 0); return { ...p, answers: n, acceptsNewAnswers: p.maxAnswers ? n < p.maxAnswers : p.acceptsNewAnswers } })
       resetComposer()
     } catch (e) { showToast(qnaError(e, 'Could not post answer')) }
     finally { setPosting(false) }
@@ -247,6 +258,7 @@ export function QuestionPage() {
   const deleteA = async (a) => {
     const ok = await uiConfirm({ title:'Delete this answer?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
+    seenAns.current.delete(a.id)
     setAnswers(arr => arr.filter(x => x.id !== a.id))
     setQ(p => p && ({ ...p, answers:Math.max(0,(p.answers||0)-1) }))
     api.qna.deleteAnswer(id, a.id).catch(() => loadAnswers())
@@ -274,7 +286,8 @@ export function QuestionPage() {
       const saved = file
         ? await api.qna.postReanswerUpload(id, targetId, buildAnswerForm(req, file.type.startsWith('audio') ? null : file, file.type.startsWith('audio') ? file : null))  // §11.6
         : await api.qna.postReanswer(id, targetId, req)
-      setRepliesMap(m => ({ ...m, [a.id]: (m[a.id]||[]).map(r => r.id===tmp.id ? saved : r) }))
+      // Swap the temp for the saved reply AND drop any duplicate the server's own SSE echo may have added.
+      setRepliesMap(m => { const list = (m[a.id]||[]).map(r => r.id===tmp.id ? saved : r); return { ...m, [a.id]: list.filter((r,i,arr) => arr.findIndex(x => x.id === r.id) === i) } })
     } catch (e) {
       setRepliesMap(m => ({ ...m, [a.id]: (m[a.id]||[]).filter(r => r.id !== tmp.id) }))   // roll back the optimistic reply
       patchA(a.id, x => ({ ...x, replyCount:Math.max(0,(x.replyCount||0)-1) }))
