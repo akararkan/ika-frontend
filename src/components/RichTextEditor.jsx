@@ -449,6 +449,7 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
         ref={ref}
         className={'rte-wysiwyg prose' + (imgSel ? ' has-img-sel' : '')}
         contentEditable
+        dir="auto"
         suppressContentEditableWarning
         spellCheck="true"
         role="textbox"
@@ -904,6 +905,7 @@ export function RichTextEditor({
             <textarea
               ref={taRef}
               className="rte-area"
+              dir="auto"
               value={value || ''}
               onChange={e => onChange(e.target.value)}
               onKeyDown={onMdKey}
@@ -926,6 +928,7 @@ export function RichTextEditor({
         <textarea
           ref={taRef}
           className="rte-area"
+          dir="auto"
           value={value || ''}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}

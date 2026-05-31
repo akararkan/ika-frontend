@@ -373,8 +373,8 @@ export function QuestionPage() {
 
           {editingQ ? (
             <div style={{ marginTop:12 }}>
-              <input className="field lg" value={qTitle} onChange={e => setQTitle(e.target.value)} style={{ marginBottom:10 }}/>
-              <textarea className="field" value={qBody} onChange={e => setQBody(e.target.value)}/>
+              <input className="field lg" dir="auto" value={qTitle} onChange={e => setQTitle(e.target.value)} style={{ marginBottom:10 }}/>
+              <textarea className="field" dir="auto" value={qBody} onChange={e => setQBody(e.target.value)}/>
               <input className="field" placeholder="Tags (comma-separated)" value={qTags} onChange={e => setQTags(e.target.value)} style={{ marginTop:10 }}/>
               <div className="flex gap-8 mt-12"><button className="btn btn-primary btn-sm" onClick={saveEditQ}>Save</button><button className="btn btn-secondary btn-sm" onClick={() => setEditingQ(false)}>Cancel</button></div>
             </div>
@@ -429,7 +429,7 @@ export function QuestionPage() {
 
               {editing ? (
                 <div className="ans-composer" style={{ marginTop:10 }}>
-                  <textarea className="field" value={editText} onChange={e => setEditText(e.target.value)}/>
+                  <textarea className="field" dir="auto" value={editText} onChange={e => setEditText(e.target.value)}/>
                   <div className="flex gap-8 mt-12"><button className="btn btn-primary btn-sm" onClick={() => saveEditA(a)}>Save</button><button className="btn btn-secondary btn-sm" onClick={() => setEditAid(null)}>Cancel</button></div>
                 </div>
               ) : (
@@ -535,7 +535,7 @@ export function QuestionPage() {
               {replyTo === a.id && (
                 <div className="cmt-box" style={{ marginTop:10 }}>
                   <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={28} src={user?.profileImage}/>
-                  <input className="field" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
+                  <input className="field" dir="auto" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
                     onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null) } }}/>
                   <input ref={replyFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setReplyFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={replyFile ? replyFile.name : 'Attach media'} onClick={() => replyFileRef.current?.click()} style={replyFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
@@ -597,7 +597,7 @@ export function QuestionPage() {
         ) : (
           <div className="card card-pad ans-composer">
             <h3 className="title"><Icon name="compose" className="sm"/>Contribute an answer</h3>
-            <textarea className="field" placeholder="Write a clear, sourced answer…" value={text} onChange={e => setText(e.target.value)}/>
+            <textarea className="field" dir="auto" placeholder="Write a clear, sourced answer…" value={text} onChange={e => setText(e.target.value)}/>
 
             {/* attached media / voice preview */}
             {(ansMedia || ansVoice) && (

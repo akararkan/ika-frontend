@@ -293,14 +293,14 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
           </div>
 
           {tab === 'QUESTION' && (
-            <input className="field lg" placeholder="What would you like to ask?" value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom:12 }}/>
+            <input className="field lg" dir="auto" placeholder="What would you like to ask?" value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom:12 }}/>
           )}
 
           {/* STORY tab: all text is added INSIDE the StoryEditor design surface
               (baked into the image), so the modal's plain textarea would be
               redundant and confusing. Hide it. Every other tab keeps it. */}
           {tab !== 'STORY' && (
-            <textarea className="cm-area" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+            <textarea className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
           )}
 
           {/* hidden file input shared by drop zone + attach buttons */}

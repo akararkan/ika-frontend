@@ -35,9 +35,10 @@
   /* Radii */
   --r-xs:8px; --r-sm:12px; --r:16px; --r-lg:22px; --r-xl:28px;
 
-  /* Type */
-  --sans:"IBM Plex Sans","Helvetica Neue",system-ui,Arial,sans-serif;
-  --serif:"IBM Plex Serif","Source Serif Pro",Georgia,serif;
+  /* Type — Latin first; Arabic-script (Arabic / Sorani-Kurdish) glyphs the
+     primary lacks fall through to good system Arabic fonts before Arial. */
+  --sans:"IBM Plex Sans","Helvetica Neue",system-ui,"Segoe UI","SF Arabic","Geeza Pro","Noto Sans Arabic","Noto Naskh Arabic",Tahoma,Arial,sans-serif;
+  --serif:"IBM Plex Serif","Source Serif Pro",Georgia,"Noto Naskh Arabic","Geeza Pro",serif;
   --mono:"IBM Plex Mono",ui-monospace,monospace;
 }
 

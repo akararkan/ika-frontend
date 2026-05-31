@@ -686,3 +686,50 @@
 .rte-img-size{font-family:var(--serif);font-weight:600;font-size:13px;letter-spacing:-.2px}
 .rte-img-alt{font-family:var(--sans);font-weight:700;font-size:11px;letter-spacing:.3px}
 .rte-img-bar .rte-tool-sep{height:20px;margin:0 4px}
+
+/* =============================================================
+   Bidirectional text  ·  Arabic + Kurdish (and any mixed script)
+   -------------------------------------------------------------
+   User content can be Arabic / Sorani-Kurdish (right-to-left,
+   Arabic script) OR English / Kurmanji-Kurdish (left-to-right,
+   Latin) — often mixed in one post. `unicode-bidi:plaintext`
+   makes the browser resolve EACH paragraph's base direction from
+   its own first strong character (Unicode Bidi Algorithm, rules
+   P2/P3), and `text-align:start` then aligns it to that direction.
+   Result: Arabic lines flow right-aligned RTL, Latin lines stay
+   left-aligned LTR — automatically, with no language tagging.
+   `overflow-wrap` keeps long RTL words from overflowing bubbles.
+   ============================================================= */
+.pc-body,.rp-body,
+.qd-body,.ans-body,
+.cmt-bubble p,
+.rvm-caption,
+.prose,
+.prose p,.prose h1,.prose h2,.prose h3,.prose h4,.prose h5,.prose h6,
+.prose li,.prose blockquote,.prose td,.prose th,.prose pre,.prose dd,.prose dt{
+  unicode-bidi:plaintext;
+  text-align:start;
+  overflow-wrap:anywhere;
+}
+
+/* Titles authored by users (Q&A questions, research papers) follow their
+   own script direction too. Card titles in lists stay clamped/ellipsised
+   by their existing rules; we only add the bidi resolution + alignment. */
+.qd-head h1,.rd-overlay h1,.qna-card h3,.r-card h3,.qna-q{
+  unicode-bidi:plaintext;
+  text-align:start;
+}
+
+/* Content compose fields auto-flip while typing Arabic/Kurdish (paired with
+   dir="auto" on the elements). Latin input is unaffected (start = left). */
+textarea.field,.cm-area,.rte-area{
+  unicode-bidi:plaintext;
+  text-align:start;
+}
+
+/* Arabic script reads more comfortably with a touch more leading; nudge it
+   up only where the element actually resolves to RTL (modern browsers). */
+.pc-body:dir(rtl),.rp-body:dir(rtl),.qd-body:dir(rtl),.ans-body:dir(rtl),
+.cmt-bubble p:dir(rtl),.prose:dir(rtl),.prose p:dir(rtl){
+  line-height:1.8;
+}
