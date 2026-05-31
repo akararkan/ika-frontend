@@ -205,7 +205,7 @@ export function PostPage() {
                 </h3>
 
                 <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
-                  <Avatar initials={me.initials} color={me.avc} size={32}/>
+                  <Avatar initials={me.initials} color={me.avc} size={32} src={me.profileImage}/>
                   <input className="field" placeholder="Write a thoughtful reply…" value={text}
                     onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submit() }}/>
                   <button className="icon-btn" disabled={busy || !text.trim()} onClick={submit}><Icon name="send" className="sm"/></button>
@@ -217,7 +217,7 @@ export function PostPage() {
                   const editing = editingId === c.id
                   return (
                     <div key={c.id || i} className="cmt">
-                      <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(c.author)}><Avatar initials={cu.initials} color={cu.avc} size={32}/></span>
+                      <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(c.author)}><Avatar initials={cu.initials} color={cu.avc} size={32} src={cu.profileImage}/></span>
                       <div className="cmt-col">
                         {editing ? (
                           <div className="cmt-box" style={{ marginTop:0 }}>
@@ -245,7 +245,7 @@ export function PostPage() {
 
                         {replyTo === c.id && (
                           <div className="cmt-box" style={{ marginTop:8 }}>
-                            <Avatar initials={me.initials} color={me.avc} size={28}/>
+                            <Avatar initials={me.initials} color={me.avc} size={28} src={me.profileImage}/>
                             <input className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText}
                               onChange={e => setReplyText(e.target.value)}
                               onKeyDown={e => { if (e.key==='Enter') submitReply(c.id); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
@@ -267,7 +267,7 @@ export function PostPage() {
                           const rEditing = editingId === r.id
                           return (
                             <div key={r.id || ri} className="cmt cmt-reply">
-                              <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><Avatar initials={ru.initials} color={ru.avc} size={28}/></span>
+                              <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><Avatar initials={ru.initials} color={ru.avc} size={28} src={ru.profileImage}/></span>
                               <div className="cmt-col">
                                 {rEditing ? (
                                   <div className="cmt-box" style={{ marginTop:0 }}>

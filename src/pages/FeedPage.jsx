@@ -17,7 +17,7 @@ function ComposerBar({ me }) {
   return (
     <section className="composer-bar card card-pad rise">
       <div className="cb-row1">
-        <Avatar initials={me.initials} color={me.avc} size={42}/>
+        <Avatar initials={me.initials} color={me.avc} size={42} src={me.profileImage}/>
         <button className="cb-fake" onClick={() => openCompose('TEXT')}>Share knowledge, {me.full.split(' ')[0]}…</button>
       </div>
       <div className="cb-row2">
@@ -196,27 +196,51 @@ export function FeedPage() {
     api.posts.remove(id).then(() => showToast('Post deleted')).catch(() => { showToast('Could not delete post'); load() })
   }
 
+  // Cover for your own story ring — the most recent frame that carries media.
+  const myStoryCover = (() => { const s = myStories.find(x => x.mediaUrl); return s ? assetUrl(s.mediaUrl) : null })()
+
   return (
     <div className="main">
       <div className="col-main">
         <section className="stories rise">
-          <button className="story-add" onClick={() => openCompose('STORY')}>
-            <Avatar initials={me.initials} color={me.avc} size={48}/>
-            <span>Your story</span>
-            <i><Icon name="compose" className="xs"/></i>
+          {/* Your story — opens the composer. Cover shows your photo. */}
+          <button className="story-card is-add" onClick={() => openCompose('STORY')}>
+            <span className="sc-thumb">
+              <span className="sc-cover" style={me.profileImage ? { backgroundImage:`url("${me.profileImage}")` } : { background: me.avc }}>
+                {!me.profileImage && <span className="sc-mono">{me.initials}</span>}
+                <span className="sc-grad"/>
+                <span className="sc-plus"><Icon name="compose" className="xs"/></span>
+                <span className="sc-nm">Your story</span>
+              </span>
+            </span>
           </button>
+
+          {/* Your posted story — opens your viewer, cover = latest story frame. */}
           {myStories.length > 0 && (
-            <button className="story-item" style={{ background:'linear-gradient(160deg,#1fb98e,#0a4a3c)' }} onClick={() => setStoryOpen({ authorId: me.id, author: me })}>
-              <span className="ring"><Avatar initials={me.initials} color={me.avc} size={50}/></span>
-              <span className="story-nm">{me.full.split(' ')[0]}</span>
+            <button className="story-card unseen" onClick={() => setStoryOpen({ authorId: me.id, author: me })}>
+              <span className="sc-thumb">
+                <span className="sc-cover" style={myStoryCover ? { backgroundImage:`url("${myStoryCover}")` } : { background:'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
+                  <span className="sc-grad"/>
+                  <span className="sc-badge"><Avatar initials={me.initials} color={me.avc} size={30} src={me.profileImage}/></span>
+                  <span className="sc-nm">{me.full.split(' ')[0]}</span>
+                </span>
+              </span>
             </button>
           )}
+
+          {/* Followed / close-friend stories (SSE) — cover = story thumbnail. */}
           {tray.map(t => {
             const a = adapters.authorFrom({ id: t.authorId, username: t.username, profileImage: t.avatarUrl })
+            const cover = t.thumbnailUrl ? assetUrl(t.thumbnailUrl) : null
             return (
-              <button key={t.authorId} className="story-item" style={{ background: t.thumbnailUrl ? `center/cover no-repeat url("${assetUrl(t.thumbnailUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }} onClick={() => setStoryOpen({ authorId: t.authorId, author: a })}>
-                <span className="ring"><Avatar initials={a.initials} color={a.avc} size={50} src={a.profileImage}/></span>
-                <span className="story-nm">{a.handle}</span>
+              <button key={t.authorId} className="story-card unseen" onClick={() => setStoryOpen({ authorId: t.authorId, author: a })}>
+                <span className="sc-thumb">
+                  <span className="sc-cover" style={cover ? { backgroundImage:`url("${cover}")` } : { background:'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
+                    <span className="sc-grad"/>
+                    <span className="sc-badge"><Avatar initials={a.initials} color={a.avc} size={30} src={a.profileImage}/></span>
+                    <span className="sc-nm">@{a.handle}</span>
+                  </span>
+                </span>
               </button>
             )
           })}

@@ -208,10 +208,8 @@ img,video{max-width:100%;height:auto}
   /* Brand: subtitle gone; logo + wordmark only */
   .brand small{display:none}
 
-  /* Story avatar shrinks slightly on compact phones */
-  .story-add .avatar,.story-item .ring,.story-item .avatar{width:56px !important;height:56px !important}
-  .story-add,.story-item{width:68px}
-  .story-add span,.story-nm{max-width:64px}
+  /* Story cards shrink slightly on compact phones */
+  .story-card{width:78px}
 
   /* Mobile post card: tighter still */
   .pc-head{padding:12px 13px 7px}
@@ -253,10 +251,9 @@ img,video{max-width:100%;height:auto}
   .botnav a{gap:0}
   .botnav a.mid .plus{width:44px;height:36px}
 
-  /* Tiniest phone: round avatars shrink to 52px */
-  .story-add .avatar,.story-item .ring,.story-item .avatar{width:52px !important;height:52px !important}
-  .story-add,.story-item{width:62px}
-  .story-add span,.story-nm{max-width:58px;font-size:10.5px}
+  /* Tiniest phone: story cards shrink further */
+  .story-card{width:72px}
+  .sc-nm{font-size:10.5px}
 
   /* Page header h1 doesn't dominate the screen */
   .phead h1{font-size:clamp(20px,6.5vw,24px)}
@@ -283,54 +280,20 @@ img,video{max-width:100%;height:auto}
   .phead h1{font-family:var(--serif);font-weight:600;letter-spacing:-.5px;line-height:1.12}
   .phead .sub{font-size:13px;color:var(--ink-soft);margin-top:3px}
 
-  /* ---------- Stories (matches .m-stories) ----------
-     Convert the rectangular desktop tile into the prototype's
-     round-avatar pattern: gradient ring + name caption below. */
+  /* ---------- Stories / Highlights — compact thumbnail cards ---------- */
   .stories{
-    gap:11px; padding:12px 0 10px; margin:0 -2px 4px;
-    overflow-x:auto; scrollbar-width:none;
+    gap:10px; padding:8px 0 12px; margin:0 -2px 6px;
+    overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
   }
   .stories::-webkit-scrollbar{display:none}
-  .story-add,.story-item{
-    flex:none; width:72px; height:auto; min-height:0;
-    background:transparent !important; border:0 !important;
-    box-shadow:none !important; border-radius:0;
-    display:flex; flex-direction:column; align-items:center;
-    gap:6px; padding:0;
-  }
-  .story-add:hover,.story-item:hover{transform:none;box-shadow:none}
-  /* Round 60×60 avatar inside a 2.5px gradient ring */
-  .story-add .avatar,.story-item .ring,.story-item .avatar{
-    width:60px !important; height:60px !important;
-    border-radius:50% !important;
-    padding:2.5px; box-sizing:border-box;
-    background:linear-gradient(135deg,var(--brass-soft),var(--emerald-glow));
-    position:relative; margin:0;
-  }
-  .story-add .avatar{
-    background:var(--line);  /* "Your story" ring is muted */
-    display:grid; place-items:center;
-  }
-  .story-add .avatar > *,.story-item .avatar > *{
-    width:100% !important; height:100% !important;
-    border:2px solid var(--paper); border-radius:50% !important;
-  }
-  /* "+" badge on the user's own story slot */
-  .story-add i{
-    position:absolute; bottom:-2px; right:-2px;
-    width:22px; height:22px; border-radius:50%;
-    background:var(--emerald-deep); color:#fff;
-    border:2.5px solid var(--paper);
-    display:grid; place-items:center;
-  }
-  .story-add i .ico{width:11px;height:11px;stroke-width:2.6}
-  /* Name caption sits below the ring, ellipsised */
-  .story-add span,.story-nm{
-    position:static !important; color:var(--ink-soft) !important;
-    text-shadow:none !important; font-size:11px; font-weight:500;
-    max-width:68px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    text-align:center; margin-top:0; padding:0;
-  }
+  .story-card{width:84px}
+  .story-card:active{transform:scale(.95)}
+  .sc-thumb{border-radius:16px;padding:2.5px;box-shadow:0 6px 16px -9px rgba(8,20,16,.5)}
+  .sc-cover{border-radius:13px}
+  .sc-nm{font-size:11px;left:8px;right:8px;bottom:7px}
+  .story-card.is-add .sc-nm{right:30px}
+  .sc-plus{width:22px;height:22px;bottom:7px;right:7px}
+  .sc-plus.lg{width:36px;height:36px}
 
   /* ---------- Post card (matches .m-post) ---------- */
   .post-card{border-radius:var(--r-lg)}
@@ -776,7 +739,7 @@ img,video{max-width:100%;height:auto}
   .post-card:active,.qna-card:active,.r-card:active{transform:scale(.99)}
   .ntf-row{transition:background .12s}
   .ntf-row:active{background:var(--card-2)}
-  .story-item:active,.story-add:active{transform:scale(.95)}
+  .story-card:active{transform:scale(.95)}
   .botnav a.mid .plus{transition:transform .15s}
   .botnav a.mid:active .plus{transform:scale(.92)}
   /* in-reel glass-bar active indicator */

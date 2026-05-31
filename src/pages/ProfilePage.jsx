@@ -125,22 +125,30 @@ export function ProfilePage() {
           </div>
 
           <section className="stories" style={{ marginTop:18 }}>
-            <button className="story-add" onClick={addHighlight}>
-              <Avatar initials="+" color="linear-gradient(135deg,#cdc4ad,#a8a08c)" size={48}/>
-              <span>New</span><i><Icon name="compose" className="xs"/></i>
+            <button className="story-card is-add is-new" onClick={addHighlight}>
+              <span className="sc-thumb">
+                <span className="sc-cover">
+                  <span className="sc-plus lg"><Icon name="compose" className="sm"/></span>
+                  <span className="sc-nm">New</span>
+                </span>
+              </span>
             </button>
             {highlights.map((h, i) => (
               <button
                 key={hid(h)}
-                className="story-item"
+                className="story-card unseen"
                 draggable
                 onDragStart={() => { dragIx.current = i }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => dropHighlight(i)}
                 onClick={() => setHlOpen({ id: hid(h), title: h.title })}
-                title={`${h.title} — tap to view, drag to reorder`}
-                style={{ background:h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
-                <span className="story-nm">{h.title}</span>
+                title={`${h.title} — tap to view, drag to reorder`}>
+                <span className="sc-thumb">
+                  <span className="sc-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
+                    <span className="sc-grad"/>
+                    <span className="sc-nm">{h.title}</span>
+                  </span>
+                </span>
               </button>
             ))}
           </section>

@@ -270,7 +270,7 @@ export function StoryViewer({ authorId, author, onClose }) {
     <div className="reels-view is-story">
       <div className="rv-top">
         <div className="rvm-author" style={{ margin:0 }}>
-          <Avatar initials={u.initials} color={u.avc} size={36}/>
+          <Avatar initials={u.initials} color={u.avc} size={36} src={u.profileImage}/>
           <div>
             <div className="rvm-name"><b>{u.full}</b>{u.verified && <Verify scholar={u.role === 'SCHOLAR'}/>}</div>
             <div className="rvm-time">{item.time} ago · {item.visibility?.toLowerCase?.() || 'public'}</div>

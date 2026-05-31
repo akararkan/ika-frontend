@@ -304,7 +304,7 @@ export function Reels({ onClose, initialId }) {
 
             <div className="rv-meta">
               <div className="rvm-author">
-                <span role="button" style={{ cursor:'pointer' }} onClick={goAuthor}><Avatar initials={u.initials} color={u.avc} size={40}/></span>
+                <span role="button" style={{ cursor:'pointer' }} onClick={goAuthor}><Avatar initials={u.initials} color={u.avc} size={40} src={u.profileImage}/></span>
                 <div role="button" style={{ cursor:'pointer' }} onClick={goAuthor}>
                   <div className="rvm-name"><b>@{u.handle}</b>{u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
                   <div className="rvm-time">{reel.time} · {fmt(reel.views)} views</div>

@@ -286,7 +286,7 @@ export function ResearchDetailPage() {
               <div className="rd-overlay">
                 <h1>{r.title}</h1>
                 <div className="rd-by">
-                  <Avatar initials={u.initials} color={u.avc} size={32}/>
+                  <Avatar initials={u.initials} color={u.avc} size={32} src={u.profileImage}/>
                   <span>{u.full}{u.verified && <Verify scholar/>}</span>
                   <span className="muted">·</span><span>{r.time}</span>
                 </div>
@@ -394,7 +394,7 @@ export function ResearchDetailPage() {
                   const cu = c._user || authorOf(c)
                   return (
                     <div key={i} className="rd-contrib">
-                      <Avatar initials={cu.initials} color={cu.avc} size={42}/>
+                      <Avatar initials={cu.initials} color={cu.avc} size={42} src={cu.profileImage}/>
                       <div style={{flex:1}}>
                         <div className="rail-name"><b>{cu.full}</b> {cu.verified && <Verify scholar/>}</div>
                         <small className="contrib-role">{(c.role||'').replace('_',' ')}</small>

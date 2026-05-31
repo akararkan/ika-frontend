@@ -141,7 +141,7 @@ export function SavedPage() {
                   const u = authorOf(q)
                   return (
                     <article key={q.id} className="qna-card" onClick={() => navigate(`/qna/${q.id}`)}>
-                      <header><Avatar initials={u.initials} color={u.avc} size={36}/><div><div className="qna-name"><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div><div className="qna-sub">{q.savedAt ? `Saved ${new Date(q.savedAt).toLocaleDateString(undefined,{day:'numeric',month:'short'})}` : q.time}</div></div><span className={'status ' + q.status.toLowerCase()}>{q.status.toLowerCase()}</span></header>
+                      <header><Avatar initials={u.initials} color={u.avc} size={36} src={u.profileImage}/><div><div className="qna-name"><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div><div className="qna-sub">{q.savedAt ? `Saved ${new Date(q.savedAt).toLocaleDateString(undefined,{day:'numeric',month:'short'})}` : q.time}</div></div><span className={'status ' + q.status.toLowerCase()}>{q.status.toLowerCase()}</span></header>
                       <h3>{q.title}</h3><p className="qna-body">{q.body}</p>
                     </article>
                   )

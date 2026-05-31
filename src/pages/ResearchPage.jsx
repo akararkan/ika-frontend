@@ -186,7 +186,7 @@ export function ResearchPage() {
                     </div>
                     <div className="r-body">
                       <div className="r-top">
-                        <Avatar initials={u.initials} color={u.avc} size={30}/>
+                        <Avatar initials={u.initials} color={u.avc} size={30} src={u.profileImage}/>
                         <div>
                           <div className="rail-name"><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
                           <small className="muted">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</small>

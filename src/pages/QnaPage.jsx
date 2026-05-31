@@ -103,7 +103,7 @@ export function QnaPage() {
                 return (
                   <article key={q.id} className="qna-card rise" style={{ animationDelay:`${i*60}ms` }} onClick={() => navigate(`/qna/${q.id}`)}>
                     <header>
-                      <Avatar initials={u.initials} color={u.avc} size={38}/>
+                      <Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/>
                       <div>
                         <div className="qna-name"><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
                         <div className="qna-sub">@{u.handle} · {q.time}</div>
