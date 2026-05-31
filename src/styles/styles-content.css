@@ -458,7 +458,17 @@
 }
 .rv-tab{font-weight:600;font-size:15px;opacity:.55;color:#fff;padding:6px 4px}
 .rv-tab.on{opacity:1;border-bottom:2px solid var(--brass-soft);padding-bottom:6px}
-.rv-close{margin-left:auto;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center}
+.rv-close{margin-left:auto;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center;transition:.16s;backdrop-filter:blur(6px)}
+.rv-close:hover{background:rgba(255,255,255,.26)}
+.rv-close:active{transform:scale(.92)}
+
+/* Reels-only: segmented "For you / Following" pill, centered between a spacer & close */
+.reels-view:not(.is-story) .rv-top{justify-content:space-between;gap:10px}
+.rv-top-spacer{width:40px;height:40px;flex:none}
+.rv-segs{display:inline-flex;gap:3px;padding:4px;border-radius:999px;background:rgba(0,0,0,.34);backdrop-filter:blur(12px) saturate(140%);-webkit-backdrop-filter:blur(12px) saturate(140%);border:1px solid rgba(255,255,255,.16);box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.rv-segs .rv-tab{opacity:.72;font-weight:600;font-size:14px;padding:7px 17px;border-radius:999px;transition:.18s ease}
+.rv-segs .rv-tab.on{opacity:1;padding:7px 17px;border-bottom:0;background:rgba(255,255,255,.92);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.22)}
+.rv-segs .rv-tab:active{transform:scale(.95)}
 .rv-progress{position:absolute;top:62px;left:22px;right:22px;z-index:5;display:flex;gap:4px}
 .rv-progress i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden;display:block}
 .rv-progress i.done{background:rgba(255,255,255,.7)}
@@ -476,6 +486,39 @@
   text-shadow:0 2px 14px rgba(0,0,0,.6);font-weight:500;line-height:1.3;
 }
 
+/* The clip itself (was inline) — gentle scale-in on each new reel */
+.rv-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;cursor:pointer;animation:rvVidIn .42s ease both}
+@keyframes rvVidIn{from{opacity:.25;transform:scale(1.05)}to{opacity:1;transform:none}}
+
+/* Top + bottom gradient scrim so chrome stays legible over any footage */
+.rv-scrim{position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,13,11,.46) 0%,transparent 18%,transparent 52%,rgba(7,13,11,.30) 74%,rgba(7,13,11,.82) 100%);
+}
+
+/* Buffering spinner */
+.rv-spin{position:absolute;inset:0;display:grid;place-items:center;z-index:3;pointer-events:none}
+.rv-spin i{width:44px;height:44px;border-radius:50%;border:3px solid rgba(255,255,255,.22);border-top-color:#fff;animation:rvSpin .8s linear infinite}
+@keyframes rvSpin{to{transform:rotate(360deg)}}
+
+/* Double-tap heart burst */
+.rv-burst{position:absolute;z-index:7;transform:translate(-50%,-50%);pointer-events:none;animation:rvBurst .9s cubic-bezier(.2,.7,.3,1) forwards}
+.rv-burst .ico{width:104px;height:104px;fill:#fff;stroke:#fff;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))}
+@keyframes rvBurst{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-12deg)}18%{opacity:1;transform:translate(-50%,-50%) scale(1.12) rotate(6deg)}34%{transform:translate(-50%,-50%) scale(.92) rotate(-3deg)}50%{transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-150%) scale(1.05)}}
+
+/* Paused glyph */
+.rv-pausewrap{position:absolute;inset:0;display:grid;place-items:center;z-index:3;pointer-events:none;animation:fade .18s ease}
+.rv-pause{width:74px;height:74px;border-radius:50%;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);display:grid;place-items:center;color:#fff;box-shadow:0 8px 26px rgba(0,0,0,.4)}
+.rv-pause .ico{margin-left:3px}
+
+/* "Tap for sound" nudge — appears only when unmuted autoplay was blocked */
+.rv-soundcue{position:absolute;top:74px;left:50%;transform:translateX(-50%);z-index:7;display:inline-flex;align-items:center;gap:7px;
+  padding:9px 16px;border-radius:999px;color:#fff;font-size:13px;font-weight:600;
+  background:rgba(0,0,0,.52);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 8px 22px rgba(0,0,0,.34);animation:rvCueIn .3s ease both,rvCuePulse 2.2s ease-in-out .3s infinite}
+.rv-soundcue .ico{width:14px;height:14px}
+@keyframes rvCueIn{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes rvCuePulse{0%,100%{box-shadow:0 8px 22px rgba(0,0,0,.34)}50%{box-shadow:0 8px 30px rgba(31,185,142,.5)}}
+
 .rv-meta{position:absolute;left:0;right:80px;bottom:0;z-index:4;padding:20px 24px;color:#fff}
 .rvm-author{display:flex;align-items:center;gap:10px;margin-bottom:11px}
 .rvm-name{font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:5px}
@@ -483,8 +526,15 @@
 .rvm-follow{margin-left:auto;padding:5px 14px;border:1.5px solid #fff;border-radius:999px;color:#fff;font-size:12.5px;font-weight:600;transition:.15s}
 .rvm-follow:active{transform:scale(.95)}
 .rvm-follow.on{background:rgba(255,255,255,.18);border-color:transparent;color:#fff}
-.rvm-caption{font-size:14px;line-height:1.55;margin-bottom:10px;text-shadow:0 1px 6px rgba(0,0,0,.6)}
-.rvm-sound{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;background:rgba(0,0,0,.32);padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px)}
+.rvm-caption{font-size:14px;line-height:1.55;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.rvm-caption.open{display:block;-webkit-line-clamp:unset;max-height:38vh;overflow-y:auto;overscroll-behavior:contain}
+.rvm-cap{margin-bottom:10px}
+/* "more / show less" — only meaningful where the caption clamps (phones) */
+.rvm-more{display:none;margin-top:3px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.82);text-shadow:0 1px 5px rgba(0,0,0,.5)}
+@media(max-width:720px){.rvm-more{display:inline-block}}
+.rvm-sound{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;background:rgba(0,0,0,.32);padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px);max-width:230px;overflow:hidden}
+.rvm-sound .ico{flex:none}
+.rvm-marquee{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Story poll — viewer. Default: floats just above the reply pill; `.placed`
    honours the author's authored position (posX/posY) once the backend stores it. */
@@ -521,12 +571,16 @@
 
 .rv-rail{position:absolute;right:16px;bottom:24px;z-index:5;display:flex;flex-direction:column;gap:18px;align-items:center}
 .rvr{display:flex;flex-direction:column;align-items:center;gap:5px;color:#fff}
-.rvr > span{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;backdrop-filter:blur(6px);transition:.18s}
+.rvr > span{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;backdrop-filter:blur(8px) saturate(140%);-webkit-backdrop-filter:blur(8px) saturate(140%);box-shadow:0 4px 14px rgba(0,0,0,.22);transition:transform .18s ease,background .18s ease}
 .rvr:hover > span{background:rgba(255,255,255,.26);transform:scale(1.06)}
+.rvr:active > span{transform:scale(.9)}
 .rvr.on{color:#ffd2cf}
-.rvr.on > span .ico{fill:var(--rose);stroke:var(--rose)}
+.rvr.on > span{background:rgba(194,69,63,.16);box-shadow:0 4px 16px rgba(194,69,63,.35)}
+.rvr.on > span .ico{fill:var(--rose);stroke:var(--rose);animation:rvLike .42s cubic-bezier(.2,1.5,.4,1)}
+@keyframes rvLike{0%{transform:scale(1)}35%{transform:scale(1.32)}70%{transform:scale(.9)}100%{transform:scale(1)}}
+.rvr.sv > span{background:rgba(216,180,99,.18)}
 .rvr.sv > span .ico{fill:var(--brass-soft);stroke:var(--brass-soft)}
-.rvr small{font-size:11.5px;font-weight:600}
+.rvr small{font-size:11.5px;font-weight:700;text-shadow:0 1px 5px rgba(0,0,0,.5);letter-spacing:.2px}
 
 .rv-nav{position:absolute;right:24px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:12px}
 .rv-nav button{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center}
@@ -571,7 +625,9 @@
 .watched-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* playback timeline pinned to the bottom of the reel */
-.rv-seek{position:absolute;left:0;right:0;bottom:0;z-index:6;padding:9px 12px 7px;cursor:pointer}
-.rv-seek-track{position:relative;height:3px;border-radius:3px;background:rgba(255,255,255,.3)}
-.rv-seek-track:hover{height:5px}
-.rv-seek-fill{position:absolute;left:0;top:0;height:100%;background:#fff;border-radius:3px}
+.rv-seek{position:absolute;left:0;right:0;bottom:0;z-index:6;padding:14px 14px 9px;cursor:pointer;touch-action:none}
+.rv-seek-track{position:relative;height:3px;border-radius:3px;background:rgba(255,255,255,.28);transition:height .15s ease}
+.rv-seek:hover .rv-seek-track,.rv-seek:active .rv-seek-track{height:5px}
+.rv-seek-fill{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,var(--brass-soft),#fff);border-radius:3px}
+.rv-seek-thumb{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 7px rgba(0,0,0,.55);transform:translate(-50%,-50%);opacity:0;transition:opacity .15s ease}
+.rv-seek:hover .rv-seek-thumb,.rv-seek:active .rv-seek-thumb{opacity:1}

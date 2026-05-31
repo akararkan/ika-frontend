@@ -21,10 +21,14 @@ export function Reels({ onClose, initialId }) {
   const [reels, setReels] = React.useState([])
   const [idx, setIdx] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
-  const [muted, setMuted] = React.useState(true)    // autoplay policy → start muted
+  const [muted, setMuted] = React.useState(false)   // sound ON by default (per request)
+  const [needsSound, setNeedsSound] = React.useState(false) // unmuted autoplay blocked → nudge
   const [playing, setPlaying] = React.useState(true)
+  const [buffering, setBuffering] = React.useState(false)
   const [videoErr, setVideoErr] = React.useState(false)
   const [progress, setProgress] = React.useState(0) // 0..1 of the active clip
+  const [capOpen, setCapOpen] = React.useState(false) // caption expanded?
+  const [burst, setBurst] = React.useState(null)    // {x,y,key} double-tap heart
   const videoRef = React.useRef(null)
 
   // Load the list for the active tab. Prefer the dedicated ranked / following
@@ -88,7 +92,7 @@ export function Reels({ onClose, initialId }) {
   const seenAt = React.useRef(0)
   React.useEffect(() => {
     seenAt.current = Date.now()
-    setVideoErr(false); setPlaying(true); setProgress(0)
+    setVideoErr(false); setPlaying(true); setProgress(0); setBuffering(false); setCapOpen(false); setBurst(null)
     if (reel) api.posts.recordView(reel.id).catch(() => {})   // counts the view (§11) — watch ≠ view
     return () => {
       if (reel) {
@@ -101,19 +105,72 @@ export function Reels({ onClose, initialId }) {
   // keep the element's muted prop authoritative (React's `muted` attr is flaky)
   React.useEffect(() => { if (videoRef.current) videoRef.current.muted = muted }, [muted, reel?.id])
 
+  // Sound ON by default: try to autoplay WITH audio. Browsers block unmuted
+  // autoplay until a user gesture, so on rejection we fall back to muted
+  // playback and raise a "tap for sound" nudge that the next tap clears.
+  React.useEffect(() => {
+    const v = videoRef.current
+    if (!v || !videoUrl) return
+    let cancelled = false
+    v.muted = muted
+    const p = v.play()
+    if (p && p.catch) p.catch(() => {
+      if (cancelled || muted) return
+      v.muted = true; setMuted(true); setNeedsSound(true)
+      v.play().catch(() => {})
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reel?.id, videoUrl])
+
+  // While the unmute nudge is up, the very next gesture anywhere flips sound on.
+  React.useEffect(() => {
+    if (!needsSound) return
+    const enable = () => {
+      const v = videoRef.current
+      if (v) { v.muted = false; v.play().catch(() => {}) }
+      setMuted(false); setNeedsSound(false)
+    }
+    window.addEventListener('pointerdown', enable, { once: true })
+    return () => window.removeEventListener('pointerdown', enable)
+  }, [needsSound])
+
   const togglePlay = () => {
     const v = videoRef.current; if (!v) return
     if (v.paused) v.play().then(() => setPlaying(true)).catch(() => {})
     else { v.pause(); setPlaying(false) }
   }
-  const toggleMute = () => setMuted(m => !m)
-  const onTime = (e) => { const v = e.target; if (v.duration) setProgress(v.currentTime / v.duration) }
-  const seek = (e) => {
-    const v = videoRef.current; if (!v || !v.duration) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-    try { v.currentTime = frac * v.duration } catch { /* needs a buffered/range-capable source */ }
+  const toggleMute = () => { setNeedsSound(false); setMuted(m => !m) }
+  const onTime = (e) => { if (scrubbing.current) return; const v = e.target; if (v.duration) setProgress(v.currentTime / v.duration) }
+
+  // Single tap → play/pause · double tap → like + heart burst (Instagram-style).
+  const lastTap = React.useRef(0)
+  const tapTimer = React.useRef(null)
+  const onTap = (e) => {
+    const now = e.timeStamp                       // pure: event-provided timestamp
+    const stage = e.currentTarget.getBoundingClientRect()
+    if (now - lastTap.current < 280) {           // second tap → like
+      clearTimeout(tapTimer.current); lastTap.current = 0
+      if (!reel.liked) like()                     // double-tap only ever likes, never unlikes
+      setBurst({ x: e.clientX - stage.left, y: e.clientY - stage.top, key: now })
+    } else {                                      // hold for a potential second tap
+      lastTap.current = now
+      tapTimer.current = setTimeout(togglePlay, 280)
+    }
   }
+
+  // Drag-scrub seek bar (pointer events so touch + mouse both feel native).
+  const scrubbing = React.useRef(false)
+  const seekTo = (clientX, el) => {
+    const v = videoRef.current; if (!v || !v.duration) return
+    const rect = el.getBoundingClientRect()
+    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    setProgress(frac)
+    try { v.currentTime = frac * v.duration } catch { /* needs a range-capable source */ }
+  }
+  const onSeekDown = (e) => { scrubbing.current = true; e.currentTarget.setPointerCapture?.(e.pointerId); seekTo(e.clientX, e.currentTarget) }
+  const onSeekMove = (e) => { if (scrubbing.current) seekTo(e.clientX, e.currentTarget) }
+  const onSeekUp = () => { scrubbing.current = false }
 
   const patch = (fn) => setReels(rs => rs.map((r, i) => i === idx ? fn(r) : r))
   const like = () => {
@@ -177,9 +234,12 @@ export function Reels({ onClose, initialId }) {
   return (
     <div className="reels-view">
       <div className="rv-top">
-        <button className={'rv-tab ' + (tab === 'FOR_YOU' ? 'on' : '')} onClick={() => setTab('FOR_YOU')}>For you</button>
-        <button className={'rv-tab ' + (tab === 'FOLLOWING' ? 'on' : '')} onClick={() => setTab('FOLLOWING')}>Following</button>
-        <button className="rv-close" onClick={onClose}><Icon name="close"/></button>
+        <span className="rv-top-spacer" aria-hidden="true"/>
+        <div className="rv-segs">
+          <button className={'rv-tab ' + (tab === 'FOR_YOU' ? 'on' : '')} onClick={() => setTab('FOR_YOU')}>For you</button>
+          <button className={'rv-tab ' + (tab === 'FOLLOWING' ? 'on' : '')} onClick={() => setTab('FOLLOWING')}>Following</button>
+        </div>
+        <button className="rv-close" onClick={onClose} aria-label="Close reels"><Icon name="close"/></button>
       </div>
 
       {loading ? (
@@ -194,10 +254,10 @@ export function Reels({ onClose, initialId }) {
             {videoUrl && !videoErr ? (
               <video
                 key={reel.id} ref={videoRef} className="rv-video" src={videoUrl} poster={m0?.poster || undefined}
-                autoPlay loop playsInline muted={muted} preload="auto" onClick={togglePlay}
-                onTimeUpdate={onTime} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+                autoPlay loop playsInline muted={muted} preload="auto" onClick={onTap}
+                onTimeUpdate={onTime} onPlay={() => { setPlaying(true); setBuffering(false) }} onPause={() => setPlaying(false)}
+                onWaiting={() => setBuffering(true)} onPlaying={() => setBuffering(false)} onCanPlay={() => setBuffering(false)}
                 onError={onVideoError}
-                style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', background:'#000', cursor:'pointer' }}
               />
             ) : (
               <>
@@ -206,16 +266,38 @@ export function Reels({ onClose, initialId }) {
               </>
             )}
 
+            {/* gradient scrim — keeps caption/rail legible over any clip */}
+            {videoUrl && !videoErr && <div className="rv-scrim" aria-hidden="true"/>}
+
+            {/* buffering spinner */}
+            {videoUrl && !videoErr && buffering && playing && (
+              <div className="rv-spin" aria-hidden="true"><i/></div>
+            )}
+
+            {/* double-tap heart burst */}
+            {burst && (
+              <span key={burst.key} className="rv-burst" style={{ left:burst.x, top:burst.y }} onAnimationEnd={() => setBurst(null)} aria-hidden="true">
+                <Icon name="heart"/>
+              </span>
+            )}
+
             {/* paused glyph — non-interactive so it never blocks the rail */}
-            {videoUrl && !videoErr && !playing && (
-              <div style={{ position:'absolute', inset:0, display:'grid', placeItems:'center', zIndex:2, pointerEvents:'none' }}>
-                <span style={{ width:64, height:64, borderRadius:'50%', background:'rgba(0,0,0,.55)', display:'grid', placeItems:'center', color:'#fff' }}><Icon name="play" className="lg"/></span>
+            {videoUrl && !videoErr && !playing && !buffering && (
+              <div className="rv-pausewrap" aria-hidden="true">
+                <span className="rv-pause"><Icon name="play" className="lg"/></span>
               </div>
+            )}
+
+            {/* "tap for sound" nudge — only when the browser blocked unmuted autoplay */}
+            {videoUrl && !videoErr && needsSound && (
+              <button className="rv-soundcue" onClick={toggleMute}>
+                <Icon name="volume" className="xs"/>Tap for sound
+              </button>
             )}
 
             {/* mute toggle */}
             {videoUrl && !videoErr && (
-              <button className="rv-mute" onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'}>
+              <button className={'rv-mute' + (muted ? ' off' : '')} onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'} aria-label={muted ? 'Unmute' : 'Mute'}>
                 <Icon name={muted ? 'mute' : 'volume'} className="sm"/>
               </button>
             )}
@@ -229,15 +311,22 @@ export function Reels({ onClose, initialId }) {
                 </div>
                 {!isSelf && <button className={'rvm-follow' + (followed[reel.author] ? ' on' : '')} onClick={followAuthor}>{followed[reel.author] ? 'Following' : 'Follow'}</button>}
               </div>
-              <p className="rvm-caption">{linkify(reel.body)}</p>
-              <div className="rvm-sound"><Icon name="music" className="xs"/>Original audio</div>
+              {reel.body && (
+                <div className="rvm-cap">
+                  <p className={'rvm-caption' + (capOpen ? ' open' : '')}>{linkify(reel.body)}</p>
+                  {(reel.body || '').length > 90 && (
+                    <button className="rvm-more" onClick={() => setCapOpen(o => !o)}>{capOpen ? 'show less' : 'more'}</button>
+                  )}
+                </div>
+              )}
+              <div className="rvm-sound"><Icon name="music" className="xs"/><span className="rvm-marquee">Original audio · @{u.handle}</span></div>
             </div>
 
             <div className="rv-rail">
               <button className={'rvr ' + (reel.liked ? 'on' : '')} onClick={like}>
                 <span><Icon name="heart" className="lg"/></span><small className="font-mono">{fmt(reel.likes)}</small>
               </button>
-              <button className="rvr">
+              <button className="rvr" onClick={() => { navigate(`/posts/${reel.id}`); onClose?.() }} aria-label="Comments">
                 <span><Icon name="comment" className="lg"/></span><small className="font-mono">{fmt(reel.comments)}</small>
               </button>
               <button className={'rvr ' + (reel.saved ? 'sv' : '')} onClick={save}>
@@ -251,10 +340,13 @@ export function Reels({ onClose, initialId }) {
               </button>
             </div>
 
-            {/* playback timeline — pinned to the bottom of the reel */}
+            {/* playback timeline — drag to scrub, pinned to the bottom of the reel */}
             {videoUrl && !videoErr && (
-              <div className="rv-seek" onClick={seek}>
-                <div className="rv-seek-track"><div className="rv-seek-fill" style={{ width:`${Math.round(progress * 100)}%` }}/></div>
+              <div className="rv-seek" onPointerDown={onSeekDown} onPointerMove={onSeekMove} onPointerUp={onSeekUp} onPointerCancel={onSeekUp}>
+                <div className="rv-seek-track">
+                  <div className="rv-seek-fill" style={{ width:`${Math.round(progress * 100)}%` }}/>
+                  <span className="rv-seek-thumb" style={{ left:`${Math.round(progress * 100)}%` }}/>
+                </div>
               </div>
             )}
           </div>

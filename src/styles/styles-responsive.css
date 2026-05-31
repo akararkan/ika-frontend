@@ -537,7 +537,10 @@ img,video{max-width:100%;height:auto}
 .cmt-reply{margin-left:34px;margin-top:8px}                /* replaces inline marginLeft:34 on reply rows */
 .ntf-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:18px}
 .ntf-toolbar .tabs{flex:1;min-width:0;margin-bottom:0}
-.rv-mute{position:absolute;top:14px;right:14px;z-index:6;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center}
+.rv-mute{position:absolute;top:62px;right:14px;z-index:6;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.42);backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);border:1px solid rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;transition:transform .16s ease,background .16s ease;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.rv-mute:hover{background:rgba(0,0,0,.6)}
+.rv-mute:active{transform:scale(.9)}
+.rv-mute.off{background:rgba(194,69,63,.32);border-color:rgba(255,255,255,.22)}   /* muted state stands out */
 
 /* ============================================================
    10.1 · PHONE  (≤720px) — the bulk of the mobile overhaul
@@ -592,7 +595,13 @@ img,video{max-width:100%;height:auto}
   .rv-seek{bottom:calc(var(--mreel-bar) + var(--safe-b));padding:10px 14px;z-index:4}
   .rv-progress{top:calc(58px + var(--safe-t));left:calc(14px + var(--safe-l));right:calc(14px + var(--safe-r))}
   .rv-meta .rvm-author button.rvm-follow{padding:6px 16px;font-size:13px;min-height:34px}
-  .rv-mute{right:calc(14px + var(--safe-r))}
+  .rv-mute{top:calc(60px + var(--safe-t));right:calc(14px + var(--safe-r))}
+  /* segmented tabs sit a touch tighter on phones */
+  .rv-segs .rv-tab{padding:8px 16px;font-size:13.5px;min-height:38px}
+  .rv-segs .rv-tab.on{padding:8px 16px}
+  .rv-soundcue{top:calc(62px + var(--safe-t))}
+  /* fatter invisible hit-area for the scrub bar above the glass tab bar */
+  .rv-seek{padding-top:16px}
   /* in-viewer glass tab bar (the real botnav is covered by this overlay) */
   .rv-mtabbar{position:absolute;left:0;right:0;bottom:0;z-index:7;display:flex;justify-content:space-around;align-items:center;padding:8px calc(8px + var(--safe-l)) calc(10px + var(--safe-b)) calc(8px + var(--safe-r));background:linear-gradient(180deg,rgba(0,0,0,0),rgba(7,13,11,.6));backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);border-top:1px solid rgba(255,255,255,.12)}
   .rv-mtabbar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(255,255,255,.78);min-height:44px;justify-content:center}
@@ -773,4 +782,32 @@ img,video{max-width:100%;height:auto}
   /* in-reel glass-bar active indicator */
   .rv-mtabbar a{position:relative}
   .rv-mtabbar a.active::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:20px;height:2.5px;border-radius:0 0 3px 3px;background:#fff}
+}
+
+/* ============================================================
+   11 · MOBILE FEEL — extra finish on top of the §10 overhaul.
+   Non-structural: momentum, tap depth, type rhythm, zoom guard.
+   ============================================================ */
+@media(max-width:720px){
+  /* Momentum scroll + no rubber-band chaining on the main surfaces */
+  .col-main,.feed,.modal,.cm-modal,.dlg,.sidebar,.set-side{-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+
+  /* Bottom nav: livelier active state — icon lifts, label firms up */
+  .botnav a .ico{transition:transform .16s ease,color .16s ease}
+  .botnav a.active .ico{transform:translateY(-1px) scale(1.07)}
+  .botnav a.active small{font-weight:700}
+  .botnav a.mid .plus{box-shadow:0 7px 18px -6px rgba(14,107,84,.62),inset 0 1px 0 rgba(255,255,255,.28)}
+
+  /* Comfortable reading rhythm for long bodies on phones */
+  .post-body,.ans-body,.rd-body,.qd-body,.prose{line-height:1.62}
+
+  /* Press depth for primary actions that lacked it */
+  .btn-primary:active,.cta-compose:active,.rvm-follow:active{transform:scale(.97)}
+}
+
+/* Tiny phones: keep the reel rail counts from crowding the caption */
+@media(max-width:380px){
+  .rvr > span{width:44px;height:44px}
+  .rv-rail{gap:13px}
+  .rv-segs .rv-tab{padding:7px 13px}
 }
