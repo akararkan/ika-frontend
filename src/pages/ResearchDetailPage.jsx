@@ -372,9 +372,9 @@ export function ResearchDetailPage() {
                     ))}
                   </section>
                 )}
-                {!!files.length && r.downloadsEnabled && (
+                {!!files.length && (
                   <section className="card card-pad">
-                    <h3 className="title"><Icon name="doc" className="sm"/>Downloadable files</h3>
+                    <h3 className="title"><Icon name="doc" className="sm"/>Files &amp; materials<span className="rd-srcn">{files.length}</span>{!r.downloadsEnabled && <small className="muted text-xs" style={{ marginLeft:8, fontWeight:500 }}>· downloads off</small>}</h3>
                     <div className="rd-files">
                       {files.map((m) => (
                         <button key={m.id} className="rd-file" onClick={() => downloadMedia(m.id)}>

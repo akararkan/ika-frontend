@@ -213,6 +213,9 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   const mediaRef = React.useRef(null)
 
   /* ---- cover image ---- */
+  // The cover endpoint (and media/video) is gated to scholars/researchers; a plain
+  // USER gets a 403. Guard up-front so we never push an op that silently 403s.
+  const canCover = ['SCHOLAR', 'RESEARCHER', 'ADMIN', 'SUPER_ADMIN'].includes(String(user?.role || '').toUpperCase())
   const [coverFile, setCoverFile] = React.useState(null)
   const [coverRemoved, setCoverRemoved] = React.useState(false)
   const coverRef = React.useRef(null)
@@ -233,6 +236,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   const videoShown = videoPreview || (videoRemoved ? null : existingVideo)
 
   const [busy, setBusy] = React.useState(false)
+  const busyRef = React.useRef(false)   // synchronous lock — blocks double-submits before the disabled state renders
   // Per-step progress (id → { name, status: pending|running|done|failed, error })
   const stepsRef = React.useRef({})
   const [steps, setSteps] = React.useState({})
@@ -277,6 +281,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           re-runs only those, "Close anyway" accepts the partial save.
   ============================================================================ */
   const submit = async () => {
+    if (busyRef.current) return        // already saving → ignore the extra click (prevents duplicate research)
     if (!title.trim()) return
 
     // validate schedule (must be in the future — §23)
@@ -327,7 +332,8 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           },
           onSuccess: () => setMedia(prev => prev.filter(x => x._id !== m._id)),
         }))
-        if (coverFile) ops.push({
+        if (coverFile && !canCover) showToast('Cover upload needs a Scholar or Researcher role — saved without it')
+        if (coverFile && canCover) ops.push({
           id: 'cover', name: 'Uploading cover image',
           run: () => api.research.uploadCover(editResearch.id, coverFile),
           onSuccess: () => setCoverFile(null),
@@ -381,7 +387,8 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
             })
           })
         }
-        if (coverFile && created?.id) ops.push({
+        if (coverFile && created?.id && !canCover) showToast('Cover upload needs a Scholar or Researcher role — published without it')
+        if (coverFile && created?.id && canCover) ops.push({
           id: 'cover', name: 'Uploading cover image',
           run: () => api.research.uploadCover(created.id, coverFile),
           onSuccess: () => setCoverFile(null),
@@ -400,7 +407,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
     }
 
     /* ---- Execute ---- */
-    setBusy(true); setSaveError(null)
+    busyRef.current = true; setBusy(true); setSaveError(null)   // claim the lock before the first await so a 2nd click can't get in
     stepsRef.current = { [critical.id]: { name: critical.name, status: 'pending', error: null } }
     setSteps({ ...stepsRef.current })
 
@@ -414,7 +421,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
     } catch (e) {
       updateStep(critical.id, 'failed', e)
       setSaveError({ critical: true, message: e?.message || 'Could not save your changes' })
-      setBusy(false)
+      setBusy(false); busyRef.current = false
       return
     }
 
@@ -430,7 +437,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
       }))
     }
 
-    setBusy(false)
+    setBusy(false); busyRef.current = false
 
     // 3) tally + decide
     const failures = Object.values(stepsRef.current).filter(s => s.status === 'failed')
@@ -577,6 +584,11 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
             <div className="cm-drop" onClick={() => coverRef.current?.click()} style={{ cursor:'pointer' }}>
               <Icon name="image" className="lg"/><b>Add a cover image</b><span className="text-xs">PNG / JPG · landscape works best</span>
             </div>
+          )}
+          {coverFile && !canCover && (
+            <small className="text-xs" style={{ display:'block', marginTop:6, color:'var(--rose)', fontWeight:600 }}>
+              <Icon name="lock" className="xs"/> Cover images require a Scholar or Researcher role.
+            </small>
           )}
 
           {/* ---- video promo (§7) ---- */}

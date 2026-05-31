@@ -6,6 +6,19 @@
    ========================================================= */
 import { assetUrl } from './config.js'
 
+/* Plain-text projection of a possibly-HTML string — used for card previews so a
+   body that arrives as HTML (e.g. an editor dumped tags into `abstractText`)
+   never renders as raw `<h1 …>` markup. Dependency-free, no DOM side-effects. */
+export function stripHtml(s) {
+  if (!s || typeof s !== 'string' || s.indexOf('<') === -1) return s || ''
+  return s
+    .replace(/<\s*\/?(br|p|h[1-6]|li|div|tr|blockquote)[^>]*>/gi, ' ')   // block boundaries → space
+    .replace(/<[^>]+>/g, '')                                              // strip remaining tags
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#3?9;/g, "'")
+    .replace(/\s+/g, ' ').trim()
+}
+
 export function initialsOf(name = '') {
   const parts = String(name).trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '··'
@@ -324,7 +337,7 @@ export function researchFrom(dto) {
     status: dto.status || 'PUBLISHED',
     irc: dto.ircId || '',
     title: dto.title || '',
-    abstract: dto.abstractText || '',
+    abstract: stripHtml(dto.abstractText || ''),         // card preview = plain text (some rows store HTML here)
     abstractHtml: dto.abstractHtml || '',                // server-rendered preview HTML for feed cards
     bodyFormat: dto.bodyFormat || 'PLAIN',
     overview: dto.description || dto.abstractText || '',
