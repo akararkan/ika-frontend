@@ -76,9 +76,9 @@ optimistic updates never double-count. See `pages/PostPage.jsx`.
 ## Public vs. admin
 
 Only public / authenticated-user features are exposed. Admin & scholar-gated
-actions are hidden: best-answer voting shows only to `SCHOLAR`/`ADMIN`, answer
-**Accept** only to the question author, **Publish research** only to
-`SCHOLAR`/`RESEARCHER`/`ADMIN`. Sound auto-approve, sound approval, and poll
+actions are hidden: answer **Accept** (the sole Q&A quality signal — best-answer
+voting was removed) shows only to the question author, **Publish research** only
+to `SCHOLAR`/`RESEARCHER`/`ADMIN`. Sound auto-approve, sound approval, and poll
 voter lists are never surfaced.
 
 ## Notes on assumed endpoints

@@ -321,14 +321,6 @@ export function ResearchDetailPage() {
             <section className="card card-pad">
               <h3 className="title"><Icon name="doc" className="sm"/>Abstract</h3>
               <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
-              {r.keywords && (
-                <div className="rd-keywords">
-                  <span className="rd-keywords-label">Keywords</span>
-                  {r.keywords.split(',').map(k => k.trim()).filter(Boolean).map((k, i) => (
-                    <span key={i} className="rd-kw">{k}</span>
-                  ))}
-                </div>
-              )}
             </section>
             {(r.descriptionHtml || r.description) && (
               <section className="card card-pad">

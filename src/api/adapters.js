@@ -371,10 +371,7 @@ export function answerFrom(dto) {
     formattedDate: dto.formattedDate || '',
     createdAt: dto.createdAt || null,
     updatedAt: dto.updatedAt || null,
-    accepted: !!dto.accepted,
-    best: !!dto.isBestAnswer,
-    votes: dto.bestAnswerVoteCount || 0,
-    votedByMe: !!dto.votedByMe,
+    accepted: !!dto.accepted,                        // author-accept is the sole quality signal (best-answer voting removed)
     likes: dto.reactionCount || 0,
     myReaction: dto.myReaction || null,
     _liked: dto.myReaction === 'LIKE',

@@ -60,7 +60,7 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
         <h1 className="auth-hero">A scholarly community,<br/>built on <em>trust</em> and <em>isnad</em>.</h1>
         <p className="auth-sub">Share posts, publish peer-reviewed research with minted IRC identifiers, ask and answer questions, and learn from verified scholars across the world.</p>
         <ul className="auth-bullets">
-          <li><span><Icon name="award" className="sm"/></span> Verified scholar program with badge & best-answer voting</li>
+          <li><span><Icon name="award" className="sm"/></span> Verified scholar program with a profile badge</li>
           <li><span><Icon name="research" className="sm"/></span> Publish research with a minted IRC identifier</li>
           <li><span><Icon name="users" className="sm"/></span> Follow, learn, and collaborate with colleagues</li>
           <li><span><Icon name="shield" className="sm"/></span> Moderation & dispute resolution by elected scholars</li>

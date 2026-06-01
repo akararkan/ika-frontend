@@ -52,11 +52,9 @@ export const qna = {
   react(questionId, answerId)   { return http.post(`/api/v1/questions/${questionId}/answers/${answerId}/react`, { reactionType: 'LIKE' }) },
   unreact(questionId, answerId) { return http.del(`/api/v1/questions/${questionId}/answers/${answerId}/react`) },
 
-  /* ---- accept / best ---- */
+  /* ---- accept (author-only — the sole quality signal; best-answer voting was removed) ---- */
   accept(questionId, answerId)  { return http.post(`/api/v1/questions/${questionId}/answers/${answerId}/accept`, {}) },
   unaccept(questionId, answerId){ return http.del(`/api/v1/questions/${questionId}/answers/${answerId}/accept`) },
-  markBest(questionId, answerId){ return http.post(`/api/v1/questions/${questionId}/answers/${answerId}/best`, {}) },   // scholar-gated
-  unvoteBest(questionId, answerId){ return http.del(`/api/v1/questions/${questionId}/answers/${answerId}/best`) },
 
   /* ---- answer attachments (§15) & sources (§16) ---- */
   async listAttachments(questionId, answerId) { return (await http.get(`/api/v1/questions/${questionId}/answers/${answerId}/attachments`) || []).map(attachmentFrom) },

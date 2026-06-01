@@ -418,6 +418,7 @@
 .cm-research-body{
   padding:20px 22px 24px;
   scroll-padding-top:64px;            /* anchors land below the sticky head */
+  background:linear-gradient(180deg,#fcfbf6,#f9f7ef);   /* faint warm paper so the white editor cards float */
 }
 .cm-research-body > .field-label:first-child{margin-top:0}
 
@@ -428,7 +429,7 @@
   text-transform:uppercase;color:var(--muted);
   margin:0 0 7px;
 }
-.cm-research-body .field.lg{height:50px;font-size:16px}
+.cm-research-body .field.lg{height:50px;font-size:16px;box-shadow:0 1px 2px rgba(11,26,22,.04),0 6px 18px -12px rgba(11,26,22,.16)}
 
 /* ---- Section head (.cm-section) → manuscript "chapter" break ----
    A hairline rule, a glossy brass icon chip, a serif title and an
@@ -460,10 +461,11 @@
 }
 .cm-rte-label .field-label{margin:0}
 .cm-rte-hint{font-size:11.5px;color:var(--muted);font-weight:500;font-style:italic}
-.cm-research-body .rte{border-radius:13px;margin-top:0;box-shadow:var(--shadow-sm)}
-.cm-research-body .rte:focus-within{box-shadow:0 0 0 4px rgba(21,154,118,.1)}
+.cm-research-body .rte{border-radius:13px;margin-top:0;background:var(--card);box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.22)}
+.cm-research-body .rte:focus-within{border-color:var(--emerald-bright);box-shadow:0 0 0 4px rgba(21,154,118,.1),0 8px 22px -14px rgba(11,26,22,.22)}
 .cm-research-body .rte-bar{padding:7px 10px;gap:10px}
-.cm-research-body .rte-tools{padding:6px 8px;gap:1px;flex-wrap:wrap}
+.cm-research-body .rte-bar:empty{display:none}      /* research is WYSIWYG-only — no format pills/label → drop the empty strip */
+.cm-research-body .rte-tools{padding:7px 9px;gap:2px;flex-wrap:wrap;background:linear-gradient(180deg,var(--card-2),#fbf9f2)}
 .cm-research-body .rte-tool{width:30px;height:30px;border-radius:8px}
 .cm-research-body .rte-tool .ico{width:16px;height:16px}
 .cm-research-body .rte-tool-text{font-size:12.5px}
@@ -480,21 +482,23 @@
    Wrapped in a soft card so the dense lower form reads as one tidy block. */
 .cm-research-body .set-grid{
   gap:14px;margin-top:14px;padding:16px;
-  background:var(--card-2);border:1px solid var(--line-soft);
-  border-radius:13px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:13px;box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.2);
 }
-.cm-research-body .set-grid .field{background:var(--card)}
+.cm-research-body .set-grid .field,
+.cm-research-body .set-grid select.field{background:var(--card-2)}   /* inset fields on the white card */
 
 /* ---- Drop zones (cover / video / files) → inviting elevated cards ---- */
 .cm-research-body .cm-drop{
   margin-top:10px;padding:26px 16px;border-radius:14px;
-  border:1.5px dashed #d9cfb0;background:var(--card-2);
+  border:1.5px dashed #d9cfb0;background:var(--card);
   display:flex;flex-direction:column;align-items:center;gap:7px;
-  color:var(--ink-soft);transition:.18s;box-shadow:var(--shadow-sm);
+  color:var(--ink-soft);transition:.18s;
+  box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.18);
 }
 .cm-research-body .cm-drop:hover{
-  border-color:var(--emerald-bright);background:rgba(31,185,142,.05);
-  transform:translateY(-1px);box-shadow:0 9px 24px -12px rgba(21,154,118,.4);
+  border-color:var(--emerald-bright);background:rgba(31,185,142,.04);
+  transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(21,154,118,.42);
 }
 .cm-research-body .cm-drop .ico{width:30px;height:30px;color:var(--emerald);margin-bottom:2px}
 .cm-research-body .cm-drop b{color:var(--ink);font-size:14.5px}

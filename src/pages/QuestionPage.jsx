@@ -1,7 +1,7 @@
 /* =========================================================
    Question detail page — /qna/:id
    Full QnA coverage: answers + reanswers (text / media / voice),
-   inline sources & attachments, reactions, accept, best-vote,
+   inline sources & attachments, reactions, author-accept,
    answer & question edit-delete, lock / answer-limit, share-link,
    and a live SSE stream that patches every counter and list in place.
    ========================================================= */
@@ -56,7 +56,6 @@ export function QuestionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const isScholar = ['SCHOLAR','ADMIN'].includes(user?.role)
 
   const [q, setQ] = React.useState(null)
   const [answers, setAnswers] = React.useState([])
@@ -120,8 +119,8 @@ export function QuestionPage() {
   // echoes our own actions back — so we patch the one row in place, no refetch.
   const numFrom = (evt, key) => { const v = evt[key] ?? evt.count; return typeof v === 'number' ? v : null }
   // take counts/content from the broadcast, but keep THIS viewer's own state
-  // (myReaction/votedByMe are neutral on the wire — §9.1)
-  const mergeViewer = (fresh, prev) => prev ? { ...fresh, _liked: prev._liked, myReaction: prev.myReaction, votedByMe: prev.votedByMe } : fresh
+  // (myReaction is neutral on the wire — §9.1)
+  const mergeViewer = (fresh, prev) => prev ? { ...fresh, _liked: prev._liked, myReaction: prev.myReaction } : fresh
   useRealtime('questions', q ? id : null, {
     onEvent: (evt) => {
       const t = evt.eventType
@@ -140,7 +139,7 @@ export function QuestionPage() {
         setAnswers(arr => arr.filter(x => x.id !== aid))
         if (root) { patchA(root, x => ({ ...x, replyCount: Math.max(0, (x.replyCount || 0) - 1) })); setRepliesMap(m => m[root] ? ({ ...m, [root]: m[root].filter(r => r.id !== aid) }) : m) }
         else setQ(p => p && ({ ...p, answers: Math.max(0, (p.answers || 0) - 1) }))
-      } else if (fresh && ['ANSWER_EDITED','ANSWER_REACTION_ADDED','ANSWER_REACTION_REMOVED','ANSWER_REACTION_CHANGED','ANSWER_ACCEPTED','ANSWER_UNACCEPTED','BEST_ANSWER_VOTED','BEST_ANSWER_UNVOTED'].includes(t)) {
+      } else if (fresh && ['ANSWER_EDITED','ANSWER_REACTION_ADDED','ANSWER_REACTION_REMOVED','ANSWER_REACTION_CHANGED','ANSWER_ACCEPTED','ANSWER_UNACCEPTED'].includes(t)) {
         if (root) setRepliesMap(m => m[root] ? ({ ...m, [root]: m[root].map(r => r.id === fresh.id ? mergeViewer(fresh, r) : r) }) : m)
         else patchA(fresh.id, prev => mergeViewer(fresh, prev))
         if (t === 'ANSWER_ACCEPTED' || t === 'ANSWER_UNACCEPTED') api.qna.get(id).then(setQ).catch(() => {})   // refresh status + acceptedAnswerCount
@@ -212,7 +211,6 @@ export function QuestionPage() {
   /* ---- answers ---- */
   const react = (a) => { patchA(a.id, x => ({ ...x, _liked:!x._liked, likes:x.likes + (x._liked?-1:1) })); (a._liked ? api.qna.unreact(id, a.id) : api.qna.react(id, a.id)).catch(() => loadAnswers()) }
   const accept = (a) => { patchA(a.id, x => ({ ...x, accepted:!x.accepted })); (a.accepted ? api.qna.unaccept(id, a.id) : api.qna.accept(id, a.id)).then(() => setQ(p => p && ({ ...p, status: a.accepted ? p.status : 'ANSWERED' }))).catch(() => loadAnswers()) }
-  const best = (a) => { patchA(a.id, x => ({ ...x, votedByMe:!x.votedByMe, votes:x.votes + (x.votedByMe?-1:1), best:true })); (a.votedByMe ? api.qna.unvoteBest(id, a.id) : api.qna.markBest(id, a.id)).catch(() => loadAnswers()) }
 
   /* ---- answer media / voice / sources ---- */
   const onPickMedia = (e) => { const f = e.target.files?.[0]; if (f) { setAnsMedia(f); setAnsVoice(null) } e.target.value = '' }
@@ -426,9 +424,8 @@ export function QuestionPage() {
           const own = !!(user && a.author === user.id)
           const editing = editAid === a.id
           return (
-            <div key={a.id} className={'card card-pad answer ' + (a.accepted ? 'accepted' : a.best ? 'best' : '')}>
+            <div key={a.id} className={'card card-pad answer ' + (a.accepted ? 'accepted' : '')}>
               {a.accepted && <div className="ans-banner accepted"><Icon name="check" className="xs"/>Accepted by the author</div>}
-              {a.best && !a.accepted && <div className="ans-banner gold"><Icon name="star" className="xs"/>Best answer · {a.votes} scholar vote{a.votes===1?'':'s'}</div>}
               <header>
                 <span role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/u/${a.author}`)}><Avatar initials={au.initials} color={au.avc} size={40} src={au.profileImage}/></span>
                 <div style={{flex:1}}>
@@ -479,9 +476,6 @@ export function QuestionPage() {
 
               <div className="ans-actions">
                 <button className={'btn btn-secondary btn-sm ' + (a._liked ? 'on-rose' : '')} onClick={() => react(a)}><Icon name="heart" className="xs"/>{a.likes}</button>
-                {isScholar
-                  ? <button className={'btn btn-secondary btn-sm ' + (a.votedByMe ? 'on-brass' : '')} onClick={() => best(a)}><Icon name="star" className="xs"/>Best · {a.votes}</button>
-                  : <span className="btn btn-secondary btn-sm" style={{ cursor:'default' }}><Icon name="star" className="xs"/>{a.votes}</span>}
                 <button className="btn btn-secondary btn-sm" onClick={() => { const open = replyTo === a.id; setReplyTo(open ? null : a.id); setReplyTarget(null) }}><Icon name="reply" className="xs"/>Reply{a.replyCount ? ` · ${a.replyCount}` : ''}</button>
                 {own && !editing && <button className="btn btn-secondary btn-sm" onClick={() => startEditA(a)}><Icon name="compose" className="xs"/>Edit</button>}
                 {own && <button className={'btn btn-secondary btn-sm ' + (openManage[a.id] ? 'on-brass' : '')} onClick={() => toggleManage(a)}><Icon name="book" className="xs"/>Sources &amp; files</button>}

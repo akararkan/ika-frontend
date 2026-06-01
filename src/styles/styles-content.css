@@ -75,10 +75,8 @@
 /* answer */
 .answer{margin-bottom:14px;position:relative}
 .answer.accepted{box-shadow:0 0 0 1px rgba(21,154,118,.4),var(--shadow-sm);border-color:rgba(21,154,118,.4)}
-.answer.best{box-shadow:0 0 0 1px rgba(189,147,68,.5),var(--shadow-sm);border-color:rgba(189,147,68,.5)}
 .ans-banner{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;margin-bottom:12px}
 .ans-banner.accepted{color:var(--emerald)}
-.ans-banner.gold{color:#7a5a1a}
 .answer > header{display:flex;align-items:center;gap:11px;margin-bottom:11px}
 .ans-body{font-size:15px;color:var(--ink-2);line-height:1.65}
 .ans-ref{color:var(--emerald);font-weight:600;font-style:normal}
@@ -456,21 +454,6 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 @media(max-width:600px){
   .rd-file-action{padding:0;width:36px;justify-content:center}
   .rd-file-action-tx{display:none}
-}
-
-/* ---------- Keywords (academic index terms, shown under the abstract) ---------- */
-.rd-keywords{
-  display:flex;flex-wrap:wrap;align-items:center;gap:7px;
-  margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);
-}
-.rd-keywords-label{
-  font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.5px;
-  text-transform:uppercase;color:var(--muted);margin-right:2px;
-}
-.rd-kw{
-  font-size:12.5px;font-weight:500;color:var(--ink-soft);
-  background:var(--card-2);border:1px solid var(--line);
-  padding:3px 11px;border-radius:999px;
 }
 
 /* Academic-style numbered references */
