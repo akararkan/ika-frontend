@@ -76,13 +76,30 @@ function Toggle({ title, desc, on, onChange, disabled }) {
   )
 }
 
-function SectionHead({ icon, title, hint, first }) {
+/* Left-rail sections + scroll-spy targets. icon = project Icon name. */
+const RM_SECTIONS = [
+  { id:'essentials',   icon:'doc',       label:'Essentials',      hint:'Title · abstract · body' },
+  { id:'discovery',    icon:'hash',      label:'Discovery',       hint:'Keywords · tags · citation' },
+  { id:'media',        icon:'image',     label:'Media',           hint:'Cover & promo video' },
+  { id:'contributors', icon:'users',     label:'Contributors',    hint:'Co-authors & advisors' },
+  { id:'sources',      icon:'cite',      label:'Sources',         hint:'References & citations' },
+  { id:'files',        icon:'paperclip', label:'Files & figures', hint:'PDF · datasets · figures' },
+  { id:'publishing',   icon:'settings',  label:'Publishing',      hint:'Permissions & schedule' },
+]
+
+/* One content section. Module-level (stable identity) so the rich-text editors
+   inside never remount on re-render. `innerRef` registers the node so the rail
+   can scroll-spy / jump to it. */
+function RmSection({ id, icon, title, tag, innerRef, children }) {
   return (
-    <div className={'cm-section' + (first ? ' first' : '')}>
-      <span className="cm-section-ic"><Icon name={icon} className="sm"/></span>
-      <b className="cm-section-title">{title}</b>
-      {hint && <span className="muted text-xs cm-section-hint">{hint}</span>}
-    </div>
+    <section className="rm-sec" data-sec={id} ref={innerRef}>
+      <header className="rm-sec-hd">
+        <span className="rm-sec-ic"><Icon name={icon} className="sm"/></span>
+        <h3 className="rm-sec-t">{title}</h3>
+        {tag && <span className="rm-sec-tag">{tag}</span>}
+      </header>
+      <div className="rm-sec-body">{children}</div>
+    </section>
   )
 }
 
@@ -467,20 +484,71 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
 
   const ctaLabel = busy ? 'Saving…' : isEdit ? 'Save changes' : scheduledAt ? 'Schedule' : publishNow ? 'Publish' : 'Create draft'
 
-  return (
-    <div className="overlay open" onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
-      <div className="modal cm-research" style={{ maxWidth: 760 }}>
-        <div className="mhead">
-          <div className="cm-head-text">
-            <h3>{isEdit ? 'Edit research' : 'Publish research'}</h3>
-            <p className="cm-head-sub">{isEdit
-              ? 'Refine your paper — body formatting, sources, media & contributors.'
-              : 'Publish scholarly work — rich formatting, sources, media & co-authors.'}</p>
-          </div>
-          <button className="x" onClick={onClose} disabled={busy} aria-label="Close"><Icon name="close" className="sm"/></button>
-        </div>
+  /* ---- left-rail scroll-spy + completion ---- */
+  const scrollRef = React.useRef(null)
+  const secRefs = React.useRef({})
+  const [activeSec, setActiveSec] = React.useState('essentials')
+  const [progress, setProgress] = React.useState(0)
+  const onScroll = () => {
+    const c = scrollRef.current; if (!c) return
+    const top = c.scrollTop + 130
+    let cur = RM_SECTIONS[0].id
+    for (const s of RM_SECTIONS) { const el = secRefs.current[s.id]; if (el && el.offsetTop <= top) cur = s.id }
+    setActiveSec(cur)
+    const denom = c.scrollHeight - c.clientHeight || 1
+    setProgress(Math.max(0, Math.min(1, c.scrollTop / denom)))
+  }
+  const goto = (id) => { const el = secRefs.current[id], c = scrollRef.current; if (el && c) c.scrollTo({ top: Math.max(0, el.offsetTop - 16), behavior:'smooth' }) }
+  const meInitials = me.initials || (me.full || 'Y').slice(0, 2).toUpperCase()
+  const done = {
+    essentials:   !!title.trim(),
+    discovery:    tags.length > 0 || !!keywords.trim(),
+    media:        !!coverShown || !!videoShown,
+    contributors: contribs.length > 0,
+    sources:      sources.length > 0,
+    files:        media.length > 0 || existingMedia.length > 0,
+    publishing:   true,
+  }
 
-        <div className="mbody cm-research-body" style={{ position:'relative' }}>
+  return (
+    <div className="overlay open rm-overlay" onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className="modal rm-modal" role="dialog" aria-label={isEdit ? 'Edit research' : 'Publish research'}>
+        {/* Header — emblem + title + live progress bar */}
+        <header className="rm-hd">
+          <span className="rm-hd-pat" aria-hidden="true"/>
+          <span className="rm-hd-emblem" aria-hidden="true"><i/></span>
+          <div className="rm-hd-text">
+            <h2 className="rm-hd-title">{isEdit ? 'Edit research' : 'Publish research'}</h2>
+            <p className="rm-hd-sub">{isEdit
+              ? 'Refine your paper — formatting, sources, media & contributors.'
+              : 'Scholarly work — rich formatting, sources, media & co-authors.'}</p>
+          </div>
+          <button className="rm-hd-close" onClick={onClose} disabled={busy} aria-label="Close"><Icon name="close" className="sm"/></button>
+          <div className="rm-hd-progress"><span style={{ width: (progress * 100).toFixed(1) + '%' }}/></div>
+        </header>
+
+        <div className="rm-body">
+          {/* Section rail */}
+          <nav className="rm-nav" aria-label="Sections">
+            <ul className="rm-nav-list">
+              {RM_SECTIONS.map(s => (
+                <li key={s.id}>
+                  <button type="button" className={'rm-nav-item' + (activeSec === s.id ? ' on' : '')} onClick={() => goto(s.id)}>
+                    <span className="rm-nav-ic"><Icon name={s.icon} className="sm"/></span>
+                    <span className="rm-nav-tx"><span className="rm-nav-l">{s.label}</span><span className="rm-nav-h">{s.hint}</span></span>
+                    {done[s.id] && <span className="rm-nav-ck"><Icon name="check" className="xs"/></span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="rm-nav-foot">
+              <Avatar initials={meInitials} color={me.avc} size={36} src={me.profileImage}/>
+              <div className="rm-nav-foot-tx"><span className="rm-nf-name">{me.full}</span><span className="rm-nf-role">Corresponding author</span></div>
+            </div>
+          </nav>
+
+          {/* Scrollable content */}
+          <div className="rm-content" ref={scrollRef} onScroll={onScroll}>
           {/* ---- progress overlay (active while saving) ---- */}
           {busy && (
             <div className="cm-saving">
@@ -540,160 +608,167 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           )}
 
           {/* ---- the form (hidden while a save is in progress so the progress panel reads cleanly) ---- */}
-          {!busy && (<>
-          {/* ---- core text ---- */}
-          <SectionHead icon="doc" title="Essentials" hint="title, abstract, body, taxonomy" first/>
-          <label className="field-label">Title</label>
-          <input className="field lg" placeholder="The effects of X on Y" value={title} onChange={e => setTitle(e.target.value)}/>
+          {!busy && (
+            <div className="rm-inner">
+              <RmSection id="essentials" icon="doc" title="Essentials" tag="required" innerRef={el => (secRefs.current.essentials = el)}>
+                <div className="rm-field">
+                  <label className="rm-lbl">Title</label>
+                  <input className="inp inp-lg rm-title" placeholder="The effects of X on Y" value={title} onChange={e => setTitle(e.target.value)}/>
+                </div>
+                <div className="rm-field">
+                  <label className="rm-lbl">Abstract <span className="rm-lbl-h">select any text to format</span></label>
+                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={150} showFormat={false}
+                    placeholder="A concise abstract of the work — select any text and use the toolbar to format it."/>
+                </div>
+                <div className="rm-field">
+                  <label className="rm-lbl">Body / overview <span className="rm-lbl-h">kept on the published page</span></label>
+                  <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={280} showFormat={false}
+                    placeholder="Write your research — headings, lists, tables, images, colours, highlights…"/>
+                </div>
+              </RmSection>
 
-          <div className="cm-rte-label">
-            <label className="field-label">Abstract</label>
-            <span className="cm-rte-hint">Select any text — a formatting bar appears (bold, colour, highlight, headings…)</span>
-          </div>
-          <RichTextEditor
-            value={abstractText}
-            format="HTML"
-            onChange={setAbstract}
-            placeholder="A concise abstract of the work — select any text and use the toolbar to format it."
-            minHeight={150}
-            showFormat={false}
-          />
+              <RmSection id="discovery" icon="hash" title="Discovery" tag="how readers find it" innerRef={el => (secRefs.current.discovery = el)}>
+                <div className="rm-grid2">
+                  <div className="rm-field"><label className="rm-lbl">Keywords</label><input className="inp" placeholder="X, Y, methodology" value={keywords} onChange={e => setKeywords(e.target.value)}/></div>
+                  <div className="rm-field"><label className="rm-lbl">Visibility</label>
+                    <div className="rm-sel">
+                      <span className="rm-sel-ic"><Icon name={visibility === 'PUBLIC' ? 'globe' : visibility === 'PRIVATE' ? 'lock' : 'users'} className="xs"/></span>
+                      <select value={visibility} onChange={e => setVisibility(e.target.value)}>{VIS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+                      <span className="rm-sel-cv"><Icon name="chevdown" className="xs"/></span>
+                    </div>
+                  </div>
+                </div>
+                <div className="rm-field">
+                  <label className="rm-lbl">Tags <span className="rm-lbl-h">{tags.length}/30 · Enter to add</span></label>
+                  <TagInput value={tags} onChange={setTags} scope="RESEARCH" placeholder="Add tag (e.g. methodology), Enter to add"/>
+                  <p className="rm-micro">Tags surface in trending only after you publish.</p>
+                </div>
+                <div className="rm-field"><label className="rm-lbl">Suggested citation</label><input className="inp rm-cite" placeholder="Al-Qaradawi, Y. (2026). …" value={citation} onChange={e => setCitation(e.target.value)}/></div>
+              </RmSection>
 
-          <div className="cm-rte-label">
-            <label className="field-label">Body / overview</label>
-            <span className="cm-rte-hint">Select text to format (colours, highlights, headings, lists, tables, images) — kept on the published page.</span>
-          </div>
-          <RichTextEditor
-            value={description}
-            format="HTML"
-            onChange={setDescription}
-            placeholder="Write your research — headings, lists, tables, images, colours, highlights…"
-            minHeight={280}
-            showFormat={false}
-          />
+              <RmSection id="media" icon="image" title="Media" tag="shown on research cards" innerRef={el => (secRefs.current.media = el)}>
+                <input ref={coverRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) { setCoverFile(f); setCoverRemoved(false) } e.target.value = '' }}/>
+                <input ref={videoRef} type="file" hidden accept="video/mp4,video/webm,video/quicktime" onChange={e => { const f = e.target.files?.[0]; if (f) { setVideoFile(f); setVideoRemoved(false) } e.target.value = '' }}/>
+                <input ref={thumbRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setThumbFile(f); e.target.value = '' }}/>
+                <div className="rm-grid2">
+                  <div className="rm-field">
+                    <label className="rm-lbl">Cover image</label>
+                    {coverShown ? (
+                      <div className="rm-media-prev">
+                        <div className="rm-cover" style={{ background:`center/cover no-repeat url("${coverShown}")` }}/>
+                        <div className="rm-media-acts">
+                          <button className="btn btn-secondary btn-sm" onClick={() => coverRef.current?.click()}><Icon name="upload" className="xs"/>Replace</button>
+                          <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={removeCover}><Icon name="close" className="xs"/>Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button" className="rm-drop tall" onClick={() => coverRef.current?.click()}>
+                        <span className="rm-drop-ic"><Icon name="image"/></span>
+                        <span className="rm-drop-t">Add a cover image</span>
+                        <span className="rm-drop-h">PNG / JPG · landscape works best</span>
+                      </button>
+                    )}
+                    {coverFile && !canCover && <small className="rm-warn"><Icon name="lock" className="xs"/> Cover needs a Scholar / Researcher role.</small>}
+                  </div>
+                  <div className="rm-field">
+                    <label className="rm-lbl">Promo video</label>
+                    {videoShown ? (
+                      <div className="rm-media-prev">
+                        <video src={videoShown} poster={(thumbPreview || (videoRemoved ? null : existingThumb)) || undefined} controls playsInline className="rm-video"/>
+                        <div className="rm-media-acts">
+                          <button className="btn btn-secondary btn-sm" onClick={() => videoRef.current?.click()}><Icon name="upload" className="xs"/>Replace</button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => thumbRef.current?.click()}><Icon name="image" className="xs"/>{thumbFile ? 'Thumb set' : 'Thumbnail'}</button>
+                          <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={removeVideo}><Icon name="close" className="xs"/>Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button" className="rm-drop tall" onClick={() => videoRef.current?.click()}>
+                        <span className="rm-drop-ic"><Icon name="video"/></span>
+                        <span className="rm-drop-t">Add a promo video</span>
+                        <span className="rm-drop-h">MP4 / WebM / MOV · auto-detected</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </RmSection>
 
-          <div className="set-grid">
-            <div><label className="field-label">Keywords</label><input className="field" placeholder="X, Y, methodology" value={keywords} onChange={e => setKeywords(e.target.value)}/></div>
-            <div><label className="field-label">Visibility</label><select className="field" value={visibility} onChange={e => setVisibility(e.target.value)}>{VIS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
-            <div style={{ gridColumn:'1/-1' }}>
-              <label className="field-label">Tags</label>
-              <TagInput value={tags} onChange={setTags} scope="RESEARCH" placeholder="Add tag (e.g. methodology), Enter to add"/>
-              <small className="muted text-xs" style={{ marginTop:4, display:'block' }}>Tags appear in trending only after you publish (SEARCH_API §7.2).</small>
-            </div>
-            <div style={{ gridColumn:'1/-1' }}><label className="field-label">Suggested citation</label><input className="field" placeholder="Al-Qaradawi, Y. (2026). …" value={citation} onChange={e => setCitation(e.target.value)}/></div>
-          </div>
+              <RmSection id="contributors" icon="users" title="Contributors" tag="co-authors · advisors · translators" innerRef={el => (secRefs.current.contributors = el)}>
+                <ContributorsField value={contribs} onChange={setContribs} meId={me.id}/>
+              </RmSection>
 
-          {/* ---- cover image (§8) ---- */}
-          <SectionHead icon="image" title="Cover image" hint="shown on research cards"/>
-          <input ref={coverRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) { setCoverFile(f); setCoverRemoved(false) } e.target.value = '' }}/>
-          {coverShown ? (
-            <div>
-              <div style={{ height:150, borderRadius:14, border:'1px solid var(--line)', background:`center/cover no-repeat url("${coverShown}")` }}/>
-              <div className="flex gap-8" style={{ marginTop:8 }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => coverRef.current?.click()}><Icon name="upload" className="xs"/>Replace</button>
-                <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={removeCover}><Icon name="close" className="xs"/>Remove</button>
-              </div>
-            </div>
-          ) : (
-            <div className="cm-drop" onClick={() => coverRef.current?.click()} style={{ cursor:'pointer' }}>
-              <Icon name="image" className="lg"/><b>Add a cover image</b><span className="text-xs">PNG / JPG · landscape works best</span>
+              <RmSection id="sources" icon="cite" title="Sources & references" innerRef={el => (secRefs.current.sources = el)}>
+                {sources.map((s, i) => (
+                  <div key={i} className="rm-src-row">
+                    <span className="rm-src-badge">{SOURCE_LABEL[s.req.sourceType] || s.req.sourceType}</span>
+                    <span className="rm-src-title">{s.req.title}{s.file ? ` · ${s.file.name}` : ''}</span>
+                    <button className="icon-btn" title="Remove" onClick={() => removeSource(i)}><Icon name="close" className="sm"/></button>
+                  </div>
+                ))}
+                <div style={{ marginTop: sources.length ? 12 : 0 }}>
+                  <AddSourceForm onAdd={(req, file) => setSources(s => [...s, { req, file }])}/>
+                </div>
+              </RmSection>
+
+              <RmSection id="files" icon="paperclip" title="Files & figures" tag="paper PDF · datasets · figures" innerRef={el => (secRefs.current.files = el)}>
+                {existingMedia.map(m => (
+                  <div key={m.id} className="rm-src-row">
+                    <span className="rm-src-badge">{(m.type || 'file').toLowerCase()}</span>
+                    <span className="rm-src-title">{m.name}{m.caption ? ` · ${m.caption}` : ''}</span>
+                    <button className="icon-btn" title="Remove file" onClick={() => dropExisting(m.id)}><Icon name="close" className="sm"/></button>
+                  </div>
+                ))}
+                <input ref={mediaRef} type="file" hidden multiple accept=".pdf,.doc,.docx,image/*,video/*,audio/*" onChange={onPickMedia}/>
+                <button type="button" className="rm-drop tall" onClick={() => mediaRef.current?.click()}>
+                  <span className="rm-drop-ic"><Icon name="upload"/></span>
+                  <span className="rm-drop-t">{isEdit ? 'Add more files' : 'Click to add files'}</span>
+                  <span className="rm-drop-h">PDF · DOCX · images · audio · video</span>
+                </button>
+                {media.map((m, i) => (
+                  <div key={i} className="rm-file-card">
+                    <div className="rm-file-head">
+                      <span className="flex-c gap-6 text-sm" style={{ minWidth:0 }}><Icon name="doc" className="sm"/><span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.file.name}</span></span>
+                      <button className="icon-btn" onClick={() => removeMedia(i)}><Icon name="close" className="xs"/></button>
+                    </div>
+                    <div className="rm-grid2" style={{ marginTop:8 }}>
+                      <input className="inp" style={{ height:38 }} placeholder="Caption" value={m.caption} onChange={e => patchMedia(i, 'caption', e.target.value)}/>
+                      <input className="inp" style={{ height:38 }} placeholder="Alt text (accessibility)" value={m.altText} onChange={e => patchMedia(i, 'altText', e.target.value)}/>
+                    </div>
+                  </div>
+                ))}
+              </RmSection>
+
+              <RmSection id="publishing" icon="settings" title="Publishing" tag="permissions & schedule" innerRef={el => (secRefs.current.publishing = el)}>
+                <Toggle title="Allow comments" desc="Readers can discuss your work." on={commentsEnabled} onChange={setComments}/>
+                <Toggle title="Allow downloads" desc="Let readers save the attached files." on={downloadsEnabled} onChange={setDownloads}/>
+                <div className="set-toggle">
+                  <div><b>Schedule publication</b><small className="muted">Leave empty to keep it a draft (or publish now below).</small></div>
+                  <input className="inp inp-date" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)}/>
+                </div>
+                {!!scheduledAt && (
+                  <div className="flex-c gap-6 text-xs" style={{ color:'var(--emerald)', marginTop:6 }}>
+                    <Icon name="check" className="xs"/>Auto-publishes at the scheduled time — no need to publish manually.
+                  </div>
+                )}
+                {scheduledAt && <button className="text-xs muted" style={{ marginTop:4 }} onClick={() => setScheduledAt('')}>Clear schedule</button>}
+                {!isEdit && <Toggle title="Publish immediately" desc="Otherwise it's saved as a draft you can publish later." on={publishNow} onChange={setPublishNow} disabled={!!scheduledAt}/>}
+              </RmSection>
+
+              <div className="rm-end"><span/></div>
             </div>
           )}
-          {coverFile && !canCover && (
-            <small className="text-xs" style={{ display:'block', marginTop:6, color:'var(--rose)', fontWeight:600 }}>
-              <Icon name="lock" className="xs"/> Cover images require a Scholar or Researcher role.
-            </small>
-          )}
-
-          {/* ---- video promo (§7) ---- */}
-          <SectionHead icon="video" title="Video promo" hint="short MP4/MOV · duration auto-detected"/>
-          <input ref={videoRef} type="file" hidden accept="video/mp4,video/webm,video/quicktime" onChange={e => { const f = e.target.files?.[0]; if (f) { setVideoFile(f); setVideoRemoved(false) } e.target.value = '' }}/>
-          <input ref={thumbRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setThumbFile(f); e.target.value = '' }}/>
-          {videoShown ? (
-            <div>
-              <video src={videoShown} poster={(thumbPreview || (videoRemoved ? null : existingThumb)) || undefined} controls playsInline
-                style={{ width:'100%', maxHeight:240, borderRadius:14, background:'#000' }}/>
-              <div className="flex gap-8" style={{ marginTop:8, flexWrap:'wrap' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => videoRef.current?.click()}><Icon name="upload" className="xs"/>Replace video</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => thumbRef.current?.click()}><Icon name="image" className="xs"/>{thumbFile ? 'Thumbnail set' : 'Set thumbnail'}</button>
-                <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={removeVideo}><Icon name="close" className="xs"/>Remove</button>
-              </div>
-            </div>
-          ) : (
-            <div className="cm-drop" onClick={() => videoRef.current?.click()} style={{ cursor:'pointer' }}>
-              <Icon name="video" className="lg"/><b>Add a promo video</b><span className="text-xs">MP4 / WebM / MOV</span>
-            </div>
-          )}
-
-          {/* ---- contributors (§11) ---- */}
-          <SectionHead icon="users" title="Contributors" hint="co-authors, advisors, translators…"/>
-          <ContributorsField value={contribs} onChange={setContribs} meId={me.id}/>
-
-          {/* ---- sources (§10) ---- */}
-          <SectionHead icon="cite" title="Sources & references"/>
-          {sources.map((s, i) => (
-            <div key={i} className="flex gap-8" style={{ marginTop:8, alignItems:'center' }}>
-              <span className="src-tag">{SOURCE_LABEL[s.req.sourceType] || s.req.sourceType}</span>
-              <span style={{ flex:1, fontSize:13 }}>{s.req.title}{s.file ? ` · ${s.file.name}` : ''}</span>
-              <button className="icon-btn" title="Remove" onClick={() => removeSource(i)}><Icon name="close" className="sm"/></button>
-            </div>
-          ))}
-          <div style={{ marginTop:10 }}>
-            <AddSourceForm onAdd={(req, file) => setSources(s => [...s, { req, file }])}/>
           </div>
-
-          {/* ---- files / figures (§9) ---- */}
-          <SectionHead icon="doc" title="Files & figures" hint="paper PDF, datasets, figures"/>
-          {/* existing media (edit) with remove */}
-          {existingMedia.map(m => (
-            <div key={m.id} className="src-row" style={{ marginBottom:8 }}>
-              <span className="src-ic" style={{ background:'#15302a' }}><Icon name={m.type === 'IMAGE' ? 'image' : m.type === 'VIDEO' ? 'video' : m.type === 'AUDIO' ? 'mic' : 'doc'} className="sm"/></span>
-              <div className="src-info"><b>{m.name}</b><small className="muted">{m.caption || (m.type || '').toLowerCase()}</small></div>
-              <button className="icon-btn" title="Remove file" onClick={() => dropExisting(m.id)}><Icon name="close" className="sm"/></button>
-            </div>
-          ))}
-          <input ref={mediaRef} type="file" hidden multiple accept=".pdf,.doc,.docx,image/*,video/*,audio/*" onChange={onPickMedia}/>
-          <div className="cm-drop" onClick={() => mediaRef.current?.click()} style={{ cursor:'pointer' }}>
-            <Icon name="upload" className="lg"/><b>{isEdit ? 'Add more files' : 'Click to add files'}</b>
-            <span className="text-xs">PDF / DOCX / images / audio / video</span>
-          </div>
-          {media.map((m, i) => (
-            <div key={i} className="card-tight card" style={{ marginTop:8 }}>
-              <div className="flex-c gap-8" style={{ justifyContent:'space-between' }}>
-                <span className="flex-c gap-6 text-sm" style={{ minWidth:0 }}><Icon name="doc" className="sm"/><span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.file.name}</span></span>
-                <button className="icon-btn" onClick={() => removeMedia(i)}><Icon name="close" className="xs"/></button>
-              </div>
-              <div className="set-grid" style={{ marginTop:8 }}>
-                <input className="field" style={{ height:38 }} placeholder="Caption" value={m.caption} onChange={e => patchMedia(i, 'caption', e.target.value)}/>
-                <input className="field" style={{ height:38 }} placeholder="Alt text (accessibility)" value={m.altText} onChange={e => patchMedia(i, 'altText', e.target.value)}/>
-              </div>
-            </div>
-          ))}
-
-          {/* ---- settings ---- */}
-          <SectionHead icon="settings" title="Publishing"/>
-          <Toggle title="Allow comments" on={commentsEnabled} onChange={setComments}/>
-          <Toggle title="Allow downloads" on={downloadsEnabled} onChange={setDownloads}/>
-          <div className="set-toggle">
-            <div><b>Schedule publication</b><small className="muted">Leave empty to keep it a draft (or publish now below).</small></div>
-            <input className="field" type="datetime-local" style={{ maxWidth:230, marginLeft:'auto' }} value={scheduledAt} onChange={e => setScheduledAt(e.target.value)}/>
-          </div>
-          {!!scheduledAt && (
-            <div className="flex-c gap-6 text-xs" style={{ color:'var(--emerald)', marginTop:6 }}>
-              <Icon name="check" className="xs"/>Auto-publishes at the scheduled time — no need to publish manually.
-            </div>
-          )}
-          {scheduledAt && <button className="text-xs muted" style={{ marginTop:4 }} onClick={() => setScheduledAt('')}>Clear schedule</button>}
-          {!isEdit && <Toggle title="Publish immediately" desc="Otherwise it's saved as a draft you can publish later." on={publishNow} onChange={setPublishNow} disabled={!!scheduledAt}/>}
-          </>)}
         </div>
 
-        <div className="mfoot">
-          <span className="muted text-xs">{isEdit ? 'Editing as' : 'Publishing as'} <b style={{ color:'var(--ink-2)' }}>{me.full}</b></span>
-          <button className="btn btn-primary" style={{ marginLeft:'auto' }} disabled={busy || !title.trim()} onClick={submit}>
-            {ctaLabel}
-          </button>
-        </div>
+        <footer className="rm-ftr">
+          <div className="rm-ftr-as">
+            <Avatar initials={meInitials} color={me.avc} size={28} src={me.profileImage}/>
+            <span>{isEdit ? 'Editing as' : 'Publishing as'} <strong>{me.full}</strong></span>
+          </div>
+          <div className="rm-ftr-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+            <button type="button" className={'btn btn-primary' + (!isEdit && publishNow ? ' rm-go' : '')} disabled={busy || !title.trim()} onClick={submit}>{ctaLabel}</button>
+          </div>
+        </footer>
       </div>
     </div>
   )

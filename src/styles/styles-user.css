@@ -392,169 +392,190 @@
 .cm-attach-row button:hover{background:var(--card-2)}
 
 /* =========================================================
-   Research compose modal — .cm-research   (refined Jun 2026)
-   A premium, manuscript-like editing surface: serif header with
-   a subtitle, chapter-style section breaks, framed rich-text
-   editors, inviting elevated dropzones, a grouped meta card and
-   a glass sticky footer with a gradient primary CTA. All scoped
-   to .cm-research* so shared classes elsewhere are untouched.
+   Research compose modal — .rm-* (two-column studio · Jun 2026)
+   A workspace-style composer: emblem header with a live progress
+   bar, a left section rail with scroll-spy + completion checks, a
+   scrollable column of "chapter" sections, and a calm footer with a
+   gradient CTA. All scoped under .rm-* so shared classes are safe.
    --------------------------------------------------------- */
-.cm-research{
-  /* Narrower than the generic .modal cap for better focus +
-     reading width on this long form (max-width set inline at 760). */
+.overlay.rm-overlay{align-items:center;padding:22px 16px}
+
+.modal.rm-modal{
+  width:min(1080px,96vw);max-width:none;height:min(92dvh,940px);
+  background:#faf7ef;border-radius:22px;overflow:hidden;
+  display:flex;flex-direction:column;position:relative;
+  border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 40px 90px -30px rgba(8,28,20,.7), 0 12px 30px -12px rgba(8,28,20,.4);
 }
 
-/* ---- Header: serif title + subtitle, left-aligned ---- */
-.cm-research .mhead{
-  justify-content:flex-start;text-align:left;
-  padding:18px 22px 15px;
-  background:linear-gradient(180deg,rgba(14,107,84,.045),transparent);
-  border-bottom:1px solid var(--line);
+/* ---- header ---- */
+.rm-hd{
+  position:relative;flex:none;display:flex;align-items:center;gap:15px;
+  padding:18px 22px 20px;overflow:hidden;color:#f4eedd;
+  background:linear-gradient(135deg,#1a5c44 0%,#103528 100%);
+  border-bottom:2px solid var(--brass);
 }
-.cm-head-text{display:flex;flex-direction:column;gap:3px;padding-right:42px}
-.cm-research .mhead h3{font-size:21px;letter-spacing:-.4px;line-height:1.2}
-.cm-head-sub{font-size:12.5px;color:var(--muted);font-weight:500;line-height:1.45}
+.rm-hd-pat{position:absolute;inset:0;opacity:.16;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='46' height='46'%3E%3Cg fill='none' stroke='%23f3ead0' stroke-width='1'%3E%3Crect x='11' y='11' width='24' height='24'/%3E%3Crect x='11' y='11' width='24' height='24' transform='rotate(45 23 23)'/%3E%3C/g%3E%3C/svg%3E");}
+.rm-hd-emblem{width:44px;height:44px;border-radius:13px;flex:none;position:relative;z-index:1;display:grid;place-items:center;
+  background:radial-gradient(circle at 35% 30%,#d8b65a,#a8842f);box-shadow:0 4px 12px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.25) inset}
+.rm-hd-emblem i{width:17px;height:17px;display:block;background:#103528;
+  clip-path:polygon(50% 0,63% 37%,100% 50%,63% 63%,50% 100%,37% 63%,0 50%,37% 37%)}
+.rm-hd-text{flex:1;min-width:0;position:relative;z-index:1;padding-right:40px}
+.rm-hd-title{font-family:var(--serif);font-weight:600;font-size:23px;line-height:1.08;margin:0;letter-spacing:.2px;color:#fdf8ec}
+.rm-hd-sub{margin:3px 0 0;font-size:12.5px;color:#cfe0d3;font-weight:400}
+.rm-hd-close{position:absolute;top:16px;right:18px;z-index:2;width:34px;height:34px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#eadfc7;display:grid;place-items:center;transition:.18s}
+.rm-hd-close:hover:not(:disabled){background:rgba(255,255,255,.18);transform:rotate(90deg)}
+.rm-hd-close:disabled{opacity:.5}
+.rm-hd-progress{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(0,0,0,.2)}
+.rm-hd-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--brass-soft),var(--brass));transition:width .15s ease}
 
-.cm-research-body{
-  padding:20px 22px 24px;
-  scroll-padding-top:64px;            /* anchors land below the sticky head */
-  background:linear-gradient(180deg,#fcfbf6,#f9f7ef);   /* faint warm paper so the white editor cards float */
-}
-.cm-research-body > .field-label:first-child{margin-top:0}
+/* ---- body shell ---- */
+.rm-body{flex:1;display:flex;min-height:0}
 
-/* Tighter labels in the research modal — feels less shouty than the
-   generic .field-label uppercase pattern. */
-.cm-research-body .field-label{
-  font-size:11.5px;font-weight:600;letter-spacing:.45px;
-  text-transform:uppercase;color:var(--muted);
-  margin:0 0 7px;
-}
-.cm-research-body .field.lg{height:50px;font-size:16px;box-shadow:0 1px 2px rgba(11,26,22,.04),0 6px 18px -12px rgba(11,26,22,.16)}
+/* ---- left rail ---- */
+.rm-nav{width:232px;flex:none;background:#f3ecda;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:14px 12px 12px}
+.rm-nav-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.rm-nav-item{width:100%;display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:11px;border:1px solid transparent;
+  background:transparent;cursor:pointer;text-align:left;color:var(--ink-soft);transition:.16s;position:relative}
+.rm-nav-item:hover{background:rgba(255,255,255,.6);color:var(--ink)}
+.rm-nav-ic{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);color:var(--emerald);transition:.16s}
+.rm-nav-ic .ico{width:16px;height:16px}
+.rm-nav-tx{display:flex;flex-direction:column;min-width:0;line-height:1.15}
+.rm-nav-l{font-size:13.5px;font-weight:600}
+.rm-nav-h{font-size:10.5px;color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm-nav-item.on{background:#fff;border-color:rgba(21,154,118,.22);color:var(--emerald-deep);box-shadow:var(--shadow-sm)}
+.rm-nav-item.on::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(var(--brass-soft),var(--emerald))}
+.rm-nav-item.on .rm-nav-ic{background:var(--emerald);color:#fff;border-color:var(--emerald)}
+.rm-nav-ck{margin-left:auto;width:18px;height:18px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(21,154,118,.12);color:var(--emerald);border:1px solid rgba(21,154,118,.25)}
+.rm-nav-ck .ico{width:11px;height:11px;stroke-width:3}
+.rm-nav-foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:13px;
+  background:linear-gradient(135deg,#fff,#fbf7ec);border:1px solid var(--line);box-shadow:var(--shadow-sm)}
+.rm-nav-foot-tx{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.rm-nf-name{font-size:13px;font-weight:700;font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm-nf-role{font-size:10.5px;color:var(--muted)}
 
-/* ---- Section head (.cm-section) → manuscript "chapter" break ----
-   A hairline rule, a glossy brass icon chip, a serif title and an
-   optional italic hint floated right. */
-.cm-section{
-  display:flex;align-items:center;gap:12px;
-  margin:32px 0 14px;padding-top:18px;
-  border-top:1px solid var(--line);
-}
-.cm-section.first{border-top:none;padding-top:2px;margin-top:2px}
-.cm-section-ic{
-  display:grid;place-items:center;flex:none;
-  width:34px;height:34px;border-radius:10px;
-  background:linear-gradient(180deg,#f8edd0,#f1e4c2);
-  color:#7a5a1a;border:1px solid #e7d49f;
-  box-shadow:0 2px 7px -3px rgba(122,90,26,.4),inset 0 1px 0 rgba(255,255,255,.6);
-}
-.cm-section-ic .ico{width:16px;height:16px;stroke-width:1.9}
-.cm-section-title{
-  font-family:var(--serif);font-size:17px;font-weight:600;
-  color:var(--ink);letter-spacing:-.2px;line-height:1.2;
-}
-.cm-section-hint{margin-left:auto;font-size:12px;color:var(--muted);font-style:italic}
+/* ---- scrollable content ---- */
+.rm-content{flex:1;overflow-y:auto;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;position:relative}
+.rm-inner{padding:20px 26px 4px;max-width:780px}
+.rm-content .cm-saving,.rm-content .cm-save-err{margin:20px 26px}
 
-/* ---- Rich-text editor blocks: labelled + framed focal points ---- */
-.cm-rte-label{
-  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
-  margin:18px 0 8px;
-}
-.cm-rte-label .field-label{margin:0}
-.cm-rte-hint{font-size:11.5px;color:var(--muted);font-weight:500;font-style:italic}
-.cm-research-body .rte{border-radius:13px;margin-top:0;background:var(--card);box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.22)}
-.cm-research-body .rte:focus-within{border-color:var(--emerald-bright);box-shadow:0 0 0 4px rgba(21,154,118,.1),0 8px 22px -14px rgba(11,26,22,.22)}
-.cm-research-body .rte-bar{padding:7px 10px;gap:10px}
-.cm-research-body .rte-bar:empty{display:none}      /* research is WYSIWYG-only — no format pills/label → drop the empty strip */
-/* Bigger, smoother, always-visible toolbar — generous tap targets,
-   soft sheen + clean wrap. */
-.cm-research-body .rte-tools{
-  padding:9px 11px;gap:3px;flex-wrap:wrap;
-  background:linear-gradient(180deg,#fcfbf6,var(--card-2));
-  border-bottom:1px solid var(--line);
-  border-radius:13px 13px 0 0;
-}
-.cm-research-body .rte-tool{
-  width:36px;height:36px;border-radius:10px;
-  transition:background .14s,color .14s,transform .1s,box-shadow .14s;
-}
-.cm-research-body .rte-tool:hover{background:#fff;color:var(--ink);box-shadow:0 2px 8px -3px rgba(11,26,22,.18)}
-.cm-research-body .rte-tool:active{transform:scale(.9)}
-.cm-research-body .rte-tool.on{
-  background:rgba(21,154,118,.14);color:var(--emerald-deep);
-  box-shadow:inset 0 0 0 1px rgba(21,154,118,.32);
-}
-.cm-research-body .rte-tool .ico{width:18px;height:18px}
-.cm-research-body .rte-tool-text{font-size:13.5px;font-weight:600}
-.cm-research-body .rte-tool-sep{height:22px;margin:0 6px}
-/* bigger size/family/colour triggers to match */
-.cm-research-body .rte-size-display{font-size:12.5px;min-width:26px;padding:3px 6px}
-.cm-research-body .rte-family-display{font-size:16px}
-.cm-research-body .rte-color-icon{font-size:12.5px}
-/* Let the editor GROW with its content and never trap the wheel — the whole
-   modal body scrolls as one (the default overflow:auto otherwise captured
-   scroll over the editor, esp. in Firefox, so the modal couldn't scroll). */
-.cm-research-body .rte-wysiwyg{padding:18px 20px;overflow:visible}
-.cm-research-body .rte-area{padding:13px 15px;font-size:14.5px;line-height:1.65;font-family:var(--sans)}
-.cm-research-body .rte-area::placeholder{
-  color:#b3aa93;font-style:normal;font-weight:500;font-size:14px;
-}
-.cm-research-body .rte-preview{padding:14px 16px}
-.cm-research-body .rte-hint{padding:7px 12px;font-size:11px}
+/* ---- section ---- */
+.rm-sec{padding:16px 0 22px;border-bottom:1px solid var(--line-soft)}
+.rm-sec:last-of-type{border-bottom:none}
+.rm-sec-hd{display:flex;align-items:center;gap:11px;margin-bottom:15px}
+.rm-sec-ic{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;color:var(--emerald);
+  background:linear-gradient(135deg,rgba(21,154,118,.12),#fff);border:1px solid rgba(21,154,118,.2)}
+.rm-sec-ic .ico{width:17px;height:17px}
+.rm-sec-t{margin:0;font-family:var(--serif);font-weight:600;font-size:19px;letter-spacing:.2px;color:var(--ink)}
+.rm-sec-tag{margin-left:auto;font-size:11px;color:var(--muted);font-style:italic;font-family:var(--serif)}
+.rm-sec-body{display:flex;flex-direction:column;gap:15px}
 
-/* ---- Grouped meta fields (keywords / visibility / tags / citation) ----
-   Wrapped in a soft card so the dense lower form reads as one tidy block. */
-.cm-research-body .set-grid{
-  gap:14px;margin-top:14px;padding:16px;
-  background:var(--card);border:1px solid var(--line);
-  border-radius:13px;box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.2);
-}
-.cm-research-body .set-grid .field,
-.cm-research-body .set-grid select.field{background:var(--card-2)}   /* inset fields on the white card */
+/* ---- fields ---- */
+.rm-field{display:flex;flex-direction:column;gap:7px}
+.rm-lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--emerald-deep);display:flex;align-items:baseline;gap:8px}
+.rm-lbl-h{font-size:11px;color:var(--muted);font-style:italic;letter-spacing:0;text-transform:none;font-weight:500}
+.rm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rm-micro{margin:-2px 0 0;font-size:11.5px;color:var(--muted)}
 
-/* ---- Drop zones (cover / video / files) → inviting elevated cards ---- */
-.cm-research-body .cm-drop{
-  margin-top:10px;padding:26px 16px;border-radius:14px;
-  border:1.5px dashed #d9cfb0;background:var(--card);
-  display:flex;flex-direction:column;align-items:center;gap:7px;
-  color:var(--ink-soft);transition:.18s;
-  box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.18);
-}
-.cm-research-body .cm-drop:hover{
-  border-color:var(--emerald-bright);background:rgba(31,185,142,.04);
-  transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(21,154,118,.42);
-}
-.cm-research-body .cm-drop .ico{width:30px;height:30px;color:var(--emerald);margin-bottom:2px}
-.cm-research-body .cm-drop b{color:var(--ink);font-size:14.5px}
-.cm-research-body .cm-drop .text-xs{font-size:12px;color:var(--muted)}
+.rm-modal .inp{width:100%;font-family:var(--sans);font-size:14.5px;color:var(--ink);background:var(--card);
+  border:1px solid var(--line);border-radius:11px;padding:11px 13px;transition:.16s;box-shadow:var(--shadow-sm)}
+.rm-modal .inp::placeholder{color:#b3aa95}
+.rm-modal .inp:focus{outline:none;border-color:var(--emerald-bright);box-shadow:0 0 0 3px rgba(21,154,118,.12)}
+.rm-modal .inp-lg{font-family:var(--serif);font-size:18px;padding:13px 15px}
+.rm-modal .rm-cite{font-family:var(--serif);font-style:italic}
+.rm-modal .inp-date{max-width:230px;margin-left:auto}
 
-/* ---- Sticky footer: glass backdrop + gradient primary CTA ---- */
-.cm-research .mfoot{
-  padding:14px 22px 18px;border-top:1px solid var(--line);
-  background:rgba(255,253,247,.94);backdrop-filter:blur(10px);
-}
-.cm-research .mfoot .btn-primary{
-  background:linear-gradient(135deg,var(--emerald-bright),var(--emerald-deep));
-  box-shadow:0 8px 18px -7px rgba(21,154,118,.45);
-}
-.cm-research .mfoot .btn-primary:hover:not(:disabled){
-  transform:translateY(-1px);box-shadow:0 11px 24px -7px rgba(21,154,118,.5);
-}
+/* visibility select with leading icon + chevron */
+.rm-sel{position:relative;display:flex;align-items:center}
+.rm-sel-ic{position:absolute;left:12px;color:var(--emerald);pointer-events:none;display:flex}
+.rm-sel select{width:100%;appearance:none;-webkit-appearance:none;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink);
+  background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 34px;cursor:pointer;box-shadow:var(--shadow-sm)}
+.rm-sel select:focus{outline:none;border-color:var(--emerald-bright);box-shadow:0 0 0 3px rgba(21,154,118,.12)}
+.rm-sel-cv{position:absolute;right:11px;color:var(--ink-soft);pointer-events:none;display:flex}
 
-/* Mobile: full-bleed sheet (the generic ≤600 sheet rule already kicks in;
-   here we just trim inner padding so the form breathes on phones). */
+/* ---- framed rich-text editor + bigger, smoother toolbar ---- */
+.rm-content .rte{border-radius:13px;background:var(--card);box-shadow:0 1px 2px rgba(11,26,22,.04),0 8px 22px -14px rgba(11,26,22,.22)}
+.rm-content .rte:focus-within{border-color:var(--emerald-bright);box-shadow:0 0 0 3px rgba(21,154,118,.12),0 8px 22px -14px rgba(11,26,22,.22)}
+.rm-content .rte-bar{padding:7px 10px;gap:10px}
+.rm-content .rte-bar:empty{display:none}
+.rm-content .rte-tools{padding:9px 11px;gap:3px;flex-wrap:wrap;background:linear-gradient(180deg,#fcfbf6,var(--card-2));border-bottom:1px solid var(--line);border-radius:13px 13px 0 0}
+.rm-content .rte-tool{width:36px;height:36px;border-radius:10px;transition:background .14s,color .14s,transform .1s,box-shadow .14s}
+.rm-content .rte-tool:hover{background:#fff;color:var(--ink);box-shadow:0 2px 8px -3px rgba(11,26,22,.18)}
+.rm-content .rte-tool:active{transform:scale(.9)}
+.rm-content .rte-tool.on{background:rgba(21,154,118,.14);color:var(--emerald-deep);box-shadow:inset 0 0 0 1px rgba(21,154,118,.32)}
+.rm-content .rte-tool .ico{width:18px;height:18px}
+.rm-content .rte-tool-text{font-size:13.5px;font-weight:600}
+.rm-content .rte-tool-sep{height:22px;margin:0 6px}
+.rm-content .rte-size-display{font-size:12.5px;min-width:26px;padding:3px 6px}
+.rm-content .rte-family-display{font-size:16px}
+/* editor grows with content & never traps the wheel → the whole column scrolls */
+.rm-content .rte-wysiwyg{padding:18px 20px;overflow:visible}
+
+/* ---- dropzones ---- */
+.rm-drop{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;
+  border:1.5px dashed #d6cbb1;border-radius:13px;background:linear-gradient(180deg,#fdfbf5,#faf5ea);padding:22px 16px;transition:.18s;text-align:center;color:var(--ink-soft)}
+.rm-drop.tall{min-height:150px}
+.rm-drop:hover{border-color:var(--emerald-bright);background:rgba(21,154,118,.06);transform:translateY(-1px)}
+.rm-drop-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:var(--emerald);background:#fff;border:1px solid rgba(21,154,118,.2);box-shadow:var(--shadow-sm)}
+.rm-drop-ic .ico{width:20px;height:20px}
+.rm-drop-t{font-size:14px;font-weight:700;color:var(--ink);font-family:var(--serif)}
+.rm-drop-h{font-size:11.5px;color:var(--muted)}
+.rm-warn{display:block;margin-top:6px;font-size:11.5px;color:var(--rose);font-weight:600}
+
+/* media previews */
+.rm-media-prev{display:flex;flex-direction:column;gap:8px}
+.rm-cover{height:140px;border-radius:12px;border:1px solid var(--line)}
+.rm-video{width:100%;max-height:200px;border-radius:12px;background:#000}
+.rm-media-acts{display:flex;flex-wrap:wrap;gap:8px}
+
+/* sources / existing files rows */
+.rm-src-row{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px;box-shadow:var(--shadow-sm)}
+.rm-src-badge{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#7a5a1a;background:var(--brass-tint);border:1px solid #ecdcb0;border-radius:7px;padding:4px 9px}
+.rm-src-title{flex:1;min-width:0;font-size:13.5px;font-weight:600;font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* new-file card (caption + alt) */
+.rm-file-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;box-shadow:var(--shadow-sm)}
+.rm-file-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+
+/* publishing rows → cards */
+.rm-content .set-toggle{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:var(--card);box-shadow:var(--shadow-sm)}
+.rm-content .set-toggle:first-of-type{border-top:1px solid var(--line)}
+
+.rm-end{display:flex;justify-content:center;padding:16px 0 8px}
+.rm-end span{width:90px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--brass),transparent)}
+
+/* ---- footer ---- */
+.rm-ftr{flex:none;display:flex;align-items:center;gap:14px;padding:13px 20px;background:#fff;border-top:1px solid var(--line);box-shadow:0 -4px 16px -10px rgba(40,33,20,.2)}
+.rm-ftr-as{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-soft)}
+.rm-ftr-as strong{color:var(--ink);font-weight:700}
+.rm-ftr-actions{margin-left:auto;display:flex;gap:9px}
+.rm-ftr .btn-primary{background:linear-gradient(135deg,var(--emerald-bright),var(--emerald-deep));box-shadow:0 8px 18px -7px rgba(21,154,118,.45)}
+.rm-ftr .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 11px 24px -7px rgba(21,154,118,.5)}
+.rm-ftr .btn-primary.rm-go{background:linear-gradient(135deg,var(--brass-soft),#a8842f);box-shadow:0 8px 18px -7px rgba(168,132,47,.5)}
+
+/* ---- responsive: rail becomes a horizontal strip ---- */
+@media(max-width:880px){
+  .modal.rm-modal{width:97vw;height:94dvh}
+  .rm-body{flex-direction:column}
+  .rm-nav{width:auto;flex-direction:row;border-right:none;border-bottom:1px solid var(--line);padding:9px;gap:7px;overflow-x:auto}
+  .rm-nav-list{flex-direction:row;gap:7px}
+  .rm-nav-foot{display:none}
+  .rm-nav-item{flex-direction:column;align-items:center;gap:5px;width:80px;padding:8px 6px;flex:none}
+  .rm-nav-item.on::before{display:none}
+  .rm-nav-tx{align-items:center}
+  .rm-nav-h{display:none}
+  .rm-nav-l{font-size:11px}
+  .rm-nav-ck{position:absolute;top:5px;right:9px;margin:0}
+  .rm-inner{padding:16px 16px 4px}
+  .rm-grid2{grid-template-columns:1fr}
+}
 @media(max-width:600px){
-  .cm-research .mhead{padding:15px 16px 12px}
-  .cm-research .mhead h3{font-size:19px}
-  .cm-head-sub{font-size:12px}
-  .cm-research-body{padding:16px 14px 18px}
-  .cm-section{gap:9px;margin:24px 0 11px;padding-top:16px}
-  .cm-section-ic{width:30px;height:30px}
-  .cm-section-title{font-size:16px}
-  .cm-section-hint{display:none}                     /* save horizontal room */
-  .cm-research-body .set-grid{padding:13px}
-  .cm-research-body .rte-tools{gap:0}
-  .cm-research-body .rte-tool{width:30px;height:30px} /* easier tap targets */
-  .cm-rte-hint{display:none}
+  .overlay.rm-overlay{padding:0}
+  .modal.rm-modal{width:100vw;height:100dvh;border-radius:0}
+  .rm-content .rte-tool{width:34px;height:34px}
 }
 
 /* =========================================================
