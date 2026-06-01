@@ -103,10 +103,15 @@
 .prose > :last-child{margin-bottom:0}
 
 .prose p{margin:0 0 .9em}
-.prose strong{font-weight:600;color:var(--ink)}
-.prose em{font-style:italic}
-.prose s,.prose del{color:var(--muted)}
+/* <strong> and the editor's <b> read identically; same for <em>/<i>. The
+   contenteditable's execCommand emits the short tags, so they get the same
+   scholarly weight/italic treatment as the semantic ones. */
+.prose strong,.prose b{font-weight:600;color:var(--ink)}
+.prose em,.prose i{font-style:italic}
+.prose s,.prose del,.prose strike{text-decoration:line-through;color:var(--muted)}
 .prose u{text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:3px}
+/* <mark> highlight (semantic twin of the class-based hl-* spans) */
+.prose mark{background:#fff59d;padding:.05em .15em;border-radius:3px;color:inherit}
 
 /* Superscript / subscript — proper academic baselines (citations, formulae) */
 .prose sup{vertical-align:super;font-size:.72em;line-height:0}

@@ -436,6 +436,8 @@ export function researchDetailFrom(dto) {
     description: dto.description || '',
     descriptionHtml: dto.descriptionHtml || '',          // server-rendered, sanitised HTML for direct render
     abstractHtml: dto.abstractHtml || '',
+    abstractSource: dto.abstractText || '',              // RAW abstract (HTML/MD) — lossless fallback + edit prefill
+                                                         // (summary.abstract is stripHtml'd to plain for card previews)
     bodyFormat: dto.bodyFormat || 'PLAIN',               // PLAIN | MARKDOWN | HTML (BodyFormat enum)
     keywords: dto.keywords || '',
     visibility: dto.visibility || 'PUBLIC',

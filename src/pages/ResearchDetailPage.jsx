@@ -31,6 +31,22 @@ const fmtDuration = (s) => {
   const m = Math.floor(s / 60), r = Math.round(s % 60)
   return `${m}:${String(r).padStart(2, '0')}`
 }
+/* File-type badge: short uppercase extension + a colour class, so each
+   downloadable file reads like a real document chip (PDF, DOCX, XLSX…). */
+const EXT_CLASS = {
+  PDF:'ext-pdf', DOC:'ext-doc', DOCX:'ext-doc', RTF:'ext-doc',
+  PPT:'ext-ppt', PPTX:'ext-ppt', KEY:'ext-ppt',
+  XLS:'ext-xls', XLSX:'ext-xls', CSV:'ext-xls', NUMBERS:'ext-xls',
+  ZIP:'ext-zip', RAR:'ext-zip', '7Z':'ext-zip', TAR:'ext-zip', GZ:'ext-zip',
+  TXT:'ext-txt', MD:'ext-txt', JSON:'ext-txt',
+}
+const fileExt = (m) => {
+  const name = m.name || m.caption || ''
+  const dot = name.lastIndexOf('.')
+  if (dot > 0 && dot < name.length - 1) return name.slice(dot + 1).toUpperCase().slice(0, 4)
+  if (m.mimeType?.includes('/')) return m.mimeType.split('/')[1].replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4)
+  return m.type === 'DOCUMENT' ? 'DOC' : 'FILE'
+}
 
 export function ResearchDetailPage() {
   const { id } = useParams()
@@ -304,7 +320,15 @@ export function ResearchDetailPage() {
           <div>
             <section className="card card-pad">
               <h3 className="title"><Icon name="doc" className="sm"/>Abstract</h3>
-              <RichText html={r.abstractHtml} source={r.abstract} format={r.bodyFormat} className="rd-abstract"/>
+              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
+              {r.keywords && (
+                <div className="rd-keywords">
+                  <span className="rd-keywords-label">Keywords</span>
+                  {r.keywords.split(',').map(k => k.trim()).filter(Boolean).map((k, i) => (
+                    <span key={i} className="rd-kw">{k}</span>
+                  ))}
+                </div>
+              )}
             </section>
             {(r.descriptionHtml || r.description) && (
               <section className="card card-pad">
@@ -376,17 +400,23 @@ export function ResearchDetailPage() {
                   <section className="card card-pad">
                     <h3 className="title"><Icon name="doc" className="sm"/>Files &amp; materials<span className="rd-srcn">{files.length}</span>{!r.downloadsEnabled && <small className="muted text-xs" style={{ marginLeft:8, fontWeight:500 }}>· downloads off</small>}</h3>
                     <div className="rd-files">
-                      {files.map((m) => (
-                        <button key={m.id} className="rd-file" onClick={() => downloadMedia(m.id)}>
-                          <span className="rd-file-ic"><Icon name={m.type === 'DOCUMENT' ? 'doc' : 'paperclip'} className="sm"/></span>
-                          <div className="rd-file-info">
-                            <b>{m.name || m.caption || 'file'}</b>
-                            <small className="muted">{[m.mimeType || m.type?.toLowerCase(), fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
-                            {m.caption && m.name && <p>{m.caption}</p>}
-                          </div>
-                          <span className="rd-file-action"><Icon name="download" className="sm"/></span>
-                        </button>
-                      ))}
+                      {files.map((m) => {
+                        const ext = fileExt(m)
+                        return (
+                          <button key={m.id} className="rd-file" onClick={() => downloadMedia(m.id)} disabled={!r.downloadsEnabled}
+                            title={r.downloadsEnabled ? `Download ${m.name || 'file'}` : 'Downloads are turned off'}>
+                            <span className={'rd-file-ic ' + (EXT_CLASS[ext] || 'ext-default')}>
+                              <span className="rd-file-ext">{ext}</span>
+                            </span>
+                            <div className="rd-file-info">
+                              <b>{m.name || m.caption || 'file'}</b>
+                              <small>{[m.mimeType || m.type?.toLowerCase(), fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
+                              {m.caption && m.name && <p>{m.caption}</p>}
+                            </div>
+                            <span className="rd-file-action"><Icon name="download" className="sm"/><span className="rd-file-action-tx">Download</span></span>
+                          </button>
+                        )
+                      })}
                     </div>
                   </section>
                 )}
@@ -427,7 +457,9 @@ export function ResearchDetailPage() {
 
           <aside className="rd-rail">
             <div className="card card-pad">
-              <button className="btn btn-primary btn-lg btn-block" onClick={download}><Icon name="download" className="sm"/>Download PDF</button>
+              <button className="btn btn-primary btn-lg btn-block" onClick={download} disabled={!r.downloadsEnabled}
+                title={r.downloadsEnabled ? 'Download the main paper' : 'Downloads are turned off'}>
+                <Icon name="download" className="sm"/>{r.downloadsEnabled ? 'Download PDF' : 'Downloads off'}</button>
               <div className="rd-rail-row">
                 <button className={'btn btn-secondary btn-sm ' + (me.liked ? 'on-rose' : '')} onClick={react}><Icon name="heart" className="xs"/>{me.liked ? 'Reacted' : 'React'}</button>
                 <button className={'btn btn-secondary btn-sm ' + (me.saved ? 'on-brass' : '')} onClick={save}><Icon name="bookmark" className="xs"/>{me.saved ? 'Saved' : 'Save'}</button>
@@ -435,9 +467,11 @@ export function ResearchDetailPage() {
               </div>
               <div className="rd-metrics">
                 <div className="rdm"><b>{fmt(r.metrics.views)}</b><small>VIEWS</small></div>
-                <div className="rdm"><b>{r.metrics.downloads}</b><small>DOWNLOADS</small></div>
-                <div className="rdm"><b>{r.metrics.citations}</b><small>CITATIONS</small></div>
                 <div className="rdm"><b>{fmt(r.metrics.reactions)}</b><small>REACTIONS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.comments)}</b><small>COMMENTS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.saves)}</b><small>SAVES</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.downloads)}</b><small>DOWNLOADS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.citations)}</b><small>CITATIONS</small></div>
               </div>
               {r.citation && (
                 <div className="rd-cite">

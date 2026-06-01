@@ -22,6 +22,11 @@ const PURIFY_CFG = {
   ALLOWED_TAGS: [
     'h1','h2','h3','h4','h5','h6','p','br','hr',
     'strong','em','s','del','u','a','code','pre','blockquote',
+    // Inline formatting the WYSIWYG editor emits via execCommand — bold→<b>,
+    // italic→<i>, strikethrough→<strike>, super/subscript→<sup>/<sub>; <mark>
+    // for highlights. Without these the editor's bold/italic/etc. were stripped
+    // on render and the published research showed unformatted text.
+    'b','i','sub','sup','strike','mark',
     'ul','ol','li','table','thead','tbody','tr','th','td',
     'img','span','div',
   ],

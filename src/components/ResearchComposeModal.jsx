@@ -179,7 +179,10 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   const [title, setTitle] = React.useState(editResearch?.title || '')
   // The composer is always WYSIWYG (HTML) — opening MD/PLAIN content
   // renders it to HTML so the user can keep editing in the rich editor.
-  const [abstractText, setAbstract] = React.useState(() => toRichHtml(editResearch?.abstract, editResearch?.bodyFormat))
+  // Prefer the RAW abstract source (HTML/MD) for the editor — `abstract` is
+  // stripHtml'd to plain text for card previews, so editing it directly would
+  // drop all the author's formatting.
+  const [abstractText, setAbstract] = React.useState(() => toRichHtml(editResearch?.abstractSource ?? editResearch?.abstract, editResearch?.bodyFormat))
   const [description,  setDescription] = React.useState(() => toRichHtml(editResearch?.description || editResearch?.overview, editResearch?.bodyFormat))
   // BodyFormat — always HTML in this modal (the WYSIWYG editor is the only entry).
   // Server's renderer will re-render both fields under HTML on save.
@@ -468,7 +471,12 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
     <div className="overlay open" onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
       <div className="modal cm-research" style={{ maxWidth: 760 }}>
         <div className="mhead">
-          <h3>{isEdit ? 'Edit research' : 'Publish research'}</h3>
+          <div className="cm-head-text">
+            <h3>{isEdit ? 'Edit research' : 'Publish research'}</h3>
+            <p className="cm-head-sub">{isEdit
+              ? 'Refine your paper — body formatting, sources, media & contributors.'
+              : 'Publish scholarly work — rich formatting, sources, media & co-authors.'}</p>
+          </div>
           <button className="x" onClick={onClose} disabled={busy} aria-label="Close"><Icon name="close" className="sm"/></button>
         </div>
 
@@ -538,23 +546,29 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           <label className="field-label">Title</label>
           <input className="field lg" placeholder="The effects of X on Y" value={title} onChange={e => setTitle(e.target.value)}/>
 
-          <label className="field-label" style={{ marginTop:14 }}>Abstract</label>
+          <div className="cm-rte-label">
+            <label className="field-label">Abstract</label>
+            <span className="cm-rte-hint">Select text, then format with the toolbar — bold, italics, headings, lists…</span>
+          </div>
           <RichTextEditor
             value={abstractText}
             format="HTML"
             onChange={setAbstract}
             placeholder="A concise abstract of the work — select any text and use the toolbar to format it."
-            minHeight={140}
+            minHeight={150}
             showFormat={false}
           />
 
-          <label className="field-label" style={{ marginTop:14 }}>Body / overview</label>
+          <div className="cm-rte-label">
+            <label className="field-label">Body / overview</label>
+            <span className="cm-rte-hint">Headings, lists, tables, images, colours & highlights — your formatting is kept on the published page.</span>
+          </div>
           <RichTextEditor
             value={description}
             format="HTML"
             onChange={setDescription}
             placeholder="Write your research — headings, lists, tables, images, colours, highlights…"
-            minHeight={260}
+            minHeight={280}
             showFormat={false}
           />
 
