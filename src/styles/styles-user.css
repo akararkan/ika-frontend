@@ -490,7 +490,10 @@
 .cm-research-body .rte-size-display{font-size:12.5px;min-width:26px;padding:3px 6px}
 .cm-research-body .rte-family-display{font-size:16px}
 .cm-research-body .rte-color-icon{font-size:12.5px}
-.cm-research-body .rte-wysiwyg{padding:18px 20px}
+/* Let the editor GROW with its content and never trap the wheel — the whole
+   modal body scrolls as one (the default overflow:auto otherwise captured
+   scroll over the editor, esp. in Firefox, so the modal couldn't scroll). */
+.cm-research-body .rte-wysiwyg{padding:18px 20px;overflow:visible}
 .cm-research-body .rte-area{padding:13px 15px;font-size:14.5px;line-height:1.65;font-family:var(--sans)}
 .cm-research-body .rte-area::placeholder{
   color:#b3aa93;font-style:normal;font-weight:500;font-size:14px;

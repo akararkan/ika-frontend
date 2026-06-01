@@ -30,7 +30,9 @@ const PURIFY_CFG = {
     'ul','ol','li','table','thead','tbody','tr','th','td',
     'img','span','div',
   ],
-  ALLOWED_ATTR: ['href','title','alt','src','width','height','class','target','rel'],
+  // `dir` lets the editor's RTL/LTR buttons survive (essential for Arabic /
+  // Kurdish direction overrides); `colspan`/`rowspan` keep merged table cells.
+  ALLOWED_ATTR: ['href','title','alt','src','width','height','class','target','rel','dir','colspan','rowspan'],
   // only http(s) + mailto on hrefs/srcs — strip javascript:, data:, vbscript:
   ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|\/|#|\?)/i,
 }
