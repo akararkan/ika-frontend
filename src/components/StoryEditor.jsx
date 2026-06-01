@@ -331,7 +331,10 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
       ctx.textAlign = layer.align
       ctx.textBaseline = 'middle'
 
-      const lines = (layer.text || '').split('\n')
+      // Wrap to the same 88% width the preview text box uses (in this scaled
+      // coordinate space that's 0.88 * EXPORT_W), so the baked text breaks onto
+      // the same lines the author saw — no more over-wide overflow / clipping.
+      const lines = wrapCanvasText(ctx, layer.text || '', EXPORT_W * 0.88)
       const lineH = fontSizePx * 1.18
       const totalH = lineH * lines.length
 
@@ -592,4 +595,33 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, radius)
   ctx.arcTo(x, y, x + w, y, radius)
   ctx.closePath()
+}
+
+/* Word-wrap text for the canvas export so the baked PNG matches the editor
+   preview, which wraps via CSS (maxWidth:88% + wordBreak:break-word). Without
+   this, a long line (e.g. an Arabic dua) baked as ONE over-wide line and ran
+   off the edge. Honours explicit "\n", greedily fills to maxW, and hard-breaks
+   any single token wider than maxW. `ctx.font` must already be set. */
+function wrapCanvasText(ctx, text, maxW) {
+  const out = []
+  const breakWord = (word) => {              // break a token longer than maxW, char by char
+    let chunk = ''
+    for (const ch of word) {
+      if (chunk && ctx.measureText(chunk + ch).width > maxW) { out.push(chunk); chunk = ch }
+      else chunk += ch
+    }
+    return chunk
+  }
+  for (const para of String(text || '').split('\n')) {
+    if (!para) { out.push(''); continue }
+    let line = ''
+    for (const w of para.split(' ')) {
+      const test = line ? line + ' ' + w : w
+      if (ctx.measureText(test).width <= maxW) { line = test; continue }
+      if (line) out.push(line)
+      line = ctx.measureText(w).width > maxW ? breakWord(w) : w
+    }
+    out.push(line)
+  }
+  return out
 }

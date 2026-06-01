@@ -465,12 +465,31 @@
 .cm-research-body .rte:focus-within{border-color:var(--emerald-bright);box-shadow:0 0 0 4px rgba(21,154,118,.1),0 8px 22px -14px rgba(11,26,22,.22)}
 .cm-research-body .rte-bar{padding:7px 10px;gap:10px}
 .cm-research-body .rte-bar:empty{display:none}      /* research is WYSIWYG-only — no format pills/label → drop the empty strip */
-.cm-research-body .rte-tools{padding:7px 9px;gap:2px;flex-wrap:wrap;background:linear-gradient(180deg,var(--card-2),#fbf9f2)}
-.cm-research-body .rte-bubble .rte-tools{background:transparent;padding:2px;gap:1px}   /* bubble toolbar floats on its own card */
-.cm-research-body .rte-tool{width:30px;height:30px;border-radius:8px}
-.cm-research-body .rte-tool .ico{width:16px;height:16px}
-.cm-research-body .rte-tool-text{font-size:12.5px}
-.cm-research-body .rte-tool-sep{height:18px;margin:0 4px}
+/* Bigger, smoother, always-visible toolbar — generous tap targets,
+   soft sheen + clean wrap. */
+.cm-research-body .rte-tools{
+  padding:9px 11px;gap:3px;flex-wrap:wrap;
+  background:linear-gradient(180deg,#fcfbf6,var(--card-2));
+  border-bottom:1px solid var(--line);
+  border-radius:13px 13px 0 0;
+}
+.cm-research-body .rte-tool{
+  width:36px;height:36px;border-radius:10px;
+  transition:background .14s,color .14s,transform .1s,box-shadow .14s;
+}
+.cm-research-body .rte-tool:hover{background:#fff;color:var(--ink);box-shadow:0 2px 8px -3px rgba(11,26,22,.18)}
+.cm-research-body .rte-tool:active{transform:scale(.9)}
+.cm-research-body .rte-tool.on{
+  background:rgba(21,154,118,.14);color:var(--emerald-deep);
+  box-shadow:inset 0 0 0 1px rgba(21,154,118,.32);
+}
+.cm-research-body .rte-tool .ico{width:18px;height:18px}
+.cm-research-body .rte-tool-text{font-size:13.5px;font-weight:600}
+.cm-research-body .rte-tool-sep{height:22px;margin:0 6px}
+/* bigger size/family/colour triggers to match */
+.cm-research-body .rte-size-display{font-size:12.5px;min-width:26px;padding:3px 6px}
+.cm-research-body .rte-family-display{font-size:16px}
+.cm-research-body .rte-color-icon{font-size:12.5px}
 .cm-research-body .rte-wysiwyg{padding:18px 20px}
 .cm-research-body .rte-area{padding:13px 15px;font-size:14.5px;line-height:1.65;font-family:var(--sans)}
 .cm-research-body .rte-area::placeholder{

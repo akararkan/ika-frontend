@@ -139,7 +139,6 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
   const imgElRef = React.useRef(null)                 // the DOM <img> we're editing (kept out of state to avoid mutation lint)
   const [active, setActive] = React.useState({})
   const [imgSel, setImgSel] = React.useState(null)    // { top, left, width, height, wrap, size }  — read-only position info
-  const [selBar, setSelBar] = React.useState(null)    // floating bubble toolbar — { top, below } when text is selected
 
   /* Sync external value → DOM only when it differs AND we aren't typing,
      so the cursor never jumps mid-keystroke. */
@@ -378,39 +377,9 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     }
   }, [])
 
-  /* Clean writing surface: the formatting toolbar is hidden until the author
-     selects text, then it appears as a floating bubble anchored to the
-     selection (Notion/Medium-style). Compute its position relative to the wrap;
-     drop it BELOW the selection when there isn't room above (so it never clips
-     against the editor's top edge). */
-  const updateSelBar = React.useCallback(() => {
-    const wrap = wrapRef.current, ed = ref.current
-    const sel = window.getSelection()
-    if (!wrap || !ed || !sel || sel.rangeCount === 0 || sel.isCollapsed || !sel.toString().trim()) { setSelBar(null); return }
-    const range = sel.getRangeAt(0)
-    const anc = range.commonAncestorContainer
-    const node = anc.nodeType === 1 ? anc : anc.parentNode
-    if (!ed.contains(node)) { setSelBar(null); return }        // selection isn't in THIS editor
-    const rect = range.getBoundingClientRect()
-    if (!rect.width && !rect.height) { setSelBar(null); return }
-    const wr = wrap.getBoundingClientRect()
-    const topRel = rect.top - wr.top
-    const below = topRel < 92                                   // not enough room above → drop below the selection
-    setSelBar({ top: below ? (rect.bottom - wr.top + 8) : (topRel - 8), below })
-  }, [])
-
-  // Track selection → show/hide/reposition the bubble (covers mouse + keyboard
-  // selection, and our own re-selection after applying a style).
-  React.useEffect(() => {
-    const h = () => updateSelBar()
-    document.addEventListener('selectionchange', h)
-    return () => document.removeEventListener('selectionchange', h)
-  }, [updateSelBar])
-
   /* Click on an <img> → show the floating toolbar; click anywhere else → hide it. */
   const onMouseUp = (e) => {
     refreshActive()
-    updateSelBar()
     if (e.target?.tagName === 'IMG') {
       imgElRef.current = e.target
       setImgSel(positionImgToolbar(e.target))
@@ -493,19 +462,13 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
   }, [imgSel, positionImgToolbar])
 
   return (
-    <div ref={wrapRef} className={'rte-wysiwyg-wrap' + (selBar ? ' has-bubble' : '')}>
-      {/* Floating bubble toolbar — only while text is selected (clean page otherwise). */}
-      {selBar && (
-        <div className={'rte-bubble' + (selBar.below ? ' below' : '')} style={{ top: selBar.top }}
-          onMouseDown={(e) => e.preventDefault()}>
-          <WysiwygToolbar
-            run={run} insertHtml={insertHtml} active={active}
-            applyBlock={applyBlock} applyDir={applyDir}
-            applySpanClass={applySpanClass} applyBlockClass={applyBlockClass}
-            applySpanStyle={applySpanStyle}
-          />
-        </div>
-      )}
+    <div ref={wrapRef} className="rte-wysiwyg-wrap">
+      <WysiwygToolbar
+        run={run} insertHtml={insertHtml} active={active}
+        applyBlock={applyBlock} applyDir={applyDir}
+        applySpanClass={applySpanClass} applyBlockClass={applyBlockClass}
+        applySpanStyle={applySpanStyle}
+      />
       <div
         ref={ref}
         className={'rte-wysiwyg prose' + (imgSel ? ' has-img-sel' : '')}
