@@ -139,6 +139,7 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
   const imgElRef = React.useRef(null)                 // the DOM <img> we're editing (kept out of state to avoid mutation lint)
   const [active, setActive] = React.useState({})
   const [imgSel, setImgSel] = React.useState(null)    // { top, left, width, height, wrap, size }  — read-only position info
+  const [selBar, setSelBar] = React.useState(null)    // floating bubble toolbar — { top, below } when text is selected
 
   /* Sync external value → DOM only when it differs AND we aren't typing,
      so the cursor never jumps mid-keystroke. */
@@ -164,9 +165,25 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     sync(); refreshActive()
   }
 
+  /* Insert raw HTML at the caret using the Range API. We do NOT use
+     execCommand('insertHTML') — it's unreliable in Firefox (it silently
+     dropped class-wrapped spans, which is why text colour / highlight / custom
+     size / image / table appeared to "do nothing"). This replaces any selected
+     content and leaves the caret right after the inserted nodes. */
   const insertHtml = (html) => {
     ref.current?.focus()
-    execCmd('insertHTML', html)
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) {                       // no caret in the editor → append
+      if (ref.current) ref.current.innerHTML += html
+      sync(); refreshActive(); return
+    }
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    const tmp = document.createElement('div'); tmp.innerHTML = html
+    const frag = document.createDocumentFragment(); let last = null
+    while (tmp.firstChild) { last = tmp.firstChild; frag.appendChild(tmp.firstChild) }
+    range.insertNode(frag)
+    if (last) { range.setStartAfter(last); range.collapse(true); sel.removeAllRanges(); sel.addRange(range) }
     sync(); refreshActive()
   }
 
@@ -183,8 +200,10 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
       execCmd('formatBlock', tag)
     } else {
       const wrapper = document.createElement(tag.toLowerCase())
-      wrapper.appendChild(range.cloneContents())
-      execCmd('insertHTML', wrapper.outerHTML)
+      wrapper.appendChild(range.extractContents())
+      range.insertNode(wrapper)
+      const r = document.createRange(); r.selectNodeContents(wrapper)
+      sel.removeAllRanges(); sel.addRange(r)
     }
     sync(); refreshActive()
   }
@@ -224,8 +243,12 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     })
   }
 
-  /* Apply / clear an inline CLASS on the current selection.
-     Pass empty `cls` to remove all classes of that group from the selection. */
+  /* Apply / clear an inline CLASS on the current selection (text colour,
+     highlight, font-size preset, font family). Pass empty `cls` to remove all
+     classes of that group from the selection.
+     Uses the Range API (extractContents + insertNode) rather than
+     execCommand('insertHTML') — the latter silently dropped these class-wrapped
+     spans in Firefox, so colour/highlight appeared to do nothing. */
   const applySpanClass = (group, cls) => {
     const regex = GROUP_RE[group]; if (!regex) return
     ref.current?.focus()
@@ -233,18 +256,19 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     if (!sel?.rangeCount) return
     const range = sel.getRangeAt(0)
     if (range.collapsed) return                                       // need a real selection
-    const fragment = range.cloneContents()
+    const fragment = range.extractContents()
     cleanFragmentSpans(fragment, regex)                               // clear old colour/size/etc. on inner spans
-    let html
     if (cls) {
       const wrapper = document.createElement('span')
       wrapper.className = cls
       wrapper.appendChild(fragment)
-      html = wrapper.outerHTML
+      range.insertNode(wrapper)
+      const r = document.createRange(); r.selectNodeContents(wrapper)  // keep it selected → chain styles + see the highlight
+      sel.removeAllRanges(); sel.addRange(r)
     } else {
-      const tmp = document.createElement('div'); tmp.appendChild(fragment); html = tmp.innerHTML
+      range.insertNode(fragment)                                      // remove: drop the cleaned content back, unwrapped
     }
-    execCmd('insertHTML', html); sync(); refreshActive()
+    sync(); refreshActive()
   }
 
   /* Apply an inline CSS property (used for ARBITRARY values that don't have a
@@ -258,7 +282,7 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     if (!sel?.rangeCount) return
     const range = sel.getRangeAt(0)
     if (range.collapsed) return
-    const fragment = range.cloneContents()
+    const fragment = range.extractContents()
     fragment.querySelectorAll('span').forEach(s => {
       if (regex && s.className) {
         const keep = s.className.split(/\s+/).filter(c => c && !regex.test(c))
@@ -275,7 +299,9 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     const wrapper = document.createElement('span')
     wrapper.style[prop] = value
     wrapper.appendChild(fragment)
-    execCmd('insertHTML', wrapper.outerHTML)
+    range.insertNode(wrapper)
+    const r = document.createRange(); r.selectNodeContents(wrapper)
+    sel.removeAllRanges(); sel.addRange(r)
     sync(); refreshActive()
   }
 
@@ -352,9 +378,39 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     }
   }, [])
 
+  /* Clean writing surface: the formatting toolbar is hidden until the author
+     selects text, then it appears as a floating bubble anchored to the
+     selection (Notion/Medium-style). Compute its position relative to the wrap;
+     drop it BELOW the selection when there isn't room above (so it never clips
+     against the editor's top edge). */
+  const updateSelBar = React.useCallback(() => {
+    const wrap = wrapRef.current, ed = ref.current
+    const sel = window.getSelection()
+    if (!wrap || !ed || !sel || sel.rangeCount === 0 || sel.isCollapsed || !sel.toString().trim()) { setSelBar(null); return }
+    const range = sel.getRangeAt(0)
+    const anc = range.commonAncestorContainer
+    const node = anc.nodeType === 1 ? anc : anc.parentNode
+    if (!ed.contains(node)) { setSelBar(null); return }        // selection isn't in THIS editor
+    const rect = range.getBoundingClientRect()
+    if (!rect.width && !rect.height) { setSelBar(null); return }
+    const wr = wrap.getBoundingClientRect()
+    const topRel = rect.top - wr.top
+    const below = topRel < 92                                   // not enough room above → drop below the selection
+    setSelBar({ top: below ? (rect.bottom - wr.top + 8) : (topRel - 8), below })
+  }, [])
+
+  // Track selection → show/hide/reposition the bubble (covers mouse + keyboard
+  // selection, and our own re-selection after applying a style).
+  React.useEffect(() => {
+    const h = () => updateSelBar()
+    document.addEventListener('selectionchange', h)
+    return () => document.removeEventListener('selectionchange', h)
+  }, [updateSelBar])
+
   /* Click on an <img> → show the floating toolbar; click anywhere else → hide it. */
   const onMouseUp = (e) => {
     refreshActive()
+    updateSelBar()
     if (e.target?.tagName === 'IMG') {
       imgElRef.current = e.target
       setImgSel(positionImgToolbar(e.target))
@@ -411,9 +467,8 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
     e.preventDefault()
     const html = e.clipboardData.getData('text/html')
     const text = e.clipboardData.getData('text/plain')
-    if (html) execCmd('insertHTML', renderSafeHtml(html))
-    else if (text) execCmd('insertText', text)
-    sync()
+    if (html) { insertHtml(renderSafeHtml(html)); return }   // Range-API insert (insertHtml syncs); FF-safe
+    if (text) { execCmd('insertText', text); sync() }
   }
 
   const onKey = (e) => {
@@ -438,13 +493,19 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
   }, [imgSel, positionImgToolbar])
 
   return (
-    <div ref={wrapRef} className="rte-wysiwyg-wrap">
-      <WysiwygToolbar
-        run={run} insertHtml={insertHtml} active={active}
-        applyBlock={applyBlock} applyDir={applyDir}
-        applySpanClass={applySpanClass} applyBlockClass={applyBlockClass}
-        applySpanStyle={applySpanStyle}
-      />
+    <div ref={wrapRef} className={'rte-wysiwyg-wrap' + (selBar ? ' has-bubble' : '')}>
+      {/* Floating bubble toolbar — only while text is selected (clean page otherwise). */}
+      {selBar && (
+        <div className={'rte-bubble' + (selBar.below ? ' below' : '')} style={{ top: selBar.top }}
+          onMouseDown={(e) => e.preventDefault()}>
+          <WysiwygToolbar
+            run={run} insertHtml={insertHtml} active={active}
+            applyBlock={applyBlock} applyDir={applyDir}
+            applySpanClass={applySpanClass} applyBlockClass={applyBlockClass}
+            applySpanStyle={applySpanStyle}
+          />
+        </div>
+      )}
       <div
         ref={ref}
         className={'rte-wysiwyg prose' + (imgSel ? ' has-img-sel' : '')}

@@ -548,7 +548,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
 
           <div className="cm-rte-label">
             <label className="field-label">Abstract</label>
-            <span className="cm-rte-hint">Select text, then format with the toolbar — bold, italics, headings, lists…</span>
+            <span className="cm-rte-hint">Select any text — a formatting bar appears (bold, colour, highlight, headings…)</span>
           </div>
           <RichTextEditor
             value={abstractText}
@@ -561,7 +561,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
 
           <div className="cm-rte-label">
             <label className="field-label">Body / overview</label>
-            <span className="cm-rte-hint">Headings, lists, tables, images, colours & highlights — your formatting is kept on the published page.</span>
+            <span className="cm-rte-hint">Select text to format (colours, highlights, headings, lists, tables, images) — kept on the published page.</span>
           </div>
           <RichTextEditor
             value={description}

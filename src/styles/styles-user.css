@@ -466,6 +466,7 @@
 .cm-research-body .rte-bar{padding:7px 10px;gap:10px}
 .cm-research-body .rte-bar:empty{display:none}      /* research is WYSIWYG-only — no format pills/label → drop the empty strip */
 .cm-research-body .rte-tools{padding:7px 9px;gap:2px;flex-wrap:wrap;background:linear-gradient(180deg,var(--card-2),#fbf9f2)}
+.cm-research-body .rte-bubble .rte-tools{background:transparent;padding:2px;gap:1px}   /* bubble toolbar floats on its own card */
 .cm-research-body .rte-tool{width:30px;height:30px;border-radius:8px}
 .cm-research-body .rte-tool .ico{width:16px;height:16px}
 .cm-research-body .rte-tool-text{font-size:12.5px}

@@ -504,6 +504,33 @@
 /* WYSIWYG toolbar gets a touch more breathing room and wraps gracefully */
 .rte-wysiwyg-tools{flex-wrap:wrap;gap:1px;padding:8px 10px}
 
+/* ----- Floating bubble toolbar (clean writing surface) -----
+   The editor is a calm page by default; selecting text reveals this bubble
+   anchored to the selection. */
+.rte-bubble{
+  position:absolute; z-index:30; left:50%;
+  max-width:calc(100% - 16px);
+  transform:translate(-50%,-100%);
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:13px;
+  box-shadow:0 16px 40px -14px rgba(11,26,22,.42), 0 4px 12px -6px rgba(11,26,22,.2);
+  padding:3px 5px;
+  animation:rte-pop .14s ease-out;
+}
+.rte-bubble.below{transform:translate(-50%,0)}
+.rte-bubble .rte-tools{
+  border-bottom:0; background:transparent; padding:2px; gap:1px;
+  justify-content:center;
+}
+/* a small downward beak so the bubble points at the selection (above mode) */
+.rte-bubble::after{
+  content:""; position:absolute; bottom:-5px; left:50%; transform:translateX(-50%) rotate(45deg);
+  width:10px; height:10px; background:var(--card);
+  border-right:1px solid var(--line); border-bottom:1px solid var(--line); border-bottom-right-radius:2px;
+}
+.rte-bubble.below::after{bottom:auto; top:-5px; transform:translateX(-50%) rotate(225deg)}
+
 /* block-style <select> in the toolbar */
 .rte-block-select{
   height:32px;padding:0 26px 0 10px;border-radius:8px;
