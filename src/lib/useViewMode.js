@@ -6,9 +6,9 @@
    ========================================================= */
 import React from 'react'
 
-export const VIEW_MODES = ['list', 'grid', 'compact']
+export const VIEW_MODES = ['feed', 'grid', 'compact', 'grouped']
 
-export function useViewMode(page, fallback = 'list') {
+export function useViewMode(page, fallback = 'feed') {
   const key = 'ika:view:' + page
   const [view, setView] = React.useState(() => {
     try { const s = localStorage.getItem(key); return VIEW_MODES.includes(s) ? s : fallback }

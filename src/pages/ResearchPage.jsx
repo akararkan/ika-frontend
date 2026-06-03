@@ -119,11 +119,103 @@ export function ResearchPage() {
 
   const hint = tab === 'MINE' && filter !== 'ALL' && FILTER_META[filter]
 
+  // Owner lifecycle bar — shared by the full card and the compact row.
+  const ownerBar = (r) => (
+    <div className="r-owner-bar" onClick={e => e.stopPropagation()}>
+      <button onClick={() => openEdit(r)}><Icon name="compose" className="xs"/>Edit</button>
+      {r.status === 'DRAFT'     && <button className="primary" onClick={() => lifecycle(r.id, 'publish')}><Icon name="upload" className="xs"/>Publish</button>}
+      {r.status === 'PUBLISHED' && <button onClick={() => lifecycle(r.id, 'unpublish')}><Icon name="download" className="xs"/>To draft</button>}
+      {r.status === 'ARCHIVED'  && <button className="primary" onClick={() => lifecycle(r.id, 'publish')}><Icon name="check" className="xs"/>Restore</button>}
+      {r.status !== 'ARCHIVED' && r.status !== 'RETRACTED' && <button onClick={() => lifecycle(r.id, 'archive')}><Icon name="bookmark" className="xs"/>Archive</button>}
+      {r.status !== 'RETRACTED' && <button className="danger" onClick={() => lifecycle(r.id, 'retract', 'It stays publicly readable with a retraction banner — citations to it remain valid.')}><Icon name="flag" className="xs"/>Retract</button>}
+      {r.status === 'RETRACTED' && <button className="primary" onClick={() => lifecycle(r.id, 'unretract')}><Icon name="check" className="xs"/>Unretract</button>}
+      <span className="spacer"/>
+      <button className="danger" title="Delete permanently" onClick={() => removeR(r.id)}><Icon name="close" className="xs"/></button>
+    </div>
+  )
+
+  // Full card — Feed, Grid and Grouped modes.
+  const RCard = (r, i) => {
+    const u = authorOf(r)
+    const sLower = r.status.toLowerCase()
+    const isOwner = tab === 'MINE' && r.author === meId
+    return (
+      <article key={r.id} className={`r-card rise is-${sLower}`} style={{ animationDelay:`${i*60}ms` }} onClick={() => navigate(`/research/${r.id}`)}>
+        <div className="r-cover" style={{ background:r.cover }}>
+          <span className="r-irc font-mono">{r.irc || (r.status === 'DRAFT' ? 'DRAFT' : '')}</span>
+          {r.hasVideo && <button className="r-play" onClick={e => { e.stopPropagation(); navigate(`/research/${r.id}`) }}><Icon name="play"/></button>}
+          {r.status !== 'PUBLISHED' && (
+            <span className={'r-status-ribbon ' + sLower}>
+              <Icon name={STATUS_ICON[r.status]} className="xs"/>{sLower}
+            </span>
+          )}
+        </div>
+        <div className="r-body">
+          <div className="r-top">
+            <Avatar initials={u.initials} color={u.avc} size={30} src={u.profileImage}/>
+            <div>
+              <div className="rail-name"><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
+              <small className="muted">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</small>
+            </div>
+            <span className={'status ' + sLower} style={{marginLeft:'auto'}}>{sLower}</span>
+          </div>
+          <h3>{r.title}</h3>
+          <p className="r-abs">{r.abstract}</p>
+          {!!r.tags?.length && <div className="qna-tags">{r.tags.map(t => <a key={t}>#{t}</a>)}</div>}
+          <footer className="r-foot">
+            <span><Icon name="eye" className="xs"/>{fmt(r.metrics.views)}</span>
+            <span><Icon name="download" className="xs"/>{r.metrics.downloads}</span>
+            <span><Icon name="heart" className="xs"/>{fmt(r.metrics.reactions)}</span>
+            <span><Icon name="cite" className="xs"/>{r.metrics.citations} cited</span>
+          </footer>
+        </div>
+        {isOwner && ownerBar(r)}
+      </article>
+    )
+  }
+
+  // Dense horizontal row — Compact mode (owner bar wraps to a full-width line).
+  const RRow = (r, i) => {
+    const u = authorOf(r)
+    const sLower = r.status.toLowerCase()
+    const isOwner = tab === 'MINE' && r.author === meId
+    return (
+      <article key={r.id} className={`rrow rise is-${sLower}`} style={{ animationDelay:`${i*35}ms` }} onClick={() => navigate(`/research/${r.id}`)}>
+        <div className="rrow-cover" style={{ background:r.cover }}>
+          {r.hasVideo && <span className="rrow-play"><Icon name="play"/></span>}
+        </div>
+        <div className="rrow-mid">
+          <div className="rrow-head"><b className="rrow-name">{u.full}</b>{u.verified && <Verify scholar/>}<span className="rrow-meta">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</span></div>
+          <h3 className="rrow-title">{r.title}</h3>
+          <p className="rrow-body">{r.abstract}</p>
+          {!!r.tags?.length && <div className="qna-tags">{r.tags.map(t => <a key={t}>#{t}</a>)}</div>}
+        </div>
+        <div className="rrow-right">
+          <span className={'status ' + sLower}>{sLower}</span>
+          <div className="rrow-metrics">
+            <span><Icon name="eye" className="xs"/>{fmt(r.metrics.views)}</span>
+            <span><Icon name="cite" className="xs"/>{r.metrics.citations}</span>
+          </div>
+        </div>
+        {isOwner && ownerBar(r)}
+      </article>
+    )
+  }
+
+  // Grouped mode buckets — by lifecycle status.
+  const R_GROUPS = [
+    { key:'PUBLISHED', label:'Published', dot:'var(--emerald-bright)' },
+    { key:'DRAFT',     label:'Drafts',    dot:'var(--brass)' },
+    { key:'ARCHIVED',  label:'Archived',  dot:'var(--muted)' },
+    { key:'RETRACTED', label:'Retracted', dot:'var(--rose)' },
+  ]
+
   return (
     <div className="main center">
       <div className="col-main">
         <div className="phead">
           <div>
+            <span className="phead-kicker">Islamic Knowledge Archive</span>
             <h1>Scholarly <em>Research</em></h1>
             <p className="sub">Peer-reviewed publications with minted IRC IDs, contributors, sources, and tracked citations.</p>
           </div>
@@ -144,6 +236,7 @@ export function ResearchPage() {
         {tab === 'MINE' ? (
           <>
             <div className="list-toolbar">
+              <ViewSeg value={view} onChange={setView}/>
               <div className="chips statuses">
                 {Object.entries(FILTER_META).map(([key, meta]) => (
                   <button key={key} className={'chip ' + (filter===key ? 'on' : '')} onClick={() => setFilter(key)}>
@@ -151,7 +244,6 @@ export function ResearchPage() {
                   </button>
                 ))}
               </div>
-              <ViewSeg value={view} onChange={setView}/>
             </div>
             {hint && (
               <div className={'r-section-hint ' + filter.toLowerCase()}>
@@ -165,7 +257,6 @@ export function ResearchPage() {
           </>
         ) : (
           <div className="list-toolbar">
-            <span className="lt-spacer"/>
             <ViewSeg value={view} onChange={setView}/>
           </div>
         )}
@@ -177,60 +268,28 @@ export function ResearchPage() {
               title={tab==='MINE' ? (filter === 'ALL' ? 'No research here yet' : `No ${filter.toLowerCase()} research`) : 'No research published yet'}
               sub={tab==='MINE' && filter === 'ALL' ? 'Publish your first paper — it starts as a draft.' : undefined}
             />
-          ) : (
-            <div className="r-list" data-view={view}>
-              {list.map((r, i) => {
-                const u = authorOf(r)
-                const sLower = r.status.toLowerCase()
-                const isOwner = tab === 'MINE' && r.author === meId
+          ) : view === 'grouped' ? (
+            <div className="list-groups">
+              {R_GROUPS.map(g => {
+                const items = list.filter(r => r.status === g.key)
+                if (!items.length) return null
                 return (
-                  <article key={r.id} className={`r-card rise is-${sLower}`} style={{ animationDelay:`${i*70}ms` }} onClick={() => navigate(`/research/${r.id}`)}>
-                    <div className="r-cover" style={{ background:r.cover }}>
-                      <span className="r-irc font-mono">{r.irc || (r.status === 'DRAFT' ? 'DRAFT' : '')}</span>
-                      {r.hasVideo && <button className="r-play" onClick={e => { e.stopPropagation(); navigate(`/research/${r.id}`) }}><Icon name="play"/></button>}
-                      {r.status !== 'PUBLISHED' && (
-                        <span className={'r-status-ribbon ' + sLower}>
-                          <Icon name={STATUS_ICON[r.status]} className="xs"/>{sLower}
-                        </span>
-                      )}
+                  <section className="lg-group" key={g.key}>
+                    <div className="lg-head">
+                      <span className="lg-dot" style={{ background:g.dot }}/>
+                      <h2>{g.label}</h2>
+                      <span className="lg-count">{items.length}</span>
+                      <span className="lg-line"/>
                     </div>
-                    <div className="r-body">
-                      <div className="r-top">
-                        <Avatar initials={u.initials} color={u.avc} size={30} src={u.profileImage}/>
-                        <div>
-                          <div className="rail-name"><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
-                          <small className="muted">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</small>
-                        </div>
-                        <span className={'status ' + sLower} style={{marginLeft:'auto'}}>{sLower}</span>
-                      </div>
-                      <h3>{r.title}</h3>
-                      <p className="r-abs">{r.abstract}</p>
-                      {!!r.tags?.length && <div className="qna-tags">{r.tags.map(t => <a key={t}>#{t}</a>)}</div>}
-                      <footer className="r-foot">
-                        <span><Icon name="eye" className="xs"/>{fmt(r.metrics.views)}</span>
-                        <span><Icon name="download" className="xs"/>{r.metrics.downloads}</span>
-                        <span><Icon name="heart" className="xs"/>{fmt(r.metrics.reactions)}</span>
-                        <span><Icon name="cite" className="xs"/>{r.metrics.citations} cited</span>
-                      </footer>
-                    </div>
-
-                    {isOwner && (
-                      <div className="r-owner-bar" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => openEdit(r)}><Icon name="compose" className="xs"/>Edit</button>
-                        {r.status === 'DRAFT'     && <button className="primary" onClick={() => lifecycle(r.id, 'publish')}><Icon name="upload" className="xs"/>Publish</button>}
-                        {r.status === 'PUBLISHED' && <button onClick={() => lifecycle(r.id, 'unpublish')}><Icon name="download" className="xs"/>To draft</button>}
-                        {r.status === 'ARCHIVED'  && <button className="primary" onClick={() => lifecycle(r.id, 'publish')}><Icon name="check" className="xs"/>Restore</button>}
-                        {r.status !== 'ARCHIVED' && r.status !== 'RETRACTED' && <button onClick={() => lifecycle(r.id, 'archive')}><Icon name="bookmark" className="xs"/>Archive</button>}
-                        {r.status !== 'RETRACTED' && <button className="danger" onClick={() => lifecycle(r.id, 'retract', 'It stays publicly readable with a retraction banner — citations to it remain valid.')}><Icon name="flag" className="xs"/>Retract</button>}
-                        {r.status === 'RETRACTED' && <button className="primary" onClick={() => lifecycle(r.id, 'unretract')}><Icon name="check" className="xs"/>Unretract</button>}
-                        <span className="spacer"/>
-                        <button className="danger" title="Delete permanently" onClick={() => removeR(r.id)}><Icon name="close" className="xs"/></button>
-                      </div>
-                    )}
-                  </article>
+                    <div className="r-list" data-view="feed">{items.map((r, i) => RCard(r, i))}</div>
+                  </section>
                 )
               })}
             </div>
+          ) : view === 'compact' ? (
+            <div className="r-list" data-view="compact">{list.map((r, i) => RRow(r, i))}</div>
+          ) : (
+            <div className="r-list" data-view={view}>{list.map((r, i) => RCard(r, i))}</div>
           )}
       </div>
       {composing && <ResearchComposeModal onClose={() => setComposing(false)} onCreated={onCreated}/>}

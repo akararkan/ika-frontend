@@ -24,26 +24,22 @@
 /* ---------- Q&A cards ---------- */
 .qna-list{display:flex;flex-direction:column;gap:14px}
 .qna-card{
-  position:relative;
+  position:relative;overflow:hidden;
   background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-lg);padding:18px 20px 18px 22px;
+  border-radius:var(--r-lg);padding:20px 22px;
   box-shadow:var(--shadow-sm);cursor:pointer;
-  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+  transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s ease,border-color .3s ease;
 }
-/* Status rail — a quiet 3px spine on the card's left edge. Colour carries the
-   lifecycle: emerald = open/answered (default), brass = resolved (accepted
-   answer), muted = closed. Brightens to full opacity on hover. */
-.qna-card::before{
-  content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;
-  border-radius:999px;background:var(--emerald-bright);opacity:.5;
-  transition:opacity .16s ease;
+/* Brass hairline revealed across the top on hover — the card's signature lift. */
+.qna-card::before,.r-card::before{
+  content:"";position:absolute;inset:0 0 auto 0;height:3px;z-index:4;
+  background:linear-gradient(90deg,var(--brass),var(--brass-soft));
+  opacity:0;transition:opacity .3s ease;
 }
-.qna-card.is-resolved::before{background:var(--brass)}
-.qna-card.is-closed::before{background:var(--muted)}
-.qna-card:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:#cbc4ab}
-.qna-card:hover::before{opacity:1}
-.qna-card:hover h3{color:var(--emerald-deep)}
-.qna-card h3{transition:color .16s ease}
+.qna-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:#dcd5c4}
+.qna-card:hover::before,.r-card:hover::before{opacity:1}
+.qna-card:hover h3,.r-card:hover h3{color:var(--emerald-deep)}
+.qna-card h3,.r-card h3{transition:color .2s ease}
 .qna-card > header{display:flex;align-items:center;gap:10px;margin-bottom:11px}
 .qna-card > header > div:nth-child(2){flex:1;min-width:0}
 .qna-name{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink);font-weight:600;flex-wrap:wrap}
@@ -151,24 +147,11 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
   background:var(--card);border:1px solid var(--line);
   border-radius:var(--r-lg);box-shadow:var(--shadow-sm);
   overflow:hidden;display:grid;grid-template-columns:220px 1fr;
-  cursor:pointer;transition:.18s;position:relative;
+  cursor:pointer;position:relative;
+  transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s ease,border-color .3s ease;
 }
-.r-card:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:#cbc4ab}
-.r-card:hover h3{color:var(--emerald-deep)}
-.r-card h3{transition:color .16s ease}
+.r-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:#dcd5c4}
 @media(max-width:640px){.r-card{grid-template-columns:1fr}}
-
-/* Status rail — same grammar as the Q&A spine, reusing the existing is-{status}
-   classes. published = emerald (default), draft = brass, archived = muted,
-   retracted = rose. Sits above the cover; brightens on hover. */
-.r-card::before{
-  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;z-index:3;
-  background:var(--emerald-bright);opacity:.55;transition:opacity .16s ease;
-}
-.r-card.is-draft::before{background:var(--brass)}
-.r-card.is-archived::before{background:var(--muted)}
-.r-card.is-retracted::before{background:var(--rose)}
-.r-card:hover::before{opacity:1}
 
 /* ----- Status variants — distinct, restrained treatments per lifecycle state */
 /* DRAFT — warm parchment edge, gentle diagonal weave on cover (work-in-progress) */
@@ -301,121 +284,116 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .r-foot span:last-child .ico{color:var(--brass)}
 
 /* =============================================================
-   List toolbar + view-mode switcher (List / Grid / Compact)
-   A single [data-view] attribute on .qna-list / .r-list drives
-   all three layouts in pure CSS — no per-card JSX branching, so
-   the owner bar, status ribbons and is-{status} variants keep
-   working untouched in every mode.
+   Header kicker (page mast)
    ============================================================= */
-.list-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
-.list-toolbar .chips{flex:1;margin:0}
+.phead-kicker{
+  display:inline-flex;align-items:center;gap:8px;margin-bottom:10px;
+  font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#7a5a1a;
+}
+.phead-kicker::before{content:"";width:26px;height:1.5px;background:var(--brass)}
+
+/* =============================================================
+   Controls bar + view-mode switcher (Feed / Grid / Compact / Grouped)
+   The chosen mode is remembered per page (useViewMode) and selects
+   which markup the page renders: full cards (Feed/Grid/Grouped) or
+   dense rows (Compact). Layout per mode is keyed on [data-view].
+   ============================================================= */
+.list-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  margin-bottom:20px;     /* the .tabs underline above is the divider — no second rule here */
+}
+.list-toolbar .chips{margin:0}
 .lt-spacer{flex:1}
 
 .view-seg{
-  display:inline-flex;align-items:center;gap:2px;flex:none;
-  padding:3px;border-radius:11px;
-  background:var(--paper-2);border:1px solid var(--line);
+  display:inline-flex;flex:none;gap:2px;padding:4px;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);
 }
 .vseg{
-  width:34px;height:30px;border-radius:8px;
-  display:grid;place-items:center;color:var(--muted);
-  transition:color .14s ease,background .14s ease,box-shadow .14s ease;
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 14px;border-radius:10px;
+  font-weight:600;font-size:13.5px;color:var(--muted);
+  transition:color .2s ease,background .2s ease,box-shadow .2s ease;
 }
-.vseg:hover{color:var(--ink-2)}
-.vseg .ico{width:16px;height:16px}
-.vseg.on{
-  background:var(--card);color:var(--emerald-deep);
-  box-shadow:var(--shadow-sm),inset 0 0 0 1px rgba(21,154,118,.22);
-}
+.vseg .ico{width:15px;height:15px}
+.vseg:hover{color:var(--emerald-deep)}
+.vseg.on{background:var(--emerald-deep);color:#fff;box-shadow:0 5px 12px -5px rgba(10,74,60,.5)}
+.vseg.on .ico{color:#fff}
 .vseg:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
 
-/* ----- GRID view — uniform, metric-forward tiles for comparing ----- */
-.qna-list[data-view="grid"]{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-  gap:14px;align-items:start;
-}
-.qna-list[data-view="grid"] .qna-card{display:flex;flex-direction:column}
-.qna-list[data-view="grid"] .qna-card footer{margin-top:auto}
-.qna-list[data-view="grid"] .qna-body{-webkit-line-clamp:3}
+/* Resolved / archived status pills (current palette) used by the new badges */
+.status.resolved{background:rgba(21,154,118,.14);color:var(--emerald-deep)}
+.status.archived{background:#ece8da;color:var(--muted)}
 
-.r-list[data-view="grid"]{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-  gap:16px;align-items:start;
-}
-/* keep the card a GRID (not flex) so the owner bar's grid-column:1/-1 still
-   spans correctly as the last row; the cover moves to a full-width top band */
-.r-list[data-view="grid"] .r-card{grid-template-columns:1fr;grid-template-rows:auto auto auto}
-.r-list[data-view="grid"] .r-cover{aspect-ratio:16/9;min-height:0;height:auto}   /* height:auto so the ratio (not the ≤720px fixed-height rule) drives sizing */
-.r-list[data-view="grid"] .r-card::before{left:0;right:0;top:0;bottom:auto;width:auto;height:3px}
+/* ----- FEED (default) — full cards, single column ----- */
+.qna-list[data-view="feed"],
+.r-list[data-view="feed"]{gap:16px}
 
-/* ----- COMPACT view — a fused catalog ledger for fast triage ----- */
+/* ----- GRID — magazine masonry of full cards ----- */
+.qna-list[data-view="grid"],
+.r-list[data-view="grid"]{display:block;column-count:2;column-gap:16px}
+.qna-list[data-view="grid"] .qna-card{break-inside:avoid;margin-bottom:16px}
+/* research grid tile = cover-on-top vertical card; owner bar still spans 1/-1 */
+.r-list[data-view="grid"] .r-card{break-inside:avoid;margin-bottom:16px;grid-template-columns:1fr}
+.r-list[data-view="grid"] .r-cover{aspect-ratio:16/10;min-height:0;height:auto}
+@media(max-width:680px){
+  .qna-list[data-view="grid"],.r-list[data-view="grid"]{column-count:1}
+}
+
+/* ----- COMPACT — dense horizontal rows (.qrow / .rrow) ----- */
 .qna-list[data-view="compact"],
-.r-list[data-view="compact"]{
-  display:flex;flex-direction:column;gap:0;
-  background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);
-}
-/* rows shed their own chrome and fuse with hairline separators */
-.qna-list[data-view="compact"] .qna-card,
-.r-list[data-view="compact"] .r-card{
-  border:0;border-radius:0;box-shadow:none;background:transparent;
-  transform:none;animation:none;          /* no per-row lift / stagger cascade */
-}
-.qna-list[data-view="compact"] .qna-card:not(:last-child),
-.r-list[data-view="compact"] .r-card:not(:last-child){border-bottom:1px solid var(--line-soft)}
-.qna-list[data-view="compact"] .qna-card:hover,
-.r-list[data-view="compact"] .r-card:hover{background:var(--card-2);transform:none}
-/* the status rail stays as the left spine, snug to the row */
-.qna-list[data-view="compact"] .qna-card::before,
-.r-list[data-view="compact"] .r-card::before{top:0;bottom:0}
+.r-list[data-view="compact"]{gap:10px}
 
-/* Q&A compact row: [title …………… status · metrics] */
-.qna-list[data-view="compact"] .qna-card{
-  display:flex;align-items:center;gap:14px;flex-wrap:nowrap;
-  padding:11px 16px 11px 18px;min-height:52px;
+.qrow,.rrow{
+  position:relative;overflow:hidden;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:15px 18px;display:flex;gap:15px;align-items:flex-start;
+  box-shadow:var(--shadow-sm);cursor:pointer;
+  transition:background .2s ease,box-shadow .25s ease,border-color .25s ease,transform .25s ease;
 }
-.qna-list[data-view="compact"] .qna-card h3{
-  order:1;flex:1;min-width:0;margin:0;
-  font-size:15.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.qna-list[data-view="compact"] .qna-card > header{order:2;margin:0;flex:none;gap:0}
-.qna-list[data-view="compact"] .qna-card > header > .avatar,
-.qna-list[data-view="compact"] .qna-card > header > div:nth-child(2),
-.qna-list[data-view="compact"] .qna-card .qna-body,
-.qna-list[data-view="compact"] .qna-card .qna-tags{display:none}
-.qna-list[data-view="compact"] .qna-card > footer{order:3;margin:0;padding:0;border:0;flex:none;gap:14px;font-size:12px}
+.rrow{flex-wrap:wrap}
+.qrow:hover,.rrow:hover{background:var(--card-2);box-shadow:var(--shadow);border-color:#dcd5c4;transform:translateY(-1px)}
+.qrow-mid,.rrow-mid{flex:1;min-width:0}
+.qrow-head,.rrow-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:2px}
+.qrow-name,.rrow-name{font-weight:700;font-size:13.5px;color:var(--ink);}
+.qrow-meta,.rrow-meta{font-size:12px;color:var(--muted)}
+.qrow-title,.rrow-title{font-family:var(--serif);font-weight:600;font-size:17px;line-height:1.25;letter-spacing:-.2px;color:var(--ink);margin:2px 0 0;transition:color .2s ease}
+.qrow:hover .qrow-title,.rrow:hover .rrow-title{color:var(--emerald-deep)}
+.qrow-body,.rrow-body{color:var(--ink-soft);font-size:13px;line-height:1.45;margin:4px 0 0;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.qrow .qna-tags,.rrow .qna-tags{margin-top:9px}
+.qrow .qna-tags a,.rrow .qna-tags a{font-size:11px;padding:3px 9px}
+.qrow-right,.rrow-right{display:flex;flex-direction:column;align-items:flex-end;gap:11px;flex-shrink:0}
+.qrow-metrics,.rrow-metrics{display:flex;gap:13px;color:var(--muted);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.qrow-metrics span,.rrow-metrics span{display:inline-flex;align-items:center;gap:5px}
+.qrow-metrics .qna-ans{color:var(--emerald)}
+.qrow-metrics .ico,.rrow-metrics .ico{width:13px;height:13px}
+/* research row cover thumb */
+.rrow-cover{position:relative;width:62px;height:62px;flex:none;border-radius:12px;overflow:hidden;background-size:cover;background-position:center}
+.rrow-play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;background:rgba(8,20,16,.28)}
+.rrow-play .ico{width:20px;height:20px;fill:#fff;stroke:none}
+/* owner bar wraps to a full-width line under the research row — negative side/
+   bottom margins bleed it edge-to-edge (the row's overflow:hidden clips it) */
+.rrow .r-owner-bar{flex-basis:100%;margin:13px -18px -15px;padding:10px 18px;border-radius:0}
 
-/* Research compact row: [thumb] [title · status] [metrics]; owner bar wraps below */
-.r-list[data-view="compact"] .r-card{
-  grid-template-columns:48px 1fr;align-items:center;
-  column-gap:14px;padding:10px 14px 10px 16px;min-height:52px;
+@media(max-width:680px){
+  .qrow,.rrow{flex-wrap:wrap}
+  .qrow-right,.rrow-right{flex-direction:row;width:100%;justify-content:space-between;align-items:center}
 }
-.r-list[data-view="compact"] .r-cover{
-  width:48px;height:48px;min-height:0;border-radius:10px;align-self:center;box-shadow:none;
-}
-.r-list[data-view="compact"] .r-cover::after,
-.r-list[data-view="compact"] .r-irc,
-.r-list[data-view="compact"] .r-play,
-.r-list[data-view="compact"] .r-status-ribbon{display:none}
-.r-list[data-view="compact"] .r-body{display:flex;align-items:center;gap:12px;padding:0;min-width:0}
-.r-list[data-view="compact"] .r-body h3{
-  order:1;flex:1;min-width:0;margin:0;
-  font-size:15.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.r-list[data-view="compact"] .r-top{order:2;flex:none;margin:0;gap:0}
-.r-list[data-view="compact"] .r-top > .avatar,
-.r-list[data-view="compact"] .r-top > div:nth-child(2),
-.r-list[data-view="compact"] .r-abs,
-.r-list[data-view="compact"] .r-body .qna-tags{display:none}
-.r-list[data-view="compact"] .r-foot{order:3;flex:none;margin:0;padding:0;border:0;gap:12px;font-size:12px}
-/* owner bar: a tidy full-width second line under the row (never hover-revealed).
-   Negative margins cancel the compact card's padding so the dashed separator
-   spans edge-to-edge (the card's overflow:hidden clips the bleed cleanly). */
-.r-list[data-view="compact"] .r-owner-bar{margin:0 -14px -10px -16px;padding:8px 16px}
 
-@media(max-width:600px){
-  /* keep tiles readable — never wedge two narrow columns on a phone */
-  .qna-list[data-view="grid"],.r-list[data-view="grid"]{grid-template-columns:1fr}
+/* ----- GROUPED — full cards bucketed by status, with section heads ----- */
+.lg-group{margin-bottom:30px}
+.lg-group:last-child{margin-bottom:0}
+.lg-head{display:flex;align-items:center;gap:12px;margin:0 2px 14px}
+.lg-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.lg-head h2{font-family:var(--serif);font-weight:600;font-size:19px;margin:0;color:var(--emerald-deep);letter-spacing:-.2px}
+.lg-count{font-size:12px;font-weight:700;color:var(--muted);background:var(--card);border:1px solid var(--line);padding:3px 9px;border-radius:999px}
+.lg-line{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+/* On small phones drop the seg labels to icons so the control + filters fit */
+@media(max-width:560px){
+  .view-seg{gap:0}
+  .vseg{padding:9px 12px}
+  .vseg-tx{display:none}
 }
 
 /* Research detail */

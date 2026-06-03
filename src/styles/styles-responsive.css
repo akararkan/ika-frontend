@@ -117,13 +117,14 @@ img,video{max-width:100%;height:auto}
   .pca{padding:10px;font-size:13px;gap:6px}
   .post-voice{margin:0 14px 12px;padding:12px}
 
-  /* Q&A cards a touch tighter */
-  .qna-list{gap:12px}
+  /* Q&A cards a touch tighter — scoped to [data-view] so it beats the new
+     same-specificity feed-gap rule in styles-content.css */
+  .qna-list[data-view="feed"]{gap:12px}
   .qna-card h3{font-size:17px;line-height:1.28}
   .qna-card .qna-body{font-size:13.5px}
 
   /* Research cards stack 1-up cleanly on phones */
-  .r-list{grid-template-columns:1fr;gap:12px}
+  .r-list[data-view="feed"]{gap:12px}
   .r-cover{height:140px}
   .r-body h3{font-size:18px;line-height:1.25}
 

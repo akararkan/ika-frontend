@@ -73,6 +73,12 @@ export const ICON_PATHS = {
   trash:  '<path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/>',
   menu:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
 
+  /* ---- view-mode switcher glyphs ---- */
+  vfeed:    '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>',
+  vgrid:    '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  vcompact: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+  vgrouped: '<path d="M4 6h16M7 12h13M10 18h10"/>',
+
   /* ---- rich-text editor glyphs ---- */
   bold:        '<path d="M7 5h6.5a3 3 0 0 1 0 6H7zM7 11h7.5a3.5 3.5 0 0 1 0 7H7z"/>',
   italic:      '<path d="M19 5h-7M12 19H5M15 5L9 19"/>',
@@ -227,13 +233,14 @@ export function linkify(text) {
   })
 }
 
-/* Segmented view-mode switcher (List / Grid / Compact) for list pages.
-   Icon-only, accessible: a labelled group of aria-pressed buttons with
-   ArrowLeft/Right roving so the whole control is keyboard-operable. */
+/* Segmented view-mode switcher (Feed / Grid / Compact / Grouped) for list
+   pages. Icon + label, accessible: a roving toolbar of aria-pressed buttons
+   with ArrowLeft/Right moving both selection and focus. */
 const VIEW_SEG_OPTS = [
-  { id:'list',    label:'List view',    icon:'list'  },
-  { id:'grid',    label:'Grid view',    icon:'grid'  },
-  { id:'compact', label:'Compact view', icon:'table' },
+  { id:'feed',    label:'Feed',    icon:'vfeed'    },
+  { id:'grid',    label:'Grid',    icon:'vgrid'    },
+  { id:'compact', label:'Compact', icon:'vcompact' },
+  { id:'grouped', label:'Grouped', icon:'vgrouped' },
 ]
 export function ViewSeg({ value, onChange }) {
   const btnRefs = React.useRef([])
@@ -258,13 +265,13 @@ export function ViewSeg({ value, onChange }) {
           type="button"
           className={'vseg' + (value === o.id ? ' on' : '')}
           aria-pressed={value === o.id}
-          aria-label={o.label}
-          title={o.label}
+          aria-label={o.label + ' view'}
+          title={o.label + ' view'}
           tabIndex={value === o.id ? 0 : -1}
           onClick={() => onChange(o.id)}
           onKeyDown={onKey}
         >
-          <Icon name={o.icon} className="sm"/>
+          <Icon name={o.icon} className="sm"/><span className="vseg-tx">{o.label}</span>
         </button>
       ))}
     </div>
