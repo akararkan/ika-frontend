@@ -3,9 +3,10 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Icon, Verify, Avatar, fmt } from '../components/ui.jsx'
+import { Icon, Verify, Avatar, fmt, ViewSeg } from '../components/ui.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
+import { useViewMode } from '../lib/useViewMode.js'
 import { openCompose } from '../lib/openCompose.js'
 import { api } from '../api/index.js'
 
@@ -13,6 +14,7 @@ const PAGE = 20
 
 export function QnaPage() {
   const navigate = useNavigate()
+  const [view, setView] = useViewMode('qna')
   const [tab, setTab] = React.useState('DISCOVER')
   const [filter, setFilter] = React.useState('OPEN')
   const [items, setItems] = React.useState([])
@@ -88,20 +90,24 @@ export function QnaPage() {
           <button className={'tab ' + (tab==='FOLLOWING'?'on':'')} onClick={() => setTab('FOLLOWING')}>Following</button>
         </div>
 
-        <div className="chips">
-          {['OPEN','ANSWERED','ALL'].map(f => (
-            <button key={f} className={'chip ' + (filter===f ? 'on' : '')} onClick={() => setFilter(f)}>{f[0]+f.slice(1).toLowerCase()}</button>
-          ))}
+        <div className="list-toolbar">
+          <div className="chips">
+            {['OPEN','ANSWERED','ALL'].map(f => (
+              <button key={f} className={'chip ' + (filter===f ? 'on' : '')} onClick={() => setFilter(f)}>{f[0]+f.slice(1).toLowerCase()}</button>
+            ))}
+          </div>
+          <ViewSeg value={view} onChange={setView}/>
         </div>
 
         {loading ? <Loader label="Loading questions…"/>
           : !list.length ? <EmptyState icon="qna" title="No questions here" sub="Be the first to ask one."/>
           : (
-            <div className="qna-list">
+            <div className="qna-list" data-view={view}>
               {list.map((q, i) => {
                 const u = authorOf(q)
+                const railClass = q.hasAcceptedAnswer ? 'is-resolved' : 'is-' + q.status.toLowerCase()
                 return (
-                  <article key={q.id} className="qna-card rise" style={{ animationDelay:`${i*60}ms` }} onClick={() => navigate(`/qna/${q.id}`)}>
+                  <article key={q.id} className={`qna-card rise ${railClass}`} style={{ animationDelay:`${i*60}ms` }} onClick={() => navigate(`/qna/${q.id}`)}>
                     <header>
                       <Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/>
                       <div>

@@ -6,11 +6,12 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Icon, Verify, Avatar, fmt, showToast } from '../components/ui.jsx'
+import { Icon, Verify, Avatar, fmt, showToast, ViewSeg } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
 import { authorOf } from '../lib/userView.js'
+import { useViewMode } from '../lib/useViewMode.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api, adapters } from '../api/index.js'
 
@@ -30,6 +31,7 @@ export function ResearchPage() {
   const { user } = useAuth()
   const meId = user?.id
   const canPublish = ['SCHOLAR','RESEARCHER','ADMIN'].includes(user?.role)
+  const [view, setView] = useViewMode('research')
   const [tab, setTab] = React.useState('DISCOVER')
   const [filter, setFilter] = React.useState('ALL')
   const [items, setItems] = React.useState([])
@@ -139,14 +141,17 @@ export function ResearchPage() {
           {canPublish && <button className={'tab ' + (tab==='MINE'?'on':'')} onClick={() => setTab('MINE')}>My research</button>}
         </div>
 
-        {tab === 'MINE' && (
+        {tab === 'MINE' ? (
           <>
-            <div className="chips statuses">
-              {Object.entries(FILTER_META).map(([key, meta]) => (
-                <button key={key} className={'chip ' + (filter===key ? 'on' : '')} onClick={() => setFilter(key)}>
-                  <Icon name={meta.icon} className="xs"/>{key === 'ALL' ? 'All' : key[0]+key.slice(1).toLowerCase()}
-                </button>
-              ))}
+            <div className="list-toolbar">
+              <div className="chips statuses">
+                {Object.entries(FILTER_META).map(([key, meta]) => (
+                  <button key={key} className={'chip ' + (filter===key ? 'on' : '')} onClick={() => setFilter(key)}>
+                    <Icon name={meta.icon} className="xs"/>{key === 'ALL' ? 'All' : key[0]+key.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+              <ViewSeg value={view} onChange={setView}/>
             </div>
             {hint && (
               <div className={'r-section-hint ' + filter.toLowerCase()}>
@@ -158,6 +163,11 @@ export function ResearchPage() {
               </div>
             )}
           </>
+        ) : (
+          <div className="list-toolbar">
+            <span className="lt-spacer"/>
+            <ViewSeg value={view} onChange={setView}/>
+          </div>
         )}
 
         {loading ? <Loader label="Loading research…"/>
@@ -168,7 +178,7 @@ export function ResearchPage() {
               sub={tab==='MINE' && filter === 'ALL' ? 'Publish your first paper — it starts as a draft.' : undefined}
             />
           ) : (
-            <div className="r-list">
+            <div className="r-list" data-view={view}>
               {list.map((r, i) => {
                 const u = authorOf(r)
                 const sLower = r.status.toLowerCase()

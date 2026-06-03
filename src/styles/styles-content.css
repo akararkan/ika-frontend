@@ -24,11 +24,26 @@
 /* ---------- Q&A cards ---------- */
 .qna-list{display:flex;flex-direction:column;gap:14px}
 .qna-card{
+  position:relative;
   background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-lg);padding:18px 20px;
-  box-shadow:var(--shadow-sm);cursor:pointer;transition:.16s;
+  border-radius:var(--r-lg);padding:18px 20px 18px 22px;
+  box-shadow:var(--shadow-sm);cursor:pointer;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
 }
-.qna-card:hover{box-shadow:var(--shadow);border-color:#cbc4ab}
+/* Status rail — a quiet 3px spine on the card's left edge. Colour carries the
+   lifecycle: emerald = open/answered (default), brass = resolved (accepted
+   answer), muted = closed. Brightens to full opacity on hover. */
+.qna-card::before{
+  content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;
+  border-radius:999px;background:var(--emerald-bright);opacity:.5;
+  transition:opacity .16s ease;
+}
+.qna-card.is-resolved::before{background:var(--brass)}
+.qna-card.is-closed::before{background:var(--muted)}
+.qna-card:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:#cbc4ab}
+.qna-card:hover::before{opacity:1}
+.qna-card:hover h3{color:var(--emerald-deep)}
+.qna-card h3{transition:color .16s ease}
 .qna-card > header{display:flex;align-items:center;gap:10px;margin-bottom:11px}
 .qna-card > header > div:nth-child(2){flex:1;min-width:0}
 .qna-name{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink);font-weight:600;flex-wrap:wrap}
@@ -40,6 +55,7 @@
   display:flex;align-items:center;gap:18px;margin-top:14px;
   padding-top:12px;border-top:1px solid var(--line-soft);
   font-size:12.5px;color:var(--muted);font-weight:600;
+  font-variant-numeric:tabular-nums;
 }
 .qna-card footer span{display:inline-flex;align-items:center;gap:5px}
 .qna-card footer .qna-ans{color:var(--emerald)}
@@ -137,8 +153,22 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
   overflow:hidden;display:grid;grid-template-columns:220px 1fr;
   cursor:pointer;transition:.18s;position:relative;
 }
-.r-card:hover{box-shadow:var(--shadow);border-color:#cbc4ab}
+.r-card:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:#cbc4ab}
+.r-card:hover h3{color:var(--emerald-deep)}
+.r-card h3{transition:color .16s ease}
 @media(max-width:640px){.r-card{grid-template-columns:1fr}}
+
+/* Status rail — same grammar as the Q&A spine, reusing the existing is-{status}
+   classes. published = emerald (default), draft = brass, archived = muted,
+   retracted = rose. Sits above the cover; brightens on hover. */
+.r-card::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;z-index:3;
+  background:var(--emerald-bright);opacity:.55;transition:opacity .16s ease;
+}
+.r-card.is-draft::before{background:var(--brass)}
+.r-card.is-archived::before{background:var(--muted)}
+.r-card.is-retracted::before{background:var(--rose)}
+.r-card:hover::before{opacity:1}
 
 /* ----- Status variants — distinct, restrained treatments per lifecycle state */
 /* DRAFT — warm parchment edge, gentle diagonal weave on cover (work-in-progress) */
@@ -239,13 +269,13 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 /* Filter chips with icons (MINE tab) */
 .chips.statuses .chip{display:inline-flex;align-items:center;gap:6px}
 .chips.statuses .chip .ico{width:13px;height:13px}
-.r-cover{position:relative;min-height:180px;display:grid;place-items:center;overflow:hidden}
-.r-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,rgba(8,20,16,.4))}
+.r-cover{position:relative;min-height:180px;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.r-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(8,20,16,.55))}
 .r-irc{
   position:absolute;z-index:2;top:12px;left:12px;
-  font-size:10.5px;font-weight:600;letter-spacing:.4px;color:#fff;
+  font-size:10.5px;font-weight:600;letter-spacing:.5px;color:#fff;
   background:rgba(8,20,16,.5);padding:4px 9px;border-radius:6px;
-  backdrop-filter:blur(4px);
+  border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(4px);
 }
 .r-play{
   position:relative;z-index:2;width:52px;height:52px;border-radius:50%;
@@ -262,16 +292,142 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
   display:flex;gap:16px;margin-top:14px;
   padding-top:12px;border-top:1px solid var(--line-soft);
   font-size:12.5px;color:var(--muted);font-weight:600;
+  font-variant-numeric:tabular-nums;
 }
 .r-foot span{display:inline-flex;align-items:center;gap:5px}
+/* Citations are the lead scholarly signal — quietly elevated with the brass
+   ink already used by .btn.on-brass, so it reads above the social counts. */
+.r-foot span:last-child{color:#7a5a1a;font-weight:700}
+.r-foot span:last-child .ico{color:var(--brass)}
+
+/* =============================================================
+   List toolbar + view-mode switcher (List / Grid / Compact)
+   A single [data-view] attribute on .qna-list / .r-list drives
+   all three layouts in pure CSS — no per-card JSX branching, so
+   the owner bar, status ribbons and is-{status} variants keep
+   working untouched in every mode.
+   ============================================================= */
+.list-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.list-toolbar .chips{flex:1;margin:0}
+.lt-spacer{flex:1}
+
+.view-seg{
+  display:inline-flex;align-items:center;gap:2px;flex:none;
+  padding:3px;border-radius:11px;
+  background:var(--paper-2);border:1px solid var(--line);
+}
+.vseg{
+  width:34px;height:30px;border-radius:8px;
+  display:grid;place-items:center;color:var(--muted);
+  transition:color .14s ease,background .14s ease,box-shadow .14s ease;
+}
+.vseg:hover{color:var(--ink-2)}
+.vseg .ico{width:16px;height:16px}
+.vseg.on{
+  background:var(--card);color:var(--emerald-deep);
+  box-shadow:var(--shadow-sm),inset 0 0 0 1px rgba(21,154,118,.22);
+}
+.vseg:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
+
+/* ----- GRID view — uniform, metric-forward tiles for comparing ----- */
+.qna-list[data-view="grid"]{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:14px;align-items:start;
+}
+.qna-list[data-view="grid"] .qna-card{display:flex;flex-direction:column}
+.qna-list[data-view="grid"] .qna-card footer{margin-top:auto}
+.qna-list[data-view="grid"] .qna-body{-webkit-line-clamp:3}
+
+.r-list[data-view="grid"]{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:16px;align-items:start;
+}
+/* keep the card a GRID (not flex) so the owner bar's grid-column:1/-1 still
+   spans correctly as the last row; the cover moves to a full-width top band */
+.r-list[data-view="grid"] .r-card{grid-template-columns:1fr;grid-template-rows:auto auto auto}
+.r-list[data-view="grid"] .r-cover{aspect-ratio:16/9;min-height:0;height:auto}   /* height:auto so the ratio (not the ≤720px fixed-height rule) drives sizing */
+.r-list[data-view="grid"] .r-card::before{left:0;right:0;top:0;bottom:auto;width:auto;height:3px}
+
+/* ----- COMPACT view — a fused catalog ledger for fast triage ----- */
+.qna-list[data-view="compact"],
+.r-list[data-view="compact"]{
+  display:flex;flex-direction:column;gap:0;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);
+}
+/* rows shed their own chrome and fuse with hairline separators */
+.qna-list[data-view="compact"] .qna-card,
+.r-list[data-view="compact"] .r-card{
+  border:0;border-radius:0;box-shadow:none;background:transparent;
+  transform:none;animation:none;          /* no per-row lift / stagger cascade */
+}
+.qna-list[data-view="compact"] .qna-card:not(:last-child),
+.r-list[data-view="compact"] .r-card:not(:last-child){border-bottom:1px solid var(--line-soft)}
+.qna-list[data-view="compact"] .qna-card:hover,
+.r-list[data-view="compact"] .r-card:hover{background:var(--card-2);transform:none}
+/* the status rail stays as the left spine, snug to the row */
+.qna-list[data-view="compact"] .qna-card::before,
+.r-list[data-view="compact"] .r-card::before{top:0;bottom:0}
+
+/* Q&A compact row: [title …………… status · metrics] */
+.qna-list[data-view="compact"] .qna-card{
+  display:flex;align-items:center;gap:14px;flex-wrap:nowrap;
+  padding:11px 16px 11px 18px;min-height:52px;
+}
+.qna-list[data-view="compact"] .qna-card h3{
+  order:1;flex:1;min-width:0;margin:0;
+  font-size:15.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.qna-list[data-view="compact"] .qna-card > header{order:2;margin:0;flex:none;gap:0}
+.qna-list[data-view="compact"] .qna-card > header > .avatar,
+.qna-list[data-view="compact"] .qna-card > header > div:nth-child(2),
+.qna-list[data-view="compact"] .qna-card .qna-body,
+.qna-list[data-view="compact"] .qna-card .qna-tags{display:none}
+.qna-list[data-view="compact"] .qna-card > footer{order:3;margin:0;padding:0;border:0;flex:none;gap:14px;font-size:12px}
+
+/* Research compact row: [thumb] [title · status] [metrics]; owner bar wraps below */
+.r-list[data-view="compact"] .r-card{
+  grid-template-columns:48px 1fr;align-items:center;
+  column-gap:14px;padding:10px 14px 10px 16px;min-height:52px;
+}
+.r-list[data-view="compact"] .r-cover{
+  width:48px;height:48px;min-height:0;border-radius:10px;align-self:center;box-shadow:none;
+}
+.r-list[data-view="compact"] .r-cover::after,
+.r-list[data-view="compact"] .r-irc,
+.r-list[data-view="compact"] .r-play,
+.r-list[data-view="compact"] .r-status-ribbon{display:none}
+.r-list[data-view="compact"] .r-body{display:flex;align-items:center;gap:12px;padding:0;min-width:0}
+.r-list[data-view="compact"] .r-body h3{
+  order:1;flex:1;min-width:0;margin:0;
+  font-size:15.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.r-list[data-view="compact"] .r-top{order:2;flex:none;margin:0;gap:0}
+.r-list[data-view="compact"] .r-top > .avatar,
+.r-list[data-view="compact"] .r-top > div:nth-child(2),
+.r-list[data-view="compact"] .r-abs,
+.r-list[data-view="compact"] .r-body .qna-tags{display:none}
+.r-list[data-view="compact"] .r-foot{order:3;flex:none;margin:0;padding:0;border:0;gap:12px;font-size:12px}
+/* owner bar: a tidy full-width second line under the row (never hover-revealed).
+   Negative margins cancel the compact card's padding so the dashed separator
+   spans edge-to-edge (the card's overflow:hidden clips the bleed cleanly). */
+.r-list[data-view="compact"] .r-owner-bar{margin:0 -14px -10px -16px;padding:8px 16px}
+
+@media(max-width:600px){
+  /* keep tiles readable — never wedge two narrow columns on a phone */
+  .qna-list[data-view="grid"],.r-list[data-view="grid"]{grid-template-columns:1fr}
+}
 
 /* Research detail */
 .rd-hero{
   position:relative;border-radius:var(--r-lg);overflow:hidden;
-  margin-bottom:18px;box-shadow:var(--shadow);min-height:280px;
+  margin-bottom:18px;box-shadow:var(--shadow);min-height:clamp(300px,38vw,420px);
   display:grid;place-items:center;
 }
-.rd-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(8,20,16,.82))}
+/* layered scrim — a soft top vignette keeps the IRC/status chips legible, the
+   deeper floor gradient anchors the masthead title + meta strip */
+.rd-hero::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(8,20,16,.30),transparent 42%)}
+.rd-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 28%,rgba(8,20,16,.88))}
 .rd-ids{position:absolute;z-index:3;top:16px;left:18px;display:flex;gap:8px;flex-wrap:wrap}
 .rd-ids span{font-size:11px;font-weight:600;letter-spacing:.4px;color:#fff;background:rgba(8,20,16,.45);backdrop-filter:blur(6px);padding:5px 11px;border-radius:7px}
 .rd-ids .rd-pub{background:rgba(21,154,118,.55)}
@@ -353,8 +509,28 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 @keyframes rd-stage-in{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:none}}
 @keyframes rd-bg-in{from{opacity:0}to{opacity:1}}
 .rd-overlay{position:absolute;z-index:3;left:24px;right:24px;bottom:22px;color:#fff}
-.rd-overlay h1{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.15;letter-spacing:-.5px;text-shadow:0 2px 14px rgba(0,0,0,.4)}
+/* mono small-caps kicker with a short brass rule — sets the editorial masthead tone */
+.rd-kicker{
+  display:flex;align-items:center;gap:9px;margin-bottom:9px;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:1.4px;text-transform:uppercase;color:var(--brass-soft);
+}
+.rd-kicker span{flex:none;width:24px;height:1.5px;border-radius:2px;background:var(--brass)}
+.rd-overlay h1{font-family:var(--serif);font-size:clamp(26px,3.6vw,40px);font-weight:600;line-height:1.14;letter-spacing:-.5px;max-width:22ch;text-shadow:0 2px 16px rgba(0,0,0,.45)}
+.rd-overlay h1::after{content:"";display:block;width:54px;height:2px;margin-top:14px;border-radius:2px;background:var(--brass)}
 .rd-by{display:flex;align-items:center;gap:9px;margin-top:11px;font-size:13.5px;font-weight:500;flex-wrap:wrap}
+
+/* glass "cite-before-you-scroll" meta strip — the scholarly signals up front */
+.rd-meta-strip{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;font-variant-numeric:tabular-nums}
+.rd-meta-strip .ms{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:#fff;
+  background:rgba(8,20,16,.42);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.15);
+  padding:5px 11px;border-radius:8px;
+}
+.rd-meta-strip .ms .ico{width:14px;height:14px;color:var(--brass-soft)}
+.rd-meta-strip .ms b{font-family:var(--serif);font-weight:600}
 
 .rd-grid{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
 @media(max-width:860px){.rd-grid{grid-template-columns:1fr}}
@@ -488,7 +664,8 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .cite-box{
   font-size:12.5px;line-height:1.55;color:var(--ink-2);
   background:var(--card-2);border:1px solid var(--line);
-  border-radius:11px;padding:11px 13px;
+  border-left:3px solid var(--brass-soft);
+  border-radius:11px;padding:11px 13px 11px 14px;
 }
 
 /* ---------- Reels (full screen, dark) ---------- */

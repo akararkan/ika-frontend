@@ -238,6 +238,10 @@ export function ResearchDetailPage() {
   if (!r) return <div className="main center"><div className="col-main"><EmptyState icon="research" title="Research not found"/></div></div>
 
   const u = authorOf(r)
+  // Approx reading time for the masthead meta strip (~200 wpm over abstract + overview).
+  const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, ' ')
+  const readWords = (stripTags(r.abstractHtml || r.abstractSource) + ' ' + stripTags(r.descriptionHtml || r.description)).split(/\s+/).filter(Boolean).length
+  const readMin = readWords ? Math.max(1, Math.round(readWords / 200)) : 0
   return (
     <div className="main center">
       <div className="col-main">
@@ -305,11 +309,18 @@ export function ResearchDetailPage() {
               </div>
               {r.hasVideo && <button className="rd-play" onClick={() => setShowVideo(true)} aria-label="Play promo video"><Icon name="play"/></button>}
               <div className="rd-overlay">
+                <div className="rd-kicker"><span/>{r.tags?.[0] || 'Research'}</div>
                 <h1>{r.title}</h1>
                 <div className="rd-by">
                   <Avatar initials={u.initials} color={u.avc} size={32} src={u.profileImage}/>
                   <span>{u.full}{u.verified && <Verify scholar/>}</span>
                   <span className="muted">·</span><span>{r.time}</span>
+                </div>
+                <div className="rd-meta-strip">
+                  <span className="ms"><Icon name="cite" className="xs"/><b>{fmt(r.metrics.citations)}</b> cited</span>
+                  <span className="ms ms-opt"><Icon name="download" className="xs"/><b>{fmt(r.metrics.downloads)}</b></span>
+                  <span className="ms"><Icon name="eye" className="xs"/><b>{fmt(r.metrics.views)}</b></span>
+                  {readMin ? <span className="ms"><Icon name="book" className="xs"/><b>{readMin}</b> min read</span> : null}
                 </div>
               </div>
             </>

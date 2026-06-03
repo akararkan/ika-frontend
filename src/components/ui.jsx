@@ -226,3 +226,47 @@ export function linkify(text) {
     return <React.Fragment key={i}>{p}</React.Fragment>
   })
 }
+
+/* Segmented view-mode switcher (List / Grid / Compact) for list pages.
+   Icon-only, accessible: a labelled group of aria-pressed buttons with
+   ArrowLeft/Right roving so the whole control is keyboard-operable. */
+const VIEW_SEG_OPTS = [
+  { id:'list',    label:'List view',    icon:'list'  },
+  { id:'grid',    label:'Grid view',    icon:'grid'  },
+  { id:'compact', label:'Compact view', icon:'table' },
+]
+export function ViewSeg({ value, onChange }) {
+  const btnRefs = React.useRef([])
+  // Roving toolbar: Arrow keys move BOTH selection and DOM focus to the next
+  // button so the focused control and the pressed (aria-pressed) control never
+  // desync for keyboard / assistive-tech users.
+  const onKey = (e) => {
+    const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    if (!dir) return
+    e.preventDefault()
+    const i = Math.max(0, VIEW_SEG_OPTS.findIndex(o => o.id === value))
+    const ni = (i + dir + VIEW_SEG_OPTS.length) % VIEW_SEG_OPTS.length
+    onChange(VIEW_SEG_OPTS[ni].id)
+    btnRefs.current[ni]?.focus()
+  }
+  return (
+    <div className="view-seg" role="toolbar" aria-label="View mode">
+      {VIEW_SEG_OPTS.map((o, idx) => (
+        <button
+          key={o.id}
+          ref={el => { btnRefs.current[idx] = el }}
+          type="button"
+          className={'vseg' + (value === o.id ? ' on' : '')}
+          aria-pressed={value === o.id}
+          aria-label={o.label}
+          title={o.label}
+          tabIndex={value === o.id ? 0 : -1}
+          onClick={() => onChange(o.id)}
+          onKeyDown={onKey}
+        >
+          <Icon name={o.icon} className="sm"/>
+        </button>
+      ))}
+    </div>
+  )
+}
