@@ -65,6 +65,11 @@ export function ResearchDetailPage() {
   const [showVideo, setShowVideo] = React.useState(false)
   const [lightbox, setLightbox] = React.useState(-1)         // index into image-only media (-1 = closed)
   const [sources, setSources] = React.useState([])           // authoritative, ordered list (§ /sources endpoint)
+  // Reading chrome: TOC scrollspy, top progress bar, back-to-top FAB
+  const pageRef = React.useRef(null)
+  const [activeSec, setActiveSec] = React.useState('')
+  const [progress, setProgress] = React.useState(0)
+  const [showFab, setShowFab] = React.useState(false)
 
   const loadComments = React.useCallback(() => {
     api.research.comments(id).then(res => setComments((res?.content || res || []).map(adapters.researchCommentFrom))).catch(() => {})
@@ -139,6 +144,42 @@ export function ResearchDetailPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [showVideo, lightbox, r])
+
+  // Reading chrome — top progress bar + back-to-top FAB on window scroll, a
+  // scrollspy that lights the active TOC entry, and reveal-on-scroll for the
+  // section cards. Re-runs when the set of sections changes (content loaded).
+  const hasDesc = !!(r && (r.descriptionHtml || r.description))
+  React.useEffect(() => {
+    const root = pageRef.current
+    if (loading || !r || !root) return
+    const onScroll = () => {
+      const d = document.documentElement
+      const top = d.scrollTop || document.body.scrollTop
+      const max = d.scrollHeight - d.clientHeight
+      setProgress(max > 0 ? Math.min(1, Math.max(0, top / max)) : 0)
+      setShowFab(top > 600)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    // Arm reveal-on-scroll only once JS is running, so cards are never left
+    // invisible if the observer can't run (the hiding lives behind this class).
+    root.classList.add('rd-reveal-on')
+    const reveal = new IntersectionObserver(
+      (es) => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); reveal.unobserve(e.target) } }),
+      { threshold: 0.1 })
+    root.querySelectorAll('.reveal').forEach(el => reveal.observe(el))
+    const spy = new IntersectionObserver(
+      (es) => es.forEach(e => { if (e.isIntersecting) setActiveSec(e.target.getAttribute('data-sec')) }),
+      { rootMargin: '-22% 0px -68% 0px', threshold: 0 })
+    root.querySelectorAll('[data-sec]').forEach(el => spy.observe(el))
+    return () => { window.removeEventListener('scroll', onScroll); reveal.disconnect(); spy.disconnect() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, r?.id, hasDesc, r?.mediaFiles?.length, r?.contributors?.length, comments.length, sources.length])
+
+  const scrollToSec = (secId) => {
+    const el = pageRef.current?.querySelector(`#${secId}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const isAuthor = !!(meId && r && r.author === meId)
   // lifecycle endpoints (§6.3-6.7) return the updated ResearchResponse → patch
@@ -238,196 +279,187 @@ export function ResearchDetailPage() {
   if (!r) return <div className="main center"><div className="col-main"><EmptyState icon="research" title="Research not found"/></div></div>
 
   const u = authorOf(r)
-  // Approx reading time for the masthead meta strip (~200 wpm over abstract + overview).
-  const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, ' ')
-  const readWords = (stripTags(r.abstractHtml || r.abstractSource) + ' ' + stripTags(r.descriptionHtml || r.description)).split(/\s+/).filter(Boolean).length
-  const readMin = readWords ? Math.max(1, Math.round(readWords / 200)) : 0
+  const sLower = r.status.toLowerCase()
+
+  // Media grouped once — drives both the table of contents and the section cards.
+  const media  = (r.mediaFiles || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  const images = media.filter(m => m.type === 'IMAGE')
+  const videos = media.filter(m => m.type === 'VIDEO')
+  const audios = media.filter(m => m.type === 'AUDIO')
+  const files  = media.filter(m => m.type === 'DOCUMENT' || m.type === 'OTHER')
+  const srcList = sources.length ? sources : (r.sources || [])
+
+  // Table of contents — only the sections that actually render, in reading order.
+  const toc = [
+    hasDesc                && { id:'rd-description',  label:'Description',  icon:'book' },
+    { id:'rd-abstract', label:'Abstract', icon:'doc' },
+    images.length          && { id:'rd-figures',      label:'Figures',      icon:'image', n:images.length },
+    videos.length          && { id:'rd-videomat',     label:'Video',        icon:'video', n:videos.length },
+    audios.length          && { id:'rd-audiomat',     label:'Audio',        icon:'audio', n:audios.length },
+    files.length           && { id:'rd-files',        label:'Files',        icon:'doc',   n:files.length },
+    r.contributors?.length && { id:'rd-contributors', label:'Contributors', icon:'users', n:r.contributors.length },
+    srcList.length         && { id:'rd-sources',      label:'Sources',      icon:'cite',  n:srcList.length },
+    { id:'rd-comments', label:'Comments', icon:'comment', n:r.metrics.comments },
+  ].filter(Boolean)
+
   return (
-    <div className="main center">
-      <div className="col-main">
-        <button className="back-btn" onClick={() => navigate('/research')}><Icon name="chevleft" className="sm"/>Back to research</button>
+    <div className="rd-page" ref={pageRef}>
+      <div className="rd-progress" style={{ width: `${progress * 100}%` }} aria-hidden="true"/>
+      <div className="rd-shell">
+
+        <div className="rd-toolbar">
+          <button className="rd-back" onClick={() => navigate('/research')}><Icon name="chevleft" className="sm"/>Back to research</button>
+          {isAuthor && (
+            <div className="rd-owner">
+              <div className="rd-owner-seg">
+                <button onClick={() => setEditing(true)}><Icon name="compose" className="xs"/>Edit</button>
+                {r.status === 'DRAFT'     && <button onClick={publish}><Icon name="upload" className="xs"/>Publish</button>}
+                {r.status === 'PUBLISHED' && <button onClick={unpublish}><Icon name="download" className="xs"/>Unpublish</button>}
+                {r.status !== 'ARCHIVED'  && <button onClick={archive}><Icon name="bookmark" className="xs"/>Archive</button>}
+                {r.status !== 'RETRACTED' && <button onClick={retract}><Icon name="flag" className="xs"/>Retract</button>}
+                {r.status === 'RETRACTED' && <button onClick={unretract}><Icon name="check" className="xs"/>Unretract</button>}
+              </div>
+              <button className="rd-del" onClick={removeResearch}><Icon name="close" className="xs"/>Delete</button>
+            </div>
+          )}
+        </div>
 
         {r.status === 'RETRACTED' && (
           <div className="rd-banner retracted">
             <div className="rd-banner-ico"><Icon name="flag"/></div>
-            <div>
-              <b>Retracted</b>
-              <p>This work has been retracted by its author and is kept publicly readable for citation integrity.</p>
-            </div>
+            <div><b>Retracted</b><p>This work has been retracted by its author and is kept publicly readable for citation integrity.</p></div>
           </div>
         )}
         {r.status === 'ARCHIVED' && (
           <div className="rd-banner archived">
             <div className="rd-banner-ico"><Icon name="lock"/></div>
-            <div>
-              <b>Archived</b>
-              <p>Hidden from public feeds but still readable by direct link — for superseded papers that should remain citable.</p>
-            </div>
+            <div><b>Archived</b><p>Hidden from public feeds but still readable by direct link — for superseded papers that should remain citable.</p></div>
           </div>
         )}
         {r.status === 'DRAFT' && isAuthor && (
           <div className="rd-banner draft">
             <div className="rd-banner-ico"><Icon name="doc"/></div>
-            <div>
-              <b>Draft</b>
-              <p>Only you can see this. Publish when ready to mint an IRC ID — the official paper identifier that stays stable through later unpublish/republish.</p>
+            <div><b>Draft</b><p>Only you can see this. Publish when ready to mint an IRC ID — the official paper identifier that stays stable through later unpublish/republish.</p></div>
+          </div>
+        )}
+
+        {/* Masthead hero — cover wash + Islamic geometric pattern + scrim, eyebrow, title, author & key facts. */}
+        <header className="rd-hero2" style={{ background: r.cover }}>
+          <span className="rd-hero2-pattern" aria-hidden="true"/>
+          <span className="rd-hero2-scrim" aria-hidden="true"/>
+          <div className="rd-hero2-top">
+            {r.irc && <span className="rd-chip-id font-mono">{r.irc}</span>}
+            <span className={'rd-chip-status ' + sLower}><span className="dot"/>{r.status}</span>
+          </div>
+          {r.hasVideo && <button className="rd-hero2-play" onClick={() => setShowVideo(true)} aria-label="Play promo video"><Icon name="play"/></button>}
+          <div className="rd-hero2-content">
+            <span className="rd-eyebrow">{r.tags?.[0] || 'Research'}</span>
+            <h1 className="rd-hero2-title">{r.title}</h1>
+            <div className="rd-hero2-by">
+              <Avatar initials={u.initials} color={u.avc} size={46} src={u.profileImage}/>
+              <div>
+                <div className="nm">{u.full}{u.verified && <Verify scholar/>}</div>
+                <div className="tm">@{u.handle} · {r.time}</div>
+              </div>
+            </div>
+            <div className="rd-facts">
+              <span className="rd-fact"><Icon name="cite" className="xs"/><b>{fmt(r.metrics.citations)}</b> cited</span>
+              <span className="rd-fact"><Icon name="download" className="xs"/><b>{fmt(r.metrics.downloads)}</b> downloads</span>
+              <span className="rd-fact"><Icon name="eye" className="xs"/><b>{fmt(r.metrics.views)}</b> views</span>
             </div>
           </div>
-        )}
+        </header>
 
-        {/* author lifecycle toolbar (§6.2-6.7) */}
-        {isAuthor && (
-          <div className="flex gap-8 mb-12 rd-author-bar" style={{ flexWrap:'wrap', marginBottom:12 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}><Icon name="compose" className="xs"/>Edit</button>
-            {r.status === 'DRAFT' && <button className="btn btn-primary btn-sm" onClick={publish}><Icon name="upload" className="xs"/>Publish</button>}
-            {r.status === 'PUBLISHED' && <button className="btn btn-secondary btn-sm" onClick={unpublish}><Icon name="download" className="xs"/>Unpublish</button>}
-            {r.status !== 'ARCHIVED' && <button className="btn btn-secondary btn-sm" onClick={archive}><Icon name="bookmark" className="xs"/>Archive</button>}
-            {r.status !== 'RETRACTED' && <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={retract}><Icon name="flag" className="xs"/>Retract</button>}
-            {r.status === 'RETRACTED' && <button className="btn btn-primary btn-sm" onClick={unretract}><Icon name="check" className="xs"/>Unretract</button>}
-            <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)', marginLeft:'auto' }} onClick={removeResearch}><Icon name="close" className="xs"/>Delete</button>
-          </div>
-        )}
-
-        <div className={'rd-hero' + (showVideo ? ' playing' : '')} style={showVideo ? undefined : { background: r.cover }}>
-          {showVideo && r.videoPromoUrl ? (
-            <>
-              <div className="rd-stage-bg" style={{ background: r.cover }} aria-hidden="true"/>
-              <div className="rd-stage-veil" aria-hidden="true"/>
-              <div className="rd-stage">
-                <video className="rd-video" src={r.videoPromoUrl} poster={r.videoPromoThumb || undefined}
-                  controls autoPlay playsInline onEnded={() => setShowVideo(false)}/>
-              </div>
-              <button className="rd-video-close" onClick={() => setShowVideo(false)} aria-label="Close video" title="Close (Esc)">
-                <Icon name="close"/>
+        <div className="rd-layout">
+          <nav className="rd-toc">
+            <h4>Contents</h4>
+            {toc.map(t => (
+              <button key={t.id} type="button" className={'rd-toc-a' + (activeSec === t.id ? ' active' : '')} onClick={() => scrollToSec(t.id)}>
+                <span className="rd-toc-dot"/>
+                <span className="rd-toc-eng">{t.label}</span>
+                {t.n != null && <span className="rd-toc-n">{fmt(t.n)}</span>}
               </button>
-            </>
-          ) : (
-            <>
-              <div className="rd-ids">
-                {r.irc && <span className="font-mono">{r.irc}</span>}
-                <span className="rd-pub">{r.status}</span>
-              </div>
-              {r.hasVideo && <button className="rd-play" onClick={() => setShowVideo(true)} aria-label="Play promo video"><Icon name="play"/></button>}
-              <div className="rd-overlay">
-                <div className="rd-kicker"><span/>{r.tags?.[0] || 'Research'}</div>
-                <h1>{r.title}</h1>
-                <div className="rd-by">
-                  <Avatar initials={u.initials} color={u.avc} size={32} src={u.profileImage}/>
-                  <span>{u.full}{u.verified && <Verify scholar/>}</span>
-                  <span className="muted">·</span><span>{r.time}</span>
-                </div>
-                <div className="rd-meta-strip">
-                  <span className="ms"><Icon name="cite" className="xs"/><b>{fmt(r.metrics.citations)}</b> cited</span>
-                  <span className="ms ms-opt"><Icon name="download" className="xs"/><b>{fmt(r.metrics.downloads)}</b></span>
-                  <span className="ms"><Icon name="eye" className="xs"/><b>{fmt(r.metrics.views)}</b></span>
-                  {readMin ? <span className="ms"><Icon name="book" className="xs"/><b>{readMin}</b> min read</span> : null}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+            ))}
+          </nav>
 
-        <div className="rd-grid">
-          <div>
-            <section className="card card-pad">
-              <h3 className="title"><Icon name="doc" className="sm"/>Abstract</h3>
-              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
-            </section>
-            {(r.descriptionHtml || r.description) && (
-              <section className="card card-pad">
-                <h3 className="title"><Icon name="book" className="sm"/>Overview</h3>
+          <main className="rd-main">
+            {hasDesc && (
+              <section className="card rd-card2 reveal" id="rd-description" data-sec="rd-description">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="book" className="sm"/></span><h2>Description</h2></div>
                 <RichText html={r.descriptionHtml} source={r.description} format={r.bodyFormat} className="rd-text"/>
               </section>
             )}
-            {/* All published media, grouped by type — figures (with lightbox), inline video & audio players, downloadable file cards. */}
-            {(() => {
-              const media  = (r.mediaFiles || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-              const images = media.filter(m => m.type === 'IMAGE')
-              const videos = media.filter(m => m.type === 'VIDEO')
-              const audios = media.filter(m => m.type === 'AUDIO')
-              const files  = media.filter(m => m.type === 'DOCUMENT' || m.type === 'OTHER')
-              return (<>
-                {!!images.length && (
-                  <section className="card card-pad">
-                    <h3 className="title"><Icon name="image" className="sm"/>Figures</h3>
-                    <div className="rd-gallery">
-                      {images.map((m, i) => (
-                        <figure key={m.id || i} className="rd-figure" onClick={() => setLightbox(i)}>
-                          <div className="rd-figure-img">
-                            {m.url
-                              ? <img src={m.url} alt={m.altText || m.caption || ''} loading="lazy"/>
-                              : <div className="rd-figure-fallback"/>}
-                            <span className="rd-figure-num">Fig. {i + 1}</span>
-                          </div>
-                          {(m.caption || m.altText) && (
-                            <figcaption><b>Fig. {i + 1}.</b> {m.caption || m.altText}</figcaption>
-                          )}
-                        </figure>
-                      ))}
-                    </div>
-                  </section>
-                )}
-                {!!videos.length && (
-                  <section className="card card-pad">
-                    <h3 className="title"><Icon name="video" className="sm"/>Video materials</h3>
-                    {videos.map((m) => (
-                      <div key={m.id} className="rd-media-block">
-                        <video src={m.url} poster={m.thumbnailUrl || undefined} controls playsInline preload="metadata"/>
-                        {(m.caption || m.name) && (
-                          <div className="rd-media-meta">
-                            <b>{m.caption || m.name}</b>
-                            <small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small>
-                          </div>
-                        )}
+            <section className="card rd-card2 reveal" id="rd-abstract" data-sec="rd-abstract">
+              <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="doc" className="sm"/></span><h2>Abstract</h2></div>
+              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
+            </section>
+            {!!images.length && (
+              <section className="card rd-card2 reveal" id="rd-figures" data-sec="rd-figures">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="image" className="sm"/></span><h2>Figures</h2><span className="rd-sec-n">{images.length}</span></div>
+                <div className="rd-gallery">
+                  {images.map((m, i) => (
+                    <figure key={m.id || i} className="rd-figure" onClick={() => setLightbox(i)}>
+                      <div className="rd-figure-img">
+                        {m.url ? <img src={m.url} alt={m.altText || m.caption || ''} loading="lazy"/> : <div className="rd-figure-fallback"/>}
+                        <span className="rd-figure-num">Fig. {i + 1}</span>
                       </div>
-                    ))}
-                  </section>
-                )}
-                {!!audios.length && (
-                  <section className="card card-pad">
-                    <h3 className="title"><Icon name="audio" className="sm"/>Audio materials</h3>
-                    {audios.map((m) => (
-                      <div key={m.id} className="rd-media-block">
-                        <audio src={m.url} controls preload="metadata" style={{ width:'100%' }}/>
-                        {(m.caption || m.name) && (
-                          <div className="rd-media-meta">
-                            <b>{m.caption || m.name}</b>
-                            <small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </section>
-                )}
-                {!!files.length && (
-                  <section className="card card-pad">
-                    <h3 className="title"><Icon name="doc" className="sm"/>Files &amp; materials<span className="rd-srcn">{files.length}</span>{!r.downloadsEnabled && <small className="muted text-xs" style={{ marginLeft:8, fontWeight:500 }}>· downloads off</small>}</h3>
-                    <div className="rd-files">
-                      {files.map((m) => {
-                        const ext = fileExt(m)
-                        return (
-                          <button key={m.id} className="rd-file" onClick={() => downloadMedia(m.id)} disabled={!r.downloadsEnabled}
-                            title={r.downloadsEnabled ? `Download ${m.name || 'file'}` : 'Downloads are turned off'}>
-                            <span className={'rd-file-ic ' + (EXT_CLASS[ext] || 'ext-default')}>
-                              <span className="rd-file-ext">{ext}</span>
-                            </span>
-                            <div className="rd-file-info">
-                              <b>{m.name || m.caption || 'file'}</b>
-                              <small>{[m.mimeType || m.type?.toLowerCase(), fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
-                              {m.caption && m.name && <p>{m.caption}</p>}
-                            </div>
-                            <span className="rd-file-action"><Icon name="download" className="sm"/><span className="rd-file-action-tx">Download</span></span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </section>
-                )}
-              </>)
-            })()}
+                      {(m.caption || m.altText) && <figcaption><b>Fig. {i + 1}.</b> {m.caption || m.altText}</figcaption>}
+                    </figure>
+                  ))}
+                </div>
+              </section>
+            )}
+            {!!videos.length && (
+              <section className="card rd-card2 reveal" id="rd-videomat" data-sec="rd-videomat">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="video" className="sm"/></span><h2>Video materials</h2><span className="rd-sec-n">{videos.length}</span></div>
+                {videos.map((m) => (
+                  <div key={m.id} className="rd-media-block">
+                    <video src={m.url} poster={m.thumbnailUrl || undefined} controls playsInline preload="metadata"/>
+                    {(m.caption || m.name) && (
+                      <div className="rd-media-meta"><b>{m.caption || m.name}</b><small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small></div>
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
+            {!!audios.length && (
+              <section className="card rd-card2 reveal" id="rd-audiomat" data-sec="rd-audiomat">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="audio" className="sm"/></span><h2>Audio materials</h2><span className="rd-sec-n">{audios.length}</span></div>
+                {audios.map((m) => (
+                  <div key={m.id} className="rd-media-block">
+                    <audio src={m.url} controls preload="metadata" style={{ width:'100%' }}/>
+                    {(m.caption || m.name) && (
+                      <div className="rd-media-meta"><b>{m.caption || m.name}</b><small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small></div>
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
+            {!!files.length && (
+              <section className="card rd-card2 reveal" id="rd-files" data-sec="rd-files">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="doc" className="sm"/></span><h2>Files &amp; materials</h2><span className="rd-sec-n">{files.length}</span>{!r.downloadsEnabled && <small className="muted text-xs" style={{ marginLeft:8, fontWeight:500 }}>· downloads off</small>}</div>
+                <div className="rd-files">
+                  {files.map((m) => {
+                    const ext = fileExt(m)
+                    return (
+                      <button key={m.id} className="rd-file" onClick={() => downloadMedia(m.id)} disabled={!r.downloadsEnabled}
+                        title={r.downloadsEnabled ? `Download ${m.name || 'file'}` : 'Downloads are turned off'}>
+                        <span className={'rd-file-ic ' + (EXT_CLASS[ext] || 'ext-default')}><span className="rd-file-ext">{ext}</span></span>
+                        <div className="rd-file-info">
+                          <b>{m.name || m.caption || 'file'}</b>
+                          <small>{[m.mimeType || m.type?.toLowerCase(), fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
+                          {m.caption && m.name && <p>{m.caption}</p>}
+                        </div>
+                        <span className="rd-file-action"><Icon name="download" className="sm"/><span className="rd-file-action-tx">Download</span></span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
             {!!r.contributors?.length && (
-              <section className="card card-pad">
-                <h3 className="title"><Icon name="users" className="sm"/>Contributors</h3>
+              <section className="card rd-card2 reveal" id="rd-contributors" data-sec="rd-contributors">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="users" className="sm"/></span><h2>Contributors</h2><span className="rd-sec-n">{r.contributors.length}</span></div>
                 {r.contributors.map((c, i) => {
                   const cu = c._user || authorOf(c)
                   return (
@@ -443,76 +475,29 @@ export function ResearchDetailPage() {
                 })}
               </section>
             )}
-            {(() => {
-              const srcList = sources.length ? sources : (r.sources || [])
-              return !!srcList.length && (
-                <section className="card card-pad">
-                  <h3 className="title"><Icon name="cite" className="sm"/>Sources &amp; references<span className="rd-srcn">{srcList.length}</span></h3>
-                  <ol className="rd-refs">
-                    {srcList.map((s, i) => (
-                      <li key={s.id || i}><SourceRow s={s}/></li>
-                    ))}
-                  </ol>
-                </section>
-              )
-            })()}
-          </div>
-
-          <aside className="rd-rail">
-            <div className="card card-pad">
-              <button className="btn btn-primary btn-lg btn-block" onClick={download} disabled={!r.downloadsEnabled}
-                title={r.downloadsEnabled ? 'Download the main paper' : 'Downloads are turned off'}>
-                <Icon name="download" className="sm"/>{r.downloadsEnabled ? 'Download PDF' : 'Downloads off'}</button>
-              <div className="rd-rail-row">
-                <button className={'btn btn-secondary btn-sm ' + (me.liked ? 'on-rose' : '')} onClick={react}><Icon name="heart" className="xs"/>{me.liked ? 'Reacted' : 'React'}</button>
-                <button className={'btn btn-secondary btn-sm ' + (me.saved ? 'on-brass' : '')} onClick={save}><Icon name="bookmark" className="xs"/>{me.saved ? 'Saved' : 'Save'}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => openShare({ kind:'research', id, title: r.title })}><Icon name="share" className="xs"/></button>
-              </div>
-              <div className="rd-metrics">
-                <div className="rdm"><b>{fmt(r.metrics.views)}</b><small>VIEWS</small></div>
-                <div className="rdm"><b>{fmt(r.metrics.reactions)}</b><small>REACTIONS</small></div>
-                <div className="rdm"><b>{fmt(r.metrics.comments)}</b><small>COMMENTS</small></div>
-                <div className="rdm"><b>{fmt(r.metrics.saves)}</b><small>SAVES</small></div>
-                <div className="rdm"><b>{fmt(r.metrics.downloads)}</b><small>DOWNLOADS</small></div>
-                <div className="rdm"><b>{fmt(r.metrics.citations)}</b><small>CITATIONS</small></div>
-              </div>
-              {r.citation && (
-                <div className="rd-cite">
-                  <div className="field-label">Cite this work</div>
-                  <div className="cite-box font-serif">{r.citation}</div>
-                  <div className="flex gap-12" style={{ marginTop:8 }}>
-                    <button className="text-sm" style={{color:'var(--emerald)',fontWeight:600}} onClick={copyCite}><Icon name="cite" className="xs"/> Copy citation</button>
-                    <button className="text-sm" style={{color:'var(--emerald)',fontWeight:600}} onClick={cite}><Icon name="check" className="xs"/> I cited this</button>
-                  </div>
-                </div>
-              )}
-            </div>
-            {!!r.tags?.length && (
-              <div className="card card-pad">
-                <h3 className="title"><Icon name="hash" className="sm"/>Topics</h3>
-                <div className="qna-tags">
-                  {r.tags.map(t => (
-                    <a key={t} onClick={() => navigate(`/tags/${encodeURIComponent(t)}`)} style={{ cursor:'pointer' }}>#{t}</a>
-                  ))}
-                </div>
-              </div>
+            {!!srcList.length && (
+              <section className="card rd-card2 reveal" id="rd-sources" data-sec="rd-sources">
+                <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="cite" className="sm"/></span><h2>Sources &amp; references</h2><span className="rd-sec-n">{srcList.length}</span></div>
+                <ol className="rd-refs">
+                  {srcList.map((s, i) => (<li key={s.id || i}><SourceRow s={s}/></li>))}
+                </ol>
+              </section>
             )}
-          </aside>
-        </div>
 
-        <section className="card card-pad" style={{ marginTop:16 }}>
-          <h3 className="title"><Icon name="comment" className="sm"/>Comments <span className="muted" style={{ fontWeight:400 }}>({fmt(r.metrics.comments)})</span></h3>
-          {r.commentsEnabled ? (
-            <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
-              <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={32} src={user?.profileImage}/>
-              <MentionBox className="field" placeholder={cFile ? `${cFile.name} attached…` : 'Add a comment…'} value={cText} onChange={e => setCText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') addComment() }}/>
-              <input ref={cFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setCFile(f); e.target.value='' }}/>
-              <button className="icon-btn" title={cFile ? cFile.name : 'Attach image / video / voice'} onClick={() => cFileRef.current?.click()} style={cFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
-              <button className="icon-btn" disabled={!cText.trim() && !cFile} onClick={addComment}><Icon name="send" className="sm"/></button>
-            </div>
-          ) : <p className="muted text-sm">Comments are turned off for this research.</p>}
+            {/* comments — last section in the reading column */}
+            <section className="card rd-card2 reveal" id="rd-comments" data-sec="rd-comments">
+              <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="comment" className="sm"/></span><h2>Comments</h2><span className="rd-sec-n">{fmt(r.metrics.comments)}</span></div>
+              {r.commentsEnabled ? (
+                <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
+                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={32} src={user?.profileImage}/>
+                  <MentionBox className="field" placeholder={cFile ? `${cFile.name} attached…` : 'Add a comment…'} value={cText} onChange={e => setCText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') addComment() }}/>
+                  <input ref={cFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setCFile(f); e.target.value='' }}/>
+                  <button className="icon-btn" title={cFile ? cFile.name : 'Attach image / video / voice'} onClick={() => cFileRef.current?.click()} style={cFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
+                  <button className="icon-btn" disabled={!cText.trim() && !cFile} onClick={addComment}><Icon name="send" className="sm"/></button>
+                </div>
+              ) : <p className="muted text-sm">Comments are turned off for this research.</p>}
 
-          {comments.map(c => {
+              {comments.map(c => {
             const cu = c._author; const own = !!(meId && c.author === meId)
             return (
               <div key={c.id} className="cmt">
@@ -564,9 +549,72 @@ export function ResearchDetailPage() {
               </div>
             )
           })}
-          {!comments.length && r.commentsEnabled && <p className="muted text-sm" style={{ padding:'8px 2px' }}>Be the first to comment.</p>}
-        </section>
+              {!comments.length && r.commentsEnabled && <p className="muted text-sm" style={{ padding:'8px 2px' }}>Be the first to comment.</p>}
+            </section>
+          </main>
+
+          <aside className="rd-rail2">
+            <div className="card rd-panel">
+              <button className="rd-dlpdf" onClick={download} disabled={!r.downloadsEnabled}
+                title={r.downloadsEnabled ? 'Download the main paper' : 'Downloads are turned off'}>
+                <Icon name="download" className="sm"/>{r.downloadsEnabled ? 'Download PDF' : 'Downloads off'}</button>
+              <div className="rd-act-row">
+                <button className={'btn btn-secondary btn-sm rd-act ' + (me.liked ? 'on-rose' : '')} onClick={react}><Icon name="heart" className="xs"/>{me.liked ? 'Reacted' : 'React'}</button>
+                <button className={'btn btn-secondary btn-sm rd-act ' + (me.saved ? 'on-brass' : '')} onClick={save}><Icon name="bookmark" className="xs"/>{me.saved ? 'Saved' : 'Save'}</button>
+                <button className="btn btn-secondary btn-sm rd-act rd-act-ic" title="Share" onClick={() => openShare({ kind:'research', id, title: r.title })}><Icon name="share" className="xs"/></button>
+              </div>
+            </div>
+
+            <div className="card rd-panel">
+              <h5 className="rd-panel-h">Engagement</h5>
+              <div className="rd-metrics">
+                <div className="rdm"><b>{fmt(r.metrics.views)}</b><small>VIEWS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.reactions)}</b><small>REACTIONS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.comments)}</b><small>COMMENTS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.saves)}</b><small>SAVES</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.downloads)}</b><small>DOWNLOADS</small></div>
+                <div className="rdm"><b>{fmt(r.metrics.citations)}</b><small>CITATIONS</small></div>
+              </div>
+            </div>
+
+            {r.citation && (
+              <div className="card rd-panel">
+                <h5 className="rd-panel-h">Cite this work</h5>
+                <div className="cite-box font-serif">{r.citation}</div>
+                <div className="rd-cite-actions">
+                  <button onClick={copyCite}><Icon name="cite" className="xs"/>Copy citation</button>
+                  <button onClick={cite}><Icon name="check" className="xs"/>I cited this</button>
+                </div>
+              </div>
+            )}
+
+            {!!r.tags?.length && (
+              <div className="card rd-panel">
+                <div className="rd-topics-head"><span className="hash">#</span>Topics</div>
+                <div className="qna-tags">
+                  {r.tags.map(t => (<a key={t} onClick={() => navigate(`/tags/${encodeURIComponent(t)}`)} style={{ cursor:'pointer' }}>#{t}</a>))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
       </div>
+
+      {/* back-to-top */}
+      <button className={'rd-fab' + (showFab ? ' show' : '')} onClick={() => window.scrollTo({ top:0, behavior:'smooth' })} aria-label="Back to top"><Icon name="chevup"/></button>
+
+      {/* Enhanced video player — full-screen cinematic theater: blurred cover backdrop,
+          framed promo with native controls, glass close (Esc / click-outside also close). */}
+      {showVideo && r.videoPromoUrl && (
+        <div className="rd-vplayer" onClick={(e) => { if (e.target === e.currentTarget) setShowVideo(false) }}>
+          <div className="rd-vp-bg" style={{ background: r.cover }} aria-hidden="true"/>
+          <div className="rd-vp-veil" aria-hidden="true"/>
+          <div className="rd-vp-stage">
+            <video className="rd-vp-video" src={r.videoPromoUrl} poster={r.videoPromoThumb || undefined} controls autoPlay playsInline onEnded={() => setShowVideo(false)}/>
+          </div>
+          <button className="rd-vp-close" onClick={() => setShowVideo(false)} aria-label="Close (Esc)"><Icon name="close"/></button>
+        </div>
+      )}
 
       {/* Figure lightbox — fades in a centred image with prev/next + close affordances */}
       {lightbox >= 0 && (() => {

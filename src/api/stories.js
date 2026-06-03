@@ -27,22 +27,37 @@ export const stories = {
   // author-only: who voted for a given choice (backed by the poll_by_id reverse index)
   voters(pollId, choice)  { return http.get(`/api/v1/polls/${pollId}/voters/${choice}`) },
 
-  /** Open the story-tray SSE stream. Event names are the LOWERCASED
-      StoryTrayEventType enum. Fires:
+  /** Open the story-tray SSE stream. Fires:
         onNewStory(ev)     — a followed/close-friend posted → light the ring
         onStoryRemoved(ev) — author deleted / all expired → grey the ring
         onPollVote(ev)     — author-only live poll tally { pollId, voteA, voteB, voteTotal }
-      Returns an unsubscribe fn. */
+      Returns an unsubscribe fn.
+
+      Casing-agnostic by design: backends differ on whether the SSE `event:`
+      name is the lower_snake or the raw UPPER_SNAKE StoryTrayEventType enum, so
+      we register BOTH casings and also route the unnamed `message` event by its
+      payload type. EventSource dispatches an event to exactly one listener
+      (named if the server set `event:`, else `message`), so nothing double-fires
+      — and a casing change on the server can never silently kill live updates. */
   trayStream({ onNewStory, onStoryRemoved, onPollVote, onConnected, onError } = {}) {
     const token = session.getToken()
     const url = `${API_BASE}${TRAY_PATH}` + (token ? `?token=${encodeURIComponent(token)}` : '')
     const es = new EventSource(url, { withCredentials: true })
     const parse = (e) => { try { return JSON.parse(e.data) } catch { return {} } }
-    es.addEventListener('connected', (e) => onConnected?.(parse(e)))
-    es.addEventListener('heartbeat', () => {})
-    es.addEventListener('new_story', (e) => onNewStory?.(parse(e)))
-    es.addEventListener('story_removed', (e) => onStoryRemoved?.(parse(e)))
-    es.addEventListener('poll_vote_cast', (e) => onPollVote?.(parse(e)))
+    const route = (name, data) => {
+      switch ((name || data.eventType || data.type || '').toUpperCase()) {
+        case 'NEW_STORY':      return onNewStory?.(data)
+        case 'STORY_REMOVED':  return onStoryRemoved?.(data)
+        case 'POLL_VOTE_CAST': return onPollVote?.(data)
+        case 'CONNECTED':      return onConnected?.(data)
+        default:               return                 // HEARTBEAT / unknown → ignore
+      }
+    }
+    ;['new_story','story_removed','poll_vote_cast','connected','heartbeat'].forEach(n => {
+      es.addEventListener(n,             (e) => route(n, parse(e)))
+      es.addEventListener(n.toUpperCase(), (e) => route(n, parse(e)))
+    })
+    es.addEventListener('message', (e) => route(null, parse(e)))   // unnamed events → route by payload type
     es.onerror = () => onError?.(es.readyState)
     return () => es.close()
   },

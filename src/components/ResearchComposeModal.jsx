@@ -78,7 +78,7 @@ function Toggle({ title, desc, on, onChange, disabled }) {
 
 /* Left-rail sections + scroll-spy targets. icon = project Icon name. */
 const RM_SECTIONS = [
-  { id:'essentials',   icon:'doc',       label:'Essentials',      hint:'Title · abstract · body' },
+  { id:'essentials',   icon:'doc',       label:'Essentials',      hint:'Title · abstract · description' },
   { id:'discovery',    icon:'hash',      label:'Discovery',       hint:'Keywords · tags · citation' },
   { id:'media',        icon:'image',     label:'Media',           hint:'Cover & promo video' },
   { id:'contributors', icon:'users',     label:'Contributors',    hint:'Co-authors & advisors' },
@@ -621,7 +621,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
                     placeholder="A concise abstract of the work — select any text and use the toolbar to format it."/>
                 </div>
                 <div className="rm-field">
-                  <label className="rm-lbl">Body / overview <span className="rm-lbl-h">kept on the published page</span></label>
+                  <label className="rm-lbl">Description <span className="rm-lbl-h">the full write-up kept on the published page</span></label>
                   <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={280} showFormat={false}
                     placeholder="Write your research — headings, lists, tables, images, colours, highlights…"/>
                 </div>
