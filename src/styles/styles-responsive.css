@@ -813,3 +813,56 @@ img,video{max-width:100%;height:auto}
   .ntf-tabs .tab .ico{opacity:.65}
   .ntf-tabs .tab.on .ico{opacity:1}
 }
+
+/* ============================================================
+   13 · Q&A / RESEARCH LIST PAGES — mobile (Feed/Grid/Compact/
+   Grouped). Appended last so these win. The desktop controls
+   row (seg-left / filters-right) restacks on phones into a
+   full-width segmented switcher above a sideways-scrolling
+   filter row, and the compact rows / grouped heads tighten.
+   ============================================================ */
+@media(max-width:720px){
+  /* Page kicker a touch smaller above the title */
+  .phead-kicker{font-size:11px;letter-spacing:.14em;margin-bottom:8px}
+
+  /* Controls: stack the switcher over the filters */
+  .list-toolbar{flex-direction:column;align-items:stretch;gap:11px;margin-bottom:16px}
+  /* View switcher → full-width segmented control (4 equal, tappable cells) */
+  .view-seg{width:100%}
+  .vseg{flex:1;justify-content:center;padding:10px 6px}
+  /* Filters → a sideways-scrolling pill row bleeding to the screen edges */
+  .list-toolbar .chips{
+    margin:0 -14px;padding:0 14px;
+    flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+  }
+  .list-toolbar .chips::-webkit-scrollbar{display:none}
+  .list-toolbar .chips .chip{flex:none}
+
+  /* ---- Compact rows (.qrow / .rrow): tighter ---- */
+  .qrow,.rrow{padding:13px 15px;gap:13px;border-radius:16px}
+  .qrow-title,.rrow-title{font-size:16px;line-height:1.28}
+  .rrow-cover{width:54px;height:54px;border-radius:11px}
+  .qrow:hover,.rrow:hover{transform:none}        /* no lift on touch */
+
+  /* ---- Grouped: section heads sit closer, smaller serif ---- */
+  .lg-group{margin-bottom:22px}
+  .lg-head{gap:10px;margin-bottom:11px}
+  .lg-head h2{font-size:17px}
+
+  /* ---- Grid masonry already collapses to 1 col ≤680 (content.css) ---- */
+}
+
+/* When the compact right rail wraps to its own full-width line (≤680, where
+   styles-content.css flips .qrow-right/.rrow-right to a row), set it off with
+   a hairline so the badge ↔ metrics band reads as distinct from the title. */
+@media(max-width:680px){
+  .qrow-right,.rrow-right{margin-top:11px;padding-top:11px;border-top:1px solid var(--line-soft)}
+}
+
+@media(max-width:460px){
+  .vseg{padding:10px 4px}
+  .qrow,.rrow{padding:12px 13px;gap:11px}
+  .qrow-title,.rrow-title{font-size:15.5px}
+  .rrow-cover{width:48px;height:48px}
+  .lg-head h2{font-size:16px}
+}

@@ -389,10 +389,10 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .lg-count{font-size:12px;font-weight:700;color:var(--muted);background:var(--card);border:1px solid var(--line);padding:3px 9px;border-radius:999px}
 .lg-line{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
 
-/* On small phones drop the seg labels to icons so the control + filters fit */
+/* On small phones drop the seg labels to icons so the control + filters fit.
+   (.vseg padding for small phones is set in the mobile §13 of styles-responsive.css) */
 @media(max-width:560px){
   .view-seg{gap:0}
-  .vseg{padding:9px 12px}
   .vseg-tx{display:none}
 }
 
