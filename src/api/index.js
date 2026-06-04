@@ -4,7 +4,7 @@
    ========================================================= */
 export { API_BASE, assetUrl, session } from './config.js'
 export { http, ApiError } from './http.js'
-export { openStream, applyPostDelta } from './realtime.js'
+export { openStream, applyPostDelta, applyResearchDelta } from './realtime.js'
 export * as adapters from './adapters.js'
 
 import { auth } from './auth.js'

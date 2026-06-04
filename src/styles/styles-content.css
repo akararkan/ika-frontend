@@ -967,6 +967,9 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .rd-vp-veil{position:absolute;inset:0;z-index:1;background:radial-gradient(70% 60% at 50% 50%,transparent,rgba(0,0,0,.6));pointer-events:none}
 .rd-vp-stage{position:relative;z-index:2;width:100%;max-width:1000px;border-radius:18px;overflow:hidden;box-shadow:0 40px 100px -25px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.08),0 0 90px -20px rgba(31,185,142,.2);animation:rd-stage-in .45s .05s cubic-bezier(.2,.8,.3,1) both}
 .rd-vp-video{width:100%;max-height:min(78vh,720px);display:block;background:#000;object-fit:contain}
+.rd-vp-fail{display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px 28px;background:#0a0f0d;color:#fff;text-align:center}
+.rd-vp-fail .ico{width:34px;height:34px;color:var(--brass-soft)}
+.rd-vp-fail p{font-size:14.5px;color:rgba(255,255,255,.82);margin:0}
 .rd-vp-close{position:absolute;top:18px;right:18px;z-index:4;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(12px);color:#fff;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 18px -6px rgba(0,0,0,.6);transition:transform .18s ease,background .18s ease;animation:rd-stage-in .4s .14s cubic-bezier(.2,.8,.3,1) both}
 .rd-vp-close:hover{background:rgba(0,0,0,.78);transform:scale(1.08)}
 .rd-vp-close:active{transform:scale(.96)}

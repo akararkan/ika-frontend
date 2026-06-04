@@ -27,7 +27,8 @@ export const research = {
     const res = await http.get('/api/v1/researches/search/tags', { tags, page, size })
     return (res?.content || []).map(researchFrom)
   },
-  trendingTags(limit = 20) { return http.get('/api/v1/researches/tags/trending', { limit }) },
+  // trending tags now live on the unified surface — use api.tags.trending({ scope:'RESEARCH' })
+  // (the old /researches/tags/trending was superseded by /api/v1/tags/trending, SEARCH_API §7.3).
 
   /* ---- lifecycle (scholar/researcher, author) ---- */
   create(formData)   { return http.upload('/api/v1/researches', formData) },     // multipart: data + files[]

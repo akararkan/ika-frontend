@@ -18,7 +18,22 @@ export class ApiError extends Error {
     this.payload = payload || null    // full parsed body when present
     this.fieldErrors = payload?.fieldErrors || null
     this.traceId = payload?.traceId || null
+    this.retryAfterSeconds = payload?.retryAfterSeconds ?? null   // 429 rate-limit (REALTIME guide §10)
+    this.action = payload?.action ?? null                         // which write path was throttled
   }
+}
+
+/* Minimal toast poke — replicated here (not imported from ui.jsx) to avoid an
+   api→ui circular import. Surfaces a friendly "slow down" on 429s app-wide. */
+let _toastTimer
+function flashToast(msg) {
+  if (typeof document === 'undefined') return
+  const el = document.getElementById('toast')
+  if (!el) return
+  const m = el.querySelector('.tmsg'); if (m) m.textContent = msg
+  el.classList.add('show')
+  clearTimeout(_toastTimer)
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2600)
 }
 
 function buildUrl(path, query) {
@@ -39,6 +54,20 @@ async function parseError(res) {
   let body = null
   const text = await res.text().catch(() => '')
   if (text) { try { body = JSON.parse(text) } catch { /* bare / non-json body */ } }
+
+  // 429 can arrive as a JSON envelope OR a bare proxy/edge body that only carries a
+  // `Retry-After` header — handle both so the friendly message + cooldown seconds work
+  // regardless of who throttled the request (REALTIME guide §10).
+  if (res.status === 429) {
+    const hdr = parseInt(res.headers.get('Retry-After') || '', 10)
+    const retry = (body && typeof body.retryAfterSeconds === 'number') ? body.retryAfterSeconds
+      : (Number.isFinite(hdr) ? hdr : null)
+    const message = (body && body.message) || `Slow down — try again in ${retry ?? 5}s`
+    const err = new ApiError(429, (body && (body.errorCode || body.error)) || 'RATE_LIMITED', message, body)
+    if (retry != null) err.retryAfterSeconds = retry
+    if (body && body.action) err.action = body.action
+    return err
+  }
 
   if (body && typeof body === 'object') {
     // Posts envelope uses `errorCode`; QnA/Research use `error` as the code.
@@ -121,6 +150,15 @@ export async function request(method, path, opts = {}) {
   }
 
   const err = await parseError(res)
+
+  // 429 rate-limit (REALTIME guide §10): surface a friendly "slow down" toast with
+  // the server's retry hint. Callers can still read err.retryAfterSeconds / err.action
+  // to disable the submit button during the cooldown.
+  if (res.status === 429) {
+    const secs = err.retryAfterSeconds ?? 5
+    flashToast(err.message || `Slow down — try again in ${secs}s`)
+    throw err
+  }
 
   // Only attempt recovery when we believe we're signed in, on a non-auth path, once.
   if (res.status === 401 && token && !_retried && !isAuthPath(path)) {

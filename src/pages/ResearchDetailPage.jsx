@@ -16,7 +16,7 @@ import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
 import { useRealtime } from '../hooks/useRealtime.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { api, adapters } from '../api/index.js'
+import { api, adapters, applyResearchDelta } from '../api/index.js'
 
 /* tiny formatters used by the media gallery (file size + audio/video duration) */
 const fmtBytes = (n) => {
@@ -46,6 +46,38 @@ const fileExt = (m) => {
   if (dot > 0 && dot < name.length - 1) return name.slice(dot + 1).toUpperCase().slice(0, 4)
   if (m.mimeType?.includes('/')) return m.mimeType.split('/')[1].replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4)
   return m.type === 'DOCUMENT' ? 'DOC' : 'FILE'
+}
+
+/* Promo-video player used inside the cinematic overlay. Explicitly calls play()
+   (the open was a user gesture, but autoplay-with-sound can still be refused — we
+   swallow that and leave the native controls so the user can start it). If the
+   source can't be played at all (bad/expired URL, unsupported codec, host served
+   HTML), we surface a clear fallback with an open-in-new-tab escape hatch instead
+   of a silent black box. */
+function PromoVideo({ src, poster, onClose }) {
+  const ref = React.useRef(null)
+  const [failed, setFailed] = React.useState(false)
+  React.useEffect(() => {
+    setFailed(false)
+    const v = ref.current
+    const p = v && v.play && v.play()
+    if (p && p.catch) p.catch(() => { /* autoplay refused — controls remain */ })
+  }, [src])
+  if (failed) {
+    return (
+      <div className="rd-vp-fail">
+        <Icon name="video"/>
+        <p>This promo video couldn’t be played here.</p>
+        {src && <a className="btn btn-primary btn-sm" href={src} target="_blank" rel="noreferrer"><Icon name="share" className="xs"/>Open in a new tab</a>}
+      </div>
+    )
+  }
+  return (
+    <video ref={ref} className="rd-vp-video" src={src} poster={poster || undefined}
+      controls autoPlay playsInline preload="metadata"
+      onError={() => { console.warn('[research] promo video failed to load:', src); setFailed(true) }}
+      onEnded={onClose}/>
+  )
 }
 
 export function ResearchDetailPage() {
@@ -92,22 +124,25 @@ export function ResearchDetailPage() {
     return () => { alive = false }
   }, [id, loadResearch, loadComments])
 
-  // SSE is FLAT (§20.1): every event carries the post-action ABSOLUTE counters in
-  // named fields, comment events embed the fresh `comment` + `parentCommentId`,
-  // and the server doesn't echo our own actions → patch in place, no refetch.
+  // SSE delta model (REALTIME_FRONTEND_GUIDE §4): events carry NO counter values —
+  // apply +1/-1 locally by type. Own actions are skipped (actorId === me) because the
+  // optimistic handlers (react/save/cite/download/comment) already applied them; the
+  // comment list also dedups by id, so an echoed own comment can never double.
   useRealtime('researches', r ? id : null, {
     onEvent: (evt) => {
       const t = evt.eventType
-      const num = (k, fb) => typeof evt[k] === 'number' ? evt[k] : fb
-      setR(prev => prev ? { ...prev, metrics: {
-        views:     num('viewCount',     prev.metrics.views),
-        downloads: num('downloadCount', prev.metrics.downloads),
-        reactions: num('reactionCount', prev.metrics.reactions),
-        comments:  num('commentCount',  prev.metrics.comments),
-        saves:     num('saveCount',     prev.metrics.saves),
-        citations: num('citationCount', prev.metrics.citations),
-      } } : prev)
 
+      // lifecycle — no optimistic counterpart, handle regardless of actor.
+      if (t === 'RESEARCH_UPDATED' || t === 'RESEARCH_PUBLISHED') { loadResearch().catch(() => {}); return }
+      if (t === 'RESEARCH_DELETED') { showToast('Research removed'); navigate('/research'); return }
+
+      // own action echo → fully applied optimistically already, ignore it.
+      if (evt.actorId && meId && evt.actorId === meId) return
+
+      // counter deltas
+      setR(prev => prev ? { ...prev, metrics: applyResearchDelta(prev.metrics, evt) } : prev)
+
+      // comment stream (others only)
       const parent = evt.parentCommentId || null
       const c = evt.comment ? adapters.researchCommentFrom(evt.comment) : null
       const mergeC = (fresh, prevC) => prevC ? { ...fresh, liked: prevC.liked } : fresh   // keep this viewer's like state
@@ -120,13 +155,14 @@ export function ResearchDetailPage() {
         const cid = evt.commentId
         setComments(cs => parent ? cs.map(x => x.id === parent ? { ...x, replies: (x.replies || []).filter(rr => rr.id !== cid), replyCount: Math.max(0, (x.replyCount || 0) - 1) } : x) : cs.filter(x => x.id !== cid))
       } else if (t === 'COMMENT_REACTION_ADDED' || t === 'COMMENT_REACTION_REMOVED') {
-        const cid = evt.commentId, lc = num('commentReactionCount', null)
-        if (cid && lc != null) setComments(cs => cs.map(x => x.id === cid ? { ...x, likes: lc } : { ...x, replies: (x.replies || []).map(rr => rr.id === cid ? { ...rr, likes: lc } : rr) }))
+        const cid = evt.commentId
+        if (cid) {
+          const d = t === 'COMMENT_REACTION_ADDED' ? 1 : -1
+          setComments(cs => cs.map(x => x.id === cid
+            ? { ...x, likes: Math.max(0, (x.likes || 0) + d) }
+            : { ...x, replies: (x.replies || []).map(rr => rr.id === cid ? { ...rr, likes: Math.max(0, (rr.likes || 0) + d) } : rr) }))
+        }
       }
-
-      // lifecycle (defined but not broadcast today, §21 — harmless if they ever fire)
-      if (t === 'RESEARCH_UPDATED' || t === 'RESEARCH_PUBLISHED') loadResearch().catch(() => {})
-      if (t === 'RESEARCH_DELETED') { showToast('Research removed'); navigate('/research') }
     },
   })
 
@@ -610,7 +646,7 @@ export function ResearchDetailPage() {
           <div className="rd-vp-bg" style={{ background: r.cover }} aria-hidden="true"/>
           <div className="rd-vp-veil" aria-hidden="true"/>
           <div className="rd-vp-stage">
-            <video className="rd-vp-video" src={r.videoPromoUrl} poster={r.videoPromoThumb || undefined} controls autoPlay playsInline onEnded={() => setShowVideo(false)}/>
+            <PromoVideo src={r.videoPromoUrl} poster={r.videoPromoThumb} onClose={() => setShowVideo(false)}/>
           </div>
           <button className="rd-vp-close" onClick={() => setShowVideo(false)} aria-label="Close (Esc)"><Icon name="close"/></button>
         </div>
