@@ -90,6 +90,8 @@ const FONT_SIZES = [
   { cls:'fs-36', label:'36', hint:'display' },
   { cls:'fs-48', label:'48', hint:'feature' },
   { cls:'fs-60', label:'60', hint:'hero' },
+  { cls:'fs-72', label:'72', hint:'banner' },
+  { cls:'fs-96', label:'96', hint:'poster' },
 ]
 const FONT_FAMILIES = [
   { cls:'',         label:'Serif (default)', family:'var(--serif)' },
@@ -130,7 +132,7 @@ const IMG_SIZES = [
   { cls:'img-md', label:'M', title:'Medium (50%)' },
   { cls:'img-lg', label:'L', title:'Large (100%)' },
 ]
-const IMG_RE_WRAP = /^(img-wrap-left|img-wrap-right|img-block|img-behind|img-front|img-inline)$/
+const IMG_RE_WRAP = /^(img-wrap-left|img-wrap-right|img-block|img-behind)$/
 const IMG_RE_SIZE = /^img-(sm|md|lg)$/
 
 function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
@@ -274,36 +276,6 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
      preset class — chiefly user-typed font sizes like 17px, 22px, 100px).
      Cleans matching classes-of-group and existing same-property inline styles
      before wrapping. */
-  const applySpanStyle = (group, prop, value) => {
-    const regex = GROUP_RE[group]
-    ref.current?.focus()
-    const sel = window.getSelection()
-    if (!sel?.rangeCount) return
-    const range = sel.getRangeAt(0)
-    if (range.collapsed) return
-    const fragment = range.extractContents()
-    fragment.querySelectorAll('span').forEach(s => {
-      if (regex && s.className) {
-        const keep = s.className.split(/\s+/).filter(c => c && !regex.test(c))
-        s.className = keep.join(' ')
-        if (!s.className) s.removeAttribute('class')
-      }
-      if (s.style?.[prop]) s.style.removeProperty(prop)
-      if (!s.getAttribute('style')) s.removeAttribute('style')
-      if (!s.attributes.length && s.childNodes.length) {
-        while (s.firstChild) s.parentNode.insertBefore(s.firstChild, s)
-        s.remove()
-      }
-    })
-    const wrapper = document.createElement('span')
-    wrapper.style[prop] = value
-    wrapper.appendChild(fragment)
-    range.insertNode(wrapper)
-    const r = document.createRange(); r.selectNodeContents(wrapper)
-    sel.removeAllRanges(); sel.addRange(r)
-    sync(); refreshActive()
-  }
-
   /* Apply / clear a CLASS on the current block (paragraph / heading / li / quote).
      Used for alignment so it survives sanitiser stripping of inline styles. */
   const applyBlockClass = (group, cls) => {
@@ -467,7 +439,6 @@ function WysiwygEditor({ value, onChange, placeholder, minHeight }) {
         run={run} insertHtml={insertHtml} active={active}
         applyBlock={applyBlock} applyDir={applyDir}
         applySpanClass={applySpanClass} applyBlockClass={applyBlockClass}
-        applySpanStyle={applySpanStyle}
       />
       <div
         ref={ref}
@@ -590,7 +561,7 @@ function ColorPicker({ title, swatch, colors, onPick, activeClass }) {
    a small mono badge. The dropdown opens with a NUMBER INPUT at the top so
    the author can type ANY size (e.g. 17, 22, 100). Common presets are
    listed beneath, each rendered at its own size as a true preview. */
-function SizePicker({ sizes, onPick, onPickPx, activeClass, activePx }) {
+function SizePicker({ sizes, onPick, activeClass, activePx }) {
   const [open, setOpen, ref] = usePopover()
   const [draft, setDraft] = React.useState('')
   const inputRef = React.useRef(null)
@@ -606,8 +577,15 @@ function SizePicker({ sizes, onPick, onPickPx, activeClass, activePx }) {
     const px = parseInt(raw, 10)
     if (!Number.isFinite(px) || px < 6 || px > 200) return
     const match = sizes.find(s => s.label === String(px))
-    if (match) onPick(match.cls)                                              // preset → clean class
-    else onPickPx(px)                                                         // arbitrary → inline style
+    if (match) onPick(match.cls)                                              // exact preset → clean class
+    else {
+      // Snap any other value to the NEAREST preset class. An inline
+      // style="font-size:Npx" would be stripped by the sanitiser on publish
+      // (the size shows while editing then vanishes) — so we never emit one.
+      const presets = sizes.map(s => ({ cls: s.cls, n: parseInt(s.label, 10) })).filter(p => Number.isFinite(p.n))
+      const near = presets.reduce((a, b) => Math.abs(b.n - px) < Math.abs(a.n - px) ? b : a, presets[0])
+      onPick(near.cls)
+    }
     setOpen(false); setDraft('')
   }
 
@@ -725,7 +703,7 @@ const HighlightSwatch = () => (
   <span className="rte-color-icon"><span className="letter hl">H</span><span className="bar yellow"/></span>
 )
 
-function WysiwygToolbar({ run, insertHtml, active, applyBlock, applyDir, applySpanClass, applyBlockClass, applySpanStyle }) {
+function WysiwygToolbar({ run, insertHtml, active, applyBlock, applyDir, applySpanClass, applyBlockClass }) {
   const onLink = async () => {
     const url = await uiPrompt({ title:'Insert link', label:'Link URL', placeholder:'https://…', initial:'https://', icon:'link' })
     if (url) run('createLink', url)
@@ -739,12 +717,12 @@ function WysiwygToolbar({ run, insertHtml, active, applyBlock, applyDir, applySp
       {/* Headings — selection-aware */}
       <HeadingButtons applyBlock={applyBlock}/>
       <Sep/>
-      {/* Font size — presets are CSS classes (sanitiser-safe); typing a custom
-          value emits an inline style="font-size:Npx" wrapper instead. */}
+      {/* Font size — every value resolves to a CSS class (sanitiser-safe): an exact
+          preset, or the nearest preset when a custom value is typed. We never emit an
+          inline style="font-size" (it would be stripped on publish). */}
       <SizePicker
         sizes={FONT_SIZES}
         onPick={(cls) => applySpanClass('size', cls)}
-        onPickPx={(px) => applySpanStyle('size', 'fontSize', `${px}px`)}
         activeClass={active.fs}
         activePx={active.fsPx}
       />

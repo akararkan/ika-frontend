@@ -327,8 +327,8 @@ export function ResearchDetailPage() {
 
   // Table of contents — only the sections that actually render, in reading order.
   const toc = [
-    hasDesc                && { id:'rd-description',  label:'Description',  icon:'book' },
     { id:'rd-abstract', label:'Abstract', icon:'doc' },
+    hasDesc                && { id:'rd-description',  label:'Description',  icon:'book' },
     images.length          && { id:'rd-figures',      label:'Figures',      icon:'image', n:images.length },
     videos.length          && { id:'rd-videomat',     label:'Video',        icon:'video', n:videos.length },
     audios.length          && { id:'rd-audiomat',     label:'Audio',        icon:'audio', n:audios.length },
@@ -419,16 +419,16 @@ export function ResearchDetailPage() {
           </nav>
 
           <main className="rd-main">
+            <section className="card rd-card2 reveal" id="rd-abstract" data-sec="rd-abstract">
+              <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="doc" className="sm"/></span><h2>Abstract</h2></div>
+              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
+            </section>
             {hasDesc && (
               <section className="card rd-card2 reveal" id="rd-description" data-sec="rd-description">
                 <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="book" className="sm"/></span><h2>Description</h2></div>
                 <RichText html={r.descriptionHtml} source={r.description} format={r.bodyFormat} className="rd-text"/>
               </section>
             )}
-            <section className="card rd-card2 reveal" id="rd-abstract" data-sec="rd-abstract">
-              <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="doc" className="sm"/></span><h2>Abstract</h2></div>
-              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
-            </section>
             {!!images.length && (
               <section className="card rd-card2 reveal" id="rd-figures" data-sec="rd-figures">
                 <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="image" className="sm"/></span><h2>Figures</h2><span className="rd-sec-n">{images.length}</span></div>

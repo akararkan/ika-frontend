@@ -162,6 +162,8 @@
 .prose .fs-36{font-size:36px;line-height:1.25;font-weight:500;letter-spacing:-.2px}
 .prose .fs-48{font-size:48px;line-height:1.15;font-weight:600;letter-spacing:-.4px}
 .prose .fs-60{font-size:60px;line-height:1.1;font-weight:600;letter-spacing:-.6px}
+.prose .fs-72{font-size:72px;line-height:1.06;font-weight:600;letter-spacing:-.7px}
+.prose .fs-96{font-size:96px;line-height:1.02;font-weight:700;letter-spacing:-.9px}
 
 /* Font families (.ff-*) */
 .prose .ff-sans{font-family:var(--sans)}
@@ -366,6 +368,8 @@
 .rte-size-row.fs-36      .rte-size-num{font-size:26px;font-weight:500}
 .rte-size-row.fs-48      .rte-size-num{font-size:26px;font-weight:600}
 .rte-size-row.fs-60      .rte-size-num{font-size:26px;font-weight:600}
+.rte-size-row.fs-72      .rte-size-num{font-size:26px;font-weight:600}
+.rte-size-row.fs-96      .rte-size-num{font-size:26px;font-weight:700}
 
 .prose h1,.prose h2,.prose h3,.prose h4,.prose h5,.prose h6{
   font-family:var(--serif);font-weight:600;color:var(--ink);
@@ -426,7 +430,7 @@
 
 /* tables */
 .prose table{
-  border-collapse:collapse;width:100%;
+  border-collapse:collapse;width:100%;table-layout:fixed;   /* match the editor so column widths render the same */
   margin:1.2em 0;font-family:var(--sans);font-size:14px;
   background:var(--card);border:1px solid var(--line);border-radius:10px;
   overflow:hidden;
@@ -693,6 +697,9 @@
   opacity:.18;filter:grayscale(.3);
   pointer-events:none;
 }
+/* While AUTHORING, the watermark must stay clickable so it can be re-selected /
+   changed — only the published render is inert. */
+.rte-wysiwyg img.img-behind{pointer-events:auto;opacity:.4}
 /* Sizes — pair with any wrap mode */
 .prose img.img-sm{max-width:25%}
 .prose img.img-md{max-width:50%}

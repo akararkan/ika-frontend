@@ -516,6 +516,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
         {/* Header — emblem + title + live progress bar */}
         <header className="rm-hd">
           <span className="rm-hd-pat" aria-hidden="true"/>
+          <button type="button" className="rm-hd-back" onClick={onClose} disabled={busy} aria-label="Back to research"><Icon name="chevleft" className="sm"/>Back</button>
           <span className="rm-hd-emblem" aria-hidden="true"><i/></span>
           <div className="rm-hd-text">
             <h2 className="rm-hd-title">{isEdit ? 'Edit research' : 'Publish research'}</h2>

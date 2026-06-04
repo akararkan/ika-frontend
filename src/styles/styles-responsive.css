@@ -866,3 +866,38 @@ img,video{max-width:100%;height:auto}
   .rrow-cover{width:48px;height:48px}
   .lg-head h2{font-size:16px}
 }
+
+/* ============================================================
+   15 · RESEARCH COMPOSER (full-page) — mobile. The section rail
+   becomes a horizontal, scrollable tab strip above the content
+   so the editor gets the full width on phones.
+   ============================================================ */
+@media(max-width:760px){
+  .rm-hd{padding:12px 14px 14px;gap:10px}
+  .rm-hd-emblem{display:none}
+  .rm-hd-back{height:34px;padding:0 12px 0 8px;font-size:13px}
+  .rm-hd-title{font-size:18px}
+  .rm-hd-sub{display:none}
+  .rm-hd-text{padding-right:36px}
+  .rm-hd-close{top:13px;right:14px}
+
+  .rm-body{flex-direction:column;min-height:0}
+  .rm-nav{
+    width:100%;flex:none;flex-direction:row;align-items:center;gap:8px;
+    border-right:0;border-bottom:1px solid var(--line);
+    padding:9px 12px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  }
+  .rm-nav::-webkit-scrollbar{display:none}
+  .rm-nav-list{flex-direction:row;gap:7px;flex-wrap:nowrap}
+  .rm-nav-item{flex:none;white-space:nowrap;padding:7px 11px}
+  .rm-nav-item.on::before{display:none}
+  .rm-nav-h{display:none}
+  .rm-nav-foot{display:none}
+  .rm-inner{padding:16px 16px 4px;max-width:none}
+  .rm-content .cm-saving,.rm-content .cm-save-err{margin:16px}
+}
+@media(max-width:460px){
+  .rm-nav-tx{display:none}                 /* icon-only section tabs on tiny phones */
+  .rm-nav-item{padding:8px}
+  .rm-nav-ck{display:none}
+}
