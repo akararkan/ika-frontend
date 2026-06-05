@@ -13,15 +13,17 @@
 import React from 'react'
 import { Icon, Avatar, Verify, fmt } from './ui.jsx'
 import { authorOf } from '../lib/userView.js'
-import { api } from '../api/index.js'
+import { api, assetUrl } from '../api/index.js'
 
-// id → { a, b } resolved counters, shared across mounts so scrolling back
+// id → { a, b, cover } resolved meta, shared across mounts so scrolling back
 // up never refires the request.
 const counterCache = new Map()
 
-/** Lazy on-screen counter fetch (guide §4). Fires one detail GET the first time
- *  the card is visible; research → reactions + comments, question → answers +
- *  views. Failures (404 removed / 403 went private) are swallowed → no numbers. */
+/** Lazy on-screen meta fetch (guide §4). Fires one detail GET the first time the
+ *  card is visible: research → reactions + comments + the authoritative COVER
+ *  image (the feed-fanout snapshot's mediaUrl is often empty, so we pull the cover
+ *  from the detail endpoint here); question → answers + views. Failures (404
+ *  removed / 403 went private) are swallowed → no numbers / fall back to gradient. */
 function useLiveCounters(item) {
   const ref = React.useRef(null)
   const [counts, setCounts] = React.useState(() => counterCache.get(item.id) || null)
@@ -36,10 +38,14 @@ function useLiveCounters(item) {
       if (done || !entries.some(e => e.isIntersecting)) return
       done = true; io.disconnect()
       const req = item.kind === 'RESEARCH'
-        ? api.research.get(item.id).then(raw => ({ a: raw?.reactionCount || 0, b: raw?.commentCount || 0 }))
+        ? api.research.get(item.id).then(raw => ({
+            a: raw?.reactionCount || 0,
+            b: raw?.commentCount || 0,
+            cover: raw?.coverImageUrl ? `center/cover no-repeat url("${assetUrl(raw.coverImageUrl)}")` : '',
+          }))
         : api.qna.get(item.id).then(q => ({ a: q?.answers || 0, b: q?.views || 0 }))
       req.then(c => { counterCache.set(item.id, c); setCounts(c) }).catch(() => {})
-    }, { rootMargin: '120px' })
+    }, { rootMargin: '300px' })
     io.observe(el)
     return () => io.disconnect()
   }, [item.id, item.kind, counts])
@@ -55,7 +61,7 @@ export function FeedResearchCard({ item, navigate }) {
   const goAuthor = e => { e.stopPropagation(); if (item.author) navigate(`/u/${item.author}`) }
   return (
     <article ref={ref} className="r-card rise feed-xcard" onClick={open}>
-      <div className="r-cover" style={{ background: item.cover }}>
+      <div className="r-cover" style={{ background: (counts && counts.cover) || item.cover }}>
         <span className="fx-kind"><Icon name="research" className="xs"/>Publication</span>
       </div>
       <div className="r-body">
