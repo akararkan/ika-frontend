@@ -48,34 +48,47 @@ const fileExt = (m) => {
   return m.type === 'DOCUMENT' ? 'DOC' : 'FILE'
 }
 
-/* Promo-video player used inside the cinematic overlay. Explicitly calls play()
-   (the open was a user gesture, but autoplay-with-sound can still be refused — we
-   swallow that and leave the native controls so the user can start it). If the
-   source can't be played at all (bad/expired URL, unsupported codec, host served
-   HTML), we surface a clear fallback with an open-in-new-tab escape hatch instead
-   of a silent black box. */
+/* Promo-video player. The FE just points <video> at r.videoPromoUrl (a direct
+   URL per RESEARCH_API §5). It explicitly calls play() (the open was a user
+   gesture, though autoplay-with-sound can still be refused — we swallow that and
+   leave native controls). When the source itself can't be played, we surface the
+   EXACT MediaError reason + the attempted URL, so a backend/CDN problem (private/
+   unsigned URL, wrong content-type, expired link, or a relative path the SPA host
+   answers with HTML) is diagnosable instead of a silent black box. */
+const MEDIA_ERR_REASON = {
+  1: 'Playback was aborted.',
+  2: 'The video couldn’t be reached — a network error, 404, CORS block, or the server refused it.',
+  3: 'The video is corrupt or uses a codec this browser can’t decode.',
+  4: 'The link isn’t a playable video — wrong file type/content-type, an expired/unsigned URL, or the server returned a web page (index.html).',
+}
 function PromoVideo({ src, poster, onClose }) {
   const ref = React.useRef(null)
-  const [failed, setFailed] = React.useState(false)
+  const [err, setErr] = React.useState(null)
   React.useEffect(() => {
-    setFailed(false)
+    setErr(null)
     const v = ref.current
     const p = v && v.play && v.play()
     if (p && p.catch) p.catch(() => { /* autoplay refused — controls remain */ })
   }, [src])
-  if (failed) {
+  if (err) {
     return (
       <div className="rd-vp-fail">
         <Icon name="video"/>
-        <p>This promo video couldn’t be played here.</p>
-        {src && <a className="btn btn-primary btn-sm" href={src} target="_blank" rel="noreferrer"><Icon name="share" className="xs"/>Open in a new tab</a>}
+        <p className="rd-vp-fail-t">This promo video couldn’t be played.</p>
+        <p className="rd-vp-reason">{MEDIA_ERR_REASON[err.code] || 'The video couldn’t be loaded.'}</p>
+        {src && <a className="btn btn-primary btn-sm" href={src} target="_blank" rel="noreferrer"><Icon name="share" className="xs"/>Open the video in a new tab</a>}
+        {src && <code className="rd-vp-url" title={src}>{src}</code>}
       </div>
     )
   }
   return (
     <video ref={ref} className="rd-vp-video" src={src} poster={poster || undefined}
       controls autoPlay playsInline preload="metadata"
-      onError={() => { console.warn('[research] promo video failed to load:', src); setFailed(true) }}
+      onError={(e) => {
+        const me = e.currentTarget?.error
+        console.warn('[research] promo video failed', { code: me?.code, message: me?.message, src })
+        setErr({ code: me?.code || 0 })
+      }}
       onEnded={onClose}/>
   )
 }

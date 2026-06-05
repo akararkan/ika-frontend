@@ -516,7 +516,6 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
         {/* Header — emblem + title + live progress bar */}
         <header className="rm-hd">
           <span className="rm-hd-pat" aria-hidden="true"/>
-          <button type="button" className="rm-hd-back" onClick={onClose} disabled={busy} aria-label="Back to research"><Icon name="chevleft" className="sm"/>Back</button>
           <span className="rm-hd-emblem" aria-hidden="true"><i/></span>
           <div className="rm-hd-text">
             <h2 className="rm-hd-title">{isEdit ? 'Edit research' : 'Publish research'}</h2>
@@ -617,14 +616,14 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
                   <input className="inp inp-lg rm-title" placeholder="The effects of X on Y" value={title} onChange={e => setTitle(e.target.value)}/>
                 </div>
                 <div className="rm-field">
-                  <label className="rm-lbl">Abstract <span className="rm-lbl-h">select any text to format</span></label>
-                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={150} showFormat={false}
-                    placeholder="A concise abstract of the work — select any text and use the toolbar to format it."/>
-                </div>
-                <div className="rm-field">
                   <label className="rm-lbl">Description <span className="rm-lbl-h">the full write-up kept on the published page</span></label>
                   <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={280} showFormat={false}
                     placeholder="Write your research — headings, lists, tables, images, colours, highlights…"/>
+                </div>
+                <div className="rm-field">
+                  <label className="rm-lbl">Abstract <span className="rm-lbl-h">select any text to format</span></label>
+                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={150} showFormat={false}
+                    placeholder="A concise abstract of the work — select any text and use the toolbar to format it."/>
                 </div>
               </RmSection>
 

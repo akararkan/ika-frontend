@@ -875,7 +875,6 @@ img,video{max-width:100%;height:auto}
 @media(max-width:760px){
   .rm-hd{padding:12px 14px 14px;gap:10px}
   .rm-hd-emblem{display:none}
-  .rm-hd-back{height:34px;padding:0 12px 0 8px;font-size:13px}
   .rm-hd-title{font-size:18px}
   .rm-hd-sub{display:none}
   .rm-hd-text{padding-right:36px}
