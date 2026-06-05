@@ -4,7 +4,7 @@
    Returns VIEW-shaped objects via the adapters.
    ========================================================= */
 import { http } from './http.js'
-import { postFromFeedItem, postFromResponse, commentFrom } from './adapters.js'
+import { feedItemFrom, postFromFeedItem, postFromResponse, commentFrom } from './adapters.js'
 
 export const posts = {
   /* ---- Feeds ---- */
@@ -12,7 +12,8 @@ export const posts = {
   // the legacy `pageSize`); `cursor` = createdAt of the last item seen (§8).
   async feed({ cursor, limit = 20 } = {}) {
     const rows = await http.get('/api/v1/posts/feed', { cursor, limit })
-    return (rows || []).map(postFromFeedItem)
+    // Mixed stream: POST | RESEARCH | QUESTION rows, dispatched by entityType.
+    return (rows || []).map(feedItemFrom)
   },
   async byAuthor(authorId, { cursor, pageSize = 20 } = {}) {
     const rows = await http.get(`/api/v1/posts/by-author/${authorId}`, { cursor, pageSize })

@@ -67,6 +67,31 @@ export function authorFrom(a, fallbackId) {
   }
 }
 
+/** "Jun 2026"-style join label from an ISO instant. */
+function monthYear(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+}
+/** LinkPlatform/ContactPlatform enum → human label (GOOGLE_SCHOLAR → "Google Scholar"). */
+function platformLabel(p) {
+  if (!p) return 'Link'
+  return String(p).toLowerCase().split('_').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+}
+/** UserAttachment (profile CV/docs) → view file. Handles both the fileType/fileSize
+ *  and the mimeType/sizeBytes field spellings across the two API doc revisions. */
+export function userAttachmentFrom(a) {
+  return {
+    id: a.id,
+    url: assetUrl(a.fileUrl),
+    name: a.fileName || a.originalFileName || 'file',
+    mime: a.fileType || a.mimeType || '',
+    size: a.fileSize ?? a.sizeBytes ?? 0,
+    description: a.description || '',
+    order: a.displayOrder ?? 0,
+  }
+}
+
 /** UserResponse (per USER_API, with nested `profile`) → view user/author.
  *  May 2026: accountType / verificationTier were removed. `verified` is now
  *  derived from `role` (SCHOLAR or RESEARCHER) or from the pre-computed
@@ -91,8 +116,32 @@ export function meFrom(u) {
     badges: Array.isArray(u.badges) ? u.badges : [],   // §6.2 pre-computed, priority-sorted (render via <Badges>)
     emailVerified: !!u.isEmailVerified,
     bio: p.profileBio || u.bio || '',
-    field: p.academicTitle || p.institutionName || p.selfDescriber || '',
+    // — rich profile detail (USER_MODEL_API ProfileResponse) — kept as DISTINCT
+    //   fields (the old single `field` collapsed academic/institution/tagline). —
+    field: p.academicTitle || p.institutionName || p.selfDescriber || '',   // back-compat
+    displayName: p.displayName || '',
+    selfDescriber: p.selfDescriber || '',
+    academicTitle: p.academicTitle || '',
+    institution: p.institutionName || '',
+    madhhab: p.madhhabName || '',
     location: p.location || '',
+    website: p.websiteUrl || u.websiteUrl || '',
+    orcid: u.orcidId || u.orcid || '',
+    isForHire: !!p.isForHire,
+    profileLocked: !!p.isProfileLocked,
+    contentLanguage: p.contentLanguage || u.preferredLanguage || '',
+    profileViews: p.profileViews ?? 0,
+    joinedAt: monthYear(u.createdAt),
+    specializations: (p.specializations || [])
+      .map(s => ({ id: s.topicId ?? s.id, name: s.topicName || s.nameEn || s.name || '', order: s.displayOrder ?? 0 }))
+      .filter(s => s.name).sort((a, b) => a.order - b.order),
+    links: (p.links || [])
+      .map(l => ({ id: l.id, platform: l.platform || 'OTHER', url: l.url || '', label: l.description || platformLabel(l.platform), order: l.displayOrder ?? 0 }))
+      .filter(l => l.url).sort((a, b) => a.order - b.order),
+    contacts: (p.contacts || [])
+      .map(c => ({ id: c.id, platform: c.platform || 'OTHER', label: platformLabel(c.platform), value: c.value || '', order: c.displayOrder ?? 0 }))
+      .filter(c => c.value).sort((a, b) => a.order - b.order),
+    attachments: (p.attachments || []).map(userAttachmentFrom).filter(a => a.url).sort((a, b) => a.order - b.order),
     followers: p.followerCount ?? 0,
     following: p.followingCount ?? 0,
     posts: p.postCount ?? 0,
@@ -202,6 +251,56 @@ export function postFromFeedItem(dto) {
     saved: !!dto.savedByMe,
     createdAt: dto.createdAt || null,   // raw ISO Instant — drives cursor pagination (FEED_API §8)
     commentPreview: [],
+  }
+}
+
+/* ---- Mixed home feed (HOME_FEED_FRONTEND_GUIDE) ----------------------------
+   GET /api/v1/posts/feed now returns POST, RESEARCH and QUESTION rows in one
+   chronological stream, each carrying an `entityType` discriminator. Counters
+   are POST-only (zeroed on research/Q&A — the detail page is the truth); the
+   light cards carry just title (textPreview), cover (mediaUrl), author + time,
+   and the raw createdAt that drives cursor pagination. */
+
+/** FeedItemResponse (RESEARCH) → light research feed-card object. */
+export function researchFromFeedItem(dto) {
+  const a = authorFrom(dto.author, dto.authorId)
+  return {
+    kind: 'RESEARCH',
+    id: dto.id,
+    author: a.id,
+    _author: a,
+    title: dto.textPreview || 'Untitled research',
+    cover: dto.mediaUrl
+      ? `center/cover no-repeat url("${assetUrl(dto.mediaUrl)}")`
+      : 'radial-gradient(120% 100% at 30% 10%,#1f5a4a,#0a2a22)',
+    hasCover: !!dto.mediaUrl,
+    time: timeAgo(dto.createdAt),
+    createdAt: dto.createdAt || null,
+  }
+}
+
+/** FeedItemResponse (QUESTION) → light Q&A feed-card object. */
+export function questionFromFeedItem(dto) {
+  const a = authorFrom(dto.author, dto.authorId)
+  return {
+    kind: 'QUESTION',
+    id: dto.id,
+    author: a.id,
+    _author: a,
+    title: dto.textPreview || 'Untitled question',
+    time: timeAgo(dto.createdAt),
+    createdAt: dto.createdAt || null,
+  }
+}
+
+/** Mixed home-feed dispatcher — branch on `entityType` FIRST (guide §2). A null/
+ *  unknown type is treated as POST (pre-migration rows read entity_type=null). */
+export function feedItemFrom(dto) {
+  switch (dto?.entityType) {
+    case 'RESEARCH': return researchFromFeedItem(dto)
+    case 'QUESTION': return questionFromFeedItem(dto)
+    case 'POST':
+    default:         return { ...postFromFeedItem(dto), kind: 'POST' }
   }
 }
 

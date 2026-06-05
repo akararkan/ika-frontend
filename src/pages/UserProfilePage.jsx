@@ -5,6 +5,7 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, Badges, fmt, showToast } from '../components/ui.jsx'
+import { ProfileDetails } from '../components/ProfileDetails.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -93,12 +94,9 @@ export function UserProfilePage() {
         </div>
         <div className="prof-meta">
           <h1>{u.full} {u.badges?.length ? <Badges items={u.badges}/> : (u.verified && <Verify scholar={u.role==='SCHOLAR'}/>)}</h1>
-          <div className="prof-handle">@{u.handle} · <span className="pill role">{(u.role||'member').toLowerCase()}</span></div>
+          <div className="prof-handle">@{u.handle} · <span className="pill role">{(u.role||'member').toLowerCase()}</span>{u.isForHire && <span className="pill hire"><Icon name="award" className="xs"/>Available for hire</span>}{u.profileLocked && <span className="pill locked"><Icon name="lock" className="xs"/>Private</span>}</div>
+          {u.selfDescriber && <p className="prof-tagline">{u.selfDescriber}</p>}
           {u.bio && <p className="prof-bio">{u.bio}</p>}
-          <div className="prof-facts">
-            {u.field && <span><Icon name="scholar" className="xs"/>{u.field}</span>}
-            {u.location && <span><Icon name="pin" className="xs"/>{u.location}</span>}
-          </div>
           <div className="prof-counts">
             <button onClick={() => setTab('POSTS')}><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>POSTS</small></button>
             <button onClick={() => setTab('REELS')}><b>{fmt(stats?.reels ?? reels.length)}</b><small>REELS</small></button>
@@ -108,6 +106,8 @@ export function UserProfilePage() {
             <button><b>{fmt(stats?.following ?? u.following)}</b><small>FOLLOWING</small></button>
           </div>
         </div>
+
+        <ProfileDetails u={u}/>
 
         <div className="tabs">
           {['POSTS','REELS','RESEARCH'].map(t => <button key={t} className={'tab ' + (tab===t?'on':'')} onClick={() => setTab(t)}>{t[0]+t.slice(1).toLowerCase()}</button>)}

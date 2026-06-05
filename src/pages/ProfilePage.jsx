@@ -4,6 +4,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Badges, fmt, showToast } from '../components/ui.jsx'
+import { ProfileDetails } from '../components/ProfileDetails.jsx'
 import { uiConfirm, uiPrompt } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { HighlightViewer } from '../components/HighlightViewer.jsx'
@@ -108,13 +109,9 @@ export function ProfilePage() {
         </div>
         <div className="prof-meta">
           <h1>{me.full} {me.badges?.length ? <Badges items={me.badges}/> : null}</h1>
-          <div className="prof-handle">@{me.handle} · <span className="pill role">{(me.role||'member').toLowerCase()}</span></div>
+          <div className="prof-handle">@{me.handle} · <span className="pill role">{(me.role||'member').toLowerCase()}</span>{me.isForHire && <span className="pill hire"><Icon name="award" className="xs"/>Available for hire</span>}{me.profileLocked && <span className="pill locked"><Icon name="lock" className="xs"/>Private</span>}</div>
+          {me.selfDescriber && <p className="prof-tagline">{me.selfDescriber}</p>}
           {me.bio && <p className="prof-bio">{me.bio}</p>}
-          <div className="prof-facts">
-            {me.field && <span><Icon name="scholar" className="xs"/>{me.field}</span>}
-            {me.location && <span><Icon name="pin" className="xs"/>{me.location}</span>}
-            {me.website && <a href={me.website} target="_blank" rel="noreferrer"><Icon name="link" className="xs"/>{me.website.replace(/^https?:\/\//, '')}</a>}
-          </div>
           <div className="prof-counts">
             <button onClick={() => setTab('POSTS')}><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>POSTS</small></button>
             <button onClick={() => setTab('REELS')}><b>{fmt(stats?.reels ?? reels.length)}</b><small>REELS</small></button>
@@ -153,6 +150,8 @@ export function ProfilePage() {
             ))}
           </section>
         </div>
+
+        <ProfileDetails u={me}/>
 
         <div className="tabs">
           {['POSTS','RESEARCH','QUESTIONS','REELS','SAVED'].map(t => (

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, fmt, showToast } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
+import { FeedResearchCard, FeedQuestionCard } from '../components/FeedCards.jsx'
 import { StoryViewer } from '../components/StoryViewer.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
@@ -265,11 +266,16 @@ export function FeedPage() {
           : !shown.length ? <EmptyState icon="feed" title={feedTab === 'SCHOLARS' ? 'No scholar posts yet' : 'Your feed is quiet'} sub={feedTab === 'SCHOLARS' ? 'Posts from verified scholars will appear here.' : 'Follow scholars and creators, or create the first post.'}/>
           : (
             <div className="feed-list">
-              {shown.map((p, i) => (
-                <PostCard key={p.id} post={p} index={i} onLike={like} onSave={save} onShare={share}
-                  onOpenComments={() => navigate(`/posts/${p.id}`)}
-                  owner={!!me.id && p.author === me.id} onEdit={() => openComposeEdit(p)} onDelete={del}/>
-              ))}
+              {shown.map((p, i) => {
+                // Mixed feed: dispatch on entityType (carried as `kind`) FIRST.
+                if (p.kind === 'RESEARCH') return <FeedResearchCard key={p.id} item={p} navigate={navigate}/>
+                if (p.kind === 'QUESTION') return <FeedQuestionCard key={p.id} item={p} navigate={navigate}/>
+                return (
+                  <PostCard key={p.id} post={p} index={i} onLike={like} onSave={save} onShare={share}
+                    onOpenComments={() => navigate(`/posts/${p.id}`)}
+                    owner={!!me.id && p.author === me.id} onEdit={() => openComposeEdit(p)} onDelete={del}/>
+                )
+              })}
             </div>
           )}
 
