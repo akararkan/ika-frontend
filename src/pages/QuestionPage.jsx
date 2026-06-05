@@ -370,7 +370,7 @@ export function QuestionPage() {
           <header>
             <span role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/u/${q.author}`)}><Avatar initials={u.initials} color={u.avc} size={44} src={u.profileImage}/></span>
             <div style={{flex:1}}>
-              <div className="qna-name"><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
+              <div className="qna-name lk" role="button" onClick={() => q.author && navigate(`/u/${q.author}`)}><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
               <div className="qna-sub">@{u.handle} · {q.time}{q.answersLocked && <> · <Icon name="lock" className="xs"/>answers locked</>}{q.maxAnswers ? <> · max {q.maxAnswers}</> : null}</div>
             </div>
             <div style={{ display:'flex', gap:6, alignItems:'center' }}>
@@ -429,7 +429,7 @@ export function QuestionPage() {
               <header>
                 <span role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/u/${a.author}`)}><Avatar initials={au.initials} color={au.avc} size={40} src={au.profileImage}/></span>
                 <div style={{flex:1}}>
-                  <div className="qna-name"><b>{au.full}</b> {au.verified && <Verify scholar={au.role==='SCHOLAR'}/>} {au.role==='SCHOLAR' && <span className="pill scholar">Scholar</span>}</div>
+                  <div className="qna-name lk" role="button" onClick={() => a.author && navigate(`/u/${a.author}`)}><b>{au.full}</b> {au.verified && <Verify scholar={au.role==='SCHOLAR'}/>} {au.role==='SCHOLAR' && <span className="pill scholar">Scholar</span>}</div>
                   <div className="qna-sub">@{au.handle} · {a.time}{a.edited && <> · edited</>}</div>
                 </div>
               </header>

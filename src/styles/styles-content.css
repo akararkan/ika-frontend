@@ -895,10 +895,13 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .rd-chip-status.draft{background:rgba(189,147,68,.66)}
 .rd-chip-status.archived{background:rgba(60,79,73,.66)}
 .rd-chip-status.retracted{background:rgba(194,69,63,.66)}
-.rd-hero2-play{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:2;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);border:1.5px solid rgba(255,255,255,.55);display:grid;place-items:center;color:#fff;box-shadow:0 12px 40px -10px rgba(0,0,0,.5);transition:transform .25s ease,background .25s ease;animation:rd-play-pulse 2.6s ease-out infinite}
-.rd-hero2-play:hover{transform:translate(-50%,-50%) scale(1.07);background:rgba(255,255,255,.28)}
-.rd-hero2-play:active{transform:translate(-50%,-50%) scale(.97)}
-.rd-hero2-play .ico{width:30px;height:30px;fill:#fff;stroke:none;margin-left:3px}
+.rd-hero2-play{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:3;width:86px;height:86px;border-radius:50%;background:rgba(255,255,255,.26);backdrop-filter:blur(7px);border:1.5px solid rgba(255,255,255,.7);display:grid;place-items:center;color:#fff;cursor:pointer;box-shadow:0 14px 44px -10px rgba(0,0,0,.55);transition:transform .16s cubic-bezier(.2,.7,.3,1),background .16s ease,box-shadow .16s ease;animation:rd-play-pulse 2.6s ease-out infinite}
+/* enlarged invisible hit target so taps NEAR the button still register — "more sensitive" */
+.rd-hero2-play::after{content:"";position:absolute;inset:-20px;border-radius:50%}
+.rd-hero2-play:hover{transform:translate(-50%,-50%) scale(1.12);background:rgba(255,255,255,.36);box-shadow:0 18px 54px -10px rgba(0,0,0,.6)}
+.rd-hero2-play:active{transform:translate(-50%,-50%) scale(.92)}
+.rd-hero2-play:focus-visible{outline:none;box-shadow:0 0 0 4px rgba(255,255,255,.55),0 14px 44px -10px rgba(0,0,0,.55)}
+.rd-hero2-play .ico{width:32px;height:32px;fill:#fff;stroke:none;margin-left:3px}
 .rd-hero2-content{position:relative;z-index:2;padding:30px 34px}
 .rd-eyebrow{display:inline-flex;align-items:center;gap:11px;color:var(--brass-soft);font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin-bottom:13px}
 .rd-eyebrow::before{content:"";width:32px;height:1.5px;background:var(--brass-soft)}
@@ -906,6 +909,22 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .rd-hero2-by{display:flex;align-items:center;gap:12px;margin-top:18px}
 .rd-hero2-by .nm{color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
 .rd-hero2-by .tm{color:rgba(255,255,255,.72);font-size:13px;margin-top:2px}
+/* clickable byline → author profile */
+.rd-hero2-ava{display:inline-flex;cursor:pointer;border-radius:50%;transition:transform .16s ease}
+.rd-hero2-ava:hover{transform:translateY(-1px)}
+.rd-hero2-ava:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.6)}
+.rd-hero2-who{cursor:pointer;border-radius:8px}
+.rd-hero2-who:hover .nm{text-decoration:underline;text-underline-offset:3px}
+.rd-hero2-who:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.45)}
+/* Follow / Following pill (reels behaviour) */
+.rd-hero2-follow{margin-left:auto;flex:none;padding:8px 20px;border-radius:999px;font-size:13.5px;font-weight:700;cursor:pointer;background:#fff;color:var(--emerald-deep);border:1.5px solid #fff;box-shadow:0 6px 20px -8px rgba(0,0,0,.5);transition:transform .15s ease,background .15s ease,color .15s ease,border-color .15s ease}
+.rd-hero2-follow:hover{transform:translateY(-1px)}
+.rd-hero2-follow:active{transform:translateY(0) scale(.97)}
+.rd-hero2-follow.on{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.55);box-shadow:none}
+.rd-hero2-follow.on:hover{background:rgba(194,69,63,.92);border-color:rgba(194,69,63,.92);color:#fff}
+/* generic "clickable to profile" affordance for contributor/comment names + avatars */
+.lk{cursor:pointer}
+.rail-name.lk:hover b,.cmt-name.lk:hover b,.qna-name.lk:hover b,.qrow-name.lk:hover,.rrow-name.lk:hover{text-decoration:underline;text-underline-offset:2px}
 .rd-facts{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px;font-variant-numeric:tabular-nums}
 .rd-fact{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#fff;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);padding:7px 12px;border-radius:10px;backdrop-filter:blur(6px)}
 .rd-fact .ico{width:14px;height:14px;color:var(--brass-soft)}

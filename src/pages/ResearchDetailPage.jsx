@@ -73,14 +73,18 @@ function PromoVideo({ src, poster, onClose }) {
   React.useEffect(() => {
     const v = ref.current
     if (!v) return
-    // MUTED autoplay is allowed in every browser → the promo ALWAYS plays the
-    // instant it opens. (The earlier "click ▶ → nothing" was Firefox blocking
-    // autoplay WITH sound — the file/URL is fine, served as video/mp4.) We show a
-    // "Tap for sound" pill to unmute.
-    v.muted = true
-    setMutedHint(true)
+    // Default to SOUND ON — the open was a user gesture, so most browsers allow
+    // autoplay-with-sound. If a browser refuses (Firefox), fall back to MUTED
+    // playback (always allowed) so it still plays, with a one-tap "Tap for sound".
+    setMutedHint(false)
+    v.muted = false
     const p = v.play()
-    if (p && p.catch) p.catch(() => { /* extremely rare — native controls remain */ })
+    if (p && p.catch) p.catch(() => {
+      v.muted = true
+      setMutedHint(true)
+      const m = v.play()
+      if (m && m.catch) m.catch(() => { /* fully blocked — native controls remain */ })
+    })
   }, [playSrc])
   React.useEffect(() => () => { if (blobSrc) URL.revokeObjectURL(blobSrc) }, [blobSrc])
 
@@ -153,6 +157,7 @@ export function ResearchDetailPage() {
   const [activeSec, setActiveSec] = React.useState('')
   const [progress, setProgress] = React.useState(0)
   const [showFab, setShowFab] = React.useState(false)
+  const [followed, setFollowed] = React.useState(null)       // author follow state: null = unknown, true/false once socialStatus resolves
 
   const loadComments = React.useCallback(() => {
     api.research.comments(id).then(res => setComments((res?.content || res || []).map(adapters.researchCommentFrom))).catch(() => {})
@@ -174,6 +179,16 @@ export function ResearchDetailPage() {
     api.research.sources(id).then(s => { if (alive && s?.length) setSources(s) }).catch(() => {})
     return () => { alive = false }
   }, [id, loadResearch, loadComments])
+
+  // Follow state for the research author — hydrate once from socialStatus (skip
+  // our own work and anonymous viewers). Mirrors the reels follow model.
+  React.useEffect(() => {
+    const aid = r?.author
+    if (!aid || !meId || String(aid) === String(meId)) return
+    let alive = true
+    api.users.socialStatus(aid).then(s => { if (alive) setFollowed(!!s.isFollowing) }).catch(() => {})
+    return () => { alive = false }
+  }, [r?.author, meId])
 
   // SSE delta model (REALTIME_FRONTEND_GUIDE §4): events carry NO counter values —
   // apply +1/-1 locally by type. Own actions are skipped (actorId === me) because the
@@ -269,6 +284,15 @@ export function ResearchDetailPage() {
   }
 
   const isAuthor = !!(meId && r && r.author === meId)
+  // Follow / unfollow the author — optimistic toggle, rolls back on failure (reels model).
+  const toggleFollow = () => {
+    const aid = r?.author
+    if (!aid) return
+    const now = !followed
+    setFollowed(now)
+    ;(now ? api.users.follow(aid) : api.users.unfollow(aid)).catch(() => setFollowed(!now))
+  }
+  const goAuthor = () => { if (r?.author) navigate(`/u/${r.author}`) }
   // lifecycle endpoints (§6.3-6.7) return the updated ResearchResponse → patch
   // the header (status pill, minted ircId) in place; keep live SSE counters.
   const lifecycle = (fn, label) => fn(id).then(updated => {
@@ -443,11 +467,20 @@ export function ResearchDetailPage() {
             <span className="rd-eyebrow">Research</span>
             <h1 className="rd-hero2-title">{r.title}</h1>
             <div className="rd-hero2-by">
-              <Avatar initials={u.initials} color={u.avc} size={46} src={u.profileImage}/>
-              <div>
+              <span className="rd-hero2-ava" role="button" tabIndex={0} title={`View @${u.handle}`}
+                onClick={goAuthor} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goAuthor() } }}>
+                <Avatar initials={u.initials} color={u.avc} size={46} src={u.profileImage}/>
+              </span>
+              <div className="rd-hero2-who" role="button" tabIndex={0} title={`View @${u.handle}`}
+                onClick={goAuthor} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goAuthor() } }}>
                 <div className="nm">{u.full}{u.verified && <Verify scholar/>}</div>
                 <div className="tm">@{u.handle} · {r.time}</div>
               </div>
+              {!isAuthor && followed !== null && (
+                <button className={'rd-hero2-follow' + (followed ? ' on' : '')} onClick={toggleFollow}>
+                  {followed ? 'Following' : 'Follow'}
+                </button>
+              )}
             </div>
             <div className="rd-facts">
               <span className="rd-fact"><Icon name="cite" className="xs"/><b>{fmt(r.metrics.citations)}</b> cited</span>
@@ -549,11 +582,13 @@ export function ResearchDetailPage() {
                 <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="users" className="sm"/></span><h2>Contributors</h2><span className="rd-sec-n">{r.contributors.length}</span></div>
                 {r.contributors.map((c, i) => {
                   const cu = c._user || authorOf(c)
+                  const cid = cu.id || c.userId
+                  const goCu = () => cid && navigate(`/u/${cid}`)
                   return (
                     <div key={i} className="rd-contrib">
-                      <Avatar initials={cu.initials} color={cu.avc} size={42} src={cu.profileImage}/>
+                      <span className={cid ? 'lk' : ''} role={cid ? 'button' : undefined} onClick={goCu}><Avatar initials={cu.initials} color={cu.avc} size={42} src={cu.profileImage}/></span>
                       <div style={{flex:1}}>
-                        <div className="rail-name"><b>{cu.full}</b> {cu.verified && <Verify scholar/>}</div>
+                        <div className={'rail-name' + (cid ? ' lk' : '')} role={cid ? 'button' : undefined} onClick={goCu}><b>{cu.full}</b> {cu.verified && <Verify scholar/>}</div>
                         <small className="contrib-role">{(c.role||'').replace('_',' ')}</small>
                         <div className="muted text-xs">{c.note}</div>
                       </div>
@@ -591,7 +626,7 @@ export function ResearchDetailPage() {
                 <span role="button" style={{ cursor:'pointer' }} onClick={() => c.author && navigate(`/u/${c.author}`)}><Avatar initials={cu.initials} color={cu.avc} size={32} src={cu.profileImage}/></span>
                 <div className="cmt-col">
                   <div className="cmt-bubble">
-                    <div className="cmt-name"><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}</div>
+                    <div className="cmt-name lk" role="button" onClick={() => c.author && navigate(`/u/${c.author}`)}><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}</div>
                     <p>{linkify(c.body)}</p>
                     {commentMedia(c)}
                   </div>
@@ -618,7 +653,7 @@ export function ResearchDetailPage() {
                         <span role="button" style={{ cursor:'pointer' }} onClick={() => rr.author && navigate(`/u/${rr.author}`)}><Avatar initials={ru.initials} color={ru.avc} size={28} src={ru.profileImage}/></span>
                         <div className="cmt-col">
                           <div className="cmt-bubble">
-                            <div className="cmt-name"><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}</div>
+                            <div className="cmt-name lk" role="button" onClick={() => rr.author && navigate(`/u/${rr.author}`)}><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}</div>
                             <p>{linkify(rr.body)}</p>
                             {commentMedia(rr)}
                           </div>

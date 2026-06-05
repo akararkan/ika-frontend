@@ -139,6 +139,7 @@ export function ResearchPage() {
     const u = authorOf(r)
     const sLower = r.status.toLowerCase()
     const isOwner = tab === 'MINE' && r.author === meId
+    const goAuthor = e => { e.stopPropagation(); if (r.author) navigate(`/u/${r.author}`) }
     return (
       <article key={r.id} className={`r-card rise is-${sLower}`} style={{ animationDelay:`${i*60}ms` }} onClick={() => navigate(`/research/${r.id}`)}>
         <div className="r-cover" style={{ background:r.cover }}>
@@ -152,9 +153,9 @@ export function ResearchPage() {
         </div>
         <div className="r-body">
           <div className="r-top">
-            <Avatar initials={u.initials} color={u.avc} size={30} src={u.profileImage}/>
+            <span className="lk" role="button" onClick={goAuthor}><Avatar initials={u.initials} color={u.avc} size={30} src={u.profileImage}/></span>
             <div>
-              <div className="rail-name"><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
+              <div className="rail-name lk" role="button" onClick={goAuthor}><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
               <small className="muted">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</small>
             </div>
             <span className={'status ' + sLower} style={{marginLeft:'auto'}}>{sLower}</span>
@@ -179,13 +180,14 @@ export function ResearchPage() {
     const u = authorOf(r)
     const sLower = r.status.toLowerCase()
     const isOwner = tab === 'MINE' && r.author === meId
+    const goAuthor = e => { e.stopPropagation(); if (r.author) navigate(`/u/${r.author}`) }
     return (
       <article key={r.id} className={`rrow rise is-${sLower}`} style={{ animationDelay:`${i*35}ms` }} onClick={() => navigate(`/research/${r.id}`)}>
         <div className="rrow-cover" style={{ background:r.cover }}>
           {r.hasVideo && <span className="rrow-play"><Icon name="play"/></span>}
         </div>
         <div className="rrow-mid">
-          <div className="rrow-head"><b className="rrow-name">{u.full}</b>{u.verified && <Verify scholar/>}<span className="rrow-meta">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</span></div>
+          <div className="rrow-head"><b className="rrow-name lk" role="button" onClick={goAuthor}>{u.full}</b>{u.verified && <Verify scholar/>}<span className="rrow-meta">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</span></div>
           <h3 className="rrow-title">{r.title}</h3>
           <p className="rrow-body">{r.abstract}</p>
           {!!r.tags?.length && <div className="qna-tags">{r.tags.map(t => <a key={t}>#{t}</a>)}</div>}

@@ -84,12 +84,13 @@ export function QnaPage() {
   // Full card — used by Feed, Grid and Grouped modes.
   const QCard = (q, i) => {
     const u = authorOf(q)
+    const goAuthor = e => { e.stopPropagation(); if (q.author) navigate(`/u/${q.author}`) }
     return (
       <article key={q.id} className="qna-card rise" style={{ animationDelay:`${i*55}ms` }} onClick={() => navigate(`/qna/${q.id}`)}>
         <header>
-          <Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/>
+          <span className="lk" role="button" onClick={goAuthor}><Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/></span>
           <div>
-            <div className="qna-name"><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
+            <div className="qna-name lk" role="button" onClick={goAuthor}><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
             <div className="qna-sub">@{u.handle} · {q.time}</div>
           </div>
           {badge(q)}
@@ -109,11 +110,12 @@ export function QnaPage() {
   // Dense horizontal row — used by Compact mode.
   const QRow = (q, i) => {
     const u = authorOf(q)
+    const goAuthor = e => { e.stopPropagation(); if (q.author) navigate(`/u/${q.author}`) }
     return (
       <article key={q.id} className="qrow rise" style={{ animationDelay:`${i*35}ms` }} onClick={() => navigate(`/qna/${q.id}`)}>
-        <Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/>
+        <span className="lk" role="button" onClick={goAuthor}><Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/></span>
         <div className="qrow-mid">
-          <div className="qrow-head"><b className="qrow-name">{u.full}</b>{u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}<span className="qrow-meta">@{u.handle} · {q.time}</span></div>
+          <div className="qrow-head"><b className="qrow-name lk" role="button" onClick={goAuthor}>{u.full}</b>{u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}<span className="qrow-meta">@{u.handle} · {q.time}</span></div>
           <h3 className="qrow-title">{q.title}</h3>
           <p className="qrow-body">{q.body}</p>
           {tagPills(q.tags)}
