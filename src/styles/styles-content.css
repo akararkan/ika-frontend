@@ -883,8 +883,10 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 /* ---- masthead hero ---- */
 .rd-hero2{position:relative;border-radius:24px;overflow:hidden;min-height:clamp(320px,40vw,440px);display:flex;flex-direction:column;justify-content:flex-end;box-shadow:var(--shadow-lg);isolation:isolate;margin-bottom:30px;animation:rd-hero-in .8s cubic-bezier(.2,.7,.2,1) both}
 @keyframes rd-hero-in{from{opacity:0;transform:translateY(14px) scale(.995)}to{opacity:1;transform:none}}
-.rd-hero2-pattern{position:absolute;inset:0;z-index:0;opacity:.5;mix-blend-mode:soft-light;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%23FBEFD0' stroke-opacity='0.5' stroke-width='1'%3E%3Crect x='28' y='28' width='36' height='36'/%3E%3Crect x='28' y='28' width='36' height='36' transform='rotate(45 46 46)'/%3E%3C/g%3E%3C/svg%3E")}
-.rd-hero2-scrim{position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(8,20,16,.20) 0%,rgba(8,20,16,0) 30%,rgba(8,20,16,.5) 60%,rgba(8,20,16,.9) 100%)}
+.rd-hero2-pattern{position:absolute;inset:0;z-index:0;opacity:.26;mix-blend-mode:soft-light;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%23FBEFD0' stroke-opacity='0.5' stroke-width='1'%3E%3Crect x='28' y='28' width='36' height='36'/%3E%3Crect x='28' y='28' width='36' height='36' transform='rotate(45 46 46)'/%3E%3C/g%3E%3C/svg%3E")}
+/* lighter top so the cover artwork shows vibrantly; the dark only ramps in low,
+   where the title/byline/facts sit, keeping them legible */
+.rd-hero2-scrim{position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(8,20,16,.06) 0%,rgba(8,20,16,0) 36%,rgba(8,20,16,.42) 62%,rgba(8,20,16,.9) 100%)}
 .rd-hero2-top{position:absolute;top:18px;left:20px;z-index:2;display:flex;gap:9px;flex-wrap:wrap}
 .rd-chip-id{font-size:12px;font-weight:700;letter-spacing:.4px;color:#3a2e0c;background:rgba(255,255,255,.85);padding:6px 11px;border-radius:8px;backdrop-filter:blur(4px)}
 .rd-chip-status{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#fff;padding:6px 12px;border-radius:8px;backdrop-filter:blur(4px)}
