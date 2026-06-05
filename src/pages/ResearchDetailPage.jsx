@@ -64,12 +64,40 @@ const MEDIA_ERR_REASON = {
 function PromoVideo({ src, poster, onClose }) {
   const ref = React.useRef(null)
   const [err, setErr] = React.useState(null)
+  const [blobSrc, setBlobSrc] = React.useState('')
+  const triedBlob = React.useRef(false)
+  const playSrc = blobSrc || src
+
+  React.useEffect(() => { setErr(null); setBlobSrc(''); triedBlob.current = false }, [src])
   React.useEffect(() => {
-    setErr(null)
     const v = ref.current
     const p = v && v.play && v.play()
     if (p && p.catch) p.catch(() => { /* autoplay refused — controls remain */ })
-  }, [src])
+  }, [playSrc])
+  React.useEffect(() => () => { if (blobSrc) URL.revokeObjectURL(blobSrc) }, [blobSrc])
+
+  const onVideoError = async (e) => {
+    const me = e.currentTarget?.error
+    const code = me?.code || 0
+    // One-shot recovery: refetch and replay as a correctly-typed blob. Fixes a
+    // server that sends the mp4 with a wrong Content-Type (octet-stream / HTML)
+    // when it allows cross-origin fetches. Harmless if it can't (→ diagnostic).
+    if (!triedBlob.current && src && /^https?:/i.test(src)) {
+      triedBlob.current = true
+      try {
+        const res = await fetch(src)
+        if (res.ok) {
+          const raw = await res.blob()
+          const typed = raw.type.startsWith('video') ? raw : new Blob([raw], { type: 'video/mp4' })
+          setBlobSrc(URL.createObjectURL(typed))
+          return
+        }
+      } catch { /* CORS / network — fall through to the diagnostic */ }
+    }
+    console.warn('[research] promo video failed', { code, message: me?.message, src })
+    setErr({ code })
+  }
+
   if (err) {
     return (
       <div className="rd-vp-fail">
@@ -82,14 +110,9 @@ function PromoVideo({ src, poster, onClose }) {
     )
   }
   return (
-    <video ref={ref} className="rd-vp-video" src={src} poster={poster || undefined}
+    <video ref={ref} className="rd-vp-video" src={playSrc} poster={poster || undefined}
       controls autoPlay playsInline preload="metadata"
-      onError={(e) => {
-        const me = e.currentTarget?.error
-        console.warn('[research] promo video failed', { code: me?.code, message: me?.message, src })
-        setErr({ code: me?.code || 0 })
-      }}
-      onEnded={onClose}/>
+      onError={onVideoError} onEnded={onClose}/>
   )
 }
 
