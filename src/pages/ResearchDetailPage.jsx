@@ -186,7 +186,7 @@ export function ResearchDetailPage() {
     const aid = r?.author
     if (!aid || !meId || String(aid) === String(meId)) return
     let alive = true
-    api.users.socialStatus(aid).then(s => { if (alive) setFollowed(!!s.isFollowing) }).catch(() => {})
+    api.users.socialStatus(aid).then(s => { if (alive) setFollowed(!!s.isFollowing) }).catch(() => { if (alive) setFollowed(false) })
     return () => { alive = false }
   }, [r?.author, meId])
 

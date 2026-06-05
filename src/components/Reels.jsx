@@ -223,7 +223,9 @@ export function Reels({ onClose, initialId }) {
     else if (dy > 44) step(-1)       // swipe down → previous reel
   }
   const isSelf = !!(reel && user?.id && String(reel.author) === String(user.id))
-  const goAuthor = () => { if (reel?.author) { navigate(`/u/${reel.author}`); onClose?.() } }
+  // Navigating already changes the route away from /reels (so the overlay unmounts) —
+  // do NOT also call onClose(), which is navigate('/') and would race us to the home page.
+  const goAuthor = () => { if (reel?.author) navigate(`/u/${reel.author}`) }
   const followAuthor = () => {
     const id = reel.author, now = !followed[id]
     setFollowed(f => ({ ...f, [id]: now }))
@@ -325,7 +327,7 @@ export function Reels({ onClose, initialId }) {
               <button className={'rvr ' + (reel.liked ? 'on' : '')} onClick={like}>
                 <span><Icon name="heart" className="lg"/></span><small className="font-mono">{fmt(reel.likes)}</small>
               </button>
-              <button className="rvr" onClick={() => { navigate(`/posts/${reel.id}`); onClose?.() }} aria-label="Comments">
+              <button className="rvr" onClick={() => navigate(`/posts/${reel.id}`)} aria-label="Comments">
                 <span><Icon name="comment" className="lg"/></span><small className="font-mono">{fmt(reel.comments)}</small>
               </button>
               <button className={'rvr ' + (reel.saved ? 'sv' : '')} onClick={save}>
