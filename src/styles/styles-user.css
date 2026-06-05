@@ -460,8 +460,20 @@
 
 /* ---- scrollable content ---- */
 .rm-content{flex:1;overflow-y:auto;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;position:relative}
-.rm-inner{padding:22px 34px 8px;max-width:none}        /* full width to the edge */
-.rm-content .cm-saving,.rm-content .cm-save-err{margin:22px 34px}
+/* Comfortable, centred column. The two rich-text editors and the title span the
+   full width (wide content); the short metadata fields are capped narrower below
+   so nothing stretches awkwardly across the page. */
+.rm-inner{padding:24px 36px 10px;max-width:1040px;margin:0 auto}
+.rm-content .cm-saving,.rm-content .cm-save-err{margin:24px auto;max-width:1040px}
+/* metadata fields read as compact next to the full-width editors/title */
+.rm-modal .inp{max-width:700px}
+.rm-modal .rm-title{max-width:none}                    /* headline spans the column */
+.rm-modal .rm-cite{max-width:700px}
+.rm-field > .tag-input{max-width:760px;margin-top:0}   /* keywords + tags chip rows */
+/* match the chip inputs to the other fields (.inp look + focus ring) */
+.rm-modal .tag-input .tag-chips{border-radius:11px;box-shadow:var(--shadow-sm);min-height:46px;padding:7px 9px;transition:border-color .16s ease,box-shadow .16s ease}
+.rm-modal .tag-input .tag-chips:focus-within{border-color:var(--emerald-bright);box-shadow:0 0 0 3px rgba(21,154,118,.12)}
+.rm-sel{max-width:360px}
 
 /* ---- section ---- */
 .rm-sec{padding:16px 0 22px;border-bottom:1px solid var(--line-soft)}

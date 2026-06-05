@@ -277,3 +277,51 @@ export function ViewSeg({ value, onChange }) {
     </div>
   )
 }
+
+/* Lightweight token/chip input for free-text lists (e.g. research keywords).
+   Adds a chip on comma / Enter / paste-with-commas; Backspace on an empty field
+   removes the last. No tag-catalogue autocomplete or normalisation — keywords
+   keep their case. value/onChange are plain string arrays. Reuses the .tag-input
+   chip styling so it matches the Tags field. */
+export function ChipInput({ value = [], onChange, placeholder = 'Type and press Enter', max = 40 }) {
+  const [draft, setDraft] = React.useState('')
+  const add = (raw) => {
+    const v = String(raw || '').trim().replace(/^#+/, '')
+    if (!v || value.length >= max) { setDraft(''); return }
+    if (!value.some(x => x.toLowerCase() === v.toLowerCase())) onChange?.([...value, v])
+    setDraft('')
+  }
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ',') { if (draft.trim()) { e.preventDefault(); add(draft) } }
+    else if (e.key === 'Backspace' && !draft && value.length) onChange?.(value.slice(0, -1))
+  }
+  const onPaste = (e) => {
+    const t = e.clipboardData?.getData('text') || ''
+    if (!/[,\n]/.test(t)) return
+    e.preventDefault()
+    const next = [...value]
+    t.split(/[,\n]+/).map(s => s.trim().replace(/^#+/, '')).filter(Boolean).forEach(v => {
+      if (next.length < max && !next.some(x => x.toLowerCase() === v.toLowerCase())) next.push(v)
+    })
+    onChange?.(next)
+  }
+  return (
+    <div className="tag-input">
+      <div className="tag-chips">
+        {value.map((t, i) => (
+          <span key={i} className="chip on" style={{ paddingRight: 6 }}>
+            {t}
+            <button type="button" onClick={() => onChange?.(value.filter((_, j) => j !== i))} title="Remove"
+              style={{ background:'transparent', border:0, color:'inherit', display:'inline-flex', padding:0, marginLeft:4, cursor:'pointer' }}>
+              <Icon name="close" className="xs"/>
+            </button>
+          </span>
+        ))}
+        <input className="field" style={{ flex:1, minWidth:140, border:0, padding:'6px 8px', background:'transparent' }}
+          value={draft} placeholder={value.length ? '' : placeholder}
+          onChange={e => setDraft(e.target.value)} onKeyDown={onKey} onPaste={onPaste}
+          onBlur={() => { if (draft.trim()) add(draft) }}/>
+      </div>
+    </div>
+  )
+}

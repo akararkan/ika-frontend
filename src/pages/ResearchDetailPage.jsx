@@ -65,14 +65,27 @@ function PromoVideo({ src, poster, onClose }) {
   const ref = React.useRef(null)
   const [err, setErr] = React.useState(null)
   const [blobSrc, setBlobSrc] = React.useState('')
+  const [mutedHint, setMutedHint] = React.useState(false)
   const triedBlob = React.useRef(false)
   const playSrc = blobSrc || src
 
   React.useEffect(() => { setErr(null); setBlobSrc(''); triedBlob.current = false }, [src])
   React.useEffect(() => {
     const v = ref.current
-    const p = v && v.play && v.play()
-    if (p && p.catch) p.catch(() => { /* autoplay refused — controls remain */ })
+    if (!v) return
+    // Try to start with sound; if the browser refuses autoplay-with-sound
+    // (Firefox does), fall back to MUTED playback (always allowed) so the video
+    // VISIBLY plays, and offer a one-tap unmute. This is why "click ▶ → nothing"
+    // happened: the gesture-detached play() was being blocked, not failing.
+    setMutedHint(false)
+    v.muted = false
+    const go = v.play()
+    if (go && go.catch) go.catch(() => {
+      v.muted = true
+      setMutedHint(true)
+      const m = v.play()
+      if (m && m.catch) m.catch(() => { /* fully blocked — native controls remain */ })
+    })
   }, [playSrc])
   React.useEffect(() => () => { if (blobSrc) URL.revokeObjectURL(blobSrc) }, [blobSrc])
 
@@ -110,9 +123,16 @@ function PromoVideo({ src, poster, onClose }) {
     )
   }
   return (
-    <video ref={ref} className="rd-vp-video" src={playSrc} poster={poster || undefined}
-      controls autoPlay playsInline preload="metadata"
-      onError={onVideoError} onEnded={onClose}/>
+    <>
+      <video ref={ref} className="rd-vp-video" src={playSrc} poster={poster || undefined}
+        controls playsInline preload="metadata"
+        onError={onVideoError} onEnded={onClose}/>
+      {mutedHint && (
+        <button className="rd-vp-unmute" onClick={() => { const v = ref.current; if (v) { v.muted = false; v.play?.() } setMutedHint(false) }}>
+          <Icon name="volume" className="xs"/>Tap for sound
+        </button>
+      )}
+    </>
   )
 }
 
@@ -363,8 +383,8 @@ export function ResearchDetailPage() {
 
   // Table of contents — only the sections that actually render, in reading order.
   const toc = [
-    { id:'rd-abstract', label:'Abstract', icon:'doc' },
     hasDesc                && { id:'rd-description',  label:'Description',  icon:'book' },
+    { id:'rd-abstract', label:'Abstract', icon:'doc' },
     images.length          && { id:'rd-figures',      label:'Figures',      icon:'image', n:images.length },
     videos.length          && { id:'rd-videomat',     label:'Video',        icon:'video', n:videos.length },
     audios.length          && { id:'rd-audiomat',     label:'Audio',        icon:'audio', n:audios.length },
@@ -455,16 +475,16 @@ export function ResearchDetailPage() {
           </nav>
 
           <main className="rd-main">
-            <section className="card rd-card2 reveal" id="rd-abstract" data-sec="rd-abstract">
-              <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="doc" className="sm"/></span><h2>Abstract</h2></div>
-              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
-            </section>
             {hasDesc && (
               <section className="card rd-card2 reveal" id="rd-description" data-sec="rd-description">
                 <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="book" className="sm"/></span><h2>Description</h2></div>
                 <RichText html={r.descriptionHtml} source={r.description} format={r.bodyFormat} className="rd-text"/>
               </section>
             )}
+            <section className="card rd-card2 reveal" id="rd-abstract" data-sec="rd-abstract">
+              <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="doc" className="sm"/></span><h2>Abstract</h2></div>
+              <RichText html={r.abstractHtml} source={r.abstractSource} format={r.bodyFormat} className="rd-abstract"/>
+            </section>
             {!!images.length && (
               <section className="card rd-card2 reveal" id="rd-figures" data-sec="rd-figures">
                 <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="image" className="sm"/></span><h2>Figures</h2><span className="rd-sec-n">{images.length}</span></div>

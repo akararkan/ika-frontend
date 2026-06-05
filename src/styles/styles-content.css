@@ -977,6 +977,13 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(21,154,118,.3
 .rd-vp-close{position:absolute;top:18px;right:18px;z-index:4;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(12px);color:#fff;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 18px -6px rgba(0,0,0,.6);transition:transform .18s ease,background .18s ease;animation:rd-stage-in .4s .14s cubic-bezier(.2,.8,.3,1) both}
 .rd-vp-close:hover{background:rgba(0,0,0,.78);transform:scale(1.08)}
 .rd-vp-close:active{transform:scale(.96)}
+/* shown only when autoplay had to fall back to muted — one tap restores sound */
+.rd-vp-unmute{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);z-index:4;display:inline-flex;align-items:center;gap:7px;
+  padding:9px 15px;border-radius:999px;font-weight:600;font-size:13px;color:#0b1a16;
+  background:var(--brass-soft);box-shadow:0 8px 20px -6px rgba(0,0,0,.5);
+  animation:rd-stage-in .4s .2s cubic-bezier(.2,.8,.3,1) both}
+.rd-vp-unmute:hover{filter:brightness(1.05)}
+.rd-vp-unmute .ico{width:15px;height:15px}
 
 /* ---- responsive ---- */
 @media(max-width:1080px){

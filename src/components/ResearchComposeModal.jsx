@@ -21,7 +21,7 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Icon, Avatar, Verify, showToast } from './ui.jsx'
+import { Icon, Avatar, Verify, showToast, ChipInput } from './ui.jsx'
 import { AddSourceForm, SOURCE_LABEL } from './SourceForm.jsx'
 import { RichTextEditor } from './RichTextEditor.jsx'
 import { TagInput } from './TagInput.jsx'
@@ -628,8 +628,19 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
               </RmSection>
 
               <RmSection id="discovery" icon="hash" title="Discovery" tag="how readers find it" innerRef={el => (secRefs.current.discovery = el)}>
+                <div className="rm-field">
+                  <label className="rm-lbl">Keywords <span className="rm-lbl-h">comma or Enter to add</span></label>
+                  <ChipInput value={keywords ? keywords.split(',').map(s => s.trim()).filter(Boolean) : []}
+                    onChange={arr => setKeywords(arr.join(', '))}
+                    placeholder="Add a keyword (e.g. methodology) — comma or Enter"/>
+                  <p className="rm-micro">Free-text terms that boost search — separate from tags.</p>
+                </div>
+                <div className="rm-field">
+                  <label className="rm-lbl">Tags <span className="rm-lbl-h">{tags.length}/30 · comma or Enter to add</span></label>
+                  <TagInput value={tags} onChange={setTags} scope="RESEARCH" placeholder="Add a tag (e.g. methodology) — comma or Enter"/>
+                  <p className="rm-micro">Tags surface in trending only after you publish.</p>
+                </div>
                 <div className="rm-grid2">
-                  <div className="rm-field"><label className="rm-lbl">Keywords</label><input className="inp" placeholder="X, Y, methodology" value={keywords} onChange={e => setKeywords(e.target.value)}/></div>
                   <div className="rm-field"><label className="rm-lbl">Visibility</label>
                     <div className="rm-sel">
                       <span className="rm-sel-ic"><Icon name={visibility === 'PUBLIC' ? 'globe' : visibility === 'PRIVATE' ? 'lock' : 'users'} className="xs"/></span>
@@ -637,13 +648,8 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
                       <span className="rm-sel-cv"><Icon name="chevdown" className="xs"/></span>
                     </div>
                   </div>
+                  <div className="rm-field"><label className="rm-lbl">Suggested citation</label><input className="inp rm-cite" placeholder="Al-Qaradawi, Y. (2026). …" value={citation} onChange={e => setCitation(e.target.value)}/></div>
                 </div>
-                <div className="rm-field">
-                  <label className="rm-lbl">Tags <span className="rm-lbl-h">{tags.length}/30 · Enter to add</span></label>
-                  <TagInput value={tags} onChange={setTags} scope="RESEARCH" placeholder="Add tag (e.g. methodology), Enter to add"/>
-                  <p className="rm-micro">Tags surface in trending only after you publish.</p>
-                </div>
-                <div className="rm-field"><label className="rm-lbl">Suggested citation</label><input className="inp rm-cite" placeholder="Al-Qaradawi, Y. (2026). …" value={citation} onChange={e => setCitation(e.target.value)}/></div>
               </RmSection>
 
               <RmSection id="media" icon="image" title="Media" tag="shown on research cards" innerRef={el => (secRefs.current.media = el)}>
