@@ -630,7 +630,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
               <RmSection id="discovery" icon="hash" title="Discovery" tag="how readers find it" innerRef={el => (secRefs.current.discovery = el)}>
                 <div className="rm-field">
                   <label className="rm-lbl">Keywords <span className="rm-lbl-h">comma or Enter to add</span></label>
-                  <ChipInput value={keywords ? keywords.split(',').map(s => s.trim()).filter(Boolean) : []}
+                  <ChipInput value={keywords ? keywords.split(/[,،؛\n]+/).map(s => s.trim()).filter(Boolean) : []}
                     onChange={arr => setKeywords(arr.join(', '))}
                     placeholder="Add a keyword (e.g. methodology) — comma or Enter"/>
                   <p className="rm-micro">Free-text terms that boost search — separate from tags.</p>

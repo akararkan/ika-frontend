@@ -283,27 +283,32 @@ export function ViewSeg({ value, onChange }) {
    removes the last. No tag-catalogue autocomplete or normalisation — keywords
    keep their case. value/onChange are plain string arrays. Reuses the .tag-input
    chip styling so it matches the Tags field. */
+const CHIP_SEP = /[,،؛\n]+/   // ASCII "," + Arabic comma «،» + Arabic semicolon «؛» + newline
 export function ChipInput({ value = [], onChange, placeholder = 'Type and press Enter', max = 40 }) {
   const [draft, setDraft] = React.useState('')
+  // add() SPLITS on the separator set, so a multi-term blob (typed, pasted, or left
+  // in the field on blur) becomes independent chips — including Arabic/Kurdish input
+  // that uses the Arabic comma «،» (U+060C) or semicolon «؛» (U+061B), not ASCII ",".
   const add = (raw) => {
-    const v = String(raw || '').trim().replace(/^#+/, '')
-    if (!v || value.length >= max) { setDraft(''); return }
-    if (!value.some(x => x.toLowerCase() === v.toLowerCase())) onChange?.([...value, v])
+    const parts = String(raw || '').split(CHIP_SEP).map(s => s.trim().replace(/^#+/, '')).filter(Boolean)
+    if (!parts.length) { setDraft(''); return }
+    const next = [...value]
+    for (const v of parts) {
+      if (next.length >= max) break
+      if (!next.some(x => x.toLowerCase() === v.toLowerCase())) next.push(v)
+    }
+    onChange?.(next)
     setDraft('')
   }
   const onKey = (e) => {
-    if (e.key === 'Enter' || e.key === ',') { if (draft.trim()) { e.preventDefault(); add(draft) } }
+    if (e.key === 'Enter' || e.key === ',' || e.key === '،' || e.key === '؛') { if (draft.trim()) { e.preventDefault(); add(draft) } }
     else if (e.key === 'Backspace' && !draft && value.length) onChange?.(value.slice(0, -1))
   }
   const onPaste = (e) => {
     const t = e.clipboardData?.getData('text') || ''
-    if (!/[,\n]/.test(t)) return
+    if (!CHIP_SEP.test(t)) return
     e.preventDefault()
-    const next = [...value]
-    t.split(/[,\n]+/).map(s => s.trim().replace(/^#+/, '')).filter(Boolean).forEach(v => {
-      if (next.length < max && !next.some(x => x.toLowerCase() === v.toLowerCase())) next.push(v)
-    })
-    onChange?.(next)
+    add(t)
   }
   return (
     <div className="tag-input">

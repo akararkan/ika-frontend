@@ -18,6 +18,9 @@ import { api } from '../api/index.js'
 import { normalizeTag, normalizeTags } from '../api/tags.js'
 
 const MAX_TAGS = 30
+// ASCII "," + Arabic comma «،» (U+060C) + Arabic semicolon «؛» (U+061B) + newline all
+// split tags, so comma-separated Arabic/Kurdish input becomes independent tags.
+const TAG_SEP = /[,،؛\n]+/
 
 export function TagInput({ value = [], onChange, scope = 'ALL', placeholder = 'Add tag, then Enter' }) {
   const [draft, setDraft] = React.useState('')
@@ -49,16 +52,18 @@ export function TagInput({ value = [], onChange, scope = 'ALL', placeholder = 'A
     return () => { alive = false; clearTimeout(t) }
   }, [draftN, focused, scope, tagsSet])
 
+  // commit() SPLITS on the separator set so a multi-term blob (typed/pasted/blur)
+  // becomes independent tags — incl. Arabic comma «،» / semicolon «؛», not just ASCII ",".
   const commit = (raw) => {
-    const t = normalizeTag(raw)
-    if (!t || tagsSet.has(t) || !canAddMore) { setDraft(''); return }
-    onChange?.(normalizeTags([...tags, t]))
+    const incoming = String(raw || '').split(TAG_SEP).map(normalizeTag).filter(Boolean)
+    if (!incoming.length) { setDraft(''); return }
+    onChange?.(normalizeTags([...tags, ...incoming]).slice(0, MAX_TAGS))
     setDraft('')
   }
   const remove = (t) => onChange?.(tags.filter(x => x !== t))
 
   const onKey = (e) => {
-    if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab' || e.key === '،' || e.key === '؛') {
       if (draft.trim()) { e.preventDefault(); commit(draft) }
     } else if (e.key === 'Backspace' && !draft && tags.length) {
       e.preventDefault(); remove(tags[tags.length - 1])
@@ -66,10 +71,9 @@ export function TagInput({ value = [], onChange, scope = 'ALL', placeholder = 'A
   }
   const onPaste = (e) => {
     const text = e.clipboardData?.getData('text') || ''
-    if (text.includes(',')) {
+    if (TAG_SEP.test(text)) {
       e.preventDefault()
-      const incoming = text.split(/[,\n]+/).map(normalizeTag).filter(Boolean)
-      onChange?.(normalizeTags([...tags, ...incoming]))
+      commit(text)
     }
   }
 
