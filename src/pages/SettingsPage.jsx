@@ -10,13 +10,26 @@ import { EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
+/* Platform enums (USER_API §5.3-5.4) + a label helper shared by the link/contact editors. */
+const LINK_PLATFORMS = ['PERSONAL_WEBSITE','TWITTER','GITHUB','LINKEDIN','ORCID','GOOGLE_SCHOLAR','RESEARCHGATE','YOUTUBE','FACEBOOK','INSTAGRAM','TELEGRAM','OTHER']
+const CONTACT_PLATFORMS = ['EMAIL','TELEGRAM','WHATSAPP','PHONE','VIBER','SIGNAL','SKYPE','OTHER']
+const LANGUAGES = [['EN','English'],['AR','العربية'],['KU','کوردی']]
+const platformLabel = (p) => !p ? 'Link' : String(p).toLowerCase().split('_').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+
 function ProfilePanel({ me }) {
   const { refreshUser } = useAuth()
   const [full, setFull] = React.useState(me.full || '')
   const [handle, setHandle] = React.useState(me.handle || '')
+  const [tagline, setTagline] = React.useState(me.selfDescriber || '')
   const [bio, setBio] = React.useState(me.bio || '')
-  const [field, setField] = React.useState(me.field || '')
+  const [field, setField] = React.useState(me.academicTitle || me.field || '')
+  const [institution, setInstitution] = React.useState(me.institution || '')
   const [location, setLocation] = React.useState(me.location || '')
+  const [website, setWebsite] = React.useState(me.website || '')
+  const [orcid, setOrcid] = React.useState(me.orcid || '')
+  const [lang, setLang] = React.useState(me.contentLanguage || 'EN')
+  const [forHire, setForHire] = React.useState(!!me.isForHire)
+  const [priv, setPriv] = React.useState(!!me.profileLocked)
   const [busy, setBusy] = React.useState(false)
   const avatarRef = React.useRef(null); const coverRef = React.useRef(null)
 
@@ -29,8 +42,18 @@ function ProfilePanel({ me }) {
       const parts = full.trim().split(/\s+/)
       const fname = parts[0] || '', lname = parts.slice(1).join(' ') || parts[0] || ''
       const uname = handle.replace(/^@/, '').split('@')[0].trim()   // username is never an email (§8.1 charset)
-      await api.users.updateIdentity({ fname, lname, ...(uname && uname !== me.handle ? { username: uname } : {}) })   // §9.5
-      await api.users.updateProfile({ displayName: full.trim(), profileBio: bio, academicTitle: field, location })    // §10.3
+      await api.users.updateIdentity({                                                               // §9.5 — User-side identity
+        fname, lname,
+        ...(uname && uname !== me.handle ? { username: uname } : {}),
+        orcidId: orcid.trim(),
+        preferredLanguage: lang,
+      })
+      await api.users.updateProfile({                                                                // §10.3 — UserProfile-side
+        displayName: full.trim(), profileBio: bio, selfDescriber: tagline,
+        academicTitle: field, institutionName: institution, location,
+        websiteUrl: website.trim(), contentLanguage: lang,
+        isForHire: forHire, isProfileLocked: priv,
+      })
       await refreshUser()
       showToast('Profile saved')
     } catch (e) {
@@ -54,13 +77,110 @@ function ProfilePanel({ me }) {
       <div className="set-grid">
         <div><label className="field-label">Full name</label><input className="field" value={full} onChange={e => setFull(e.target.value)}/></div>
         <div><label className="field-label">Handle</label><input className="field" value={'@'+handle.replace(/^@/, '')} onChange={e => setHandle(e.target.value)}/></div>
+        <div style={{gridColumn:'1/-1'}}><label className="field-label">Tagline</label><input className="field" value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Scholar · Author · Researcher"/></div>
         <div style={{gridColumn:'1/-1'}}><label className="field-label">Bio</label><textarea className="field" value={bio} onChange={e => setBio(e.target.value)}/></div>
-        <div><label className="field-label">Field of study</label><input className="field" value={field} onChange={e => setField(e.target.value)}/></div>
+        <div><label className="field-label">Academic title</label><input className="field" value={field} onChange={e => setField(e.target.value)} placeholder="e.g. Professor of Fiqh"/></div>
+        <div><label className="field-label">Institution</label><input className="field" value={institution} onChange={e => setInstitution(e.target.value)} placeholder="e.g. Salahaddin University"/></div>
         <div><label className="field-label">Location</label><input className="field" placeholder="City, Country" value={location} onChange={e => setLocation(e.target.value)}/></div>
+        <div><label className="field-label">Content language</label><select className="field" value={lang} onChange={e => setLang(e.target.value)}>{LANGUAGES.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+        <div><label className="field-label">Website</label><input className="field" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://…"/></div>
+        <div><label className="field-label">ORCID iD</label><input className="field" value={orcid} onChange={e => setOrcid(e.target.value)} placeholder="0000-0002-1825-0097"/></div>
+      </div>
+      <div className="set-toggle" style={{ marginTop:14 }}>
+        <div><b>Available for hire</b><small className="muted">Show an “Available for hire” badge on your profile.</small></div>
+        <button className={'sw ' + (forHire ? 'on' : '')} onClick={() => setForHire(v => !v)}/>
+      </div>
+      <div className="set-toggle">
+        <div><b>Private profile</b><small className="muted">Only followers can see your posts and research.</small></div>
+        <button className={'sw ' + (priv ? 'on' : '')} onClick={() => setPriv(v => !v)}/>
       </div>
       <div className="set-actions">
         <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
       </div>
+    </div>
+  )
+}
+
+/* External links manager — POST/DELETE /users/me/links (§9.7-9.9). */
+function LinksPanel({ me }) {
+  const { refreshUser } = useAuth()
+  const [links, setLinks] = React.useState(() => me.links || [])
+  const [platform, setPlatform] = React.useState('PERSONAL_WEBSITE')
+  const [url, setUrl] = React.useState('')
+  const [desc, setDesc] = React.useState('')
+  React.useEffect(() => { if (me.id && me.id !== 'me') api.users.profile(me.id).then(u => setLinks(u.links || [])).catch(() => {}) }, [me.id])
+  const add = () => {
+    const u = url.trim(); if (!u) return
+    const label = desc.trim() || platformLabel(platform)
+    api.users.addLink({ platform, url: u, description: label, isPublic: true, displayOrder: links.length })
+      .then(l => { setLinks(ls => [...ls, { id: l?.id || u, platform, url: u, label }]); setUrl(''); setDesc(''); showToast('Link added'); refreshUser?.() })
+      .catch(() => showToast('Could not add link'))
+  }
+  const remove = (id) => { setLinks(ls => ls.filter(l => l.id !== id)); api.users.removeLink(id).then(() => refreshUser?.()).catch(() => {}); showToast('Link removed') }
+  return (
+    <div className="card card-pad">
+      <h3 className="title"><Icon name="link" className="sm"/>Links</h3>
+      <p className="muted text-sm" style={{marginBottom:14}}>External profiles — ORCID, GitHub, your site. Shown publicly on your profile.</p>
+      {links.length > 0 && (
+        <div className="rail-list" style={{ marginBottom:12 }}>
+          {links.map(l => (
+            <div key={l.id} className="rail-row">
+              <span className="pa-ic"><Icon name="link" className="xs"/></span>
+              <div className="rail-info"><div className="rail-name"><b>{l.label || platformLabel(l.platform)}</b></div><div className="rail-sub">{(l.url || '').replace(/^https?:\/\//, '')}</div></div>
+              <button className="btn btn-secondary btn-sm" onClick={() => remove(l.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="set-grid">
+        <div><label className="field-label">Platform</label><select className="field" value={platform} onChange={e => setPlatform(e.target.value)}>{LINK_PLATFORMS.map(p => <option key={p} value={p}>{platformLabel(p)}</option>)}</select></div>
+        <div><label className="field-label">Label (optional)</label><input className="field" value={desc} onChange={e => setDesc(e.target.value)} placeholder="e.g. My research profile"/></div>
+        <div style={{gridColumn:'1/-1'}}><label className="field-label">URL</label><input className="field" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" onKeyDown={e => { if (e.key==='Enter') add() }}/></div>
+      </div>
+      <div className="set-actions"><button className="btn btn-primary btn-sm" disabled={!url.trim()} onClick={add}><Icon name="follow" className="xs"/>Add link</button></div>
+    </div>
+  )
+}
+
+/* Contact handles manager — POST/DELETE /users/me/contacts (§9.10-9.12). Default-private. */
+function ContactsPanel({ me }) {
+  const { refreshUser } = useAuth()
+  const [contacts, setContacts] = React.useState(() => me.contacts || [])
+  const [platform, setPlatform] = React.useState('EMAIL')
+  const [value, setValue] = React.useState('')
+  const [pub, setPub] = React.useState(false)
+  React.useEffect(() => { if (me.id && me.id !== 'me') api.users.profile(me.id).then(u => setContacts(u.contacts || [])).catch(() => {}) }, [me.id])
+  const add = () => {
+    const v = value.trim(); if (!v) return
+    api.users.addContact({ platform, value: v, isPublic: pub })
+      .then(c => { setContacts(cs => [...cs, { id: c?.id || v, platform, label: platformLabel(platform), value: v }]); setValue(''); showToast('Contact added'); refreshUser?.() })
+      .catch(() => showToast('Could not add contact'))
+  }
+  const remove = (id) => { setContacts(cs => cs.filter(c => c.id !== id)); api.users.removeContact(id).then(() => refreshUser?.()).catch(() => {}); showToast('Contact removed') }
+  return (
+    <div className="card card-pad">
+      <h3 className="title"><Icon name="at" className="sm"/>Contacts</h3>
+      <p className="muted text-sm" style={{marginBottom:14}}>Direct-message handles. <b>Private by default</b> — toggle public to show one on your profile.</p>
+      {contacts.length > 0 && (
+        <div className="rail-list" style={{ marginBottom:12 }}>
+          {contacts.map(c => (
+            <div key={c.id} className="rail-row">
+              <span className="pa-ic"><Icon name="at" className="xs"/></span>
+              <div className="rail-info"><div className="rail-name"><b>{c.label || platformLabel(c.platform)}</b></div><div className="rail-sub">{c.value}</div></div>
+              <button className="btn btn-secondary btn-sm" onClick={() => remove(c.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="set-grid">
+        <div><label className="field-label">Platform</label><select className="field" value={platform} onChange={e => setPlatform(e.target.value)}>{CONTACT_PLATFORMS.map(p => <option key={p} value={p}>{platformLabel(p)}</option>)}</select></div>
+        <div><label className="field-label">Handle / address</label><input className="field" value={value} onChange={e => setValue(e.target.value)} placeholder="@handle or address" onKeyDown={e => { if (e.key==='Enter') add() }}/></div>
+      </div>
+      <div className="set-toggle" style={{ marginTop:4 }}>
+        <div><b>Show publicly</b><small className="muted">Off keeps this visible only to you.</small></div>
+        <button className={'sw ' + (pub ? 'on' : '')} onClick={() => setPub(v => !v)}/>
+      </div>
+      <div className="set-actions"><button className="btn btn-primary btn-sm" disabled={!value.trim()} onClick={add}><Icon name="follow" className="xs"/>Add contact</button></div>
     </div>
   )
 }
@@ -247,7 +367,13 @@ export function SettingsPage() {
           </aside>
 
           <div>
-            {tab==='PROFILE' && <ProfilePanel me={me}/>}
+            {tab==='PROFILE' && (
+              <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                <ProfilePanel me={me}/>
+                <LinksPanel me={me}/>
+                <ContactsPanel me={me}/>
+              </div>
+            )}
             {tab==='CLOSE_FRIENDS' && <CloseFriendsPanel/>}
             {tab==='NOTIFICATIONS' && <EmailPrefsPanel/>}
             {tab==='BLOCKED' && <BlockedPanel/>}
