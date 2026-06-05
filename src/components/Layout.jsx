@@ -5,7 +5,7 @@
 import React from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { Icon, Avatar, BrandMark } from './ui.jsx'
-import { ToastHost } from './states.jsx'
+import { ToastHost, Loader } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
 import { ShareHost } from './ShareSheet.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
@@ -177,7 +177,10 @@ export function Layout() {
       </aside>
 
       <main style={{ minWidth:0 }}>
-        <Outlet/>
+        {/* lazy page chunks resolve here → the shell stays, only content shows the loader */}
+        <React.Suspense fallback={<div className="main center"><div className="col-main"><Loader label="Loading…"/></div></div>}>
+          <Outlet/>
+        </React.Suspense>
       </main>
 
       <nav className="botnav">
