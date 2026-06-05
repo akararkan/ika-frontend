@@ -617,12 +617,12 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
                 </div>
                 <div className="rm-field">
                   <label className="rm-lbl">Description <span className="rm-lbl-h">the full write-up kept on the published page</span></label>
-                  <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={280} showFormat={false}
+                  <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={200} showFormat={false}
                     placeholder="Write your research — headings, lists, tables, images, colours, highlights…"/>
                 </div>
                 <div className="rm-field">
                   <label className="rm-lbl">Abstract <span className="rm-lbl-h">select any text to format</span></label>
-                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={150} showFormat={false}
+                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={360} showFormat={false}
                     placeholder="A concise abstract of the work — select any text and use the toolbar to format it."/>
                 </div>
               </RmSection>

@@ -73,19 +73,14 @@ function PromoVideo({ src, poster, onClose }) {
   React.useEffect(() => {
     const v = ref.current
     if (!v) return
-    // Try to start with sound; if the browser refuses autoplay-with-sound
-    // (Firefox does), fall back to MUTED playback (always allowed) so the video
-    // VISIBLY plays, and offer a one-tap unmute. This is why "click ▶ → nothing"
-    // happened: the gesture-detached play() was being blocked, not failing.
-    setMutedHint(false)
-    v.muted = false
-    const go = v.play()
-    if (go && go.catch) go.catch(() => {
-      v.muted = true
-      setMutedHint(true)
-      const m = v.play()
-      if (m && m.catch) m.catch(() => { /* fully blocked — native controls remain */ })
-    })
+    // MUTED autoplay is allowed in every browser → the promo ALWAYS plays the
+    // instant it opens. (The earlier "click ▶ → nothing" was Firefox blocking
+    // autoplay WITH sound — the file/URL is fine, served as video/mp4.) We show a
+    // "Tap for sound" pill to unmute.
+    v.muted = true
+    setMutedHint(true)
+    const p = v.play()
+    if (p && p.catch) p.catch(() => { /* extremely rare — native controls remain */ })
   }, [playSrc])
   React.useEffect(() => () => { if (blobSrc) URL.revokeObjectURL(blobSrc) }, [blobSrc])
 
