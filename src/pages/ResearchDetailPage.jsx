@@ -440,7 +440,7 @@ export function ResearchDetailPage() {
           </div>
           {r.hasVideo && <button className="rd-hero2-play" onClick={() => setShowVideo(true)} aria-label="Play promo video"><Icon name="play"/></button>}
           <div className="rd-hero2-content">
-            <span className="rd-eyebrow">{r.tags?.[0] || 'Research'}</span>
+            <span className="rd-eyebrow">Research</span>
             <h1 className="rd-hero2-title">{r.title}</h1>
             <div className="rd-hero2-by">
               <Avatar initials={u.initials} color={u.avc} size={46} src={u.profileImage}/>
