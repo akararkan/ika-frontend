@@ -1,5 +1,11 @@
 /* =========================================================
    Research composer — full RESEARCH_API coverage.
+   MIDAD studio layout: a full-page, 3-column manuscript desk —
+   left "Contents" rail (scroll-spy + completion ticks), a center
+   canvas that reads like the published masthead (cover hero ·
+   title · abstract · manuscript · contributors · sources · files),
+   and a right "Publication" rail (visibility · schedule ·
+   permissions · citation · keywords · tags).
 
    CREATE (§6.1): one multipart POST sends the whole
    CreateResearchRequest (title, description, abstractText,
@@ -40,7 +46,11 @@ function toRichHtml(source, fmt) {
   return renderPlain(source)
 }
 
-const VIS = [['PUBLIC', 'Public'], ['FOLLOWERS_ONLY', 'Followers'], ['PRIVATE', 'Private']]   // ResearchVisibility
+const VIS = [                                                                                  // ResearchVisibility
+  ['PUBLIC', 'Public', 'globe'],
+  ['FOLLOWERS_ONLY', 'Followers', 'users'],
+  ['PRIVATE', 'Private', 'lock'],
+]
 const CONTRIB_ROLES = [                                                                        // ContributorRole (§4)
   ['CO_AUTHOR', 'Co-author'], ['ADVISOR', 'Advisor'], ['REVIEWER', 'Reviewer'],
   ['TRANSLATOR', 'Translator'], ['EDITOR', 'Editor'], ['CONTRIBUTOR', 'Contributor'],
@@ -67,38 +77,38 @@ function useObjectUrl(file) {
   return url
 }
 
-function Toggle({ title, desc, on, onChange, disabled }) {
+/* Right-rail toggle switch (comments / downloads). */
+function RailSwitch({ on, onChange }) {
   return (
-    <div className="set-toggle" style={disabled ? { opacity:.5 } : undefined}>
-      <div><b>{title}</b>{desc && <small className="muted">{desc}</small>}</div>
-      <button className={'sw ' + (on ? 'on' : '')} disabled={disabled} onClick={() => !disabled && onChange(!on)}/>
-    </div>
+    <button type="button" className={'rm-switch' + (on ? ' on' : '')} onClick={() => onChange(!on)} aria-pressed={on}>
+      <span className="rm-switch-knob"/>
+    </button>
   )
 }
 
-/* Left-rail sections + scroll-spy targets. icon = project Icon name. */
+/* Left-rail "Contents" sections + scroll-spy targets. */
 const RM_SECTIONS = [
-  { id:'essentials',   icon:'doc',       label:'Essentials',      hint:'Title · abstract · description' },
-  { id:'discovery',    icon:'hash',      label:'Discovery',       hint:'Keywords · tags · citation' },
-  { id:'media',        icon:'image',     label:'Media',           hint:'Cover & promo video' },
-  { id:'contributors', icon:'users',     label:'Contributors',    hint:'Co-authors & advisors' },
-  { id:'sources',      icon:'cite',      label:'Sources',         hint:'References & citations' },
-  { id:'files',        icon:'paperclip', label:'Files & figures', hint:'PDF · datasets · figures' },
-  { id:'publishing',   icon:'settings',  label:'Publishing',      hint:'Permissions & schedule' },
+  { id:'cover',        no:'01', label:'Cover & title',   hint:'Masthead' },
+  { id:'abstract',     no:'02', label:'Abstract',        hint:'The summary' },
+  { id:'body',         no:'03', label:'Manuscript',      hint:'Full body' },
+  { id:'contributors', no:'04', label:'Contributors',    hint:'Co-authors' },
+  { id:'sources',      no:'05', label:'Sources',         hint:'Bibliography' },
+  { id:'files',        no:'06', label:'Files & figures', hint:'Attachments' },
 ]
 
 /* One content section. Module-level (stable identity) so the rich-text editors
    inside never remount on re-render. `innerRef` registers the node so the rail
    can scroll-spy / jump to it. */
-function RmSection({ id, icon, title, tag, innerRef, children }) {
+function RmSection({ id, no, title, hint, tag, innerRef, children }) {
   return (
     <section className="rm-sec" data-sec={id} ref={innerRef}>
-      <header className="rm-sec-hd">
-        <span className="rm-sec-ic"><Icon name={icon} className="sm"/></span>
-        <h3 className="rm-sec-t">{title}</h3>
-        {tag && <span className="rm-sec-tag">{tag}</span>}
+      <header className="rm-sechd">
+        <span className="rm-secno font-mono">{no}</span>
+        <h2 className="rm-sectt">{title}</h2>
+        <span className="rm-secrule"/>
+        {tag ? <span className="rm-sectag">{tag}</span> : hint ? <span className="rm-sechint">{hint}</span> : null}
       </header>
-      <div className="rm-sec-body">{children}</div>
+      <div className="rm-secbody">{children}</div>
     </section>
   )
 }
@@ -137,21 +147,26 @@ function ContributorsField({ value, onChange, meId }) {
   }
 
   return (
-    <div style={{ display:'grid', gap:10 }}>
+    <div className="rm-contribs">
       {value.map((c, i) => (
-        <div key={c.userId} className="src-row" style={{ alignItems:'flex-start', flexWrap:'wrap' }}>
-          <Avatar initials={c.initials} color={c.avc} size={36} src={c.profileImage}/>
-          <div className="src-info" style={{ flex:'1 1 180px' }}>
-            <b className="flex-c gap-6">{c.full} {c.verified && <Verify scholar/>}</b>
-            <small className="muted">@{c.handle}</small>
-            <input className="field" style={{ height:36, marginTop:6 }} placeholder="Contribution note (e.g. Wrote section 3 — methodology)"
+        <div key={c.userId} className="rm-contrib">
+          <div className="rm-contrib-id">
+            <span className="rm-contrib-no font-mono">{String(i + 1).padStart(2, '0')}</span>
+            <Avatar initials={c.initials} color={c.avc} size={42} src={c.profileImage}/>
+          </div>
+          <div className="rm-contrib-main">
+            <div className="rm-contrib-name"><b>{c.full}</b> {c.verified && <Verify scholar/>}<span className="rm-contrib-handle">@{c.handle}</span></div>
+            <input className="inp rm-contrib-note" placeholder="Contribution note (e.g. Wrote the methodology section)"
               value={c.note} onChange={e => patch(i, 'note', e.target.value)}/>
           </div>
-          <div className="flex" style={{ flexDirection:'column', gap:6, alignItems:'flex-end' }}>
-            <select className="field" style={{ height:36, maxWidth:140 }} value={c.role} onChange={e => patch(i, 'role', e.target.value)}>
-              {CONTRIB_ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-            </select>
-            <div className="flex gap-6">
+          <div className="rm-contrib-side">
+            <div className="rm-sel">
+              <select value={c.role} onChange={e => patch(i, 'role', e.target.value)}>
+                {CONTRIB_ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+              <span className="rm-sel-cv"><Icon name="chevdown" className="xs"/></span>
+            </div>
+            <div className="rm-contrib-moves">
               <button className="icon-btn" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}><Icon name="chevup" className="xs"/></button>
               <button className="icon-btn" title="Move down" disabled={i === value.length - 1} onClick={() => move(i, 1)}><Icon name="chevdown" className="xs"/></button>
               <button className="icon-btn" title="Remove" onClick={() => remove(i)}><Icon name="close" className="sm"/></button>
@@ -160,27 +175,27 @@ function ContributorsField({ value, onChange, meId }) {
         </div>
       ))}
 
-      <div className="explore-search" style={{ height:44, marginBottom:0 }}>
+      <div className="rm-search">
         <Icon name="search" className="sm"/>
         <input placeholder="Search scholars & researchers to add…" value={q} onChange={e => setQ(e.target.value)}/>
         {loading && <span className="muted text-xs">…</span>}
       </div>
       {!!visible.length && (
-        <div className="card" style={{ overflow:'hidden' }}>
+        <div className="rm-cands">
           {visible.map(u => (
-            <button key={u.id} className="rail-row" style={{ width:'100%', textAlign:'left', padding:'10px 12px' }} onClick={() => add(u)}>
-              <Avatar initials={u.initials} color={u.avc} size={34} src={u.profileImage}/>
-              <div className="rail-info">
-                <div className="rail-name"><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
-                <div className="rail-sub">@{u.handle} · {(u.role || 'member').toLowerCase()}</div>
+            <button key={u.id} className="rm-cand" onClick={() => add(u)}>
+              <Avatar initials={u.initials} color={u.avc} size={36} src={u.profileImage}/>
+              <div className="rm-cand-tx">
+                <div className="rm-cand-name"><b>{u.full}</b> {u.verified && <Verify scholar/>}</div>
+                <div className="rm-cand-sub font-mono">@{u.handle} · {(u.role || 'member').toLowerCase()}</div>
               </div>
-              <Icon name="follow" className="sm"/>
+              <span className="rm-cand-add"><Icon name="follow" className="sm"/>Add</span>
             </button>
           ))}
         </div>
       )}
       {q.trim().length >= 2 && !loading && !visible.length && (
-        <p className="muted text-xs">No eligible co-authors found. Only verified researchers & scholars can be added.</p>
+        <p className="rm-empty-hint">No eligible co-authors found. Only verified researchers & scholars can be added.</p>
       )}
     </div>
   )
@@ -212,6 +227,15 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   const [downloadsEnabled, setDownloads] = React.useState(editResearch ? editResearch.downloadsEnabled !== false : true)
   const [scheduledAt, setScheduledAt] = React.useState(toLocalInput(editResearch?.scheduledPublishAt))
   const [publishNow, setPublishNow] = React.useState(false)
+  // Right-rail "when to publish": draft | now | schedule. Derived state that
+  // drives the underlying publishNow / scheduledAt fields submit() already reads.
+  const [scheduleMode, setScheduleMode] = React.useState(() => toLocalInput(editResearch?.scheduledPublishAt) ? 'schedule' : 'draft')
+  const setMode = (m) => {
+    setScheduleMode(m)
+    if (m === 'draft') { setPublishNow(false); setScheduledAt('') }
+    else if (m === 'now') { setPublishNow(true); setScheduledAt('') }
+    else { setPublishNow(false) }   // schedule keeps whatever is in scheduledAt
+  }
 
   /* ---- sources [{ req, file }] ---- */
   const [sources, setSources] = React.useState(() => (editResearch?.sources || []).map(s => ({
@@ -289,7 +313,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   /* ===========================================================================
      submit — orchestrated update / create.
        1. Run the critical metadata op (PATCH for edit, multipart POST for create).
-          If it fails, the modal stays open and a banner offers Retry — the
+          If it fails, the page stays open and a banner offers Retry — the
           user never loses their form state.
        2. After it succeeds, run ALL the rest (contributors, media diff, cover,
           video, publish) IN PARALLEL with per-step progress tracking.
@@ -297,7 +321,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           (e.g. drops the uploaded file from `media`) so Retry never re-uploads
           something that already succeeded.
        4. If every op succeeds → close + notify parent.
-          If some fail → keep modal open, show what failed, "Retry failed"
+          If some fail → keep open, show what failed, "Retry failed"
           re-runs only those, "Close anyway" accepts the partial save.
   ============================================================================ */
   const submit = async () => {
@@ -473,7 +497,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
     if (!isEdit && criticalResult?.id) navigate(`/research/${criticalResult.id}`)
   }
 
-  /* Accept whatever did save and leave the rest behind — close the modal with the partial update applied. */
+  /* Accept whatever did save and leave the rest behind — close with the partial update applied. */
   const acceptPartial = () => {
     const updated = saveError?.updated
     setSaveError(null); setSteps({})
@@ -482,299 +506,375 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
     onClose()
   }
 
-  const ctaLabel = busy ? 'Saving…' : isEdit ? 'Save changes' : scheduledAt ? 'Schedule' : publishNow ? 'Publish' : 'Create draft'
+  const ctaLabel = busy ? 'Saving…' : isEdit ? 'Save changes' : scheduleMode === 'schedule' ? 'Schedule' : scheduleMode === 'now' ? 'Publish' : 'Create draft'
 
   /* ---- left-rail scroll-spy + completion ---- */
   const scrollRef = React.useRef(null)
   const secRefs = React.useRef({})
-  const [activeSec, setActiveSec] = React.useState('essentials')
-  const [progress, setProgress] = React.useState(0)
+  const [activeSec, setActiveSec] = React.useState('cover')
   const onScroll = () => {
     const c = scrollRef.current; if (!c) return
-    const top = c.scrollTop + 130
+    const top = c.scrollTop + 150
     let cur = RM_SECTIONS[0].id
     for (const s of RM_SECTIONS) { const el = secRefs.current[s.id]; if (el && el.offsetTop <= top) cur = s.id }
     setActiveSec(cur)
-    const denom = c.scrollHeight - c.clientHeight || 1
-    setProgress(Math.max(0, Math.min(1, c.scrollTop / denom)))
   }
-  const goto = (id) => { const el = secRefs.current[id], c = scrollRef.current; if (el && c) c.scrollTo({ top: Math.max(0, el.offsetTop - 16), behavior:'smooth' }) }
+  const goto = (id) => { const el = secRefs.current[id], c = scrollRef.current; if (el && c) c.scrollTo({ top: Math.max(0, el.offsetTop - 28), behavior:'smooth' }) }
+  const activeIndex = Math.max(0, RM_SECTIONS.findIndex(s => s.id === activeSec))
   const meInitials = me.initials || (me.full || 'Y').slice(0, 2).toUpperCase()
+  const today = React.useMemo(() => new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), [])
+
   const done = {
-    essentials:   !!title.trim(),
-    discovery:    tags.length > 0 || !!keywords.trim(),
-    media:        !!coverShown || !!videoShown,
+    cover:        !!title.trim() || !!coverShown,
+    abstract:     !!abstractText && abstractText.replace(/<[^>]*>/g, '').trim().length > 0,
+    body:         !!description && description.replace(/<[^>]*>/g, '').trim().length > 0,
     contributors: contribs.length > 0,
     sources:      sources.length > 0,
     files:        media.length > 0 || existingMedia.length > 0,
-    publishing:   true,
   }
 
+  const fileCount = media.length + existingMedia.length
+  const statusText = [
+    `${sources.length} source${sources.length === 1 ? '' : 's'}`,
+    `${contribs.length} contributor${contribs.length === 1 ? '' : 's'}`,
+    `${fileCount} file${fileCount === 1 ? '' : 's'}`,
+  ].join('  ·  ')
+
+  const visIndex = Math.max(0, VIS.findIndex(v => v[0] === visibility))
+  const scheduleOpts = isEdit
+    ? [
+        { k: 'draft', label: 'Save changes', hint: 'Keep its current state' },
+        { k: 'schedule', label: 'Schedule a publish time', hint: 'Auto-publish later' },
+      ]
+    : [
+        { k: 'draft', label: 'Save as draft', hint: 'Keep refining privately' },
+        { k: 'now', label: 'Publish now', hint: 'Make it public immediately' },
+        { k: 'schedule', label: 'Schedule', hint: 'Auto-publish at a set time' },
+      ]
+
   return (
-    <div className="overlay open rm-overlay" onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
-      <div className="modal rm-modal" role="dialog" aria-label={isEdit ? 'Edit research' : 'Publish research'}>
-        {/* Header — emblem + title + live progress bar */}
-        <header className="rm-hd">
-          <span className="rm-hd-pat" aria-hidden="true"/>
-          <span className="rm-hd-emblem" aria-hidden="true"><i/></span>
-          <div className="rm-hd-text">
-            <h2 className="rm-hd-title">{isEdit ? 'Edit research' : 'Publish research'}</h2>
-            <p className="rm-hd-sub">{isEdit
-              ? 'Refine your paper — formatting, sources, media & contributors.'
-              : 'Scholarly work — rich formatting, sources, media & co-authors.'}</p>
+    <div className="overlay open rm-overlay" role="dialog" aria-label={isEdit ? 'Edit research' : 'Publish research'}>
+      <div className="rm-app">
+
+        {/* ============ TOP BAR ============ */}
+        <header className="rm-top">
+          <div className="rm-top-l">
+            <button className="rm-back" onClick={onClose} disabled={busy} aria-label="Back"><Icon name="chevleft" className="sm"/></button>
+            <div className="rm-top-text">
+              <span className="rm-top-kick font-mono">{isEdit ? 'Edit manuscript' : 'New manuscript'}</span>
+              <span className="rm-top-title">{title.trim() || 'Untitled manuscript'}</span>
+            </div>
+            <span className="rm-top-badge font-mono">{isEdit ? 'Editing' : 'Draft'}</span>
           </div>
-          <button className="rm-hd-close" onClick={onClose} disabled={busy} aria-label="Close"><Icon name="close" className="sm"/></button>
-          <div className="rm-hd-progress"><span style={{ width: (progress * 100).toFixed(1) + '%' }}/></div>
+
+          <div className="rm-top-c">
+            <span className="rm-top-status"><span className="rm-top-dot"/>{statusText}</span>
+          </div>
+
+          <div className="rm-top-r">
+            <button type="button" className="rm-cancel" onClick={onClose} disabled={busy}>Cancel</button>
+            <button type="button" className="rm-cta" disabled={busy || !title.trim()} onClick={submit}>
+              <Icon name="feather" className="sm"/>{ctaLabel}
+            </button>
+          </div>
         </header>
 
-        <div className="rm-body">
-          {/* Section rail */}
-          <nav className="rm-nav" aria-label="Sections">
-            <ul className="rm-nav-list">
-              {RM_SECTIONS.map(s => (
-                <li key={s.id}>
-                  <button type="button" className={'rm-nav-item' + (activeSec === s.id ? ' on' : '')} onClick={() => goto(s.id)}>
-                    <span className="rm-nav-ic"><Icon name={s.icon} className="sm"/></span>
-                    <span className="rm-nav-tx"><span className="rm-nav-l">{s.label}</span><span className="rm-nav-h">{s.hint}</span></span>
-                    {done[s.id] && <span className="rm-nav-ck"><Icon name="check" className="xs"/></span>}
-                  </button>
-                </li>
+        {/* ============ BODY: rail · canvas · publication ============ */}
+        <div className="rm-grid">
+
+          {/* ---- LEFT RAIL: contents ---- */}
+          <nav className="rm-rail" aria-label="Contents">
+            <div className="rm-rail-cap">Contents <b lang="ar" dir="rtl">الفهرس</b></div>
+            <div className="rm-rail-list">
+              <div className="rm-rail-marker" style={{ transform: `translateY(${activeIndex * 56}px)` }}/>
+              <div className="rm-rail-bar" style={{ transform: `translateY(${activeIndex * 56}px)` }}/>
+              {RM_SECTIONS.map((s) => (
+                <button key={s.id} type="button" className={'rm-rail-item' + (activeSec === s.id ? ' on' : '')} onClick={() => goto(s.id)}>
+                  <span className="rm-rail-no font-mono">{s.no}</span>
+                  <span className="rm-rail-tx"><span className="rm-rail-l">{s.label}</span><span className="rm-rail-h">{s.hint}</span></span>
+                  {done[s.id] && <span className="rm-rail-ck"><Icon name="check" className="xs"/></span>}
+                </button>
               ))}
-            </ul>
-            <div className="rm-nav-foot">
+            </div>
+            <div className="rm-rail-foot">
               <Avatar initials={meInitials} color={me.avc} size={36} src={me.profileImage}/>
-              <div className="rm-nav-foot-tx"><span className="rm-nf-name">{me.full}</span><span className="rm-nf-role">Corresponding author</span></div>
+              <div className="rm-rail-foot-tx"><span className="rm-rf-name">{me.full}</span><span className="rm-rf-role">Corresponding author</span></div>
             </div>
           </nav>
 
-          {/* Scrollable content */}
-          <div className="rm-content" ref={scrollRef} onScroll={onScroll}>
-          {/* ---- progress overlay (active while saving) ---- */}
-          {busy && (
-            <div className="cm-saving">
-              <div className="cm-saving-head">
-                <span className="cm-mini-spin"/>
-                <h4>{isEdit ? 'Saving your changes…' : 'Publishing your research…'}</h4>
-              </div>
-              <ul className="cm-step-list" role="list">
-                {Object.entries(steps).map(([id, s]) => (
-                  <li key={id} className={'cm-step ' + s.status}>
-                    <span className="cm-step-icon">
-                      {s.status === 'done'    && <Icon name="check" className="xs"/>}
-                      {s.status === 'running' && <span className="cm-mini-spin sm"/>}
-                      {s.status === 'failed'  && <Icon name="close" className="xs"/>}
-                    </span>
-                    <span className="cm-step-name">{s.name}</span>
-                    {s.error?.message && <span className="cm-step-err">{s.error.message}</span>}
-                  </li>
-                ))}
-              </ul>
-              <p className="cm-saving-note muted text-xs">
-                Running {Object.keys(steps).length} step{Object.keys(steps).length > 1 ? 's' : ''} — uploads run in parallel, you can leave this open.
-              </p>
-            </div>
-          )}
+          {/* ---- CENTER: the manuscript canvas ---- */}
+          <div className="rm-canvas" ref={scrollRef} onScroll={onScroll}>
+            <div className="rm-page t-stagger">
 
-          {/* ---- error banner (after a critical or partial failure; modal stays open) ---- */}
-          {!busy && saveError && (
-            <div className={'cm-save-err ' + (saveError.critical ? 'critical' : 'partial')}>
-              <div className="cm-save-err-ic"><Icon name="flag"/></div>
-              <div className="cm-save-err-body">
-                <b>{saveError.critical ? 'Couldn’t save your changes' : 'Saved with issues'}</b>
-                <p>{saveError.message}</p>
-                {!saveError.critical && (
-                  <p className="muted text-xs">Your details are saved. Only the failing pieces need another try — your existing form values are kept intact.</p>
-                )}
-                <ul className="cm-step-list cm-step-list-compact">
-                  {Object.entries(steps).filter(([, s]) => s.status === 'failed').map(([id, s]) => (
-                    <li key={id} className="cm-step failed">
-                      <span className="cm-step-icon"><Icon name="close" className="xs"/></span>
-                      <span className="cm-step-name">{s.name}</span>
-                      {s.error?.message && <span className="cm-step-err">{s.error.message}</span>}
-                    </li>
-                  ))}
-                </ul>
-                <div className="cm-save-err-actions">
-                  <button type="button" className="btn btn-primary btn-sm" onClick={submit}>
-                    <Icon name="upload" className="xs"/>Retry{saveError.critical ? '' : ' failed steps'}
-                  </button>
-                  {!saveError.critical && (
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={acceptPartial}>Close anyway</button>
-                  )}
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSaveError(null)}>Dismiss</button>
-                </div>
-              </div>
-            </div>
-          )}
+              {/* hidden file inputs */}
+              <input ref={coverRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) { setCoverFile(f); setCoverRemoved(false) } e.target.value = '' }}/>
+              <input ref={videoRef} type="file" hidden accept="video/mp4,video/webm,video/quicktime" onChange={e => { const f = e.target.files?.[0]; if (f) { setVideoFile(f); setVideoRemoved(false) } e.target.value = '' }}/>
+              <input ref={thumbRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setThumbFile(f); e.target.value = '' }}/>
+              <input ref={mediaRef} type="file" hidden multiple accept=".pdf,.doc,.docx,image/*,video/*,audio/*" onChange={onPickMedia}/>
 
-          {/* ---- the form (hidden while a save is in progress so the progress panel reads cleanly) ---- */}
-          {!busy && (
-            <div className="rm-inner">
-              <RmSection id="essentials" icon="doc" title="Essentials" tag="required" innerRef={el => (secRefs.current.essentials = el)}>
-                <div className="rm-field">
-                  <label className="rm-lbl">Title</label>
-                  <input className="inp inp-lg rm-title" placeholder="The effects of X on Y" value={title} onChange={e => setTitle(e.target.value)}/>
-                </div>
-                <div className="rm-field">
-                  <label className="rm-lbl">Description <span className="rm-lbl-h">the full write-up kept on the published page</span></label>
-                  <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={200} showFormat={false}
-                    placeholder="Write your research — headings, lists, tables, images, colours, highlights…"/>
-                </div>
-                <div className="rm-field">
-                  <label className="rm-lbl">Abstract <span className="rm-lbl-h">select any text to format</span></label>
-                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={360} showFormat={false}
-                    placeholder="A concise abstract of the work — select any text and use the toolbar to format it."/>
-                </div>
-              </RmSection>
-
-              <RmSection id="discovery" icon="hash" title="Discovery" tag="how readers find it" innerRef={el => (secRefs.current.discovery = el)}>
-                <div className="rm-field">
-                  <label className="rm-lbl">Keywords <span className="rm-lbl-h">comma or Enter to add</span></label>
-                  <ChipInput value={keywords ? keywords.split(/[,،؛\n]+/).map(s => s.trim()).filter(Boolean) : []}
-                    onChange={arr => setKeywords(arr.join(', '))}
-                    placeholder="Add a keyword (e.g. methodology) — comma or Enter"/>
-                  <p className="rm-micro">Free-text terms that boost search — separate from tags.</p>
-                </div>
-                <div className="rm-field">
-                  <label className="rm-lbl">Tags <span className="rm-lbl-h">{tags.length}/30 · comma or Enter to add</span></label>
-                  <TagInput value={tags} onChange={setTags} scope="RESEARCH" placeholder="Add a tag (e.g. methodology) — comma or Enter"/>
-                  <p className="rm-micro">Tags surface in trending only after you publish.</p>
-                </div>
-                <div className="rm-grid2">
-                  <div className="rm-field"><label className="rm-lbl">Visibility</label>
-                    <div className="rm-sel">
-                      <span className="rm-sel-ic"><Icon name={visibility === 'PUBLIC' ? 'globe' : visibility === 'PRIVATE' ? 'lock' : 'users'} className="xs"/></span>
-                      <select value={visibility} onChange={e => setVisibility(e.target.value)}>{VIS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-                      <span className="rm-sel-cv"><Icon name="chevdown" className="xs"/></span>
+              {/* 01 · Cover & title */}
+              <section ref={el => (secRefs.current.cover = el)}>
+                {coverShown ? (
+                  <div className="rm-cover-on" style={{ backgroundImage: `url("${coverShown}")` }}>
+                    <span className="rm-cover-scrim" aria-hidden="true"/>
+                    <div className="rm-cover-acts">
+                      <button type="button" className="rm-cv-btn" onClick={() => coverRef.current?.click()}><Icon name="image" className="xs"/>Replace</button>
+                      <button type="button" className="rm-cv-btn danger" onClick={removeCover} aria-label="Remove cover"><Icon name="close" className="sm"/></button>
                     </div>
                   </div>
-                  <div className="rm-field"><label className="rm-lbl">Suggested citation</label><input className="inp rm-cite" placeholder="Al-Qaradawi, Y. (2026). …" value={citation} onChange={e => setCitation(e.target.value)}/></div>
+                ) : (
+                  <button type="button" className="rm-cover-empty" onClick={() => coverRef.current?.click()}>
+                    <span className="rm-cv-ic"><Icon name="image"/></span>
+                    <span className="rm-cv-t">Add a cover image</span>
+                    <span className="rm-cv-h font-mono">landscape · framed on the research card</span>
+                  </button>
+                )}
+                {coverFile && !canCover && <small className="rm-warn"><Icon name="lock" className="xs"/> Cover image needs a Scholar / Researcher role.</small>}
+
+                {/* masthead */}
+                <div className="rm-mast">
+                  <span className="rm-mast-kick font-mono">Research manuscript</span>
+                  <input className="rm-mast-title" dir="auto" placeholder="Untitled manuscript"
+                    value={title} onChange={e => setTitle(e.target.value)}/>
+                  <div className="rm-mast-by">
+                    <Avatar initials={meInitials} color={me.avc} size={30} src={me.profileImage}/>
+                    <span>by <b>{me.full}</b></span>
+                    <span className="rm-mast-dot"/>
+                    <span className="rm-mast-date font-mono">{today}</span>
+                  </div>
+                </div>
+
+                {/* promo video tile */}
+                <div className="rm-promo">
+                  {videoShown ? (
+                    <video className="rm-promo-vid" src={videoShown} poster={(thumbPreview || (videoRemoved ? null : existingThumb)) || undefined} controls playsInline/>
+                  ) : (
+                    <button type="button" className="rm-promo-thumb" onClick={() => videoRef.current?.click()}><Icon name="play"/></button>
+                  )}
+                  <div className="rm-promo-tx">
+                    <div className="rm-promo-t">Promo video <span className="muted">· optional</span></div>
+                    <div className="rm-promo-h">A short clip shown on the reader page. MP4 / WebM / MOV.</div>
+                    <div className="rm-promo-acts">
+                      <button type="button" className="rm-promo-btn" onClick={() => videoRef.current?.click()}>{videoShown ? 'Replace' : 'Upload video'}</button>
+                      {videoShown && <button type="button" className="rm-promo-btn" onClick={() => thumbRef.current?.click()}>{thumbFile ? 'Thumb set' : 'Thumbnail'}</button>}
+                      {videoShown && <button type="button" className="rm-promo-btn danger" onClick={removeVideo}>Remove</button>}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="rm-divider"/>
+
+              {/* 02 · Abstract */}
+              <RmSection id="abstract" no="02" title="Abstract" hint="select text to format" innerRef={el => (secRefs.current.abstract = el)}>
+                <div className="rm-abstract">
+                  <RichTextEditor value={abstractText} format="HTML" onChange={setAbstract} minHeight={200} showFormat={false}
+                    placeholder="A concise summary of the work — what you asked, how you studied it, and what you found."/>
                 </div>
               </RmSection>
 
-              <RmSection id="media" icon="image" title="Media" tag="shown on research cards" innerRef={el => (secRefs.current.media = el)}>
-                <input ref={coverRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) { setCoverFile(f); setCoverRemoved(false) } e.target.value = '' }}/>
-                <input ref={videoRef} type="file" hidden accept="video/mp4,video/webm,video/quicktime" onChange={e => { const f = e.target.files?.[0]; if (f) { setVideoFile(f); setVideoRemoved(false) } e.target.value = '' }}/>
-                <input ref={thumbRef} type="file" hidden accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setThumbFile(f); e.target.value = '' }}/>
-                <div className="rm-grid2">
-                  <div className="rm-field">
-                    <label className="rm-lbl">Cover image</label>
-                    {coverShown ? (
-                      <div className="rm-media-prev">
-                        <div className="rm-cover" style={{ background:`center/cover no-repeat url("${coverShown}")` }}/>
-                        <div className="rm-media-acts">
-                          <button className="btn btn-secondary btn-sm" onClick={() => coverRef.current?.click()}><Icon name="upload" className="xs"/>Replace</button>
-                          <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={removeCover}><Icon name="close" className="xs"/>Remove</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button type="button" className="rm-drop tall" onClick={() => coverRef.current?.click()}>
-                        <span className="rm-drop-ic"><Icon name="image"/></span>
-                        <span className="rm-drop-t">Add a cover image</span>
-                        <span className="rm-drop-h">PNG / JPG · landscape works best</span>
-                      </button>
-                    )}
-                    {coverFile && !canCover && <small className="rm-warn"><Icon name="lock" className="xs"/> Cover needs a Scholar / Researcher role.</small>}
-                  </div>
-                  <div className="rm-field">
-                    <label className="rm-lbl">Promo video</label>
-                    {videoShown ? (
-                      <div className="rm-media-prev">
-                        <video src={videoShown} poster={(thumbPreview || (videoRemoved ? null : existingThumb)) || undefined} controls playsInline className="rm-video"/>
-                        <div className="rm-media-acts">
-                          <button className="btn btn-secondary btn-sm" onClick={() => videoRef.current?.click()}><Icon name="upload" className="xs"/>Replace</button>
-                          <button className="btn btn-secondary btn-sm" onClick={() => thumbRef.current?.click()}><Icon name="image" className="xs"/>{thumbFile ? 'Thumb set' : 'Thumbnail'}</button>
-                          <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={removeVideo}><Icon name="close" className="xs"/>Remove</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button type="button" className="rm-drop tall" onClick={() => videoRef.current?.click()}>
-                        <span className="rm-drop-ic"><Icon name="video"/></span>
-                        <span className="rm-drop-t">Add a promo video</span>
-                        <span className="rm-drop-h">MP4 / WebM / MOV · auto-detected</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+              <div className="rm-divider"/>
+
+              {/* 03 · Manuscript */}
+              <RmSection id="body" no="03" title="Manuscript" hint="the full write-up" innerRef={el => (secRefs.current.body = el)}>
+                <RichTextEditor value={description} format="HTML" onChange={setDescription} minHeight={320} showFormat={false}
+                  placeholder="Write your research — headings, lists, tables, images, colours, highlights…"/>
               </RmSection>
 
-              <RmSection id="contributors" icon="users" title="Contributors" tag="co-authors · advisors · translators" innerRef={el => (secRefs.current.contributors = el)}>
+              <div className="rm-divider"/>
+
+              {/* 04 · Contributors */}
+              <RmSection id="contributors" no="04" title="Contributors" hint="co-authors · advisors · translators" innerRef={el => (secRefs.current.contributors = el)}>
                 <ContributorsField value={contribs} onChange={setContribs} meId={me.id}/>
               </RmSection>
 
-              <RmSection id="sources" icon="cite" title="Sources & references" innerRef={el => (secRefs.current.sources = el)}>
-                {sources.map((s, i) => (
-                  <div key={i} className="rm-src-row">
-                    <span className="rm-src-badge">{SOURCE_LABEL[s.req.sourceType] || s.req.sourceType}</span>
-                    <span className="rm-src-title">{s.req.title}{s.file ? ` · ${s.file.name}` : ''}</span>
-                    <button className="icon-btn" title="Remove" onClick={() => removeSource(i)}><Icon name="close" className="sm"/></button>
-                  </div>
-                ))}
-                <div style={{ marginTop: sources.length ? 12 : 0 }}>
+              <div className="rm-divider"/>
+
+              {/* 05 · Sources */}
+              <RmSection id="sources" no="05" title="Sources & references" hint={`${sources.length} reference${sources.length === 1 ? '' : 's'}`} innerRef={el => (secRefs.current.sources = el)}>
+                {!!sources.length && (
+                  <ol className="rm-src-list">
+                    {sources.map((s, i) => (
+                      <li key={i} className="rm-src-item">
+                        <span className="rm-src-no font-mono">{String(i + 1).padStart(2, '0')}</span>
+                        <div className="rm-src-body">
+                          <span className="rm-src-badge font-mono">{SOURCE_LABEL[s.req.sourceType] || s.req.sourceType}</span>
+                          <div className="rm-src-title">{s.req.title}</div>
+                          {(s.req.citationText || s.req.url || s.file) && (
+                            <div className="rm-src-meta font-mono">{s.file ? s.file.name : (s.req.citationText || s.req.url)}</div>
+                          )}
+                        </div>
+                        <button className="icon-btn" title="Remove" onClick={() => removeSource(i)}><Icon name="close" className="sm"/></button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <div className="rm-src-add">
                   <AddSourceForm onAdd={(req, file) => setSources(s => [...s, { req, file }])}/>
                 </div>
               </RmSection>
 
-              <RmSection id="files" icon="paperclip" title="Files & figures" tag="paper PDF · datasets · figures" innerRef={el => (secRefs.current.files = el)}>
-                {existingMedia.map(m => (
-                  <div key={m.id} className="rm-src-row">
-                    <span className="rm-src-badge">{(m.type || 'file').toLowerCase()}</span>
-                    <span className="rm-src-title">{m.name}{m.caption ? ` · ${m.caption}` : ''}</span>
-                    <button className="icon-btn" title="Remove file" onClick={() => dropExisting(m.id)}><Icon name="close" className="sm"/></button>
-                  </div>
-                ))}
-                <input ref={mediaRef} type="file" hidden multiple accept=".pdf,.doc,.docx,image/*,video/*,audio/*" onChange={onPickMedia}/>
-                <button type="button" className="rm-drop tall" onClick={() => mediaRef.current?.click()}>
-                  <span className="rm-drop-ic"><Icon name="upload"/></span>
-                  <span className="rm-drop-t">{isEdit ? 'Add more files' : 'Click to add files'}</span>
-                  <span className="rm-drop-h">PDF · DOCX · images · audio · video</span>
-                </button>
-                {media.map((m, i) => (
-                  <div key={i} className="rm-file-card">
-                    <div className="rm-file-head">
-                      <span className="flex-c gap-6 text-sm" style={{ minWidth:0 }}><Icon name="doc" className="sm"/><span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.file.name}</span></span>
-                      <button className="icon-btn" onClick={() => removeMedia(i)}><Icon name="close" className="xs"/></button>
-                    </div>
-                    <div className="rm-grid2" style={{ marginTop:8 }}>
-                      <input className="inp" style={{ height:38 }} placeholder="Caption" value={m.caption} onChange={e => patchMedia(i, 'caption', e.target.value)}/>
-                      <input className="inp" style={{ height:38 }} placeholder="Alt text (accessibility)" value={m.altText} onChange={e => patchMedia(i, 'altText', e.target.value)}/>
-                    </div>
-                  </div>
-                ))}
-              </RmSection>
+              <div className="rm-divider"/>
 
-              <RmSection id="publishing" icon="settings" title="Publishing" tag="permissions & schedule" innerRef={el => (secRefs.current.publishing = el)}>
-                <Toggle title="Allow comments" desc="Readers can discuss your work." on={commentsEnabled} onChange={setComments}/>
-                <Toggle title="Allow downloads" desc="Let readers save the attached files." on={downloadsEnabled} onChange={setDownloads}/>
-                <div className="set-toggle">
-                  <div><b>Schedule publication</b><small className="muted">Leave empty to keep it a draft (or publish now below).</small></div>
-                  <input className="inp inp-date" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)}/>
+              {/* 06 · Files & figures */}
+              <RmSection id="files" no="06" title="Files & figures" hint="paper PDF · datasets · figures" innerRef={el => (secRefs.current.files = el)}>
+                <div className="rm-files-grid">
+                  {existingMedia.map(m => (
+                    <div key={m.id} className="rm-file">
+                      <div className="rm-file-hd">
+                        <span className="rm-file-ic font-mono">{(m.type || 'file').slice(0, 4).toUpperCase()}</span>
+                        <div className="rm-file-tx">
+                          <div className="rm-file-nm">{m.name}</div>
+                          <div className="rm-file-meta font-mono">{m.caption || 'saved file'}</div>
+                        </div>
+                        <button className="icon-btn" title="Remove file" onClick={() => dropExisting(m.id)}><Icon name="close" className="xs"/></button>
+                      </div>
+                    </div>
+                  ))}
+                  {media.map((m, i) => (
+                    <div key={m._id} className="rm-file">
+                      <div className="rm-file-hd">
+                        <span className="rm-file-ic font-mono">{(m.file.name.split('.').pop() || 'file').slice(0, 4).toUpperCase()}</span>
+                        <div className="rm-file-tx">
+                          <div className="rm-file-nm">{m.file.name}</div>
+                          <div className="rm-file-meta font-mono">{(m.file.size / 1024 / 1024).toFixed(1)} MB</div>
+                        </div>
+                        <button className="icon-btn" title="Remove" onClick={() => removeMedia(i)}><Icon name="close" className="xs"/></button>
+                      </div>
+                      <input className="inp rm-file-cap" placeholder="Caption" value={m.caption} onChange={e => patchMedia(i, 'caption', e.target.value)}/>
+                      <input className="inp rm-file-cap" placeholder="Alt text (accessibility)" value={m.altText} onChange={e => patchMedia(i, 'altText', e.target.value)}/>
+                    </div>
+                  ))}
+                  <button type="button" className="rm-file-add" onClick={() => mediaRef.current?.click()}>
+                    <span className="rm-file-add-ic"><Icon name="upload"/></span>
+                    <span className="rm-file-add-t">Add files</span>
+                    <span className="rm-file-add-h font-mono">PDF · DOCX · images · data</span>
+                  </button>
                 </div>
-                {!!scheduledAt && (
-                  <div className="flex-c gap-6 text-xs" style={{ color:'var(--emerald)', marginTop:6 }}>
-                    <Icon name="check" className="xs"/>Auto-publishes at the scheduled time — no need to publish manually.
-                  </div>
-                )}
-                {scheduledAt && <button className="text-xs muted" style={{ marginTop:4 }} onClick={() => setScheduledAt('')}>Clear schedule</button>}
-                {!isEdit && <Toggle title="Publish immediately" desc="Otherwise it's saved as a draft you can publish later." on={publishNow} onChange={setPublishNow} disabled={!!scheduledAt}/>}
               </RmSection>
 
-              <div className="rm-end"><span/></div>
+              <div className="rm-end"/>
             </div>
-          )}
           </div>
+
+          {/* ---- RIGHT RAIL: publication ---- */}
+          <aside className="rm-pub" aria-label="Publication">
+            <span className="rm-pub-cap">Publication</span>
+
+            {/* visibility */}
+            <div className="rm-pub-block">
+              <label className="rm-pub-label">Who can see it</label>
+              <div className="rm-seg">
+                <div className="rm-seg-marker" style={{ transform: `translateX(${visIndex * 100}%)` }}/>
+                {VIS.map(([k, l, ic]) => (
+                  <button key={k} type="button" className={'rm-seg-btn' + (visibility === k ? ' on' : '')} onClick={() => setVisibility(k)}>
+                    <Icon name={ic} className="sm"/><span>{l}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* schedule */}
+            <div className="rm-pub-block">
+              <label className="rm-pub-label">When to publish</label>
+              <div className="rm-sched">
+                {scheduleOpts.map(o => (
+                  <button key={o.k} type="button" className={'rm-sched-opt' + (scheduleMode === o.k ? ' on' : '')} onClick={() => setMode(o.k)}>
+                    <span className="rm-sched-ring">{scheduleMode === o.k && <span className="rm-sched-dot"/>}</span>
+                    <span className="rm-sched-tx"><span className="rm-sched-l">{o.label}</span><span className="rm-sched-h">{o.hint}</span></span>
+                  </button>
+                ))}
+                {scheduleMode === 'schedule' && (
+                  <input className="inp rm-sched-date" type="datetime-local" value={scheduledAt} onChange={e => { setScheduledAt(e.target.value); setScheduleMode('schedule') }}/>
+                )}
+              </div>
+            </div>
+
+            <div className="rm-pub-rule"/>
+
+            {/* permissions */}
+            <label className="rm-pub-label">Reader permissions</label>
+            <div className="rm-perm-row">
+              <div className="rm-perm-tx"><span className="rm-perm-l">Allow comments</span><span className="rm-perm-h">Readers can discuss the work</span></div>
+              <RailSwitch on={commentsEnabled} onChange={setComments}/>
+            </div>
+            <div className="rm-perm-row">
+              <div className="rm-perm-tx"><span className="rm-perm-l">Allow downloads</span><span className="rm-perm-h">Let readers save attached files</span></div>
+              <RailSwitch on={downloadsEnabled} onChange={setDownloads}/>
+            </div>
+
+            <div className="rm-pub-rule"/>
+
+            {/* citation */}
+            <label className="rm-pub-label">Suggested citation</label>
+            <input className="inp rm-pub-input rm-cite" placeholder="Al-Qaradawi, Y. (2026). Title. Journal." value={citation} onChange={e => setCitation(e.target.value)}/>
+
+            {/* keywords */}
+            <label className="rm-pub-label" style={{ marginTop: 18 }}>Keywords</label>
+            <ChipInput value={keywords ? keywords.split(/[,،؛\n]+/).map(s => s.trim()).filter(Boolean) : []}
+              onChange={arr => setKeywords(arr.join(', '))}
+              placeholder="Add a keyword — comma or Enter"/>
+
+            {/* tags */}
+            <label className="rm-pub-label" style={{ marginTop: 18 }}>Tags <span className="rm-pub-label-h">· {tags.length}/30 · surface in trending</span></label>
+            <TagInput value={tags} onChange={setTags} scope="RESEARCH" placeholder="Add a tag — comma or Enter"/>
+          </aside>
         </div>
 
-        <footer className="rm-ftr">
-          <div className="rm-ftr-as">
-            <Avatar initials={meInitials} color={me.avc} size={28} src={me.profileImage}/>
-            <span>{isEdit ? 'Editing as' : 'Publishing as'} <strong>{me.full}</strong></span>
+        {/* ============ SAVING OVERLAY ============ */}
+        {busy && (
+          <div className="rm-scrim">
+            <div className="rm-dialog">
+              <div className="rm-dialog-hd">
+                <span className="rm-spin"/>
+                <h3>{isEdit ? 'Saving your changes…' : 'Publishing your research…'}</h3>
+              </div>
+              <ul className="rm-steps">
+                {Object.entries(steps).map(([id, s]) => (
+                  <li key={id} className={'rm-step ' + s.status}>
+                    <span className="rm-step-ic">
+                      {s.status === 'done'    && <Icon name="check" className="xs"/>}
+                      {s.status === 'running' && <span className="rm-spin sm"/>}
+                      {s.status === 'failed'  && <Icon name="close" className="xs"/>}
+                    </span>
+                    <span className="rm-step-nm">{s.name}</span>
+                    {s.error?.message && <span className="rm-step-err">{s.error.message}</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="rm-dialog-note">Uploads run in parallel — you can leave this open.</p>
+            </div>
           </div>
-          <div className="rm-ftr-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-            <button type="button" className={'btn btn-primary' + (!isEdit && publishNow ? ' rm-go' : '')} disabled={busy || !title.trim()} onClick={submit}>{ctaLabel}</button>
+        )}
+
+        {/* ============ ERROR OVERLAY ============ */}
+        {!busy && saveError && (
+          <div className="rm-scrim">
+            <div className={'rm-dialog' + (saveError.critical ? ' critical' : ' partial')}>
+              <div className="rm-dialog-hd">
+                <span className="rm-dialog-flag"><Icon name="flag"/></span>
+                <h3>{saveError.critical ? 'Couldn’t save your changes' : 'Saved with issues'}</h3>
+              </div>
+              <p className="rm-dialog-msg">{saveError.message}</p>
+              {!saveError.critical && <p className="rm-dialog-note">Your details are saved. Only the failing pieces need another try — your form values are kept intact.</p>}
+              <ul className="rm-steps">
+                {Object.entries(steps).filter(([, s]) => s.status === 'failed').map(([id, s]) => (
+                  <li key={id} className="rm-step failed">
+                    <span className="rm-step-ic"><Icon name="close" className="xs"/></span>
+                    <span className="rm-step-nm">{s.name}</span>
+                    {s.error?.message && <span className="rm-step-err">{s.error.message}</span>}
+                  </li>
+                ))}
+              </ul>
+              <div className="rm-dialog-acts">
+                <button type="button" className="rm-cta" onClick={submit}><Icon name="upload" className="xs"/>Retry{saveError.critical ? '' : ' failed steps'}</button>
+                {!saveError.critical && <button type="button" className="rm-cancel" onClick={acceptPartial}>Close anyway</button>}
+                <button type="button" className="rm-dialog-dismiss" onClick={() => setSaveError(null)}>Dismiss</button>
+              </div>
+            </div>
           </div>
-        </footer>
+        )}
+
       </div>
     </div>
   )

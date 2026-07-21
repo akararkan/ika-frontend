@@ -40,11 +40,11 @@ const detailHref = (h) => {
 
 /* Stable colour from username so the avatar matches the one on the detail page. */
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg,#159a76,#0a4a3c)',
-  'linear-gradient(135deg,#bd9344,#7a5a1a)',
-  'linear-gradient(135deg,#3f6a8a,#16302a)',
+  'linear-gradient(135deg,#c9382f,#8f1f18)',
+  'linear-gradient(135deg,#b3271e,#8a221b)',
+  'linear-gradient(135deg,#1f3a6e,#2a251d)',
   'linear-gradient(135deg,#5a2a1a,#160a06)',
-  'linear-gradient(135deg,#3c5a4a,#0a2a1f)',
+  'linear-gradient(135deg,#5e5447,#231d15)',
 ]
 function gradientFor(seed = '') {
   let h = 0
@@ -107,15 +107,15 @@ function HitSkeleton() {
 function TrendingStrip({ trending, navigate, title = 'Trending tags', scope = 'ALL' }) {
   if (!trending.length) return null
   return (
-    <section className="card card-pad">
-      <h3 className="title">
-        <Icon name="hash" className="sm"/>{title}
-        {scope !== 'ALL' && <small className="muted" style={{ marginLeft:8, fontWeight:500 }}>in {scope.toLowerCase()}</small>}
+    <section className="x-sec">
+      <h3 className="x-kick">
+        {title}
+        {scope !== 'ALL' && <small style={{ color:'var(--muted)', fontWeight:600 }}>in {scope.toLowerCase()}</small>}
       </h3>
       <div className="chips" style={{ marginBottom: 0 }}>
         {trending.map(t => (
           <button key={t.tag} className="chip" onClick={() => navigate(`/tags/${encodeURIComponent(t.tag)}`)} title={`${fmt(t.usageCount)} uses`}>
-            <span style={{ color:'var(--brass)' }}>#</span>{t.tag}
+            <span style={{ color:'var(--rubric)' }}>#</span>{t.tag}
             <i className="muted text-xs" style={{ fontStyle:'normal', marginLeft:4 }}>{fmt(t.usageCount)}</i>
           </button>
         ))}
@@ -226,7 +226,7 @@ export function ExplorePage() {
       <div className="col-main">
         <div className="phead">
           <div>
-            <h1>Explore</h1>
+            <h1>Explore <span className="phead-ar" lang="ar" dir="rtl">استكشاف</span></h1>
             <p className="sub">Search posts, reels, research, questions, and sounds across the IKA community.</p>
           </div>
         </div>
@@ -253,7 +253,7 @@ export function ExplorePage() {
             </div>
 
             {degraded && (
-              <div className="card card-pad" style={{ background:'rgba(194,69,63,.06)', borderColor:'rgba(194,69,63,.25)', marginBottom:12 }}>
+              <div className="x-note" style={{ marginBottom:12 }}>
                 <div className="flex gap-8" style={{ alignItems:'center' }}>
                   <Icon name="shield" className="sm" style={{ color:'var(--rose)' }}/>
                   <div>
@@ -270,7 +270,7 @@ export function ExplorePage() {
               </div>
             ) : !hits.length ? (
               <>
-                <div className="card card-pad" style={{ textAlign:'center', padding:'28px 20px' }}>
+                <div className="x-empty">
                   <div style={{ display:'grid', placeItems:'center', margin:'0 auto 10px', width:48, height:48, borderRadius:'50%', background:'var(--card-2)', color:'var(--muted)' }}>
                     <Icon name="search"/>
                   </div>
@@ -298,14 +298,14 @@ export function ExplorePage() {
                           </span>
                           <i>{rows.length}</i>
                         </div>
-                        <div className="qna-list">
+                        <div className="qna-list t-stagger">
                           {rows.map(h => <HitRow key={`${h.contentType}:${h.contentId}`} hit={h} onOpen={() => { const href = detailHref(h); if (href) navigate(href) }}/>)}
                         </div>
                       </React.Fragment>
                     )
                   })
                 ) : (
-                  <div className="qna-list">
+                  <div className="qna-list t-stagger">
                     {(hits || []).map(h => <HitRow key={`${h.contentType}:${h.contentId}`} hit={h} onOpen={() => { const href = detailHref(h); if (href) navigate(href) }}/>)}
                   </div>
                 )}
@@ -327,32 +327,44 @@ export function ExplorePage() {
         ) : (
           <div className="explore-grid">
             {!!trending.length && (
-              <section className="card card-pad" style={{gridColumn:'1 / -1'}}>
-                <h3 className="title"><Icon name="hash" className="sm"/>Trending tags</h3>
+              <section className="x-sec" style={{gridColumn:'1 / -1'}}>
+                <h3 className="x-kick">Trending tags</h3>
                 <div className="chips" style={{ marginBottom: 0 }}>
                   {trending.map(t => (
                     <button key={t.tag} className="chip" onClick={() => navigate(`/tags/${encodeURIComponent(t.tag)}`)} title={`${fmt(t.usageCount)} uses`}>
-                      <span style={{ color:'var(--brass)' }}>#</span>{t.tag}
+                      <span style={{ color:'var(--rubric)' }}>#</span>{t.tag}
                       <i className="muted text-xs" style={{ fontStyle:'normal', marginLeft:4 }}>{fmt(t.usageCount)}</i>
                     </button>
                   ))}
                 </div>
               </section>
             )}
-            <section className="card card-pad" style={{gridColumn:'1 / -1'}}>
-              <h3 className="title"><Icon name="research" className="sm"/>Featured research</h3>
-              <div className="r-list">
-                {featured.length ? featured.map(r => (
-                  <article key={r.id} className="r-card" onClick={() => navigate(`/research/${r.id}`)}>
-                    <div className="r-cover" style={{ background:r.cover }}><span className="r-irc font-mono">{r.irc}</span></div>
-                    <div className="r-body"><h3>{r.title}</h3><p className="r-abs">{r.abstract}</p></div>
-                  </article>
-                )) : <p className="muted text-sm">No research yet.</p>}
-              </div>
+            <section className="x-sec" style={{gridColumn:'1 / -1'}}>
+              <h3 className="x-kick">Featured research</h3>
+              {featured.length ? (<>
+                <article className="r-hero" onClick={() => navigate(`/research/${featured[0].id}`)}>
+                  <span className="rh-ph" style={{ background: featured[0].cover }}/>
+                  <div className="rh-panel">
+                    <span className="rh-meta font-mono">{featured[0].irc}</span>
+                    <h3 dir="auto">{featured[0].title}</h3>
+                    {featured[0].abstract && <p className="r-abs">{featured[0].abstract}</p>}
+                  </div>
+                </article>
+                {featured.length > 1 && (
+                  <div className="r-list">
+                    {featured.slice(1).map(r => (
+                      <article key={r.id} className="r-card" onClick={() => navigate(`/research/${r.id}`)}>
+                        <div className="r-cover" style={{ background:r.cover }}><span className="r-irc font-mono">{r.irc}</span></div>
+                        <div className="r-body"><h3>{r.title}</h3><p className="r-abs">{r.abstract}</p></div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>) : <p className="muted text-sm">No research yet.</p>}
             </section>
 
-            <section className="card card-pad">
-              <h3 className="title"><Icon name="music" className="sm"/>Trending sounds</h3>
+            <section className="x-sec">
+              <h3 className="x-kick">Trending sounds</h3>
               <div className="rail-list">
                 {sounds.length ? sounds.map(s => (
                   <div key={s.id} className="rail-row">
@@ -364,16 +376,31 @@ export function ExplorePage() {
               </div>
             </section>
 
-            <section className="card card-pad">
-              <h3 className="title"><Icon name="reels" className="sm"/>Trending reels</h3>
-              <div className="explore-reels">
-                {reels.length ? reels.map(r => (
-                  <button key={r.id} className="reel-tile" style={{ background:r.media?.[0]?.bg || 'linear-gradient(160deg,#1f3a4a,#070d0b)' }} onClick={() => navigate('/reels')}>
-                    <span className="rt-plays font-mono">▶ {fmt(r.views)}</span>
-                    <span className="rt-cap">{(r.body || '').slice(0, 60)}…</span>
-                  </button>
-                )) : <p className="muted text-sm">No reels yet.</p>}
-              </div>
+            <section className="x-sec">
+              <h3 className="x-kick">Trending reels</h3>
+              {reels.length ? (<>
+                <button className="hero-reel" onClick={() => navigate('/reels')}>
+                  <span className="hr-ph" style={{ background: reels[0].media?.[0]?.bg || '#232b42' }}/>
+                  <span className="hr-ov">
+                    <span className="hr-play"><Icon name="play"/></span>
+                    <span className="hr-tx">
+                      <b>{(reels[0].body || 'Featured reel').slice(0, 64)}</b>
+                      <i>▶ {fmt(reels[0].views)} views · open reels</i>
+                    </span>
+                  </span>
+                </button>
+                <div className="explore-reels">
+                  {reels.slice(1).map(r => (
+                    <button key={r.id} className="plate-reel" onClick={() => navigate('/reels')}>
+                      <span className="pr-scr" style={{ background:r.media?.[0]?.bg || '#232b42' }}>
+                        <span className="pr-play"><Icon name="play"/></span>
+                        <span className="pr-dur font-mono">▶ {fmt(r.views)}</span>
+                      </span>
+                      <span className="pr-strip"><b className="pr-title">{(r.body || 'Reel').slice(0, 40)}</b></span>
+                    </button>
+                  ))}
+                </div>
+              </>) : <p className="muted text-sm">No reels yet.</p>}
             </section>
           </div>
         )}

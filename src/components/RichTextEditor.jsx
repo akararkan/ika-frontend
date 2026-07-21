@@ -16,7 +16,7 @@
 import React from 'react'
 import { Icon } from './ui.jsx'
 import { uiPrompt } from './Dialog.jsx'
-import { renderByFormat, detectFormat, renderSafeHtml } from '../lib/richtext.js'
+import { renderByFormat, detectFormat, renderSafeHtml, applyAutoDir } from '../lib/richtext.js'
 
 const FORMATS = [
   { key:'HTML',     label:'Rich',     desc:'WYSIWYG editor — formatting, colours, tables, images.' },
@@ -53,17 +53,17 @@ const MD_TOOLS = [
    sees in the editor is what they get on the published research page.
    The classes themselves are defined in styles-richtext.css. */
 const TEXT_COLORS = [
-  { cls:'tc-ink',     val:'#0b1a16' },
-  { cls:'tc-soft',    val:'#3c4f49' },
-  { cls:'tc-muted',   val:'#7a8783' },
-  { cls:'tc-light',   val:'#cdc4ad' },
+  { cls:'tc-ink',     val:'#1b1813' },
+  { cls:'tc-soft',    val:'#5e574b' },
+  { cls:'tc-muted',   val:'#9b948e' },
+  { cls:'tc-light',   val:'#d8d4cb' },
   { cls:'tc-rose',    val:'#c2453f' },
-  { cls:'tc-brass',   val:'#bd9344' },
-  { cls:'tc-emerald', val:'#0e6b54' },
-  { cls:'tc-blue',    val:'#3f6a8a' },
-  { cls:'tc-brown',   val:'#7a4a2a' },
+  { cls:'tc-brass',   val:'#b3271e' },
+  { cls:'tc-emerald', val:'#b3271e' },
+  { cls:'tc-blue',    val:'#1f3a6e' },
+  { cls:'tc-brown',   val:'#6e4a2f' },
   { cls:'tc-deep',    val:'#5a2a1a' },
-  { cls:'tc-bright',  val:'#159a76' },
+  { cls:'tc-bright',  val:'#c9382f' },
   { cls:'tc-white',   val:'#ffffff' },
 ]
 const HIGHLIGHT_COLORS = [
@@ -73,7 +73,7 @@ const HIGHLIGHT_COLORS = [
   { cls:'hl-blue',    val:'#90caf9' },
   { cls:'hl-coral',   val:'#ffab91' },
   { cls:'hl-pink',    val:'#ce93d8' },
-  { cls:'hl-cream',   val:'#f4ead0' },
+  { cls:'hl-cream',   val:'#f3eee1' },
   { cls:'hl-orange',  val:'#ffe0b2' },
 ]
 /* Font sizes as actual pixel values — the picker button shows the current
@@ -863,7 +863,7 @@ export function RichTextEditor({
     else if (k === 'k') { e.preventDefault(); void runMd({ action:'link' }) }
   }
 
-  const previewHtml = React.useMemo(() => renderByFormat(value || '', fmt), [value, fmt])
+  const previewHtml = React.useMemo(() => applyAutoDir(renderByFormat(value || '', fmt)), [value, fmt])
 
   return (
     <div className="rte">

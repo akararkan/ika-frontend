@@ -17,22 +17,22 @@ import { Icon } from './ui.jsx'
 /* ---------- Editor preset palette ---------- */
 
 const BACKGROUNDS = [
-  { id:'g1', label:'Emerald',  bg:'linear-gradient(160deg,#0a4a3c,#159a76)' },
-  { id:'g2', label:'Brass',    bg:'linear-gradient(160deg,#bd9344,#7a5a1a)' },
-  { id:'g3', label:'Midnight', bg:'linear-gradient(160deg,#1f3a4a,#070d0b)' },
-  { id:'g4', label:'Rose',     bg:'linear-gradient(160deg,#c2453f,#5a2a1a)' },
-  { id:'g5', label:'Forest',   bg:'linear-gradient(160deg,#16302a,#0a2a1f)' },
-  { id:'g6', label:'Paper',    bg:'linear-gradient(160deg,#f4f1e8,#cdc4ad)' },
+  { id:'g1', label:'Rubric',   bg:'linear-gradient(160deg,#8f1f18,#b3271e)' },
+  { id:'g2', label:'Ink',      bg:'linear-gradient(160deg,#2a251d,#100e0b)' },
+  { id:'g3', label:'Midnight', bg:'linear-gradient(160deg,#232b42,#100e0b)' },
+  { id:'g4', label:'Lapis',    bg:'linear-gradient(160deg,#1f3a6e,#16264a)' },
+  { id:'g5', label:'Walnut',   bg:'linear-gradient(160deg,#6e4a2f,#3a2415)' },
+  { id:'g6', label:'Paper',    bg:'linear-gradient(160deg,#ffffff,#d8d4cb)' },
 ]
 
 const FONTS = [
-  { id:'serif',   label:'Serif',  family:'"IBM Plex Serif", Georgia, serif' },
-  { id:'sans',    label:'Sans',   family:'"IBM Plex Sans", system-ui, sans-serif' },
+  { id:'serif',   label:'Serif',  family:'"Newsreader", "Scheherazade New", Georgia, serif' },
+  { id:'sans',    label:'Sans',   family:'"Archivo", system-ui, sans-serif' },
   { id:'mono',    label:'Mono',   family:'"IBM Plex Mono", ui-monospace, monospace' },
-  { id:'display', label:'Display',family:'"IBM Plex Serif", Georgia, serif', italic:true, weight:500 },
+  { id:'display', label:'Display',family:'"Newsreader", "Scheherazade New", Georgia, serif', italic:true, weight:500 },
 ]
 
-const COLORS = ['#ffffff', '#0b1a16', '#bd9344', '#159a76', '#c2453f', '#3f6a8a', '#f4ead0', '#0a4a3c']
+const COLORS = ['#ffffff', '#1b1813', '#b3271e', '#c9382f', '#c2453f', '#1f3a6e', '#e9c4bf', '#8f1f18']
 
 /* Story canvas is 1080×1920 (Instagram-equivalent 9:16). The on-screen
    preview is scaled to fit the modal viewport; all positions are stored
@@ -100,7 +100,7 @@ function TextLayer({ layer, selected, onSelect, onChange, onDelete }) {
     touchAction:'none',
     userSelect: 'none',
     textShadow: layer.bgOn ? 'none' : '0 2px 8px rgba(0,0,0,.45)',
-    outline:    selected ? '2px dashed rgba(189,147,68,.85)' : 'none',
+    outline:    selected ? '2px dashed rgba(179,39,30,.85)' : 'none',
     outlineOffset: 4,
   }
   return (
@@ -121,7 +121,7 @@ function TextLayer({ layer, selected, onSelect, onChange, onDelete }) {
           onClick={(e) => { e.stopPropagation(); onDelete(layer.id) }}
           style={{
             position:'absolute', top:-12, right:-12, width:26, height:26,
-            borderRadius:'50%', background:'#0b1a16', color:'#fff', border:'2px solid #fff',
+            borderRadius:'50%', background:'#1b1813', color:'#fff', border:'2px solid #fff',
             display:'grid', placeItems:'center', boxShadow:'0 2px 6px rgba(0,0,0,.3)',
             zIndex:5,
           }}
@@ -242,10 +242,21 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
       rotation: 0, scale: 1,
       font: 'serif', size: 56, color: '#ffffff',
       align: 'center', bold: false, italic: false,
-      bgOn: false, bgColor: 'rgba(11,26,22,.5)',
+      bgOn: false, bgColor: 'rgba(27,24,19,.5)',
       _edit: true,
     }
     setLayers(prev => [...prev, layer])
+    setSelectedId(id)
+  }
+
+  const addStamp = () => {
+    const id = Math.random().toString(36).slice(2, 9)
+    const onPaper = bgPreset?.id === 'g6'
+    setLayers(prev => [...prev, {
+      id, text:'۞', x:50, y:50, rotation:0, scale:1,
+      font:'serif', size:96, color: onPaper ? '#b3271e' : '#ffffff',
+      align:'center', bold:false, italic:false, bgOn:false, bgColor:'rgba(27,24,19,.5)',
+    }])
     setSelectedId(id)
   }
 
@@ -272,13 +283,34 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
     cnv.width = EXPORT_W; cnv.height = EXPORT_H
     const ctx = cnv.getContext('2d')
 
+    // WYSIWYG: load every webfont variant BEFORE measuring — otherwise the
+    // canvas silently falls back and wraps differently than the preview did.
+    try {
+      const variants = new Set()
+      for (const layer of layers) {
+        const fd = FONTS.find(f => f.id === layer.font) || FONTS[0]
+        const w = layer.bold ? 700 : (fd.weight || 500)
+        const it = (fd.italic || layer.italic) ? 'italic ' : ''
+        variants.add(`${it}${w} 64px ${fd.family}`)
+      }
+      await Promise.all([...variants].map(v => document.fonts.load(v, 'Aa مرحبا')))
+      await document.fonts.ready
+    } catch { /* font API unavailable — canvas falls back gracefully */ }
+
     // Background — gradient preset, image, or video frame
     if (bgPreset) {
       // Parse the preset gradient and reapply on canvas (canvas can't render
       // CSS gradients directly). We use two-stop linear gradient extracted
       // from the preset background string.
-      const colors = (bgPreset.bg.match(/#[0-9a-f]{6}/gi) || ['#0a4a3c','#159a76'])
-      const grad = ctx.createLinearGradient(0, 0, EXPORT_W * 0.4, EXPORT_H)
+      const colors = (bgPreset.bg.match(/#[0-9a-f]{6}/gi) || ['#8f1f18','#b3271e'])
+      // Reproduce CSS `linear-gradient(<deg>, …)` exactly: 0deg points up,
+      // clockwise; the gradient line spans the box projection at that angle.
+      const deg = +(bgPreset.bg.match(/linear-gradient\((\d+)deg/) || [0, 160])[1]
+      const rad = deg * Math.PI / 180
+      const dx = Math.sin(rad), dy = -Math.cos(rad)
+      const L = Math.abs(EXPORT_W * dx) + Math.abs(EXPORT_H * dy)
+      const cx = EXPORT_W / 2, cy = EXPORT_H / 2
+      const grad = ctx.createLinearGradient(cx - dx * L / 2, cy - dy * L / 2, cx + dx * L / 2, cy + dy * L / 2)
       grad.addColorStop(0, colors[0]); grad.addColorStop(1, colors[1])
       ctx.fillStyle = grad
       ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
@@ -303,10 +335,10 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
         else         { sw = v.videoWidth;  sh = sw / cr; sx = 0; sy = (v.videoHeight - sh) / 2 }
         ctx.drawImage(v, sx, sy, sw, sh, 0, 0, EXPORT_W, EXPORT_H)
       } else {
-        ctx.fillStyle = '#0a1a16'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
+        ctx.fillStyle = '#191613'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
       }
     } else {
-      ctx.fillStyle = '#0a1a16'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
+      ctx.fillStyle = '#191613'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
     }
 
     // Text layers — render in order on top
@@ -338,26 +370,29 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
       const lineH = fontSizePx * 1.18
       const totalH = lineH * lines.length
 
-      // Background pill
+      // The preview centres the text BOX at (x,y); lines align INSIDE that
+      // box. Measure the widest line once and anchor everything against it
+      // so left / right / pill all land exactly where the author saw them.
+      const maxLineW = Math.max(...lines.map(t => ctx.measureText(t).width), 1)
       if (layer.bgOn) {
-        const maxWidth = Math.max(...lines.map(t => ctx.measureText(t).width))
-        const padX = 24 * sizeScale, padY = 18 * sizeScale
-        const bgW = maxWidth + padX * 2, bgH = totalH + padY * 2
+        // Same pill metrics as the preview: 8px/14px padding, 12px radius.
+        const padX = 14 * sizeScale, padY = 8 * sizeScale
+        const bgW = maxLineW + padX * 2, bgH = totalH + padY * 2
         ctx.fillStyle = layer.bgColor
-        const xOffset = layer.align === 'center' ? -bgW/2 : layer.align === 'right' ? -bgW : 0
-        roundRect(ctx, xOffset, -bgH/2, bgW, bgH, 22 * sizeScale)
+        roundRect(ctx, -bgW / 2, -bgH / 2, bgW, bgH, 12 * sizeScale)
         ctx.fill()
       } else {
-        // soft drop-shadow for legibility on busy photos
+        // Same drop-shadow as the preview's `0 2px 8px rgba(0,0,0,.45)`.
         ctx.shadowColor = 'rgba(0,0,0,.45)'
-        ctx.shadowBlur = 14 * sizeScale
-        ctx.shadowOffsetY = 4 * sizeScale
+        ctx.shadowBlur = 8 * sizeScale
+        ctx.shadowOffsetY = 2 * sizeScale
       }
 
+      const ax = layer.align === 'left' ? -maxLineW / 2 : layer.align === 'right' ? maxLineW / 2 : 0
       ctx.fillStyle = layer.color
       lines.forEach((line, i) => {
         const y = -totalH/2 + lineH * (i + 0.5)
-        ctx.fillText(line, 0, y)
+        ctx.fillText(line, ax, y)
       })
 
       ctx.restore()
@@ -386,9 +421,13 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
         <button className="se-bar-btn" onClick={onCancel} aria-label="Cancel">
           <Icon name="chevleft"/>
         </button>
+        <div className="se-bar-title"><span className="se-kicker">Story atelier</span><b lang="ar" dir="rtl">قِصّة</b></div>
         <div className="se-bar-spacer"/>
         <button className="se-bar-btn ghost" onClick={addText} title="Add text">
           <Icon name="compose" className="sm"/><span>Text</span>
+        </button>
+        <button className="se-bar-btn ghost" onClick={addStamp} title="Stamp the rub el-hizb">
+          <span className="se-stamp-glyph">۞</span><span>Stamp</span>
         </button>
         <button className="se-bar-btn ghost" onClick={() => fileRef.current?.click()} title="Replace media">
           <Icon name="image" className="sm"/><span>Photo</span>
@@ -403,7 +442,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
           </button>
         )}
         <button className="se-bar-btn primary" onClick={handleSave}>
-          <span>Next</span><Icon name="chevright" className="sm"/>
+          <Icon name="feather" className="sm"/><span>Next</span>
         </button>
       </div>
 
@@ -416,7 +455,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
         }}
       >
         <div className="se-stage" ref={stageRef}
-          style={{ background: bgPreset?.bg || '#0a1a16' }}
+          style={{ background: bgPreset?.bg || '#191613' }}
           onPointerDown={() => deselectAll()}
         >
           {bgKind === 'image' && bgUrl && (
@@ -426,6 +465,8 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
             <video data-story-bg src={bgUrl} muted playsInline autoPlay loop
               style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}/>
           )}
+          <div className="se-guide top" aria-hidden="true"><span>safe area</span></div>
+          <div className="se-guide bottom" aria-hidden="true"><span>safe area</span></div>
           {layers.map(l => (
             <TextLayer
               key={l.id}
@@ -454,9 +495,10 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
         <div className="se-bg-row">
           {BACKGROUNDS.map(b => (
             <button key={b.id} className={'se-bg-tile ' + (bgPreset?.id === b.id ? 'on' : '')}
-              style={{ background: b.bg }}
-              onClick={() => setBgPreset(b)}
-              title={b.label}/>
+              onClick={() => setBgPreset(b)}>
+              <span className="se-bg-chip" style={{ background: b.bg }}/>
+              <i>{b.label}</i>
+            </button>
           ))}
         </div>
       )}
@@ -470,13 +512,13 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
               {FONTS.map(f => (
                 <button key={f.id} className={'se-font ' + (selected.font === f.id ? 'on' : '')}
                   style={{ fontFamily: f.family, fontStyle: f.italic ? 'italic' : 'normal' }}
-                  onClick={() => patchSelected({ font: f.id })}>Aa</button>
+                  onClick={() => patchSelected({ font: f.id })}><span>Aa</span><i>{f.label}</i></button>
               ))}
             </div>
             <div className="se-colors">
               {COLORS.map(c => (
                 <button key={c} className={'se-color ' + (selected.color === c ? 'on' : '')}
-                  style={{ background: c, borderColor: c === '#ffffff' ? '#cbc4ab' : 'transparent' }}
+                  style={{ background: c, borderColor: c === '#ffffff' ? '#d8d4cb' : 'transparent' }}
                   onClick={() => patchSelected({ color: c })}/>
               ))}
             </div>

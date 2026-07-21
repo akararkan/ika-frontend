@@ -5,7 +5,7 @@ import { adapters } from '../api/index.js'
 
 const FALLBACK = {
   full: 'Member', handle: 'member', initials: '··',
-  avc: 'linear-gradient(135deg,#159a76,#0a4a3c)', verified: false, role: 'MEMBER', profileImage: null,
+  avc: '#1b1813', verified: false, role: 'MEMBER', profileImage: null,
 }
 
 /** Resolve the author object attached to an entity by the adapters. */

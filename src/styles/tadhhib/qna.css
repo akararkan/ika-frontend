@@ -1,0 +1,321 @@
+/* =============================================================
+   IKA · TADHHIB — qna layer · "a majlis of folios"
+   Q&A list (/qna) + question detail (/qna/:id).
+   Additive override layer: imported after all MIDAD files, so
+   equal-specificity selectors here win by order. Tokens and
+   keyframes come from tadhhib/core.css — never redefined here.
+   Page scopes: .qna-page (list) · .qd-page (detail).
+   ============================================================= */
+
+/* ================= 1 · The folio — .qna-card ================= */
+/* Card physics: warmer easing, gentler press, gilded hover edge. */
+.qna-card{
+  transition:
+    transform var(--t-med) var(--ease-out),
+    box-shadow var(--t-med) var(--ease-out),
+    border-color var(--t-med) ease;
+}
+.qna-card:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-float);
+  border-color:var(--gild-line);
+}
+.qna-card:active{transform:translateY(-1px) scale(.99)}
+
+/* Signature 1 — the illuminated hairline draws itself across the
+   top on hover (upgrades MIDAD's opacity-only rubric bar). */
+.qna-card::before{
+  height:2px;
+  background:var(--illum);
+  opacity:1;
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .45s var(--ease-out);
+}
+.qna-card:hover::before{transform:scaleX(1)}
+
+/* Signature 4 — a huge ghost "؟" folio ornament, top-right corner.
+   Serif (Scheherazade fallback carries the Arabic glyph), 4% ink —
+   you notice it the third visit. Card already clips (overflow:hidden). */
+.qna-card::after{
+  content:"؟";
+  position:absolute;top:-8px;inset-inline-end:12px;
+  font-family:var(--serif);font-size:96px;line-height:1;font-weight:600;
+  color:var(--ink);opacity:.04;pointer-events:none;
+  transition:opacity var(--t-med) ease,transform var(--t-slow) var(--ease-smooth);
+}
+.qna-card:hover::after{opacity:.07;transform:rotate(-6deg) scale(1.04)}
+
+/* Living type — the question itself grows into a folio heading. */
+.qna-card h3{font-size:21px;line-height:1.24}
+
+/* Footer stats: tabular counts + icon micro-bounce on hover. */
+.qna-card footer span .ico,
+.qd-meta span .ico,
+.qrow-metrics span .ico{transition:transform var(--t-fast) var(--ease-spring)}
+.qna-card footer span:hover .ico,
+.qd-meta span:hover .ico,
+.qrow-metrics span:hover .ico{transform:translateY(-2px)}
+
+/* Answered metric gilded — quiet gold ink + a tiny gold seal dot. */
+.qna-card footer .qna-ans,
+.qrow-metrics .qna-ans{color:var(--gild-ink)}
+.qna-card footer .qna-ans::after,
+.qrow-metrics .qna-ans::after{
+  content:"";width:5px;height:5px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,var(--gild-2),var(--gild-bright));
+  box-shadow:0 0 0 2px rgba(196,154,60,.14);
+}
+
+/* Status line — "Answered · verified" earns gold ink + seal dot. */
+.qna-card .status.answered,
+.qd-page .qd-head .status.answered{color:var(--gild-ink)}
+.qna-card .status.answered::before,
+.qd-page .qd-head .status.answered::before{
+  content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:linear-gradient(135deg,var(--gild-2),var(--gild-bright));
+  box-shadow:0 0 0 3px rgba(196,154,60,.14);
+}
+
+/* Resolved badge — a small gilded seal pill (list rows + detail). */
+.qna-page .status.resolved,
+.qd-page .status.resolved{
+  padding:3px 10px;border-radius:999px;color:var(--gild-ink);
+  background:linear-gradient(100deg,rgba(196,154,60,.16),rgba(227,188,102,.09));
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.32);
+  animation:t-pop .4s var(--ease-spring) backwards;
+}
+.qna-page .status.resolved .ico,
+.qd-page .status.resolved .ico{color:var(--gild)}
+
+/* Tags — quiet gold-tinted links with a gradient underline draw. */
+.qna-tags a{
+  color:var(--gild-ink);
+  background-image:linear-gradient(90deg,var(--gild-2),var(--gild-bright));
+  background-repeat:no-repeat;background-position:0 100%;background-size:0% 1.5px;
+  transition:background-size .35s var(--ease-out),color var(--t-fast) ease;
+}
+.qna-tags a:hover{text-decoration:none;color:var(--gild);background-size:100% 1.5px}
+
+/* ============ 2 · List entrance + compact rows + groups ============ */
+/* Stagger: cards already carry .rise with an inline per-index delay —
+   swap the animation for the TADHHIB rise (deeper, slower, decel). */
+.qna-list > .rise{animation:t-rise var(--t-slow) var(--ease-out) backwards}
+
+/* Compact rows — same folio manners, denser. */
+.qrow{
+  transition:
+    background var(--t-fast) ease,
+    box-shadow var(--t-med) var(--ease-out),
+    border-color var(--t-med) ease,
+    transform var(--t-med) var(--ease-out);
+}
+.qrow:hover{border-color:var(--gild-line);box-shadow:var(--shadow-float)}
+.qrow:active{transform:scale(.99)}
+
+/* Grouped view — gilded kicker rules on the bucket headers. */
+.qna-page .lg-line{background:linear-gradient(90deg,rgba(196,154,60,.45),transparent)}
+.qna-page .lg-count{
+  font-variant-numeric:tabular-nums;color:var(--gild-ink);
+  background:#fffdf6;border-color:var(--gild-line);
+}
+
+/* Filter chips (Open / Answered / All) — gold-tinted active ink. */
+.qna-page .chip{transition:color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.qna-page .chip:active{transform:scale(.94)}
+.qna-page .chip.on{color:var(--gild-ink)}
+
+/* ============ 3 · Question masthead — .qd-head ============ */
+.qd-page .qd-head{
+  position:relative;overflow:hidden;
+  background:linear-gradient(175deg,#fffdf6 0%,#fff 30%);
+  animation:t-rise .5s var(--ease-out) backwards;
+}
+/* Girih khatam star, masked into the top-right corner at 4.5%. */
+.qd-page .qd-head::after{
+  content:"";position:absolute;top:-36px;inset-inline-end:-36px;
+  width:150px;height:150px;pointer-events:none;
+  background:var(--girih) center/contain no-repeat;opacity:.045;
+}
+/* Serif title up to 30px — keeps styles-responsive's fluid clamp,
+   just raises the ceiling (equal specificity, later import wins). */
+.qd-head h1{font-size:clamp(22px,5.4vw,30px)}
+/* Gradient-ink accent support (spec: living type). */
+.qd-page .qd-head h1 em{
+  font-style:normal;background:var(--illum);
+  -webkit-background-clip:text;background-clip:text;
+  color:var(--rubric);-webkit-text-fill-color:transparent;
+}
+/* An illuminated rule draws itself beneath the title on load. */
+.qd-page .qd-head h1::after{
+  content:"";display:block;width:64px;height:2px;margin-top:12px;border-radius:2px;
+  background:var(--illum);transform-origin:left;
+  animation:t-draw .7s var(--ease-out) .18s backwards;
+}
+/* The question opens with a rubric drop cap — a critical-edition folio. */
+.qd-page .qd-body::first-letter{
+  float:inline-start;
+  font-size:2.6em;line-height:.82;font-weight:600;
+  color:var(--rubric);
+  padding-inline-end:.13em;padding-top:.05em;
+}
+/* Meta row: press physics come from core .btn; counts stay tabular. */
+.qd-page .qd-meta{font-variant-numeric:tabular-nums}
+
+/* Resolved pill in the masthead header — gilded seal chip. */
+.qd-page .qd-head .pill.scholar{
+  padding:4px 10px;border-radius:999px;color:var(--gild-ink);
+  background:linear-gradient(100deg,rgba(196,154,60,.16),rgba(227,188,102,.09));
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.32);
+  animation:t-pop .45s var(--ease-spring) backwards;
+}
+.qd-page .qd-head .pill.scholar .ico{color:var(--gild)}
+
+/* "Answers · N" section label — gilded kicker rule + rubric count seal. */
+.qd-page .section-label::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(196,154,60,.4),transparent);
+}
+.qd-page .section-label i{
+  background:linear-gradient(135deg,#c9382f,#8f1f18);
+  box-shadow:0 4px 10px -4px rgba(143,31,24,.5);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ============ 4 · Answers — folios of the majlis ============ */
+.qd-page .answer{
+  animation:t-rise .5s var(--ease-out) .06s backwards;
+  transition:border-color var(--t-med) ease,box-shadow var(--t-med) var(--ease-out);
+}
+
+/* ---- THE gilded seal moment — the accepted answer ----
+   Gold wash (barely there), an --illum left bar replacing MIDAD's
+   flat inset rubric, a warm gold ring instead of the red one. */
+.answer.accepted{
+  background:linear-gradient(150deg,#fffef9 0%,#fdf9ec 100%);
+  border-color:rgba(196,154,60,.45);
+  box-shadow:
+    0 0 0 1px rgba(196,154,60,.2),
+    0 14px 34px -20px rgba(168,120,29,.4);
+}
+.answer.accepted:hover{
+  box-shadow:
+    0 0 0 1px rgba(196,154,60,.32),
+    0 16px 38px -18px rgba(168,120,29,.45);
+}
+.answer.accepted::before{
+  content:"";position:absolute;top:14px;bottom:14px;inset-inline-start:0;
+  width:3px;border-radius:2px;
+  background:linear-gradient(180deg,#8f1f18,#b3271e 30%,#c49a3c 72%,#e3bc66);
+}
+
+/* The seal banner — a gilded chip; check glyph pops in on a small gold
+   medal, then one slow shine sweeps across. Runs once whenever the
+   banner mounts: page load OR the instant the author taps Accept. */
+.ans-banner.accepted{
+  position:relative;overflow:hidden;
+  display:inline-flex;width:fit-content;
+  color:var(--gild-ink);letter-spacing:1.4px;
+  padding:6px 12px;margin:-2px 0 14px;border-radius:999px;
+  background:linear-gradient(100deg,rgba(196,154,60,.15),rgba(227,188,102,.08));
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.3);
+  transition:box-shadow var(--t-med) ease;
+  animation:t-pop .5s var(--ease-spring) backwards;
+}
+.ans-banner.accepted:hover{
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.45),0 4px 14px -8px rgba(168,120,29,.4);
+}
+.ans-banner.accepted .ico{
+  width:17px;height:17px;padding:3.5px;border-radius:50%;flex:none;
+  color:#fff;stroke:#fff;
+  background:linear-gradient(135deg,#b3271e,#c49a3c 70%,#e3bc66);
+  box-shadow:0 3px 8px -2px rgba(168,120,29,.55);
+  animation:t-pop .5s var(--ease-spring) .12s backwards;
+}
+.ans-banner.accepted::after{
+  content:"";position:absolute;top:0;bottom:0;left:0;width:46%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);
+  transform:translateX(-160%) skewX(-18deg);
+  animation:t-shine 1.2s var(--ease-smooth) .55s both;
+}
+
+/* Accept button — accepted state reads as a quiet gold endorsement;
+   its check bursts the moment the accepted class lands. */
+.ans-actions .ans-accept.btn-secondary{
+  color:var(--gild-ink);
+  border-color:rgba(196,154,60,.5);
+  background:linear-gradient(180deg,#fffdf6,#faf4e4);
+}
+.ans-actions .ans-accept.btn-secondary:hover{
+  border-color:var(--gild-2);
+  box-shadow:0 6px 16px -8px rgba(168,120,29,.45);
+}
+.answer.accepted .ans-accept .ico{animation:t-burst .5s var(--ease-spring)}
+
+/* Reaction heart bursts when it turns on (class toggle restarts it). */
+.ans-actions .btn.on-rose .ico{animation:t-burst .45s var(--ease-spring)}
+
+/* Reply thread — rows rise in; tiny inline actions get press physics. */
+.answer .cmt-reply{animation:t-rise .4s var(--ease-out) backwards}
+.answer .cmt-meta button{
+  transition:color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring);
+}
+.answer .cmt-meta button:active{transform:scale(.9)}
+
+/* ============ 5 · The answer composer — a small atelier ============ */
+/* No overflow:hidden here — MentionBox's .mention-pop must escape. */
+.qd-page .ans-composer.card{
+  position:relative;
+  transition:border-color var(--t-med) ease,box-shadow var(--t-med) var(--ease-out);
+}
+.qd-page .ans-composer.card:focus-within{
+  border-color:rgba(196,154,60,.45);
+  box-shadow:0 14px 36px -22px rgba(168,120,29,.45);
+}
+/* Illuminated hairline draws across the top as you begin to write. */
+.qd-page .ans-composer.card::before{
+  content:"";position:absolute;top:-1px;left:16px;right:16px;height:2px;
+  border-radius:2px;background:var(--illum);pointer-events:none;
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .5s var(--ease-out);
+}
+.qd-page .ans-composer.card:focus-within::before{transform:scaleX(1)}
+
+/* Lock / limit notices — quiet parchment, not alarms. */
+.qd-page .card.muted{background:var(--paper-2)}
+
+/* ============ 6 · Mobile re-statements (≤720 / ≤600 / ≤460 / ≤380) ==== */
+/* styles-responsive.css values this file's unqualified selectors would
+   otherwise stomp — re-asserted here, at the end, per the layer rules. */
+@media(max-width:720px){
+  /* §10 mobile card: simple tap physics replace the hover lift */
+  .qna-card{transition:transform .12s ease}
+  .qna-card:hover{transform:none;box-shadow:none}
+  .qna-card:active{transform:scale(.99)}
+  .qna-card h3{font-size:17px;line-height:1.3;letter-spacing:-.2px}
+  /* keep the hairline visible-on-tap rather than hover-drawn */
+  .qna-card::before{transition:transform .2s ease}
+  .qna-card:active::before{transform:scaleX(1)}
+  .qrow:hover{transform:none;box-shadow:var(--shadow-sm)}
+  /* mobile banner rhythm (styles-responsive §qd sets margin-bottom:10px) */
+  .ans-banner.accepted{margin:-2px 0 10px;font-size:11px}
+}
+@media(max-width:600px){
+  /* ornament breathes less in tight folios */
+  .qna-card::after{font-size:72px;inset-inline-end:8px}
+  .qd-page .qd-head::after{width:120px;height:120px;top:-30px;inset-inline-end:-30px}
+  .qd-page .qd-body::first-letter{font-size:2.3em}
+}
+@media(max-width:460px){
+  .qna-card::after{font-size:60px;opacity:.035}
+}
+@media(max-width:380px){
+  /* tiny phones: ghost + girih ornaments retire, gold stays in the seals */
+  .qna-card::after{content:none}
+  .qd-page .qd-head::after{content:none}
+}
+
+/* Coherence-audit fix: press micro-feedback must land ≤.2s on desktop too
+   (base transform transition is var(--t-med)); mobile keeps its §10 .12s. */
+@media(min-width:721px){
+  .qna-card:active,.qrow:active{transition-duration:var(--t-fast)}
+}

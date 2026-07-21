@@ -22,7 +22,7 @@ export const ICON_PATHS = {
   send:   '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
   message:'<path d="M21 11.5a8.4 8.4 0 0 1-12 7.6L3 21l1.9-6A8.4 8.4 0 1 1 21 11.5z"/>',
   comment:'<path d="M21 11.5a8.4 8.4 0 0 1-12 7.6L3 21l1.9-6A8.4 8.4 0 1 1 21 11.5z"/>',
-  heart:  '<path d="M12 21C5 15 3 12 3 8.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9 2.5C21 12 19 15 12 21z"/>',
+  heart:  '<path d="M6.2 6.2h11.6v11.6H6.2z"/><path d="M12 3.8 20.2 12 12 20.2 3.8 12z"/>',  /* MIDAD: rub el-hizb ۞ — readers rubricate, not like */
   share:  '<path d="M4 12v8h16v-8M16 6l-4-4-4 4M12 2v14"/>',
   more:   '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
   close:  '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -72,6 +72,7 @@ export const ICON_PATHS = {
   paperclip:'<path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L13 5a3.5 3.5 0 0 1 5 5l-8 8a1.5 1.5 0 0 1-2-2l7.5-7.5"/>',
   trash:  '<path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/>',
   menu:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  feather:'<path d="M19.5 4.5c-3.5 0-9 1.5-12 7.5L6 16.5l1.5 1.5 4.5-1.5c6-3 7.5-9 7.5-12z"/><path d="M15 9 4.5 19.5"/>',
 
   /* ---- view-mode switcher glyphs ---- */
   vfeed:    '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>',
@@ -103,6 +104,11 @@ export const ICON_PATHS = {
 }
 
 export function Icon({ name, className = '', style }) {
+  // ۞ — the rubrication mark renders as the real rub el-hizb glyph, not an
+  // SVG approximation, so the app matches the Midad plates 100%.
+  if (name === 'heart') {
+    return <span className={'ico kh-ico ' + className} style={style}>۞</span>
+  }
   const path = ICON_PATHS[name] || ''
   return (
     <svg
@@ -152,7 +158,7 @@ export function Badges({ items, max }) {
 
 /* ----- Avatar ----- */
 export function Avatar({ initials, color, size = 38, square, className = '', src }) {
-  const bg = color || 'linear-gradient(135deg,#159a76,#0a4a3c)'
+  const bg = color || 'linear-gradient(135deg,#c9382f,#8f1f18)'
   const fontSize = Math.max(11, Math.round(size * 0.36))
   return (
     <span

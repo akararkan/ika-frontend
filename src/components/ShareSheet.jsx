@@ -87,8 +87,8 @@ function ShareModal({ sheet, onClose }) {
   const SOCIAL = [
     { key: 'wa', label: 'WhatsApp', color: '#1faf54', icon: 'message', href: `https://wa.me/?text=${encT}%20${enc}` },
     { key: 'tg', label: 'Telegram', color: '#229ED9', icon: 'send',    href: `https://t.me/share/url?url=${enc}&text=${encT}` },
-    { key: 'x',  label: 'X',        color: '#0b1a16', icon: 'share',   href: `https://twitter.com/intent/tweet?url=${enc}&text=${encT}` },
-    { key: 'em', label: 'Email',    color: '#7a8783', icon: 'at',      href: `mailto:?subject=${encT}&body=${enc}` },
+    { key: 'x',  label: 'X',        color: '#1b1813', icon: 'share',   href: `https://twitter.com/intent/tweet?url=${enc}&text=${encT}` },
+    { key: 'em', label: 'Email',    color: '#9b948e', icon: 'at',      href: `mailto:?subject=${encT}&body=${enc}` },
   ]
   const canNative = typeof navigator !== 'undefined' && !!navigator.share
 

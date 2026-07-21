@@ -103,7 +103,7 @@ export function TagPage() {
           <EmptyState icon="hash" title={`Nothing tagged #${tag} yet`} sub="Tag your post, question, or research to surface it here."/>
         ) : (
           <>
-            <div className="qna-list">
+            <div className="qna-list t-stagger">
               {rows.map(row => {
                 const meta = TYPE_BADGE[row.type] || { icon:'feed', label:row.type, color:'var(--muted)' }
                 const href = detailHref(row)

@@ -31,7 +31,7 @@ export const research = {
   // (the old /researches/tags/trending was superseded by /api/v1/tags/trending, SEARCH_API §7.3).
 
   /* ---- lifecycle (scholar/researcher, author) ---- */
-  create(formData)   { return http.upload('/api/v1/researches', formData) },     // multipart: data + files[]
+  create(formData)   { return http.upload('/api/v1/researches', formData) },     // multipart: data + files (backend also accepts files[], file, media, etc.)
   update(id, req)    { return http.patch(`/api/v1/researches/${id}`, req) },
   publish(id)        { return http.post(`/api/v1/researches/${id}/publish`, {}) },
   unpublish(id)      { return http.post(`/api/v1/researches/${id}/unpublish`, {}) },

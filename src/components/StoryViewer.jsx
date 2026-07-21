@@ -11,8 +11,8 @@ import { api, adapters, assetUrl } from '../api/index.js'
 
 function gradientFor(id = '') {
   const grads = [
-    'linear-gradient(160deg,#0a4a3c,#070d0b)', 'linear-gradient(160deg,#1fb98e,#0a4a3c)',
-    'linear-gradient(160deg,#bd9344,#7a5a1a)', 'linear-gradient(160deg,#3f6a8a,#16302a)',
+    'linear-gradient(160deg,#8f1f18,#100e0b)', 'linear-gradient(160deg,#d8453a,#8f1f18)',
+    'linear-gradient(160deg,#b3271e,#8a221b)', 'linear-gradient(160deg,#1f3a6e,#2a251d)',
     'linear-gradient(160deg,#5a2a1a,#160a06)',
   ]
   let h = 0; for (let i = 0; i < String(id).length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
@@ -108,13 +108,13 @@ function AddToHighlightSheet({ storyId, authorId, onClose }) {
         <div className="phead" style={{ padding:'14px 16px 4px' }}><h3 style={{ margin:0 }}><Icon name="star" className="sm"/> Add to highlight</h3><button className="icon-btn" onClick={onClose}><Icon name="close" className="sm"/></button></div>
         <div style={{ padding:'4px 16px 16px', maxHeight:'60vh', overflowY:'auto' }}>
           <button className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={newHl}>
-            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#bd9344' }}><Icon name="compose" className="sm"/></span>
+            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#b3271e' }}><Icon name="compose" className="sm"/></span>
             <div className="rail-info"><div className="rail-name"><b>New highlight</b></div></div>
           </button>
           {hls == null ? <div className="muted text-sm" style={{ padding:'10px 0' }}>Loading…</div>
             : hls.map(h => (
               <button key={h.highlightId || h.id} className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={() => addTo(h.highlightId || h.id)}>
-                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}/>
+                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#d8453a,#8f1f18)' }}/>
                 <div className="rail-info"><div className="rail-name"><b>{h.title}</b></div></div>
               </button>
             ))}
@@ -203,7 +203,7 @@ export function StoryViewer({ authorId, author, onClose }) {
       if (!alive) return
       setItems((rows || []).map(r => ({
         id: r.storyId, type: r.storyType, visibility: r.visibility,
-        bg: r.mediaUrl ? `center/cover no-repeat url("${assetUrl(r.mediaUrl)}")` : gradientFor(r.storyId),
+        bg: r.mediaUrl ? `#100e0b center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : gradientFor(r.storyId),
         text: r.textContent || '',
         // When the story has media, the StoryEditor has already baked the text
         // layers into the image. The `textContent` field is metadata for
@@ -287,7 +287,8 @@ export function StoryViewer({ authorId, author, onClose }) {
       </div>
 
       <div className="rv-stage">
-        <div className="rv-card">
+        {/* keyed per story → the page-turn animation replays on every step */}
+        <div key={idx} className="rv-card">
           <div className="rv-bg" style={{ background: item.bg }}/>
           {item.text && !item.hasMedia && <div className="rv-center">{item.text}</div>}
           {poll && (

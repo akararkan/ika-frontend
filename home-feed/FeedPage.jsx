@@ -59,7 +59,7 @@ function FeedRail({ navigate }) {
       {!!people.length && (
         <div className="card card-pad">
           <h3 className="title"><Icon name="award" className="sm"/> Who to follow</h3>
-          <div className="rail-list t-stagger">
+          <div className="rail-list">
             {people.map(u => (
               <div key={u.id} className="rail-row">
                 <span role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/u/${u.id}`)}>
@@ -80,7 +80,7 @@ function FeedRail({ navigate }) {
       <div className="card card-pad">
         <h3 className="title"><Icon name="qna" className="sm"/> Open questions</h3>
         {questions.length ? (
-          <div className="rail-list t-stagger">
+          <div className="rail-list">
             {questions.map(q => (
               <button key={q.id} className="rail-q" onClick={() => navigate(`/qna/${q.id}`)}>
                 <div className="status open" style={{ marginBottom:6 }}>{q.status.toLowerCase()} · {q.answers} answers</div>
@@ -212,7 +212,7 @@ export function FeedPage() {
           <span className="folio-ar" lang="ar" dir="rtl">الصفحة الرئيسية</span>
         </div>
 
-        <section className="stories rise t-stagger">
+        <section className="stories rise">
           {/* Your story — opens the composer. */}
           <button className="st is-add" onClick={() => openCompose('STORY')}>
             <span className="st-ring add"><Icon name="compose" className="sm"/></span>
@@ -246,7 +246,7 @@ export function FeedPage() {
           : error ? <EmptyState icon="feed" title="Couldn’t load the feed" sub="Check your connection to the backend and try again."/>
           : !shown.length ? <EmptyState icon="feed" title={feedTab === 'SCHOLARS' ? 'No scholar posts yet' : 'Your feed is quiet'} sub={feedTab === 'SCHOLARS' ? 'Posts from verified scholars will appear here.' : 'Follow scholars and creators, or create the first post.'}/>
           : (
-            <div className="feed-list t-stagger">
+            <div className="feed-list">
               {shown.map((p, i) => {
                 // Mixed feed: dispatch on entityType (carried as `kind`) FIRST.
                 if (p.kind === 'RESEARCH') return <FeedResearchCard key={p.id} item={p} navigate={navigate}/>

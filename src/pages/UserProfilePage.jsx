@@ -8,6 +8,7 @@ import { Icon, Avatar, Verify, Badges, fmt, showToast } from '../components/ui.j
 import { ProfileDetails } from '../components/ProfileDetails.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
+import { FollowListModal } from '../components/FollowListModal.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -22,6 +23,7 @@ export function UserProfilePage() {
   const [research, setResearch] = React.useState([])
   const [reels, setReels] = React.useState([])      // reel-only list (§17.2 by-author)
   const [stats, setStats] = React.useState(null)   // §9.14
+  const [followList, setFollowList] = React.useState(null)   // {mode} → followers/following list modal
   const [loading, setLoading] = React.useState(true)
 
   const isMe = me?.id === id
@@ -79,12 +81,12 @@ export function UserProfilePage() {
           {!u.coverImage && <div className="prof-cover-pattern"/>}
         </div>
         <div className="prof-head">
-          <Avatar initials={u.initials} color={u.avc} size={132} className="prof-avatar" src={u.profileImage}/>
+          <span className="t-ring"><Avatar initials={u.initials} color={u.avc} size={132} className="prof-avatar" src={u.profileImage}/></span>
           <div className="prof-actions">
             {blockedByThem ? (
               <span className="btn btn-secondary" style={{ cursor:'default' }}><Icon name="block" className="sm"/>Unavailable</span>
             ) : (
-              <button className={'btn ' + (following ? 'btn-secondary' : 'btn-primary')} onClick={toggleFollow}>
+              <button className={'btn ' + (following ? 'btn-secondary is-following' : 'btn-primary')} onClick={toggleFollow}>
                 <Icon name={following ? 'followed' : 'follow'} className="sm"/>{following ? 'Following' : 'Follow'}
               </button>
             )}
@@ -102,8 +104,8 @@ export function UserProfilePage() {
             <button onClick={() => setTab('REELS')}><b>{fmt(stats?.reels ?? reels.length)}</b><small>REELS</small></button>
             <button onClick={() => setTab('RESEARCH')}><b>{fmt(stats?.research ?? research.length)}</b><small>RESEARCH</small></button>
             <button><b>{fmt(stats?.questions ?? 0)}</b><small>QUESTIONS</small></button>
-            <button><b>{fmt(status?.followerCount ?? stats?.followers ?? u.followers)}</b><small>FOLLOWERS</small></button>
-            <button><b>{fmt(stats?.following ?? u.following)}</b><small>FOLLOWING</small></button>
+            <button onClick={() => setFollowList({ mode:'followers' })}><b>{fmt(status?.followerCount ?? stats?.followers ?? u.followers)}</b><small>FOLLOWERS</small></button>
+            <button onClick={() => setFollowList({ mode:'following' })}><b>{fmt(stats?.following ?? u.following)}</b><small>FOLLOWING</small></button>
           </div>
         </div>
 
@@ -122,6 +124,7 @@ export function UserProfilePage() {
           </article>
         ))}</div> : <EmptyState icon="research" title="No research yet"/>)}
       </div>
+      {followList && <FollowListModal userId={id} mode={followList.mode} onClose={() => setFollowList(null)}/>}
     </div>
   )
 }

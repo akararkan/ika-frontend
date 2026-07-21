@@ -9,7 +9,6 @@ import { Icon, Verify, Avatar, linkify, fmt, showToast } from './ui.jsx'
 import { openShare } from './ShareSheet.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import { VoicePlayer } from './VoicePlayer.jsx'
-import { PlayableVideo } from './PlayableVideo.jsx'
 import { authorOf } from '../lib/userView.js'
 import { api } from '../api/index.js'
 
@@ -180,7 +179,7 @@ function PostMedia({ post, onOpenReel, onOpenImage }) {
       <div className="post-media count-1">
         <button className="pm-cell pm-reel" onClick={onOpenReel} aria-label="Watch reel">
           {m.url
-            ? <PlayableVideo src={m.url} poster={m.poster} muted controls={false} autoPlay={false} className="pm-reel-cover" wrapperClassName="pm-reel-video" style={{ borderRadius:0 }} modal />
+            ? <video src={m.url} muted preload="metadata" playsInline className="pm-reel-cover"/>
             : <span className="pm-reel-bg" style={{ background: m.bg }}/>}
           <span className="pm-play"><Icon name="play" className="lg"/></span>
           <span className="pm-reel-badge"><Icon name="reels" className="xs"/>Reel</span>
@@ -196,7 +195,8 @@ function PostMedia({ post, onOpenReel, onOpenImage }) {
         {post.media.map((m, i) => (
           m.type === 'VIDEO' && m.url ? (
             <div key={i} className="pm-cell" style={{ aspectRatio: m.ratio || '16/10', background:'#000' }}>
-              <PlayableVideo src={m.url} poster={m.poster} controls preload="metadata" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} modal />
+              <video src={m.url} controls playsInline preload="metadata"
+                style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
             </div>
           ) : (
             <div key={i} className="pm-cell ph-bg" data-label={m.label} style={{ background: m.bg, aspectRatio: m.ratio || '16/10', cursor: m.type === 'IMAGE' && m.url ? 'zoom-in' : undefined }}
@@ -332,7 +332,7 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
       </div>
 
       {showC && (
-        <div className="pc-comments t-stagger">
+        <div className="pc-comments">
           <div className="pc-clabel">Comments — {fmt(cCount)}</div>
           {comments == null ? <div className="muted text-sm" style={{ padding:'10px 2px' }}>Loading comments…</div>
             : !comments.length ? <div className="muted text-sm" style={{ padding:'10px 2px' }}>No comments yet — be the first.</div>

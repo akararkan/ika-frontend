@@ -49,7 +49,7 @@ export function WatchedReelsPage() {
       <div className="col-main">
         <div className="phead">
           <div>
-            <h1>Watched <em>reels</em></h1>
+            <h1>Watched <em>reels</em> <span className="phead-ar" lang="ar" dir="rtl">المقاطع</span></h1>
             <p className="sub">Reels you’ve watched recently, newest first.</p>
           </div>
           {!!items.length && <button className="btn btn-secondary btn-sm" onClick={clearAll}><Icon name="close" className="sm"/>Clear all</button>}
@@ -59,23 +59,20 @@ export function WatchedReelsPage() {
           : !items.length ? <EmptyState icon="reels" title="No watch history yet" sub="Reels you watch will show up here."/>
           : (
             <>
-              <div className="watched-grid">
+              <div className="watched-grid t-stagger">
                 {items.map(w => (
-                  <div key={w.id} className="watched-card">
-                    <div className="watched-thumb" onClick={() => navigate(`/posts/${w.reelId}`)}>
+                  <div key={w.id} className="plate-reel watched-card">
+                    <div className="pr-scr" onClick={() => navigate(`/posts/${w.reelId}`)}>
                       {w.mediaUrl
                         ? <video src={w.mediaUrl} muted preload="metadata" playsInline/>
                         : <div className="watched-fallback"/>}
-                      <span className="watched-play"><Icon name="play" className="lg"/></span>
-                      {fmtDur(w.watchedSeconds) && <span className="watched-dur font-mono">{fmtDur(w.watchedSeconds)}</span>}
+                      <span className="pr-play"><Icon name="play"/></span>
+                      {fmtDur(w.watchedSeconds) && <span className="pr-dur font-mono">{fmtDur(w.watchedSeconds)}</span>}
                       <button className="watched-x" title="Remove from history" onClick={(e) => { e.stopPropagation(); remove(w.id) }}><Icon name="close" className="xs"/></button>
                     </div>
-                    <div className="watched-meta">
-                      <Avatar initials={w._author.initials} color={w._author.avc} size={26} src={w._author.profileImage}/>
-                      <div className="watched-info">
-                        <div className="watched-title">{w.title || 'Reel'}</div>
-                        <small className="muted">@{w._author.handle} · {w.time}</small>
-                      </div>
+                    <div className="pr-strip">
+                      <b className="pr-title">{w.title || 'Reel'}</b>
+                      <span className="pr-sub">@{w._author.handle} · {w.time}</span>
                     </div>
                   </div>
                 ))}

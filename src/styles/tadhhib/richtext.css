@@ -1,0 +1,387 @@
+/* =============================================================
+   IKA · TADHHIB — richtext layer
+   The `.prose` reading experience + the RichTextEditor chrome.
+   Additive override layer: imported AFTER all MIDAD files (equal
+   specificity wins by order) and BEFORE the other tadhhib area
+   files — every selector here stays scoped to .prose / .rte-* /
+   .t-dropcap so it never leaks into another area's surfaces.
+
+   Showpieces:
+     · gradient link underlines that draw themselves in
+     · gilded blockquotes with a vertical illumination bar +
+       ghost quote-glyph ornament
+     · ornamental <hr>: tiny khatam star between two gold hairlines
+     · warm-paper code blocks crowned by an illuminated rule
+     · glass & grain RTE toolbar, gild-wash active tools, spring
+       popovers, ink-press physics on every actionable
+     · the shared .t-dropcap utility (documented below) used by
+       the qna / research areas for their reading views
+   ============================================================= */
+
+/* ================================================================
+   1 · PROSE — links. The illuminated underline: a quiet 1px rubric
+   hairline at rest; on hover a 2px --illum gradient draws itself
+   across (background-size 0%→100%). box-decoration-break:clone
+   gives every wrapped line fragment its own underline.
+   ================================================================ */
+.prose a{
+  color:var(--emerald);
+  border-bottom:0;                                   /* replaces MIDAD's static border underline */
+  padding-bottom:1px;
+  background-image:
+    linear-gradient(90deg,rgba(179,39,30,.28),rgba(179,39,30,.28)),
+    var(--illum);
+  background-repeat:no-repeat;
+  background-position:0 100%,0 100%;
+  background-size:100% 1px,0% 2px;
+  -webkit-box-decoration-break:clone;
+  box-decoration-break:clone;
+  transition:background-size var(--t-med) var(--ease-out),color var(--t-fast) ease;
+}
+.prose a:hover{
+  color:var(--emerald-deep);
+  border-bottom:0;
+  background-size:100% 1px,100% 2px;
+}
+
+/* ================================================================
+   2 · PROSE — blockquote. A gilded folio inset: faint gold wash,
+   vertical illumination bar (rubric→gold), and a ghost quote glyph
+   floating in the corner at ornament opacity. Logical properties
+   keep it RTL-safe (bar + glyph flip sides automatically).
+   ================================================================ */
+.prose blockquote{
+  position:relative;
+  margin:1.4em 0;
+  padding:12px 18px;
+  padding-inline-start:22px;
+  border-inline-start:0;                             /* MIDAD's 3px brass bar → replaced by ::before */
+  border-radius:12px;
+  background:linear-gradient(135deg,rgba(250,244,228,.55),rgba(250,244,228,.12) 70%);
+  box-shadow:inset 0 0 0 1px rgba(234,223,196,.45);
+  color:var(--ink-soft);
+  font-style:italic;
+}
+.prose blockquote::before{                           /* the vertical illuminated hairline */
+  content:"";position:absolute;
+  inset-block:10px;inset-inline-start:0;
+  width:2px;border-radius:2px;
+  background:linear-gradient(180deg,#8f1f18 0%,#b3271e 38%,#c49a3c 82%,#e3bc66 100%);
+}
+.prose blockquote::after{                            /* ghost quote glyph — barely-there ornament */
+  content:"\201C";position:absolute;
+  top:0;inset-inline-end:10px;
+  font-family:var(--serif);font-size:54px;line-height:1;
+  color:var(--gild);opacity:.07;
+  pointer-events:none;
+}
+
+/* ================================================================
+   3 · PROSE — <hr>. The section divider becomes an ornament: a tiny
+   khatam (8-point star) glyph centred between two gold hairlines
+   that fade toward the margins. Pure background layers on the hr
+   itself — no pseudo-elements, robust everywhere.
+   ================================================================ */
+.prose hr{
+  border:0;height:28px;margin:2.2em 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23c49a3c' stroke-width='1.2'%3E%3Crect x='7.2' y='7.2' width='9.6' height='9.6'/%3E%3Crect x='7.2' y='7.2' width='9.6' height='9.6' transform='rotate(45 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='1.6' fill='%23c49a3c'/%3E%3C/svg%3E"),
+    linear-gradient(90deg,transparent,rgba(196,154,60,.5)),
+    linear-gradient(90deg,rgba(196,154,60,.5),transparent);
+  background-repeat:no-repeat;
+  background-size:18px 18px,calc(50% - 24px) 1px,calc(50% - 24px) 1px;
+  background-position:center,left center,right center;
+}
+
+/* ================================================================
+   4 · PROSE — code. Inline code warms toward the gild wash; the
+   <pre> block trades the night slab for warm paper ink — #faf9f5,
+   hairline frame, and a 2px illuminated rule crowning the block.
+   ================================================================ */
+.prose code{
+  background:#fbf8f0;
+  border-color:rgba(234,223,196,.6);
+}
+.prose pre{
+  background:
+    linear-gradient(90deg,rgba(143,31,24,.45),rgba(196,154,60,.5) 60%,rgba(227,188,102,.3)) 0 0/100% 2px no-repeat,
+    #faf9f5;
+  color:var(--ink-2);
+  border:1px solid var(--line);
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(27,24,19,.03);
+}
+
+/* ================================================================
+   5 · PROSE — tables. Hairline grid on warm paper; the header row
+   carries a continuous gilded underline (inset shadow → same color
+   in every cell, no per-cell gradient restarts); rows warm softly
+   under the pointer.
+   ================================================================ */
+.prose table{
+  border-color:var(--line);
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(27,24,19,.03);
+}
+.prose thead th{
+  background:linear-gradient(180deg,#fdfcf9,#faf6ea);
+  box-shadow:inset 0 -2px 0 rgba(196,154,60,.45);
+  letter-spacing:.3px;
+}
+.prose tbody tr:nth-child(2n) td{background:rgba(250,244,228,.3)}   /* zebra: red tint → gold-paper */
+.prose td{transition:background-color var(--t-fast) ease}
+.prose tbody tr:hover td{background:rgba(250,244,228,.55)}
+
+/* ================================================================
+   6 · PROSE — images. A mounted plate: hairline frame with a sliver
+   of paper mat, floating warm shadow, and a one-shot rise entrance.
+   The img-behind watermark mode stays frameless and inert.
+   ================================================================ */
+.prose img{
+  padding:4px;background:#fff;
+  border:1px solid var(--line);
+  border-radius:12px;
+  box-shadow:0 2px 6px rgba(27,24,19,.04),0 16px 36px -18px rgba(27,24,19,.25);
+  animation:t-rise var(--t-slow) var(--ease-out) backwards;
+}
+.prose img.img-behind{
+  padding:0;background:transparent;border:0;box-shadow:none;animation:none;
+}
+
+/* ================================================================
+   7 · PROSE — scholarly details. Gilded footnote/citation marks,
+   gold list markers, warm underline ink.
+   ================================================================ */
+.prose sup{font-family:var(--serif);font-weight:600;color:var(--gild-ink)}
+.prose sup a{                                        /* footnote refs: quiet gold, no drawn underline */
+  color:var(--gild-ink);
+  background-image:none;padding-bottom:0;
+}
+.prose sup a:hover{color:var(--emerald-deep)}
+.prose u{text-decoration-color:var(--gild-2)}
+.prose li::marker{color:var(--gild)}
+.prose ol > li::marker{font-family:var(--serif);font-weight:600}
+
+/* ================================================================
+   8 · PROSE — headings. h2's plain rule becomes a gold hairline
+   fading toward the text-end margin (flips for RTL blocks).
+   ================================================================ */
+.prose h2{
+  border-bottom:0;padding-bottom:.3em;
+  background-image:linear-gradient(90deg,rgba(196,154,60,.5),rgba(196,154,60,.05) 72%,transparent);
+  background-repeat:no-repeat;
+  background-size:100% 1px;
+  background-position:0 100%;
+}
+.prose h2:dir(rtl){
+  background-image:linear-gradient(270deg,rgba(196,154,60,.5),rgba(196,154,60,.05) 72%,transparent);
+}
+
+/* ================================================================
+   9 · SHARED UTILITY — .t-dropcap                    ★ DOCUMENTED ★
+   The rubric drop cap that opens a reading view (spec: living type).
+   HOW TO USE (qna / research areas):
+     · add className "t-dropcap" to the .prose element itself
+       (e.g. <RichText className="rd-text t-dropcap" …/>), OR
+     · add it to any ANCESTOR wrapping a .prose child.
+   The first <p> child's first letter becomes a 3-line floated
+   rubric serif initial with a whisper of gold leaf behind it.
+   NOTES:
+     · RTL blocks are exempted below — ::first-letter styling breaks
+       Arabic-script letter joining, so the cap only fires on LTR.
+     · Pattern targets direct <p> children only; if an area's body
+       opens with a different block, extend in that area's own file.
+   ================================================================ */
+.prose.t-dropcap > p:first-of-type::first-letter,
+.t-dropcap .prose > p:first-of-type::first-letter{
+  float:left;float:inline-start;
+  font-family:var(--serif);font-weight:600;
+  font-size:3.4em;line-height:.82;
+  color:var(--rubric);
+  padding:.05em 0 .02em;
+  padding-inline-end:.12em;
+  margin-inline-end:.02em;
+  text-shadow:2px 2px 0 rgba(196,154,60,.28);        /* the gold-leaf edge behind the rubric initial */
+}
+.prose.t-dropcap > p:first-of-type:dir(rtl)::first-letter,
+.t-dropcap .prose > p:first-of-type:dir(rtl)::first-letter{
+  float:none;
+  font-size:inherit;line-height:inherit;font-weight:inherit;
+  color:inherit;padding:0;margin:0;text-shadow:none;
+}
+
+/* ================================================================
+   10 · RTE — the illuminated frame. Focus turns the whole editor
+   into a gilded plate (gold hairline + soft gold ring), echoing
+   core.css's gold focus language.
+   ================================================================ */
+.rte{
+  transition:border-color var(--t-fast) ease,box-shadow var(--t-med) var(--ease-out);
+}
+.rte:focus-within{
+  border-color:var(--gild-2);
+  box-shadow:0 0 0 4px rgba(196,154,60,.13),var(--shadow-sm);
+}
+
+/* Label kicker — tiny gold rule trailing the rubric small caps */
+.rte-label::after{
+  content:"";display:inline-block;vertical-align:middle;
+  width:18px;height:1px;margin-inline-start:7px;
+  background:linear-gradient(90deg,var(--gild-2),transparent);
+}
+
+/* Format pills + Write/Preview tabs — active = gild wash (the
+   TADHHIB "this tool is on" state), rubric stays the hover/action */
+.rte-fmt-pill{
+  transition:background-color var(--t-fast) ease,color var(--t-fast) ease,
+             transform var(--t-fast) var(--ease-spring);
+}
+.rte-fmt-pill:active{transform:scale(.95)}
+.rte-fmt-pill.on{
+  background:var(--gild-wash);color:var(--gild-ink);
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.38);
+}
+.rte-tab{
+  transition:background-color var(--t-fast) ease,color var(--t-fast) ease;
+}
+.rte-tab.on{background:var(--gild-wash);color:var(--gild-ink)}
+
+/* ================================================================
+   11 · RTE — glass & grain toolbar. The sticky tool row becomes
+   floating chrome: blur + saturation, paper grain film at 2%, and
+   a gradient hairline (line→gold→line) along its bottom edge.
+   (Pseudos are safe: popovers live inside .rte-pop-wrap at z:120,
+   well above these decorations; grain is pointer-events:none.)
+   ================================================================ */
+.rte-tools{
+  background:rgba(255,255,255,.82);
+  backdrop-filter:blur(18px) saturate(160%);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);
+}
+.rte-tools::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:var(--grain);opacity:.02;
+}
+.rte-tools::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,var(--line-soft),rgba(196,154,60,.5) 50%,var(--line-soft));
+}
+
+/* Tool buttons — ink-press physics + gild-wash active state */
+.rte-tool{
+  transition:background-color var(--t-fast) ease,color var(--t-fast) ease,
+             transform var(--t-fast) var(--ease-spring);
+}
+.rte-tool:hover{transform:translateY(-1px)}
+.rte-tool:active{transform:scale(.9)}
+.rte-tool.on{
+  background:var(--gild-wash);color:var(--gild-ink);
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.4);
+}
+.rte-tool.on:hover{background:#f5ecd6;color:var(--gild-ink)}
+.rte-tool.on .rte-size-display{
+  background:#fff;border-color:rgba(196,154,60,.5);color:var(--gild-ink);
+}
+
+/* Block-style select + manual size input — gold focus language */
+.rte-block-select:focus{
+  border-color:var(--gild-2);
+  box-shadow:0 0 0 3px rgba(196,154,60,.15);
+}
+.rte-size-input:focus{
+  border-color:var(--gild-2);
+  box-shadow:0 0 0 3px rgba(196,154,60,.15);
+}
+.rte-size-apply{
+  transition:background-color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring);
+}
+.rte-size-apply:active{transform:scale(.95)}
+
+/* ================================================================
+   12 · RTE — popovers (colour / size / family / table). Spring
+   pop-in from the trigger corner, gold hairline shell.
+   ================================================================ */
+.rte-popover{
+  border-color:var(--gild-line);
+  box-shadow:0 18px 44px -16px rgba(27,24,19,.25),0 0 0 1px rgba(196,154,60,.08);
+  animation:t-pop .28s var(--ease-spring);
+  transform-origin:top left;
+}
+.rte-color-swatch{
+  transition:transform var(--t-fast) var(--ease-spring),box-shadow var(--t-fast) ease;
+}
+.rte-color-swatch:hover{
+  transform:scale(1.18);
+  box-shadow:0 4px 10px -3px rgba(0,0,0,.25),0 0 0 1px rgba(196,154,60,.5);
+}
+.rte-color-swatch:active{transform:scale(1.02)}
+
+/* Size / family rows — gild selection, quiet press */
+.rte-size-row{
+  transition:background-color var(--t-fast) ease,color var(--t-fast) ease,
+             transform var(--t-fast) var(--ease-spring);
+}
+.rte-size-row:active{transform:scale(.97)}
+.rte-size-row.on{
+  background:var(--gild-wash);color:var(--gild-ink);
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.42);
+}
+.rte-size-row.on .rte-size-num{color:var(--gild-ink)}
+.rte-size-row.on .rte-size-hint{color:var(--gild)}
+
+/* Table-size picker — the swept extent gilds instead of rubricating */
+.rte-table-cell{transition:background-color .08s ease,border-color .08s ease}
+.rte-table-cell.on{background:var(--gild-2);border-color:var(--gild)}
+
+/* ================================================================
+   13 · RTE — floating image toolbar. Night → glass: warm white
+   blur plate with a gold hairline, spring entrance from below the
+   anchor, gild-wash active buttons.
+   ================================================================ */
+.rte-img-bar{
+  background:rgba(255,255,255,.9);
+  backdrop-filter:blur(16px) saturate(150%);
+  -webkit-backdrop-filter:blur(16px) saturate(150%);
+  border-color:var(--gild-line);
+  box-shadow:0 16px 40px -14px rgba(27,24,19,.28),0 0 0 1px rgba(196,154,60,.1);
+  animation:t-pop .26s var(--ease-spring);
+  transform-origin:bottom left;
+}
+.rte-img-btn{
+  transition:background-color var(--t-fast) ease,color var(--t-fast) ease,
+             transform var(--t-fast) var(--ease-spring);
+}
+.rte-img-btn:active{transform:scale(.9)}
+.rte-img-btn.on{
+  background:var(--gild-wash);color:var(--gild-ink);
+  box-shadow:inset 0 0 0 1px rgba(196,154,60,.45);
+}
+.rte-img-btn.on:hover{background:#f2e7cd;color:var(--gild-ink)}
+
+/* Selected-image affordance in the editor — gold instead of rubric */
+.rte-wysiwyg img:hover{outline-color:rgba(196,154,60,.55)}
+
+/* ================================================================
+   14 · RTE — writing surfaces. Selection harmonised with the global
+   gold-leaf selection; preview fades in on tab switch; hint footer
+   warms toward the wash.
+   ================================================================ */
+.rte-wysiwyg ::selection{background:#f3e0b8}
+.rte-preview.prose{animation:t-fade var(--t-med) var(--ease-out)}
+.rte-hint{background:linear-gradient(180deg,var(--card-2),#faf7ef)}
+.rte-hint code{border-color:rgba(234,223,196,.7)}
+
+/* ================================================================
+   15 · MOBILE — re-stated / adjusted values. styles-responsive.css
+   only touches .prose line-height (untouched here), so this block
+   is purely additive comfort: tighter quote insets, a slightly
+   smaller drop cap, calmer ornament scale.
+   ================================================================ */
+@media(max-width:720px){
+  .prose blockquote{padding:10px 14px;padding-inline-start:18px}
+  .prose blockquote::after{font-size:44px;inset-inline-end:8px}
+  .prose hr{margin:1.8em 0}
+  .prose.t-dropcap > p:first-of-type::first-letter,
+  .t-dropcap .prose > p:first-of-type::first-letter{font-size:3em}
+  .prose img{padding:3px;border-radius:10px}
+}

@@ -11,7 +11,7 @@ import { api, adapters, assetUrl } from '../api/index.js'
 export function HighlightViewer({ highlight, author, owner, onClose }) {
   const [items, setItems] = React.useState(null)
   const [idx, setIdx] = React.useState(0)
-  const u = author || { full: 'Member', handle: 'member', initials: '··', avc: 'linear-gradient(160deg,#1fb98e,#0a4a3c)' }
+  const u = author || { full: 'Member', handle: 'member', initials: '··', avc: 'linear-gradient(160deg,#d8453a,#8f1f18)' }
 
   React.useEffect(() => {
     let alive = true
@@ -19,7 +19,7 @@ export function HighlightViewer({ highlight, author, owner, onClose }) {
       if (!alive) return
       setItems((rows || []).map(r => ({
         id: r.storyId, createdAt: r.createdAt, type: r.storyType,
-        bg: r.mediaUrl ? `center/cover no-repeat url("${assetUrl(r.mediaUrl)}")` : 'linear-gradient(160deg,#1fb98e,#0a4a3c)',
+        bg: r.mediaUrl ? `#100e0b center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : 'linear-gradient(160deg,#d8453a,#8f1f18)',
         text: r.textContent || '', hasMedia: !!r.mediaUrl, time: adapters.timeAgo(r.createdAt),
       })))
     }).catch(() => { if (alive) setItems([]) })
@@ -68,7 +68,8 @@ export function HighlightViewer({ highlight, author, owner, onClose }) {
       </div>
 
       <div className="rv-stage">
-        <div className="rv-card">
+        {/* keyed per item → the page-turn animation replays on every step */}
+        <div key={idx} className="rv-card">
           <div className="rv-bg" style={{ background: item.bg }}/>
           {item.text && !item.hasMedia && <div className="rv-center">{item.text}</div>}
         </div>

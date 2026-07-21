@@ -22,7 +22,7 @@ const TABS = [
 ]
 const CAT_OF = Object.fromEntries(TABS.map(([k, , c]) => [k, c]))
 const CAT_ICON = { POSTS:'heart', QNA:'qna', RESEARCH:'research', MENTIONS:'at', SOCIAL:'follow', SYSTEM:'bell' }
-const CAT_TINT = { POSTS:'#c2453f', QNA:'#159a76', RESEARCH:'#bd9344', MENTIONS:'#bd9344', SOCIAL:'#3f6a8a', SYSTEM:'#3c4f49' }
+const CAT_TINT = { POSTS:'#c2453f', QNA:'#c9382f', RESEARCH:'#b3271e', MENTIONS:'#b3271e', SOCIAL:'#1f3a6e', SYSTEM:'#5e574b' }
 
 // The daily trending digest (NOTIFICATIONS_API §11.6) has no actor and its body is a
 // comma-joined hashtag list. Parse the #tags so each can route to its tag feed.
@@ -102,7 +102,7 @@ export function NotificationsPage() {
       <div className="col-main ntf-page">
         <div className="phead ntf-head">
           <div>
-            <h1>Notifications {unreadCount > 0 && <span className="ntf-count">{unreadCount}</span>}</h1>
+            <h1>Notifications {unreadCount > 0 && <span className="ntf-count">{unreadCount}</span>} <span className="phead-ar" lang="ar" dir="rtl">الإشعارات</span></h1>
             <p className="sub">{unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}.` : 'Latest activity across your posts, research, and community.'}</p>
           </div>
           <button className="btn btn-secondary" onClick={markAll} disabled={!unreadCount}><Icon name="check" className="sm"/>Mark all read</button>
@@ -126,13 +126,13 @@ export function NotificationsPage() {
           : groups.map(([label, rows]) => (
             <section key={label} className="ntf-section">
               <div className="ntf-group">{label}</div>
-              <div className="card ntf-list">
+              <div className="card ntf-list t-stagger">
                 {rows.map(n => {
                   const u = n._actor || authorOf(n)
                   // TRENDING_DIGEST: no actor — system tile + tag chips instead of a user avatar (§11.6)
                   const isTrending = n.type === 'TRENDING_DIGEST'
                   const tags = isTrending ? trendingTags(n.body) : []
-                  const tint = isTrending ? '#bd9344' : (CAT_TINT[n.category] || '#3c4f49')
+                  const tint = isTrending ? '#b3271e' : (CAT_TINT[n.category] || '#5e574b')
                   const goActor = (e) => { e.stopPropagation(); if (!isTrending && u.id) navigate(`/u/${u.id}`) }
                   return (
                     <div key={n.id} className={'ntf-row ' + (n.unread ? 'unread' : '')} style={{ cursor: n.deepLink ? 'pointer' : 'default', '--cat': tint }} onClick={() => open(n)}>

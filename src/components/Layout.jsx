@@ -37,12 +37,21 @@ export function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
-  const me = user || { full: 'You', handle: 'you', initials: 'Y', avc: 'linear-gradient(135deg,#159a76,#0a4a3c)' }
+  const me = user || { full: 'You', handle: 'you', initials: 'Y', avc: '#1b1813' }
   const [composeType, setComposeType] = React.useState(null)
   const [editPost, setEditPost] = React.useState(null)
   const [search, setSearch] = React.useState('')
   const [unread, setUnread] = React.useState(0)
   const [navOpen, setNavOpen] = React.useState(false)
+  const [desktopNavOpen, setDesktopNavOpen] = React.useState(() => {
+    try { return window.localStorage.getItem('ika:sidebar') !== 'closed' }
+    catch { return true }
+  })
+
+  React.useEffect(() => {
+    try { window.localStorage.setItem('ika:sidebar', desktopNavOpen ? 'open' : 'closed') }
+    catch { /* storage may be unavailable in private contexts */ }
+  }, [desktopNavOpen])
 
   // On mobile the full sidebar slides in as a left drawer (the topbar hamburger
   // opens it); the bottom bar carries the main pages.
@@ -113,15 +122,18 @@ export function Layout() {
   const signOut = async () => { await logout(); navigate('/login') }
 
   return (
-    <div className="app">
+    <div className={'app' + (desktopNavOpen ? '' : ' sidebar-collapsed')}>
       <header className="topbar">
         <button className="topbar-menu" onClick={() => setNavOpen(true)} aria-label="Open menu"><Icon name="menu"/></button>
+        <button className="sidebar-toggle" onClick={() => setDesktopNavOpen(open => !open)}
+          aria-label={desktopNavOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-expanded={desktopNavOpen} aria-controls="app-sidebar"
+          title={desktopNavOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+          <Icon name="chevleft"/>
+        </button>
         <div className="brand" onClick={() => navigate('/')} style={{ cursor:'pointer' }}>
           <div className="mark"><BrandMark/></div>
-          <div>
-            <div className="word">IKA<b>.</b></div>
-            <small>Islamic Knowledge Archive</small>
-          </div>
+          <div className="word">IKA<b> ·</b> Archive</div>
         </div>
 
         <div className="tb-search">
@@ -134,7 +146,7 @@ export function Layout() {
           <button className="icon-btn" style={{ position:'relative' }} onClick={() => navigate('/notifications')}>
             <Icon name="bell"/>{unread > 0 && <span className="dot"/>}
           </button>
-          <button className="icon-btn tint" onClick={() => setComposeType('TEXT')}><Icon name="compose"/></button>
+          <button className="icon-btn tint" onClick={() => setComposeType('TEXT')}><Icon name="feather"/></button>
           <button className="me-chip" onClick={() => navigate('/profile')}>
             <Avatar initials={me.initials} color={me.avc} size={30} src={me.profileImage}/>
             <span className="nm">{me.full.split(' ')[0]}</span>
@@ -142,7 +154,7 @@ export function Layout() {
         </div>
       </header>
 
-      <aside className={'sidebar' + (navOpen ? ' open' : '')}>
+      <aside id="app-sidebar" className={'sidebar' + (navOpen ? ' open' : '')}>
         <div className="sidebar-head">
           <div className="brand">
             <div className="mark"><BrandMark/></div>
@@ -191,7 +203,7 @@ export function Layout() {
           <Icon name={BOTTOM_TABS[1].icon}/><small>{BOTTOM_TABS[1].label}</small>
         </NavLink>
         <a className="mid" onClick={() => setComposeType('TEXT')} aria-label="Create">
-          <span className="plus"><Icon name="compose"/></span>
+          <span className="plus"><Icon name="feather"/></span>
         </a>
         <NavLink to={BOTTOM_TABS[2].to} className={({ isActive }) => isActive ? 'active' : ''}>
           <Icon name={BOTTOM_TABS[2].icon}/><small>{BOTTOM_TABS[2].label}</small>
@@ -207,7 +219,7 @@ export function Layout() {
           editPost={composeType === 'EDIT' ? editPost : null}
           onClose={closeCompose} onPublished={onPublished} onEdited={onEdited}/>
       )}
-      {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)}/>}
+      <div className={'nav-scrim' + (navOpen ? ' open' : '')} aria-hidden={!navOpen} onClick={() => setNavOpen(false)}/>
       <ToastHost/>
       <DialogHost/>
       <ShareHost/>

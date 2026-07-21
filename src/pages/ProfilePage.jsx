@@ -8,6 +8,7 @@ import { ProfileDetails } from '../components/ProfileDetails.jsx'
 import { uiConfirm, uiPrompt } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { HighlightViewer } from '../components/HighlightViewer.jsx'
+import { FollowListModal } from '../components/FollowListModal.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { openComposeEdit } from '../lib/openCompose.js'
@@ -16,10 +17,11 @@ import { api, assetUrl } from '../api/index.js'
 export function ProfilePage() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()
-  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#159a76,#0a4a3c)', role:'MEMBER', bio:'', field:'', followers:0, following:0, posts:0, contributions:0 }
+  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)', role:'MEMBER', bio:'', field:'', followers:0, following:0, posts:0, contributions:0 }
   const coverRef = React.useRef(null)
   const pickCover = (e) => { const f = e.target.files?.[0]; e.target.value=''; if (!f) return; api.users.uploadCover(f).then(() => { showToast('Cover updated'); refreshUser?.() }).catch(() => showToast('Could not upload cover')) }   // §10.6
   const [hlOpen, setHlOpen] = React.useState(null)   // open highlight archive viewer
+  const [followList, setFollowList] = React.useState(null)   // {mode} → followers/following list modal
   const [tab, setTab] = React.useState('POSTS')
   const [posts, setPosts] = React.useState([])
   const [research, setResearch] = React.useState([])
@@ -100,7 +102,7 @@ export function ProfilePage() {
           </button>
         </div>
         <div className="prof-head">
-          <Avatar initials={me.initials} color={me.avc} size={132} className="prof-avatar" src={me.profileImage}/>
+          <span className="t-ring"><Avatar initials={me.initials} color={me.avc} size={132} className="prof-avatar" src={me.profileImage}/></span>
           <div className="prof-actions">
             <button className="btn btn-secondary" onClick={() => navigate('/activity')}><Icon name="list" className="sm"/>Activity</button>
             <button className="btn btn-secondary" onClick={() => navigate('/settings')}><Icon name="settings" className="sm"/>Edit profile</button>
@@ -117,35 +119,29 @@ export function ProfilePage() {
             <button onClick={() => setTab('REELS')}><b>{fmt(stats?.reels ?? reels.length)}</b><small>REELS</small></button>
             <button onClick={() => setTab('RESEARCH')}><b>{fmt(stats?.research ?? research.length)}</b><small>RESEARCH</small></button>
             <button onClick={() => setTab('QUESTIONS')}><b>{fmt(stats?.questions ?? questions.length)}</b><small>QUESTIONS</small></button>
-            <button><b>{fmt(stats?.followers ?? me.followers ?? 0)}</b><small>FOLLOWERS</small></button>
-            <button><b>{fmt(stats?.following ?? me.following ?? 0)}</b><small>FOLLOWING</small></button>
+            <button onClick={() => setFollowList({ mode:'followers' })}><b>{fmt(stats?.followers ?? me.followers ?? 0)}</b><small>FOLLOWERS</small></button>
+            <button onClick={() => setFollowList({ mode:'following' })}><b>{fmt(stats?.following ?? me.following ?? 0)}</b><small>FOLLOWING</small></button>
           </div>
 
           <section className="stories" style={{ marginTop:18 }}>
-            <button className="story-card is-add is-new" onClick={addHighlight}>
-              <span className="sc-thumb">
-                <span className="sc-cover">
-                  <span className="sc-plus lg"><Icon name="compose" className="sm"/></span>
-                  <span className="sc-nm">New</span>
-                </span>
-              </span>
+            <button className="st is-add" onClick={addHighlight}>
+              <span className="st-ring add"><Icon name="compose" className="sm"/></span>
+              <b>New</b>
             </button>
             {highlights.map((h, i) => (
               <button
                 key={hid(h)}
-                className="story-card unseen"
+                className="st"
                 draggable
                 onDragStart={() => { dragIx.current = i }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => dropHighlight(i)}
                 onClick={() => setHlOpen({ id: hid(h), title: h.title })}
                 title={`${h.title} — tap to view, drag to reorder`}>
-                <span className="sc-thumb">
-                  <span className="sc-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'linear-gradient(160deg,#1fb98e,#0a4a3c)' }}>
-                    <span className="sc-grad"/>
-                    <span className="sc-nm">{h.title}</span>
-                  </span>
+                <span className="st-ring unseen">
+                  <span className="st-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'#8f1f18' }}/>
                 </span>
+                <b>{h.title}</b>
               </button>
             ))}
           </section>
@@ -183,6 +179,7 @@ export function ProfilePage() {
         )}
       </div>
       {hlOpen && <HighlightViewer highlight={hlOpen} author={me} owner onClose={() => setHlOpen(null)}/>}
+      {followList && <FollowListModal userId={me.id} mode={followList.mode} onClose={() => setFollowList(null)}/>}
     </div>
   )
 }

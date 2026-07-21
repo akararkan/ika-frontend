@@ -1,0 +1,389 @@
+/* =============================================================
+   IKA · TADHHIB — user layer
+   Profile · Notifications · Explore/Tag · Settings · Saved ·
+   Activity · Auth · FollowListModal.
+   Additive override layer: imported AFTER every MIDAD file, so
+   equal-specificity selectors win by order. Tokens + keyframes
+   come from tadhhib/core.css — never redefined here.
+   Showpieces: the illumination avatar ring, gilded notification
+   date-kickers with a pulse dot, and the auth girih first
+   impression.
+   ============================================================= */
+
+/* ===================== PROFILE — the illuminated folio ===================== */
+
+/* Cover plate: warm scrim + gold foot hairline (::before, z1) and a girih
+   khatam star ghosted into the top corner (::after, z1). The edit button
+   sits at z3, so both ornaments stay safely beneath it. */
+.prof-cover{animation:t-fade var(--t-slow) var(--ease-out) backwards}
+.prof-cover::before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(20,16,10,0) 55%,rgba(20,16,10,.30));
+  box-shadow:inset 0 -1px 0 rgba(227,188,102,.42);
+}
+.prof-cover::after{
+  content:"";position:absolute;top:-44px;inset-inline-end:-44px;z-index:1;
+  width:200px;height:200px;pointer-events:none;
+  background:var(--girih) center/contain no-repeat;opacity:.08;
+}
+.prof-cover-edit{transition:background var(--t-fast) ease,border-color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.prof-cover-edit:hover{background:rgba(27,24,19,.68);border-color:rgba(227,188,102,.45)}
+.prof-cover-edit:active{transform:scale(.95)}
+
+/* The illumination ring — a thin conic gold band orbiting the avatar.
+   .avatar clips overflow, so the ring lives on a wrapper span (.t-ring)
+   added in ProfilePage / UserProfilePage. Quiet at rest, full at hover. */
+.t-ring{position:relative;display:inline-flex;flex:none;border-radius:50%}
+.t-ring::after{
+  content:"";position:absolute;inset:-8px;border-radius:50%;pointer-events:none;
+  background:conic-gradient(from 215deg,#b3271e,#c49a3c 30%,#e3bc66 50%,#c49a3c 70%,#b3271e);
+  -webkit-mask:radial-gradient(farthest-side,#0000 calc(100% - 2.5px),#000 calc(100% - 1.5px));
+          mask:radial-gradient(farthest-side,#0000 calc(100% - 2.5px),#000 calc(100% - 1.5px));
+  opacity:.5;transform:scale(.97);
+  transition:opacity var(--t-med) var(--ease-out),transform var(--t-med) var(--ease-spring);
+  animation:t-fade .8s var(--ease-out) .15s backwards;
+}
+.t-ring:hover::after{opacity:1;transform:scale(1.03)}
+.t-ring:hover .prof-avatar{transform:scale(1.012)}
+.prof-avatar{box-shadow:0 0 0 1px var(--gild-line),0 10px 24px -10px rgba(27,24,19,.35)}
+
+/* Head + meta rise in as a short procession */
+.prof-head{animation:t-rise .5s var(--ease-out) .06s backwards}
+.prof-meta{animation:t-rise .55s var(--ease-out) .12s backwards}
+.prof-about{animation:t-rise .55s var(--ease-out) .18s backwards}
+
+/* Name rule: rubric bar → illuminated hairline that draws itself in */
+.prof-meta h1::after{
+  background:var(--illum);height:2px;border-radius:2px;
+  transform-origin:left;animation:t-draw .8s var(--ease-out) .25s backwards;
+}
+
+/* Stats: serif tabular numbers with a gentle lift + first-paint pop */
+.prof-counts button{transition:transform var(--t-fast) var(--ease-out)}
+.prof-counts button:hover{transform:translateY(-1px)}
+.prof-counts button:active{transform:scale(.97)}
+.prof-counts b{font-variant-numeric:tabular-nums;transition:color var(--t-fast) ease;animation:t-pop .45s var(--ease-spring) backwards}
+.prof-counts button:nth-child(2) b{animation-delay:.05s}
+.prof-counts button:nth-child(3) b{animation-delay:.1s}
+.prof-counts button:nth-child(4) b{animation-delay:.15s}
+.prof-counts button:nth-child(5) b{animation-delay:.2s}
+.prof-counts button:nth-child(6) b{animation-delay:.25s}
+
+/* Following = quiet gold outline (className added in owned JSX) */
+.btn.is-following{background:var(--gild-wash);border-color:var(--gild-line);color:var(--gild-ink)}
+.btn.is-following:hover{background:#f6edd6;border-color:var(--gild-2)}
+.btn.is-following .ico{color:var(--gild)}
+
+/* Highlights rail (scoped: the feed area owns the global story ring) —
+   unseen ring becomes the conic illumination band; add-ring goes gold. */
+/* (Story-ring illumination is owned by tadhhib/feed.css — its unqualified
+   .st-ring rules reach the profile rail too; duplicating them here caused a
+   half-merged double treatment, per the coherence audit.) */
+
+/* Profile detail panel: gilded kickers + rows that answer the hand */
+.pa-h{
+  display:flex;align-items:center;gap:10px;
+  color:var(--gild-ink);letter-spacing:.16em;
+}
+.pa-h::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(196,154,60,.45),var(--line) 55%,transparent);
+}
+.pa-chip{
+  color:var(--gild-ink);background:rgba(196,154,60,.09);
+  border:1px solid rgba(168,120,29,.26);
+  transition:background var(--t-fast) ease,border-color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring);
+}
+.pa-chip:hover{background:rgba(196,154,60,.15);border-color:var(--gild-2);transform:translateY(-1px)}
+.pa-list li a,.pa-list li .pa-row{
+  transition:background var(--t-fast) ease,border-color var(--t-fast) ease,transform var(--t-fast) var(--ease-out),box-shadow var(--t-med) var(--ease-out);
+}
+.pa-list li a:hover{background:var(--card-2);border-color:var(--gild-line);transform:translateX(3px);box-shadow:var(--shadow-float)}
+.pa-list li a:active{transform:scale(.99)}
+.pa-list li a:hover .pa-ic{background:var(--gild-wash);color:var(--gild-ink)}
+.pa-ic{transition:background var(--t-fast) ease,color var(--t-fast) ease}
+
+/* ================= FOLLOWERS / FOLLOWING MODAL — a gilded register ========= */
+.follow-list .dlg-head{position:relative}
+.follow-list .dlg-head::after{
+  content:"";position:absolute;left:18px;right:18px;bottom:-4px;height:2px;border-radius:2px;
+  background:var(--illum);transform-origin:left;
+  animation:t-draw .7s var(--ease-out) .1s backwards;
+}
+.follow-list .dlg-ic{background:var(--gild-wash);color:var(--gild-ink)}
+.fl-row{
+  border-radius:10px;
+  transition:background var(--t-fast) ease,transform var(--t-fast) var(--ease-out);
+}
+.fl-row:hover{background:rgba(196,154,60,.06);transform:translateX(3px)}
+.fl-who .avatar{transition:transform var(--t-fast) var(--ease-spring)}
+.fl-who:hover .avatar{transform:scale(1.06)}
+.fl-who:active .avatar{transform:scale(.95)}
+.fl-who:hover b{color:var(--rubric)}
+
+/* ================= NOTIFICATIONS — the gilded inbox ======================= */
+
+/* Count seal in the page title: deep illum ink, pops on arrival */
+.ntf-count{background:var(--illum-deep);animation:t-pop .4s var(--ease-spring)}
+
+/* Date-kickers — the showpiece: small-caps gold, a breathing seal-dot,
+   and a hairline that fades from gold to paper after the word. */
+.ntf-group{
+  display:flex;align-items:center;gap:9px;
+  color:var(--gild-ink);font-size:10.5px;letter-spacing:.18em;
+}
+.ntf-group::before{
+  content:"";width:7px;height:7px;flex:none;border-radius:50%;
+  background:radial-gradient(circle at 32% 32%,var(--gild-bright),var(--gild) 70%);
+  box-shadow:0 0 0 1px rgba(168,120,29,.25);
+}
+.ntf-group::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(196,154,60,.5),var(--line) 55%,transparent);
+}
+/* Only the freshest kicker breathes (Today on /notifications, first group
+   in the /activity register) — the rest stay still. */
+.ntf-section:first-of-type .ntf-group::before,
+.ntf-page .card>.ntf-group:first-child::before{animation:t-dot-pulse 2.8s ease-in-out infinite}
+
+/* Sections unfurl top-down */
+.ntf-section{animation:t-rise .5s var(--ease-out) backwards}
+.ntf-section:nth-of-type(2){animation-delay:.08s}
+.ntf-section:nth-of-type(3){animation-delay:.16s}
+.ntf-section:nth-of-type(4){animation-delay:.24s}
+
+/* Rows: warm gold-tinted hover wash + a 3px slide; badges spring */
+.ntf-row{transition:background var(--t-fast) ease,transform var(--t-fast) var(--ease-out)}
+.ntf-row:hover{background:rgba(196,154,60,.07);transform:translateX(3px)}
+.ntf-row.unread:hover{background:rgba(201,56,47,.08)}
+/* Unread rail: category tint melting into gold leaf */
+.ntf-row.unread::before{background:linear-gradient(180deg,var(--cat,#b3271e) 30%,#c49a3c)}
+.ntf-badge{transition:transform var(--t-fast) var(--ease-spring),border-color .14s ease}
+.ntf-row:hover .ntf-badge{transform:scale(1.12)}
+.ntf-avatar .avatar{transition:transform var(--t-fast) var(--ease-spring)}
+.ntf-row:hover .ntf-avatar .avatar{transform:scale(1.04)}
+/* Dismiss: ink-press + quarter turn, like the modal close */
+.ntf-x{transition:opacity .14s ease,background .14s ease,color .14s ease,transform var(--t-med) var(--ease-spring)}
+.ntf-x:hover{transform:rotate(90deg)}
+.ntf-x:active{transform:rotate(90deg) scale(.88)}
+/* Quoted snippet leans gold instead of brass */
+.ntf-snippet{border-left-color:var(--gild-2);background:var(--gild-wash)}
+
+/* Unread-only pill: ink-press + a live pulse when armed */
+.ntf-unread-toggle{transition:background var(--t-fast) ease,border-color var(--t-fast) ease,color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.ntf-unread-toggle:hover{border-color:var(--gild-line)}
+.ntf-unread-toggle:active{transform:scale(.95)}
+.ntf-unread-toggle.on .ntf-dot{animation:t-dot-pulse 2.4s ease-in-out infinite}
+
+/* Inbox card: crisper plate w/ soft float on hover of the whole list */
+.ntf-list{transition:border-color var(--t-med) ease,box-shadow var(--t-med) var(--ease-out)}
+.ntf-list:hover{border-color:#d8d2c2;box-shadow:var(--shadow-float)}
+
+/* ==================== EXPLORE — the cabinet of curiosities ================= */
+
+/* Search plate: glass & grain + gold focus bloom */
+.explore-search{
+  background:rgba(255,255,255,.78);
+  backdrop-filter:blur(14px) saturate(150%);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  transition:border-color var(--t-fast) ease,box-shadow var(--t-med) var(--ease-out),transform var(--t-fast) var(--ease-out);
+}
+.explore-search:focus-within{
+  border-color:var(--gild-2);
+  box-shadow:0 0 0 3px rgba(196,154,60,.16),var(--shadow-float);
+  transform:translateY(-1px);
+}
+.explore-search .ico{transition:color var(--t-fast) ease}
+.explore-search:focus-within>.ico{color:var(--gild)}
+.kbd{transition:border-color var(--t-fast) ease,color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+button.kbd:hover{border-color:var(--gild-2);color:var(--ink)}
+button.kbd:active{transform:scale(.94)}
+
+/* Section kickers: rubric caps + an illuminated underline that draws in */
+.x-kick,.section-label{position:relative}
+.x-kick::after,.section-label::after{
+  content:"";position:absolute;left:0;bottom:-1px;width:52px;height:2px;border-radius:2px;
+  background:var(--illum);transform-origin:left;
+  animation:t-draw .7s var(--ease-out) .1s backwards;
+}
+/* Landing grid unfurls section by section */
+.explore-grid>.x-sec{animation:t-rise var(--t-slow) var(--ease-out) backwards}
+.explore-grid>.x-sec:nth-child(2){animation-delay:.08s}
+.explore-grid>.x-sec:nth-child(3){animation-delay:.16s}
+.explore-grid>.x-sec:nth-child(4){animation-delay:.24s}
+
+/* Tag chips: gold-tint hover + press (scoped to explore & inbox surfaces) */
+.x-sec .chip,.ntf-body .chip{transition:color var(--t-fast) ease,border-color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.x-sec .chip:hover,.ntf-body .chip:hover{color:var(--gild-ink)}
+.x-sec .chip:active,.ntf-body .chip:active{transform:scale(.95)}
+.tag-pill{transition:border-color var(--t-fast) ease,background var(--t-fast) ease,transform var(--t-fast) var(--ease-out),box-shadow var(--t-med) var(--ease-out)}
+.tag-pill:hover{border-color:var(--gild-2);background:var(--gild-wash);transform:translateY(-1px);box-shadow:var(--shadow-float)}
+.tag-pill:active{transform:scale(.98)}
+.tag-pill i{color:var(--gild-ink)}
+
+/* Hero reel: plate lift + the play seal springs and glows */
+.hero-reel{transition:transform var(--t-fast) var(--ease-out),box-shadow var(--t-med) var(--ease-out),border-color var(--t-med) ease}
+.hero-reel:hover{transform:translateY(-2px);border-color:var(--gild-line);box-shadow:var(--shadow-float)}
+.hero-reel:active{transform:scale(.99)}
+.hr-play{transition:transform var(--t-med) var(--ease-spring),box-shadow var(--t-med) ease}
+.hero-reel:hover .hr-play{transform:scale(1.1);box-shadow:var(--glow-rubric)}
+
+/* Trending reel tiles: hover lift + play glyph pop (scoped to explore) */
+.explore-reels .plate-reel{transition:transform var(--t-fast) var(--ease-out),box-shadow var(--t-med) var(--ease-out)}
+.explore-reels .plate-reel:hover{transform:translateY(-2px);box-shadow:var(--shadow-float)}
+.explore-reels .plate-reel:active{transform:scale(.98)}
+.explore-reels .pr-play{transition:transform var(--t-med) var(--ease-spring)}
+.explore-reels .plate-reel:hover .pr-play{transform:translate(-50%,-50%) scale(1.14)}
+
+/* Empty search state: a ghosted khatam watches over the silence */
+.x-empty{position:relative;overflow:hidden;animation:t-rise .5s var(--ease-out)}
+.x-empty::after{
+  content:"";position:absolute;top:-36px;inset-inline-end:-36px;
+  width:150px;height:150px;pointer-events:none;
+  background:var(--girih) center/contain no-repeat;opacity:.05;
+}
+
+/* Degraded-search notice: keep rubric semantics, soften the plate */
+.x-note{animation:t-rise .45s var(--ease-out)}
+
+/* ==================== SETTINGS — the registrar's desk ===================== */
+
+/* Side nav: gilded active tick (desktop only — mobile keeps m-* pills) */
+@media(min-width:721px){
+  .set-item{position:relative;transition:background var(--t-fast) ease,color var(--t-fast) ease,transform var(--t-fast) var(--ease-out)}
+  .set-item:hover{transform:translateX(2px)}
+  .set-item::before{
+    content:"";position:absolute;left:-2px;top:26%;bottom:26%;width:3px;border-radius:3px;
+    background:var(--illum);opacity:0;transform:scaleY(.3);
+    transition:opacity var(--t-fast) ease,transform var(--t-med) var(--ease-spring);
+  }
+  .set-item.on::before{opacity:1;transform:scaleY(1)}
+}
+.set-item:active{transform:scale(.97)}
+.set-item.on .ico{color:var(--gild-bright)}
+
+/* Panels rise in sequence; titles carry a drawn hairline */
+.settings-shell .card{animation:t-rise var(--t-slow) var(--ease-out) backwards}
+.settings-shell .card:nth-child(2){animation-delay:.09s}
+.settings-shell .card:nth-child(3){animation-delay:.18s}
+.settings-shell .card h3.title{position:relative;padding-bottom:10px}
+.settings-shell .card h3.title::after{
+  content:"";position:absolute;left:0;bottom:0;width:44px;height:2px;border-radius:2px;
+  background:var(--illum);transform-origin:left;
+  animation:t-draw .7s var(--ease-out) .15s backwards;
+}
+.set-avatar-row{border-color:var(--gild-line);transition:border-color var(--t-fast) ease,background var(--t-fast) ease}
+.set-avatar-row:hover{border-color:var(--gild-2);background:rgba(196,154,60,.04)}
+
+/* Switches: spring knob (transform, not left) + illuminated "on" track */
+.sw{transition:background var(--t-med) var(--ease-smooth),box-shadow var(--t-med) ease}
+.sw::after{transition:transform var(--t-med) var(--ease-spring)}
+.sw:hover{box-shadow:0 0 0 3px rgba(196,154,60,.14)}
+.sw.on{background:linear-gradient(120deg,#b3271e 15%,#a8781d 90%)}
+.sw.on::after{left:3px;transform:translateX(18px)}
+.sw:active::after{transform:scale(.9)}
+.sw.on:active::after{transform:translateX(18px) scale(.9)}
+
+/* ==================== AUTH — the first impression ========================= */
+
+/* The girih khatam, large and barely-there, presiding over the ink panel.
+   (Content sits at z2; ::after scrims are z-auto — the star rests between.) */
+.auth-left::before{
+  content:"";position:absolute;top:-90px;inset-inline-end:-90px;z-index:1;
+  width:460px;height:460px;pointer-events:none;
+  background:var(--girih) center/contain no-repeat;opacity:.08;
+  animation:t-fade 1.2s var(--ease-out) .2s backwards;
+}
+/* Procession: brand → hero → sub → bullets → foot */
+.auth-brand{animation:t-rise .5s var(--ease-out) .05s backwards}
+.auth-hero{animation:t-rise .55s var(--ease-out) .16s backwards}
+.auth-sub{animation:t-rise .55s var(--ease-out) .26s backwards}
+.auth-bullets li{animation:t-rise .5s var(--ease-out) backwards}
+.auth-bullets li:nth-child(1){animation-delay:.34s}
+.auth-bullets li:nth-child(2){animation-delay:.4s}
+.auth-bullets li:nth-child(3){animation-delay:.46s}
+.auth-bullets li:nth-child(4){animation-delay:.52s}
+.auth-foot{animation:t-fade .8s ease .6s backwards}
+
+/* Brand mark bobs gently; the wordmark's period turns gold */
+.auth-mark{animation:t-float 6s ease-in-out infinite}
+.auth-name b{color:var(--gild-bright)}
+
+/* Hero: an illuminated rule draws itself, accent words in gold-leaf ink */
+.auth-hero::before{
+  content:"";display:block;width:72px;height:2px;border-radius:2px;
+  background:var(--illum);margin-bottom:20px;
+  transform-origin:left;animation:t-draw .8s var(--ease-out) .4s backwards;
+}
+.auth-hero em{
+  background:linear-gradient(100deg,#e3bc66,#c49a3c 55%,#e3bc66);
+  -webkit-background-clip:text;background-clip:text;
+  color:var(--gild-bright);-webkit-text-fill-color:transparent;
+}
+/* Bullet seals: gold-leaf instead of rubric-tinted squares */
+.auth-bullets li span{
+  background:rgba(196,154,60,.1);border-color:rgba(196,154,60,.32);color:var(--gild-bright);
+  transition:background var(--t-fast) ease,transform var(--t-fast) var(--ease-spring);
+}
+.auth-bullets li:hover span{background:rgba(196,154,60,.18);transform:translateY(-1px)}
+
+/* Form card rises; segmented tabs get a gold hairline + spring */
+.auth-card{animation:t-rise .55s var(--ease-out) .12s backwards}
+.auth-tab{transition:color var(--t-fast) ease,background var(--t-med) var(--ease-out),box-shadow var(--t-med) var(--ease-out),transform var(--t-fast) var(--ease-spring)}
+.auth-tab.on{box-shadow:0 1px 3px rgba(27,24,19,.12),inset 0 0 0 1px var(--gild-line)}
+.auth-tab:active{transform:scale(.98)}
+/* Submit: deep illuminated ink w/ a shine sweep on hover (core .btn gives
+   overflow:hidden + the ripple ::after; the shine rides on ::before). */
+.auth-card .btn-primary{
+  position:relative;
+  background:var(--illum-deep);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 24px -10px rgba(143,31,24,.5);
+}
+.auth-card .btn-primary::before{
+  content:"";position:absolute;top:0;bottom:0;left:0;width:42%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);
+  transform:translateX(-160%) skewX(-18deg);
+}
+.auth-card .btn-primary:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),var(--glow-rubric)}
+.auth-card .btn-primary:hover::before{animation:t-shine .9s var(--ease-smooth)}
+.auth-card .btn-primary:active{transform:scale(.97)}
+/* Divider hairlines melt toward a gold center */
+.auth-or::before{background:linear-gradient(90deg,transparent,rgba(196,154,60,.5))}
+.auth-or::after{background:linear-gradient(90deg,rgba(196,154,60,.5),transparent)}
+.auth-switch a{transition:color var(--t-fast) ease}
+.auth-switch a:hover{color:var(--rubric)}
+
+/* ============== SAVED · ACTIVITY · TAG — quiet consistency ================ */
+
+/* Activity register (one .card of kickers + rows) floats like the inbox */
+.ntf-page>.card{transition:border-color var(--t-med) ease,box-shadow var(--t-med) var(--ease-out)}
+.ntf-page>.card:hover{border-color:#d8d2c2;box-shadow:var(--shadow-float)}
+.ntf-page .card>.ntf-group{margin:14px 16px 9px}
+.ntf-page .card>.ntf-group:first-child{margin-top:16px}
+
+/* ======================= MOBILE RE-STATEMENTS ============================= */
+/* This file imports after styles-responsive.css — restore every mobile value
+   we could have stomped, and thin the ornaments on small paper. */
+
+@media(hover:none){
+  .ntf-row{transition:background .12s}            /* §10 touch: fast bg only */
+  .ntf-row:hover{transform:none}                  /* no hover-slide on touch */
+  .fl-row:hover{transform:none;background:transparent}
+}
+@media(max-width:720px){
+  /* mobile keeps the m-* pill nav — no tick, no hover slide */
+  .set-item{transform:none}
+  .set-item:hover{transform:none}
+  /* activity/inbox kicker margins + tracking from styles-responsive §10 */
+  .ntf-group{margin:14px 18px 7px;font-size:11px;letter-spacing:.5px}
+  /* cover ornament shrinks with the plate */
+  .prof-cover::after{width:150px;height:150px;top:-32px;inset-inline-end:-32px}
+}
+@media(max-width:880px){
+  .auth-hero::before{margin-bottom:14px}
+  .auth-left::before{width:320px;height:320px;top:-60px;inset-inline-end:-60px}
+}
+@media(max-width:380px){
+  /* tiny phones: girih would crowd — let the paper breathe */
+  .prof-cover::after,.auth-left::before,.x-empty::after{display:none}
+}

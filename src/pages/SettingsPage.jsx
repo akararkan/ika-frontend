@@ -344,13 +344,13 @@ function SecurityPanel() {
 
 export function SettingsPage() {
   const { user } = useAuth()
-  const me = user || { full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#159a76,#0a4a3c)', bio:'', field:'' }
+  const me = user || { full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)', bio:'', field:'' }
   const [tab, setTab] = React.useState('PROFILE')
 
   return (
     <div className="main center">
       <div className="col-main">
-        <div className="phead"><div><h1>Settings</h1><p className="sub">Manage your account, privacy, notifications, and security.</p></div></div>
+        <div className="phead"><div><h1>Settings <span className="phead-ar" lang="ar" dir="rtl">الإعدادات</span></h1><p className="sub">Manage your account, privacy, notifications, and security.</p></div></div>
 
         <div className="settings-shell">
           <aside className="set-side">

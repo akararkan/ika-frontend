@@ -90,6 +90,27 @@ export function detectFormat(src) {
   return 'PLAIN'
 }
 
+/* Block tags that should each resolve their OWN base direction, so a document
+   mixing Arabic / Kurdish (RTL) with Latin (LTR) reads correctly block-by-block
+   instead of inheriting one container direction. */
+const DIR_BLOCKS = 'p,h1,h2,h3,h4,h5,h6,blockquote,li,td,th,pre,ul,ol,dl,dd,dt'
+
+/** Tag each block with dir="auto" (unless it already declares a direction) so
+    the browser resolves its direction from content. This drives BOTH text
+    alignment (text-align:start) AND logical box properties (padding/border
+    -inline-start) — so RTL lists indent + bullet on the right, blockquotes get
+    their rule on the right, etc. Render-only: never mutates stored content;
+    idempotent; respects an explicit dir the author set via the RTL/LTR buttons. */
+export function applyAutoDir(html) {
+  if (!html || typeof document === 'undefined') return html || ''
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  tmp.querySelectorAll(DIR_BLOCKS).forEach(el => {
+    if (!el.getAttribute('dir')) el.setAttribute('dir', 'auto')
+  })
+  return tmp.innerHTML
+}
+
 /** Plain-text projection — used by previews of long bodies (e.g. cards). */
 export function toPlainText(html) {
   if (!html) return ''

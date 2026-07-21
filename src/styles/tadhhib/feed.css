@@ -1,0 +1,390 @@
+/* =============================================================
+   IKA · TADHHIB — feed layer · "The living broadsheet"
+   Posts, comments, reactions, stories, composer, share sheet.
+   Additive override layer: imported AFTER all MIDAD files —
+   equal-specificity selectors win by order. Tokens + shared
+   keyframes come from tadhhib/core.css (never redefined here).
+   Animates transform / opacity / color / box-shadow only.
+   ============================================================= */
+
+/* ---------- Area keyframes (tf-* — never shadowing core t-*) ---------- */
+@keyframes tf-ring{                       /* gold particle ring on rubrication */
+  0%{opacity:0;transform:scale(.35)}
+  28%{opacity:1}
+  100%{opacity:0;transform:scale(1.5)}
+}
+@keyframes tf-spin{to{transform:rotate(1turn)}}   /* conic story-ring rotation */
+@keyframes tf-zoom{from{opacity:0;transform:scale(.965)}to{opacity:1;transform:none}}
+@keyframes tf-vppulse{                    /* voice "playing" halo — gold leaf */
+  0%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 0 rgba(227,188,102,.45)}
+  70%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 14px rgba(227,188,102,0)}
+  100%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 0 rgba(227,188,102,0)}
+}
+
+/* =============== Folio dateline — an illuminated rule =============== */
+.folio{
+  border-bottom-color:transparent;
+  background:linear-gradient(90deg,var(--line) 0%,rgba(196,154,60,.55) 50%,var(--line) 100%)
+    bottom/100% 1px no-repeat;
+}
+.folio-ar{                                 /* the basmala-corner: gradient ink */
+  background:var(--illum);
+  -webkit-background-clip:text;background-clip:text;
+  color:var(--rubric);-webkit-text-fill-color:transparent;
+}
+
+/* =============== Stories — the conic illumination ring =============== */
+.st-ring{
+  transition:border-color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring);
+}
+.st-ring.unseen{
+  position:relative;background:transparent;
+  padding:4.5px;                           /* room for a 3px leaf + paper gap */
+}
+.st-ring.unseen::before{                   /* rubric→gold→rubric conic leaf */
+  content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 220deg,
+    #b3271e 0%,#8f1f18 18%,#b3271e 38%,#c49a3c 62%,#e3bc66 76%,#c49a3c 88%,#b3271e 100%);
+}
+.st-ring.unseen .avatar,.st-ring.unseen .st-cover{
+  position:relative;z-index:1;
+  box-shadow:0 0 0 1.5px var(--paper);     /* paper gap between leaf and portrait */
+}
+.st:hover .st-ring{border-color:var(--gild-2)}
+.st:hover .st-ring.unseen{filter:none}
+.st:hover .st-ring.unseen::before{animation:tf-spin 3.6s linear infinite}
+.st:active .st-ring{transform:scale(.93)}
+.st-ring.add{transition:border-color var(--t-fast) ease,color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.st:hover .st-ring.add{border-color:var(--gild-2);color:var(--gild-ink)}
+.st b{transition:color var(--t-fast) ease}
+.st:hover b{color:var(--ink)}
+
+/* =============== Segmented control — gilded active pill =============== */
+.seg button{
+  position:relative;
+  transition:color var(--t-fast) ease,background-color var(--t-med) var(--ease-smooth),
+    transform var(--t-fast) var(--ease-spring),box-shadow var(--t-med) var(--ease-out);
+}
+.seg button.on{
+  background:linear-gradient(100deg,rgba(179,39,30,.06),rgba(196,154,60,.09)),var(--card);
+  box-shadow:0 1px 3px rgba(27,24,19,.1),inset 0 0 0 1px rgba(196,154,60,.24);
+}
+.seg button:active{transform:scale(.96)}
+
+/* =============== Composer bar — quiet girih, warm invitation =============== */
+.composer-bar{position:relative;overflow:hidden}
+.composer-bar::after{                      /* khatam whisper, top-right, 4% */
+  content:"";position:absolute;top:-32px;inset-inline-end:-32px;width:112px;height:112px;
+  background:var(--girih) center/contain no-repeat;opacity:.045;pointer-events:none;
+}
+.cb-fake{
+  transition:border-color var(--t-fast) ease,background-color var(--t-fast) ease,
+    color var(--t-fast) ease,box-shadow var(--t-med) var(--ease-out),transform var(--t-fast) var(--ease-out);
+}
+.cb-fake:hover{
+  border-color:var(--gild-line);
+  box-shadow:0 6px 16px -10px rgba(27,24,19,.16),inset 0 1px 0 rgba(255,255,255,.6);
+}
+.cb-fake:active{transform:scale(.99)}
+.cb-ico{transition:background-color var(--t-fast) ease,color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.cb-ico:hover{transform:translateY(-1px)}
+.cb-ico:active{transform:scale(.88)}
+
+/* =============== Post card — the refined plate =============== */
+.post-card{
+  position:relative;
+  border-color:#e9e5da;
+  transition:border-color var(--t-med) ease,box-shadow var(--t-med) var(--ease-out),
+    transform var(--t-med) var(--ease-out);
+}
+.post-card::before{                        /* illuminated hairline draws at hover */
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;z-index:3;
+  background:var(--illum);transform:scaleX(0);transform-origin:left;
+  transition:transform var(--t-slow) var(--ease-out);pointer-events:none;
+}
+@media(hover:hover){
+  .post-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-float)}
+  /* :has guard — never lift while the fixed-position lightbox is mounted inside */
+  .post-card:hover:not(:has(.lightbox)){transform:translateY(-2px)}
+  .post-card:hover::before{transform:scaleX(1)}
+}
+/* MIDAD sets contain:layout on .post-card, which traps the fixed .lightbox
+   inside the card's overflow:hidden. Additive correctness fix: relax layout
+   containment only while a lightbox is open (style containment kept). */
+.post-card:has(.lightbox){contain:style}
+
+.pc-line{transition:color var(--t-fast) ease}
+.pc-line:hover b{color:var(--rubric)}
+.pc-handle{transition:color var(--t-fast) ease}
+.pc-handle:hover{color:var(--gild-ink)}
+
+/* --- media plate: inner hairline + slow illuminated zoom --- */
+.pc-plate{
+  position:relative;
+  transition:border-color var(--t-med) ease,box-shadow var(--t-med) var(--ease-out);
+}
+.pc-plate::after{                          /* glass inner hairline over the figure */
+  content:"";position:absolute;inset:0;border-radius:inherit;z-index:2;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),inset 0 1px 0 rgba(255,255,255,.32);
+}
+.pc-plate .post-media{transition:transform var(--t-slow) var(--ease-smooth)}
+@media(hover:hover){
+  .pc-plate:hover{border-color:var(--line-strong-2)}
+  .pc-plate:hover .post-media{transform:scale(1.015)}
+}
+.pm-play,.rp-media .pm-play,.pm-reel .pm-play{   /* repeat MIDAD's embed selectors so night glass wins there too */
+  background:rgba(20,17,11,.46);
+  backdrop-filter:blur(10px) saturate(150%);
+  -webkit-backdrop-filter:blur(10px) saturate(150%);
+  border:1px solid rgba(227,188,102,.35);
+  box-shadow:0 10px 26px -10px rgba(0,0,0,.5);
+  transition:background-color var(--t-fast) ease,border-color var(--t-fast) ease;
+}
+.pm-cell:hover .pm-play{background:rgba(143,31,24,.55);border-color:rgba(227,188,102,.6)}
+.pm-reel-badge{border:1px solid rgba(227,188,102,.3)}
+
+/* --- voice note — night chrome, gold leaf, paper grain --- */
+.vp{
+  background:linear-gradient(165deg,#27221b,var(--night));
+  border:1px solid rgba(227,188,102,.14);
+  box-shadow:0 16px 30px -22px rgba(16,14,11,.85),inset 0 1px 0 rgba(227,188,102,.08);
+}
+.vp::before{
+  content:"";position:absolute;inset:0;background:var(--grain);
+  opacity:.04;pointer-events:none;
+}
+.vp-wave i{background:rgba(227,188,102,.22)}
+.vp-wave i.on{background:var(--gild-bright)}
+.vp-tag{color:#d8bd85}
+.vp-tag .ico{stroke:#d8bd85}
+.vp-play.playing{animation:tf-vppulse 2s ease-out infinite}
+
+/* --- repost embed — folio-in-folio --- */
+.post-repost{
+  transition:border-color var(--t-fast) ease,background-color var(--t-fast) ease,
+    box-shadow var(--t-med) var(--ease-out);
+}
+.post-repost:hover{
+  border-color:var(--gild-line);background:#fdfcf8;
+  box-shadow:0 8px 20px -14px rgba(27,24,19,.18);
+}
+
+/* --- stats strip — the gilded readers' seal --- */
+.ps-heart{
+  background:linear-gradient(135deg,#b3271e 30%,#c49a3c 115%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.55),0 2px 6px -2px rgba(143,31,24,.5);
+}
+.ps-right,.pca span{font-variant-numeric:tabular-nums}
+
+/* =============== Action row — ink-press + burst + gold particle ring ==== */
+.pca{
+  position:relative;
+  transition:background-color var(--t-fast) ease,color var(--t-fast) ease,
+    transform var(--t-fast) var(--ease-spring);
+}
+.pca:active{transform:scale(.95)}
+.pca::after{                               /* centred ink ripple (no overflow clip
+                                              — the gradient itself fades out) */
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(circle at 50% 50%,rgba(179,39,30,.13) 0%,transparent 62%);
+  opacity:0;transform:scale(.5);
+  transition:opacity var(--t-med) var(--ease-out),transform var(--t-med) var(--ease-out);
+}
+.pca:active::after{opacity:1;transform:scale(1.08)}
+.pca::before{                              /* eight gold-leaf sparks, dormant */
+  content:"";position:absolute;top:calc(50% - 22px);inset-inline-start:0;
+  width:44px;height:44px;border-radius:50%;opacity:0;pointer-events:none;
+  background:
+    radial-gradient(circle 2.2px at 50% 4%,var(--gild-2) 60%,transparent 66%),
+    radial-gradient(circle 1.8px at 82% 17%,var(--gild-bright) 60%,transparent 66%),
+    radial-gradient(circle 2.2px at 96% 50%,#b3271e 60%,transparent 66%),
+    radial-gradient(circle 1.8px at 82% 83%,var(--gild-2) 60%,transparent 66%),
+    radial-gradient(circle 2.2px at 50% 96%,var(--gild-bright) 60%,transparent 66%),
+    radial-gradient(circle 1.8px at 18% 83%,#b3271e 60%,transparent 66%),
+    radial-gradient(circle 2.2px at 4% 50%,var(--gild-2) 60%,transparent 66%),
+    radial-gradient(circle 1.8px at 18% 17%,var(--gild-bright) 60%,transparent 66%);
+}
+.pca.on::before{animation:tf-ring .6s var(--ease-out)}     /* fires as .on lands */
+.pca.on .ico{animation:t-burst .45s var(--ease-spring)}    /* upgrades rubstamp */
+.pca.on span{animation:t-pop .35s var(--ease-out)}         /* count bump */
+.pca.saved{color:var(--gild-ink)}                          /* saved = gilded */
+.pca.saved .ico{fill:var(--gild);stroke:var(--gild-ink);animation:t-burst .45s var(--ease-spring)}
+
+/* =============== Comments — the marginalia =============== */
+.pc-comments{animation:t-rise var(--t-med) var(--ease-out)}
+.pc-clabel{display:flex;align-items:center;gap:10px}
+.pc-clabel::after{                          /* gilded kicker rule */
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(196,154,60,.45),transparent);
+}
+.pc-comments .cmt-bubble{
+  background:#fcfaf4;border-color:#efe9da;
+  transition:border-color var(--t-fast) ease,background-color var(--t-fast) ease;
+}
+.pc-comments .cmt-bubble:hover{border-color:var(--gild-line)}
+.cmt-meta button{transition:color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.cmt-meta button:active{transform:scale(.9)}
+.pc-viewall{transition:color var(--t-fast) ease}
+
+/* reply-thread connectors + entrance live in tadhhib/social.css (elbow + spine) */
+
+/* composer pill — glass, gold focus ring, pressed send seal */
+.pc-comments .cmt-box{
+  background:rgba(251,250,246,.82);
+  backdrop-filter:blur(8px) saturate(140%);
+  -webkit-backdrop-filter:blur(8px) saturate(140%);
+  transition:border-color var(--t-fast) ease,box-shadow var(--t-med) var(--ease-out);
+}
+.pc-comments .cmt-box:focus-within{
+  border-color:var(--gild-2);
+  box-shadow:0 0 0 3px rgba(196,154,60,.14);
+}
+.pc-comments .cmt-box .icon-btn{
+  background:linear-gradient(180deg,#c9382f,#a92318);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
+  transition:transform var(--t-fast) var(--ease-spring),box-shadow var(--t-med) ease;
+}
+.pc-comments .cmt-box .icon-btn:hover{color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),var(--glow-rubric)}
+.pc-comments .cmt-box .icon-btn:active{transform:scale(.88)}
+
+/* post-detail comments card (PostPage) shares the thread language */
+.card-pad > .cmt{animation:t-rise .4s var(--ease-out) backwards}
+.card-pad .cmt-box{transition:border-color var(--t-fast) ease,box-shadow var(--t-med) var(--ease-out)}
+
+/* =============== Mixed feed cards (research / question rows) =============== */
+.feed-xcard .fx-cta{
+  background-image:linear-gradient(90deg,#b3271e,#c49a3c);
+  background-repeat:no-repeat;background-position:0 100%;background-size:0% 2px;
+  transition:background-size .35s var(--ease-out),color var(--t-fast) ease;
+}
+.feed-xcard .fx-cta:hover{text-decoration:none;background-size:100% 2px}
+.feed-xcard .fx-kind{
+  background:rgba(20,17,11,.55);border-color:rgba(227,188,102,.35);
+  backdrop-filter:blur(8px) saturate(140%);
+  -webkit-backdrop-filter:blur(8px) saturate(140%);
+}
+
+/* =============== Right rail — quiet slide physics =============== */
+.rail-q,.trends .trend-row{
+  transition:transform var(--t-fast) var(--ease-out),color var(--t-fast) ease;
+}
+.rail-q:hover,.trends .trend-row:hover{transform:translateX(3px)}
+.rail-q:active,.trends .trend-row:active{transform:translateX(3px) scale(.985)}
+
+/* =============== Compose modal — the writing atelier =============== */
+.cm-top{position:relative;overflow:hidden}
+.cm-top::before{                            /* khatam corner, 4.5% */
+  content:"";position:absolute;top:-34px;inset-inline-end:-34px;width:120px;height:120px;
+  background:var(--girih) center/contain no-repeat;opacity:.045;pointer-events:none;
+}
+.cm-top::after{                             /* illuminated hairline unfurls once */
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2px;pointer-events:none;
+  background:var(--illum);transform-origin:left;
+  animation:t-draw .8s var(--ease-out) .12s backwards;
+}
+.cm-kicker{                                 /* living type — gradient-ink kicker */
+  background:var(--illum);
+  -webkit-background-clip:text;background-clip:text;
+  color:var(--rubric);-webkit-text-fill-color:transparent;
+}
+.cm-cancel{transition:color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.cm-cancel:active{transform:scale(.94)}
+
+.cm-tab{position:relative;transition:color var(--t-fast) ease}
+.cm-tab::after{                             /* gilded underline glides in */
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;
+  background:var(--illum);transform:scaleX(0);transform-origin:left;
+  transition:transform .38s var(--ease-out);
+}
+.cm-tab.on{border-bottom-color:transparent}
+.cm-tab.on::after{transform:scaleX(1)}
+.cm-tab .ico{transition:transform var(--t-fast) var(--ease-spring)}
+.cm-tab:hover .ico{transform:translateY(-1px)}
+
+.cm-vis{transition:color var(--t-fast) ease}
+.cm-vis:hover{color:var(--gild-ink)}
+.cm-sheet::before{background:var(--illum);border-radius:2px;opacity:1}
+
+.cm-drop{
+  border:1.5px dashed var(--gild-dash);border-radius:14px;
+  background:linear-gradient(180deg,var(--paper-2),#fdfbf3);
+  transition:border-color var(--t-fast) ease,background-color var(--t-med) ease,
+    transform var(--t-fast) var(--ease-out),box-shadow var(--t-med) var(--ease-out);
+}
+.cm-drop:hover{
+  border-color:var(--gild-2);color:var(--ink-soft);
+  background:linear-gradient(100deg,rgba(179,39,30,.05),rgba(196,154,60,.09)),var(--paper-2);
+  box-shadow:0 10px 24px -16px rgba(168,120,29,.4);
+}
+.cm-drop:active{transform:scale(.99)}
+.cm-drop .ico{color:var(--gild)}
+.cm-drop:hover .ico{color:var(--gild-ink);animation:t-float 3s var(--ease-smooth) infinite}
+.cm-drop b{color:var(--ink-2)}
+
+.cm-voice{background:linear-gradient(165deg,#241e14,var(--night));border-color:var(--night-line)}
+.cv-pill{border:1px solid rgba(227,188,102,.2);color:#e9d9ae}
+.cv-btn{transition:transform var(--t-fast) var(--ease-spring),box-shadow var(--t-med) ease}
+.cv-btn:hover{box-shadow:var(--glow-rubric)}
+.cv-btn:active{transform:scale(.9)}
+
+.cm-publish{position:relative;overflow:hidden}
+.cm-publish::before{                        /* gold shine sweep on hover */
+  content:"";position:absolute;top:0;bottom:0;width:46%;left:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);
+  transform:translateX(-160%) skewX(-18deg);
+}
+.cm-publish:hover::before{animation:t-shine .9s var(--ease-smooth)}
+.cm-tools button{transition:background-color var(--t-fast) ease,color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.cm-tools button:active{transform:scale(.88)}
+.cm-count{font-variant-numeric:tabular-nums}
+
+/* =============== Share sheet — a gilded despatch =============== */
+.share-sheet .dlg-head{position:relative;overflow:hidden}
+.share-sheet .dlg-head::before{
+  content:"";position:absolute;top:-36px;inset-inline-end:-36px;width:120px;height:120px;
+  background:var(--girih) center/contain no-repeat;opacity:.05;pointer-events:none;
+}
+.share-sheet .dlg-head::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2px;pointer-events:none;
+  background:var(--illum);transform-origin:left;
+  animation:t-draw .7s var(--ease-out) .1s backwards;
+}
+.share-sheet .dlg-ic{
+  background:var(--illum-deep);color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 6px 16px -8px rgba(143,31,24,.5);
+}
+.share-sheet .share-count{
+  background:var(--gild-wash);border-color:var(--gild-line);color:var(--gild-ink);
+}
+.share-sheet .share-act{
+  transition:background-color var(--t-fast) ease,border-color var(--t-fast) ease,
+    transform var(--t-fast) var(--ease-spring),box-shadow var(--t-med) var(--ease-out);
+}
+.share-sheet .share-act:hover{
+  background:#fdfcf8;border-color:var(--gild-line);transform:translateY(-2px);
+  box-shadow:0 10px 22px -14px rgba(27,24,19,.2);
+}
+.share-sheet .share-act:active{transform:scale(.95)}
+.share-sheet .sa-ic{transition:transform var(--t-fast) var(--ease-spring)}
+.share-sheet .share-act:hover .sa-ic{transform:scale(1.1) rotate(-4deg)}
+
+/* =============== Lightbox — softer plate reveal =============== */
+.lightbox{animation:t-fade .25s var(--ease-out)}
+.lb-img{animation:tf-zoom .35s var(--ease-out)}
+.lb-close,.lb-nav{transition:background-color var(--t-fast) ease,transform var(--t-fast) var(--ease-spring)}
+.lb-close:active{transform:scale(.9)}
+.lb-nav:active{transform:translateY(-50%) scale(.9)}   /* keep the centring translate */
+
+/* =============================================================
+   Mobile re-statements — this file imports after
+   styles-responsive.css, so restore its intent where we touched
+   the same properties, and thin ornaments on tiny phones.
+   ============================================================= */
+@media(max-width:720px){
+  /* §10 gives cards a quick tap-shrink; keep it alongside our shadows */
+  .post-card{transition:transform .12s ease,box-shadow var(--t-med) var(--ease-out),border-color var(--t-med) ease}
+  .post-card:active{transform:scale(.99)}
+}
+@media(max-width:380px){
+  .composer-bar::after,.cm-top::before{display:none}   /* girih yields to space */
+}

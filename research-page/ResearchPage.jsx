@@ -143,7 +143,6 @@ export function ResearchPage() {
     return (
       <article key={r.id} className={`r-card rise is-${sLower}`} style={{ animationDelay:`${i*60}ms` }} onClick={() => navigate(`/research/${r.id}`)}>
         <div className="r-cover" style={{ background:r.cover }}>
-          <span className="t-zoom" style={{ background:r.cover }} aria-hidden="true"/>
           <span className="r-irc font-mono">{r.irc || (r.status === 'DRAFT' ? 'DRAFT' : '')}</span>
           {r.hasVideo && <button className="r-play" onClick={e => { e.stopPropagation(); navigate(`/research/${r.id}`) }}><Icon name="play"/></button>}
           {r.status !== 'PUBLISHED' && (

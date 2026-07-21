@@ -15,17 +15,17 @@ import { api } from '../api/index.js'
 // Per-activity-type glyph + tint for the row badge (the title text comes from
 // the server's `label`, so this is purely the icon).
 const META = {
-  POST_CREATED:['compose','#0e6b54'], POST_REACTION:['heart','#c2453f'], POST_COMMENT:['comment','#0e6b54'],
-  POST_COMMENT_REACTION:['heart','#c2453f'], POST_SHARE:['share','#3f6a8a'], POST_SAVED:['bookmark','#bd9344'],
+  POST_CREATED:['compose','#b3271e'], POST_REACTION:['heart','#c2453f'], POST_COMMENT:['comment','#b3271e'],
+  POST_COMMENT_REACTION:['heart','#c2453f'], POST_SHARE:['share','#1f3a6e'], POST_SAVED:['bookmark','#b3271e'],
   REEL_WATCH:['reels','#c2453f'],
-  GLOBAL_SEARCH:['search','#7a8783'], HASHTAG_SEARCH:['hash','#bd9344'], MENTION_LOOKUP:['at','#bd9344'],
-  USER_MENTIONED:['at','#bd9344'], PROFILE_VIEW:['eye','#3f6a8a'], FOLLOWED_USER:['follow','#3f6a8a'],
-  QNA_QUESTION_CREATED:['qna','#159a76'], QNA_QUESTION_SAVED:['bookmark','#bd9344'], QNA_ANSWER_CREATED:['reply','#0e6b54'],
-  QNA_REANSWER_CREATED:['reply','#0e6b54'], QNA_ANSWER_REACTION:['heart','#c2453f'],
-  RESEARCH_PUBLISHED:['research','#bd9344'], RESEARCH_SAVED:['bookmark','#bd9344'], RESEARCH_REACTION:['heart','#c2453f'],
-  RESEARCH_COMMENT:['comment','#0e6b54'], RESEARCH_COMMENT_REACTION:['heart','#c2453f'],
-  STORY_VIEWED:['eye','#3f6a8a'], STORY_REACTED:['heart','#c2453f'], STORY_REPLIED:['reply','#0e6b54'], STORY_POLL_VOTED:['qna','#159a76'],
-  SOUND_USED:['music','#bd9344'],
+  GLOBAL_SEARCH:['search','#9b948e'], HASHTAG_SEARCH:['hash','#b3271e'], MENTION_LOOKUP:['at','#b3271e'],
+  USER_MENTIONED:['at','#b3271e'], PROFILE_VIEW:['eye','#1f3a6e'], FOLLOWED_USER:['follow','#1f3a6e'],
+  QNA_QUESTION_CREATED:['qna','#c9382f'], QNA_QUESTION_SAVED:['bookmark','#b3271e'], QNA_ANSWER_CREATED:['reply','#b3271e'],
+  QNA_REANSWER_CREATED:['reply','#b3271e'], QNA_ANSWER_REACTION:['heart','#c2453f'],
+  RESEARCH_PUBLISHED:['research','#b3271e'], RESEARCH_SAVED:['bookmark','#b3271e'], RESEARCH_REACTION:['heart','#c2453f'],
+  RESEARCH_COMMENT:['comment','#b3271e'], RESEARCH_COMMENT_REACTION:['heart','#c2453f'],
+  STORY_VIEWED:['eye','#1f3a6e'], STORY_REACTED:['heart','#c2453f'], STORY_REPLIED:['reply','#b3271e'], STORY_POLL_VOTED:['qna','#c9382f'],
+  SOUND_USED:['music','#b3271e'],
 }
 
 // Tabs → the activity `types` they request from the server.
@@ -52,7 +52,7 @@ function bucketOf(createdAt) {
 export function ActivityPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { initials:'Y', avc:'linear-gradient(135deg,#159a76,#0a4a3c)' }
+  const me = user || { initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)' }
   const [filter, setFilter] = React.useState('ALL')
   const [items, setItems] = React.useState([])
   const [loading, setLoading] = React.useState(true)
@@ -95,7 +95,7 @@ export function ActivityPage() {
       <div className="col-main ntf-page">
         <div className="phead">
           <div>
-            <h1>Your <em>activity</em></h1>
+            <h1>Your <em>activity</em> <span className="phead-ar" lang="ar" dir="rtl">النشاط</span></h1>
             <p className="sub">Everything you’ve posted, liked, saved, shared, watched, asked, and searched.</p>
           </div>
           <div className="flex gap-8" style={{ flexWrap:'wrap' }}>
@@ -111,9 +111,9 @@ export function ActivityPage() {
         {loading ? <Loader label="Loading activity…"/>
           : !items.length ? <EmptyState icon="list" title="No activity yet" sub="Your actions across IKA will appear here."/>
           : (
-            <div className="card" style={{ overflow:'hidden' }}>
+            <div className="card t-stagger" style={{ overflow:'hidden' }}>
               {grouped.map(({ a, head }) => {
-                const [icon, tint] = META[a.type] || ['bell', '#3c4f49']
+                const [icon, tint] = META[a.type] || ['bell', '#5e574b']
                 return (
                   <React.Fragment key={a.id}>
                     {head && <div className="ntf-group">{head}</div>}

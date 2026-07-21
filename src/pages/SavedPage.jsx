@@ -94,7 +94,7 @@ export function SavedPage() {
       <div className="col-main">
         <div className="phead">
           <div>
-            <h1>Saved</h1>
+            <h1>Saved <span className="phead-ar" lang="ar" dir="rtl">المحفوظات</span></h1>
             <p className="sub">Your bookmarked posts, research papers, and questions in one place.</p>
           </div>
         </div>

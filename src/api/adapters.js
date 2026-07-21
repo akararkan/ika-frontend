@@ -38,11 +38,12 @@ export function handleOf(username, fallback = 'member') {
 }
 
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg,#159a76,#0a4a3c)',
-  'linear-gradient(135deg,#bd9344,#7a5a1a)',
-  'linear-gradient(135deg,#3f6a8a,#16302a)',
-  'linear-gradient(135deg,#5a2a1a,#160a06)',
-  'linear-gradient(135deg,#3c5a4a,#0a2a1f)',
+  '#b3271e',
+  '#1f3a6e',
+  '#4a3a78',
+  '#6e4a2f',
+  '#2f6b72',
+  '#57534b',
 ]
 function gradientFor(id = '') {
   let h = 0
@@ -144,6 +145,7 @@ export function meFrom(u) {
     attachments: (p.attachments || []).map(userAttachmentFrom).filter(a => a.url).sort((a, b) => a.order - b.order),
     followers: p.followerCount ?? 0,
     following: p.followingCount ?? 0,
+    isFollowing: !!(u.isFollowing ?? p.isFollowing),   // present on list rows (followers/following); harmless for `me`
     posts: p.postCount ?? 0,
     contributions: p.researchCount ?? 0,
     raw: u,
@@ -204,7 +206,7 @@ function mediaFromUrls(urls = [], types = []) {
     const t = types[i] || 'IMAGE'
     const src = assetUrl(url)   // backend media URLs are relative → make absolute
     if (t === 'IMAGE') return { type: 'IMAGE', url: src, label: 'image', bg: `center/cover no-repeat url("${src}")`, ratio: '16/10' }
-    if (t === 'VIDEO') return { type: 'VIDEO', url: src, label: 'video', bg: 'linear-gradient(160deg,#1f3a4a,#070d0b)', ratio: '16/10' }
+    if (t === 'VIDEO') return { type: 'VIDEO', url: src, label: 'video', bg: 'linear-gradient(160deg,#232b42,#100e0b)', ratio: '16/10' }
     return { type: t, url: src, label: t.toLowerCase() }
   })
 }
@@ -224,7 +226,7 @@ export function postFromFeedItem(dto) {
   const cover = dto.mediaUrl ? assetUrl(dto.mediaUrl) : null   // VOICE_POST: this is the audio URL
   let media = []
   if (isReel && (video || cover)) {
-    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#1f3a4a,#070d0b)', ratio: '9/16' }]
+    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#232b42,#100e0b)', ratio: '9/16' }]
   } else if (!isVoice && dto.mediaUrl) {
     media = mediaFromUrls([dto.mediaUrl], ['IMAGE'])
   }
@@ -272,7 +274,7 @@ export function researchFromFeedItem(dto) {
     title: dto.textPreview || 'Untitled research',
     cover: dto.mediaUrl
       ? `center/cover no-repeat url("${assetUrl(dto.mediaUrl)}")`
-      : 'radial-gradient(120% 100% at 30% 10%,#1f5a4a,#0a2a22)',
+      : 'radial-gradient(120% 100% at 30% 10%,#564c40,#231d15)',
     hasCover: !!dto.mediaUrl,
     time: timeAgo(dto.createdAt),
     createdAt: dto.createdAt || null,
@@ -349,6 +351,10 @@ export function commentFrom(dto) {
     likes: dto.reactionCount || 0,
     liked: !!dto.likedByMe,
     replyCount: dto.replyCount || 0,
+    parentCommentId: dto.parentCommentId || dto.parentId || null,
+    replyToCommentId: dto.replyToCommentId || null,
+    replyToUserId: dto.replyToUserId || null,
+    _replyToHandle: dto.replyToUsername || dto.replyToUserUsername || null,
   }
 }
 
@@ -443,7 +449,7 @@ export function researchFrom(dto) {
     keywords: dto.keywords || '',
     visibility: dto.visibility || 'PUBLIC',
     tags: dto.tags || [],
-    cover: dto.coverImageUrl ? `center/cover no-repeat url("${assetUrl(dto.coverImageUrl)}")` : 'radial-gradient(120% 100% at 30% 10%,#1f5a4a,#0a2a22)',
+    cover: dto.coverImageUrl ? `center/cover no-repeat url("${assetUrl(dto.coverImageUrl)}")` : 'radial-gradient(120% 100% at 30% 10%,#564c40,#231d15)',
     hasVideo: !!dto.videoPromoThumbnailUrl,
     metrics: {
       views: dto.viewCount || 0, downloads: dto.downloadCount || 0, reactions: dto.reactionCount || 0,
@@ -568,7 +574,7 @@ export function researchDetailFrom(dto) {
     })),
     sources: (dto.sources || []).map(sourceFrom),   // includes MEDIA_FILE → clickable fileUrl
     figures: (dto.mediaFiles || []).filter(m => m.mediaType === 'IMAGE').map(m => ({
-      bg: m.fileUrl ? `center/cover no-repeat url("${assetUrl(m.fileUrl)}")` : 'linear-gradient(140deg,#16302a,#0a4a3c)',
+      bg: m.fileUrl ? `center/cover no-repeat url("${assetUrl(m.fileUrl)}")` : 'linear-gradient(140deg,#2a251d,#8f1f18)',
       label: m.caption || m.originalFileName || 'figure',
     })),
     citation: dto.citation || '',

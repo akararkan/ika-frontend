@@ -85,7 +85,7 @@ function StoryDraftPreview({ draft, onEdit, onClear }) {
 
 export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublished, onEdited }) {
   const { user } = useAuth()
-  const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#159a76,#0a4a3c)' }
+  const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#c9382f,#8f1f18)' }
   const isEdit = !!editPost   // edit mode → PATCH /api/v1/posts/{id} (§6.4)
 
   const [tab, setTab] = React.useState(isEdit ? (editPost.type || 'TEXT') : type)
@@ -113,18 +113,29 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   // reset attachments when switching tabs
   React.useEffect(() => { setFiles([]); setRecording(false); setSound(null); if (vis === 'CLOSE_FRIENDS' && tab !== 'STORY') setVis('PUBLIC') }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // image thumbnails (revoked on change/unmount)
+  // live media thumbnails — images, videos AND audio get object URLs so the
+  // gallery can show the real media (revoked on change/unmount)
   const previews = React.useMemo(
-    () => files.map(f => ({ name: f.name, isImage: f.type.startsWith('image'), isVideo: f.type.startsWith('video'), url: f.type.startsWith('image') ? URL.createObjectURL(f) : null })),
+    () => files.map(f => ({
+      name: f.name,
+      isImage: f.type.startsWith('image'),
+      isVideo: f.type.startsWith('video'),
+      isAudio: f.type.startsWith('audio'),
+      url: /^(image|video|audio)\//.test(f.type) ? URL.createObjectURL(f) : null,
+    })),
     [files],
   )
   React.useEffect(() => () => previews.forEach(p => p.url && URL.revokeObjectURL(p.url)), [previews])
 
   const pickFiles = () => fileRef.current?.click()
-  const onPicked = (e) => {
-    const picked = Array.from(e.target.files || [])
-    if (picked.length) setFiles(prev => (tab === 'REEL' ? picked.slice(0, 1) : [...prev, ...picked]))
-    e.target.value = ''
+  const addFiles = (picked) => { if (picked.length) setFiles(prev => (tab === 'REEL' ? picked.slice(0, 1) : [...prev, ...picked])) }
+  const onPicked = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = '' }
+  // real drag & drop onto the drop zones (previously click-only)
+  const [dragOver, setDragOver] = React.useState(false)
+  const dropProps = {
+    onDragOver: (e) => { e.preventDefault(); setDragOver(true) },
+    onDragLeave: () => setDragOver(false),
+    onDrop: (e) => { e.preventDefault(); setDragOver(false); addFiles(Array.from(e.dataTransfer?.files || [])) },
   }
   const removeFile = (i) => setFiles(fs => fs.filter((_, idx) => idx !== i))
 
@@ -272,9 +283,9 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
       <div className="modal cm-modal">
         <div className="cm-top">
           <button className="cm-cancel" onClick={onClose}>Cancel</button>
-          <h3>{heading}</h3>
+          <div className="cm-headwrap"><span className="cm-kicker">New entry</span><h3>{heading}</h3></div>
           <button className="btn btn-primary cm-publish" disabled={disabled} onClick={publish}>
-            {busy ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save' : tab === 'QUESTION' ? 'Post' : tab === 'STORY' ? 'Add' : 'Publish'}
+            <Icon name="feather" className="sm"/>{busy ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save' : tab === 'QUESTION' ? 'Post' : tab === 'STORY' ? 'Add' : 'Publish'}
           </button>
         </div>
 
@@ -300,43 +311,65 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             </div>
           </div>
 
-          {tab === 'QUESTION' && (
-            <input className="field lg" dir="auto" placeholder="What would you like to ask?" value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom:12 }}/>
-          )}
-
           {/* STORY tab: all text is added INSIDE the StoryEditor design surface
               (baked into the image), so the modal's plain textarea would be
               redundant and confusing. Hide it. Every other tab keeps it. */}
           {tab !== 'STORY' && (
-            <MentionBox as="textarea" className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+            <div className="cm-sheet">
+              {tab === 'QUESTION' && (
+                <input className="field cm-qtitle" dir="auto" placeholder="What would you like to ask?" value={title} onChange={e => setTitle(e.target.value)}/>
+              )}
+              <MentionBox as="textarea" className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+            </div>
           )}
 
           {/* hidden file input shared by drop zone + attach buttons */}
           {!isEdit && <input ref={fileRef} type="file" hidden accept={ACCEPT[tab] || (tab === 'VOICE_POST' ? 'audio/*' : '*/*')}
             multiple={tab === 'EMBEDDED' || tab === 'STORY'} onChange={onPicked}/>}
 
-          {/* selected files preview */}
+          {/* selected media — live preview gallery (real video frames, playable) */}
           {!isEdit && !!files.length && (
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:12 }}>
+            <div className={'cm-previews' + (tab === 'REEL' ? ' is-reel' : '')}>
               {previews.map((p, i) => (
-                <div key={i} style={{ position:'relative', width:84, height:84, borderRadius:12, overflow:'hidden', border:'1px solid var(--line)', background:'var(--card-2)', display:'grid', placeItems:'center' }}>
-                  {p.isImage
-                    ? <img src={p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-                    : <Icon name={p.isVideo ? 'video' : 'music'} className="lg"/>}
-                  <button onClick={() => removeFile(i)} style={{ position:'absolute', top:4, right:4, width:22, height:22, borderRadius:'50%', background:'rgba(11,26,22,.7)', color:'#fff', display:'grid', placeItems:'center' }}>
-                    <Icon name="close" className="xs"/>
-                  </button>
-                  {!p.isImage && <span style={{ position:'absolute', bottom:0, left:0, right:0, fontSize:9, padding:'2px 4px', background:'rgba(11,26,22,.7)', color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.name}</span>}
+                <div key={i} className={'cm-prev' + (i === 0 && tab === 'EMBEDDED' && previews.length > 1 ? ' lead' : '') + (p.isAudio ? ' is-audio' : '')}>
+                  {p.isImage && <img src={p.url} alt=""/>}
+                  {p.isVideo && (
+                    <video
+                      src={p.url} muted playsInline loop preload="metadata"
+                      onMouseEnter={e => e.currentTarget.play().catch(() => {})}
+                      onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+                      onClick={e => { const v = e.currentTarget; if (v.paused) v.play().catch(() => {}); else v.pause() }}
+                    />
+                  )}
+                  {p.isAudio && (
+                    <div className="cm-prev-audio">
+                      <span className="cm-prev-audio-ic"><Icon name="music"/></span>
+                      <div className="cm-prev-audio-col">
+                        <b>{p.name}</b>
+                        <audio src={p.url} controls preload="metadata"/>
+                      </div>
+                    </div>
+                  )}
+                  {!p.isImage && !p.isVideo && !p.isAudio && <span className="cm-prev-ic"><Icon name="music" className="lg"/></span>}
+                  {p.isVideo && <span className="cm-prev-badge"><Icon name="video" className="xs"/>hover to play</span>}
+                  {i === 0 && tab === 'EMBEDDED' && previews.length > 1 && <span className="cm-prev-lead">Lead figure</span>}
+                  <button className="cm-prev-x" onClick={() => removeFile(i)} aria-label="Remove"><Icon name="close" className="xs"/></button>
+                  {!p.isImage && !p.isVideo && !p.isAudio && <span className="cm-prev-name">{p.name}</span>}
                 </div>
               ))}
+              {tab === 'EMBEDDED' && (
+                <button className="cm-prev-add" onClick={pickFiles} aria-label="Add more media">
+                  <Icon name="upload"/><span>Add more</span>
+                </button>
+              )}
             </div>
           )}
 
           {!isEdit && tab === 'EMBEDDED' && (
-            <div className="cm-drop" onClick={pickFiles} style={{ cursor:'pointer' }}>
+            <div className={'cm-drop' + (dragOver ? ' over' : '')} onClick={pickFiles} style={{ cursor:'pointer' }} {...dropProps}>
               <Icon name="image" className="lg"/>
-              <b>Click to add photos or video</b>
-              <span className="text-xs">JPG, PNG, WebP or MP4 · up to 10 files</span>
+              <b>Attach figures — drag or browse</b>
+              <span className="text-xs">JPG, PNG, WebP or MP4 · figures appear plate-framed in your post</span>
             </div>
           )}
           {!isEdit && tab === 'STORY' && (
@@ -351,10 +384,10 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             )
           )}
           {!isEdit && tab === 'REEL' && (
-            <div className="cm-drop" onClick={pickFiles} style={{ cursor:'pointer' }}>
+            <div className={'cm-drop' + (dragOver ? ' over' : '')} onClick={pickFiles} style={{ cursor:'pointer' }} {...dropProps}>
               <Icon name="reels" className="lg"/>
-              <b>Click to add your reel video</b>
-              <span className="text-xs">MP4 or WebM · vertical 9:16 works best</span>
+              <b>Attach your reel</b>
+              <span className="text-xs">MP4 or WebM · vertical 9:16 · shown as a plate card</span>
             </div>
           )}
           {!isEdit && tab === 'VOICE_POST' && (
@@ -390,9 +423,9 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         {/* Attach bar + character count (prototype .m-cmp footer) */}
         <div className="cm-footbar">
           <div className="cm-tools">
-            {!isEdit && <button style={{ color:'#3f9a6b' }} title="Add photo / video" onClick={pickFiles}><Icon name="image"/></button>}
-            <button style={{ color:'#bd9344' }} title="Mention someone" onClick={() => insertToken('@')}><Icon name="at"/></button>
-            <button style={{ color:'#0e6b54' }} title="Add hashtag" onClick={() => insertToken('#')}><Icon name="hash"/></button>
+            {!isEdit && <button style={{ color:'var(--ink-soft)' }} title="Add photo / video" onClick={pickFiles}><Icon name="image"/></button>}
+            <button style={{ color:'#b3271e' }} title="Mention someone" onClick={() => insertToken('@')}><Icon name="at"/></button>
+            <button style={{ color:'#b3271e' }} title="Add hashtag" onClick={() => insertToken('#')}><Icon name="hash"/></button>
           </div>
           <span className="cm-count font-mono">{(tab === 'QUESTION' ? title : text).length}/5000</span>
         </div>

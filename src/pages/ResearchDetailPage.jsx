@@ -12,6 +12,7 @@ import { SourceRow } from '../components/Source.jsx'
 import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
 import { RichText } from '../components/RichText.jsx'
 import { VoicePlayer } from '../components/VoicePlayer.jsx'
+import { PlayableVideo } from '../components/PlayableVideo.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
 import { useRealtime } from '../hooks/useRealtime.js'
@@ -123,9 +124,18 @@ function PromoVideo({ src, poster, onClose }) {
   }
   return (
     <>
-      <video ref={ref} className="rd-vp-video" src={playSrc} poster={poster || undefined}
-        controls playsInline preload="metadata"
-        onError={onVideoError} onEnded={onClose}/>
+      <PlayableVideo
+        src={playSrc}
+        poster={poster || undefined}
+        className="rd-vp-video"
+        controls
+        playsInline
+        preload="metadata"
+        onError={onVideoError}
+        onEnded={onClose}
+        fallbackHref={src}
+        modal
+      />
       {mutedHint && (
         <button className="rd-vp-unmute" onClick={() => { const v = ref.current; if (v) { v.muted = false; v.play?.() } setMutedHint(false) }}>
           <Icon name="volume" className="xs"/>Tap for sound
@@ -420,19 +430,29 @@ export function ResearchDetailPage() {
 
         <div className="rd-toolbar">
           <button className="rd-back" onClick={() => navigate('/research')}><Icon name="chevleft" className="sm"/>Back to research</button>
-          {isAuthor && (
-            <div className="rd-owner">
-              <div className="rd-owner-seg">
-                <button onClick={() => setEditing(true)}><Icon name="compose" className="xs"/>Edit</button>
-                {r.status === 'DRAFT'     && <button onClick={publish}><Icon name="upload" className="xs"/>Publish</button>}
-                {r.status === 'PUBLISHED' && <button onClick={unpublish}><Icon name="download" className="xs"/>Unpublish</button>}
-                {r.status !== 'ARCHIVED'  && <button onClick={archive}><Icon name="bookmark" className="xs"/>Archive</button>}
-                {r.status !== 'RETRACTED' && <button onClick={retract}><Icon name="flag" className="xs"/>Retract</button>}
-                {r.status === 'RETRACTED' && <button onClick={unretract}><Icon name="check" className="xs"/>Unretract</button>}
+          <div className="rd-toolbar-right">
+            {isAuthor && (
+              <div className="rd-owner">
+                <div className="rd-owner-seg">
+                  <button onClick={() => setEditing(true)}><Icon name="compose" className="xs"/>Edit</button>
+                  {r.status === 'DRAFT'     && <button onClick={publish}><Icon name="upload" className="xs"/>Publish</button>}
+                  {r.status === 'PUBLISHED' && <button onClick={unpublish}><Icon name="download" className="xs"/>Unpublish</button>}
+                  {r.status !== 'ARCHIVED'  && <button onClick={archive}><Icon name="bookmark" className="xs"/>Archive</button>}
+                  {r.status !== 'RETRACTED' && <button onClick={retract}><Icon name="flag" className="xs"/>Retract</button>}
+                  {r.status === 'RETRACTED' && <button onClick={unretract}><Icon name="check" className="xs"/>Unretract</button>}
+                </div>
+                <button className="rd-del" onClick={removeResearch}><Icon name="close" className="xs"/>Delete</button>
               </div>
-              <button className="rd-del" onClick={removeResearch}><Icon name="close" className="xs"/>Delete</button>
+            )}
+            <div className="rd-toolbar-actions">
+              <button className={me.saved ? 'active' : ''} onClick={save} title={me.saved ? 'Remove from saved' : 'Save'} aria-pressed={me.saved}>
+                <Icon name="bookmark" className="sm"/>
+              </button>
+              <button onClick={() => openShare({ kind:'research', id, title:r.title })} title="Share">
+                <Icon name="share" className="sm"/>
+              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {r.status === 'RETRACTED' && (
@@ -454,35 +474,40 @@ export function ResearchDetailPage() {
           </div>
         )}
 
-        {/* Masthead hero — cover wash + Islamic geometric pattern + scrim, eyebrow, title, author & key facts. */}
-        <header className="rd-hero2" style={{ background: r.cover }}>
-          <span className="rd-hero2-pattern" aria-hidden="true"/>
-          <span className="rd-hero2-scrim" aria-hidden="true"/>
-          <div className="rd-hero2-top">
-            {r.irc && <span className="rd-chip-id font-mono">{r.irc}</span>}
-            <span className={'rd-chip-status ' + sLower}><span className="dot"/>{r.status}</span>
+        {/* Reader masthead — the cover photo hangs full-bleed behind the title
+            plate (a legibility scrim deepens toward the byline). When there's no
+            cover image, `r.cover` is the brand gradient fallback and the geometric
+            endpaper texture (.rd-hero-pattern) shows instead. */}
+        <header className={'rd-hero' + (r.coverImageUrl ? ' has-cover' : ' is-fallback')}>
+          {r.coverImageUrl
+            ? <span className="rd-hero-cover" aria-hidden="true"><span className="rd-hero-cover-img" style={{ background: r.cover }}/></span>
+            : <span className="rd-hero-pattern" aria-hidden="true"/>}
+          <span className="rd-hero-scrim" aria-hidden="true"/>
+          <div className="rd-hero-top">
+            {r.irc && <span className="rd-hero-id font-mono">{r.irc}</span>}
+            <span className={'rd-hero-status ' + sLower}><span className="dot"/>{r.status}</span>
           </div>
-          {r.hasVideo && <button className="rd-hero2-play" onClick={() => setShowVideo(true)} aria-label="Play promo video"><Icon name="play"/></button>}
-          <div className="rd-hero2-content">
+          {r.hasVideo && <button className="rd-hero-play" onClick={() => setShowVideo(true)} aria-label="Play promo video"><Icon name="play"/></button>}
+          <div className="rd-hero-content">
             <span className="rd-eyebrow">Research</span>
-            <h1 className="rd-hero2-title">{r.title}</h1>
-            <div className="rd-hero2-by">
-              <span className="rd-hero2-ava" role="button" tabIndex={0} title={`View @${u.handle}`}
+            <h1 className="rd-hero-title" dir="auto">{r.title}</h1>
+            <div className="rd-hero-by">
+              <span className="rd-hero-ava" role="button" tabIndex={0} title={`View @${u.handle}`}
                 onClick={goAuthor} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goAuthor() } }}>
                 <Avatar initials={u.initials} color={u.avc} size={46} src={u.profileImage}/>
               </span>
-              <div className="rd-hero2-who" role="button" tabIndex={0} title={`View @${u.handle}`}
+              <div className="rd-hero-who" role="button" tabIndex={0} title={`View @${u.handle}`}
                 onClick={goAuthor} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goAuthor() } }}>
                 <div className="nm">{u.full}{u.verified && <Verify scholar/>}</div>
                 <div className="tm">@{u.handle} · {r.time}</div>
               </div>
               {!isAuthor && followed !== null && (
-                <button className={'rd-hero2-follow' + (followed ? ' on' : '')} onClick={toggleFollow}>
+                <button className={'rd-hero-follow' + (followed ? ' on' : '')} onClick={toggleFollow}>
                   {followed ? 'Following' : 'Follow'}
                 </button>
               )}
             </div>
-            <div className="rd-facts">
+            <div className="rd-facts t-stagger">
               <span className="rd-fact"><Icon name="cite" className="xs"/><b>{fmt(r.metrics.citations)}</b> cited</span>
               <span className="rd-fact"><Icon name="download" className="xs"/><b>{fmt(r.metrics.downloads)}</b> downloads</span>
               <span className="rd-fact"><Icon name="eye" className="xs"/><b>{fmt(r.metrics.views)}</b> views</span>
@@ -491,7 +516,7 @@ export function ResearchDetailPage() {
         </header>
 
         <div className="rd-layout">
-          <nav className="rd-toc">
+          <nav className="rd-toc t-stagger">
             <h4>Contents</h4>
             {toc.map(t => (
               <button key={t.id} type="button" className={'rd-toc-a' + (activeSec === t.id ? ' active' : '')} onClick={() => scrollToSec(t.id)}>
@@ -523,7 +548,7 @@ export function ResearchDetailPage() {
                         {m.url ? <img src={m.url} alt={m.altText || m.caption || ''} loading="lazy"/> : <div className="rd-figure-fallback"/>}
                         <span className="rd-figure-num">Fig. {i + 1}</span>
                       </div>
-                      {(m.caption || m.altText) && <figcaption><b>Fig. {i + 1}.</b> {m.caption || m.altText}</figcaption>}
+                      {(m.caption || m.altText) && <figcaption dir="auto"><b>Fig. {i + 1}.</b> {m.caption || m.altText}</figcaption>}
                     </figure>
                   ))}
                 </div>
@@ -536,7 +561,7 @@ export function ResearchDetailPage() {
                   <div key={m.id} className="rd-media-block">
                     <video src={m.url} poster={m.thumbnailUrl || undefined} controls playsInline preload="metadata"/>
                     {(m.caption || m.name) && (
-                      <div className="rd-media-meta"><b>{m.caption || m.name}</b><small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small></div>
+                      <div className="rd-media-meta"><b dir="auto">{m.caption || m.name}</b><small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small></div>
                     )}
                   </div>
                 ))}
@@ -549,7 +574,7 @@ export function ResearchDetailPage() {
                   <div key={m.id} className="rd-media-block">
                     <audio src={m.url} controls preload="metadata" style={{ width:'100%' }}/>
                     {(m.caption || m.name) && (
-                      <div className="rd-media-meta"><b>{m.caption || m.name}</b><small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small></div>
+                      <div className="rd-media-meta"><b dir="auto">{m.caption || m.name}</b><small className="muted">{[m.mimeType, fmtBytes(m.fileSize), fmtDuration(m.duration)].filter(Boolean).join(' · ')}</small></div>
                     )}
                   </div>
                 ))}
@@ -566,9 +591,9 @@ export function ResearchDetailPage() {
                         title={r.downloadsEnabled ? `Download ${m.name || 'file'}` : 'Downloads are turned off'}>
                         <span className={'rd-file-ic ' + (EXT_CLASS[ext] || 'ext-default')}><span className="rd-file-ext">{ext}</span></span>
                         <div className="rd-file-info">
-                          <b>{m.name || m.caption || 'file'}</b>
+                          <b dir="auto">{m.name || m.caption || 'file'}</b>
                           <small>{[m.mimeType || m.type?.toLowerCase(), fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
-                          {m.caption && m.name && <p>{m.caption}</p>}
+                          {m.caption && m.name && <p dir="auto">{m.caption}</p>}
                         </div>
                         <span className="rd-file-action"><Icon name="download" className="sm"/><span className="rd-file-action-tx">Download</span></span>
                       </button>
@@ -590,7 +615,7 @@ export function ResearchDetailPage() {
                       <div style={{flex:1}}>
                         <div className={'rail-name' + (cid ? ' lk' : '')} role={cid ? 'button' : undefined} onClick={goCu}><b>{cu.full}</b> {cu.verified && <Verify scholar/>}</div>
                         <small className="contrib-role">{(c.role||'').replace('_',' ')}</small>
-                        <div className="muted text-xs">{c.note}</div>
+                        <div className="muted text-xs" dir="auto">{c.note}</div>
                       </div>
                     </div>
                   )
@@ -611,7 +636,7 @@ export function ResearchDetailPage() {
               <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="comment" className="sm"/></span><h2>Comments</h2><span className="rd-sec-n">{fmt(r.metrics.comments)}</span></div>
               {r.commentsEnabled ? (
                 <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
-                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={32} src={user?.profileImage}/>
+                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={32} src={user?.profileImage}/>
                   <MentionBox className="field" placeholder={cFile ? `${cFile.name} attached…` : 'Add a comment…'} value={cText} onChange={e => setCText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') addComment() }}/>
                   <input ref={cFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setCFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={cFile ? cFile.name : 'Attach image / video / voice'} onClick={() => cFileRef.current?.click()} style={cFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
@@ -640,7 +665,7 @@ export function ResearchDetailPage() {
 
                   {replyTo === c.id && (
                     <div className="cmt-box" style={{ marginTop:8 }}>
-                      <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={28} src={user?.profileImage}/>
+                      <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={28} src={user?.profileImage}/>
                       <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(c); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
                       <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c)}><Icon name="send" className="sm"/></button>
                     </div>
@@ -702,7 +727,7 @@ export function ResearchDetailPage() {
             {r.citation && (
               <div className="card rd-panel">
                 <h5 className="rd-panel-h">Cite this work</h5>
-                <div className="cite-box font-serif">{r.citation}</div>
+                <div className="cite-box font-serif" dir="auto">{r.citation}</div>
                 <div className="rd-cite-actions">
                   <button onClick={copyCite}><Icon name="cite" className="xs"/>Copy citation</button>
                   <button onClick={cite}><Icon name="check" className="xs"/>I cited this</button>
@@ -751,7 +776,7 @@ export function ResearchDetailPage() {
             {imgs.length > 1 && <button className="lb-nav lb-next" onClick={next} aria-label="Next"><Icon name="chevright"/></button>}
             <img className="lb-img" src={m.url} alt={m.altText || m.caption || ''}/>
             {(m.caption || m.altText) && (
-              <div className="lb-count"><b>Fig. {lightbox + 1}.</b> {m.caption || m.altText}</div>
+              <div className="lb-count" dir="auto"><b>Fig. {lightbox + 1}.</b> {m.caption || m.altText}</div>
             )}
           </div>
         )

@@ -7,7 +7,7 @@
 import { Icon } from './ui.jsx'
 
 const ICON_MAP  = { URL:'link', BOOK:'book', ARTICLE:'doc', ISBN:'book', MEDIA_FILE:'doc', MANUAL:'cite' }
-const COLOR_MAP = { URL:'#0e6b54', BOOK:'#7a5a1a', ARTICLE:'#3f6a8a', ISBN:'#7a5a1a', MEDIA_FILE:'#15302a', MANUAL:'#3c4f49' }
+const COLOR_MAP = { URL:'#b3271e', BOOK:'#8a221b', ARTICLE:'#1f3a6e', ISBN:'#8a221b', MEDIA_FILE:'#2a251d', MANUAL:'#5e574b' }
 
 function bytes(n) {
   if (n == null || n < 0) return ''
@@ -19,7 +19,7 @@ function bytes(n) {
 
 export function SourceRow({ s }) {
   const icon = ICON_MAP[s.type] || 'book'
-  const color = COLOR_MAP[s.type] || '#15302a'
+  const color = COLOR_MAP[s.type] || '#2a251d'
   const isFile = s.type === 'MEDIA_FILE' || !!s.fileUrl
   // The descriptive line: prefer a full citation, then the URL / ISBN / file name.
   const desc = isFile
@@ -30,8 +30,8 @@ export function SourceRow({ s }) {
     <>
       <span className="src-ic" style={{ background: color }}><Icon name={icon} className="sm"/></span>
       <div className="src-info">
-        <b>{s.title || s.fileName || s.url || 'Source'}</b>
-        {desc && <small className="muted">{desc}</small>}
+        <b dir="auto">{s.title || s.fileName || s.url || 'Source'}</b>
+        {desc && <small className="muted" dir="auto">{desc}</small>}
       </div>
       {s.href
         ? <span className="src-action" title={isFile ? 'Open file' : 'Open link'}><Icon name={isFile ? 'download' : 'link'} className="sm"/></span>

@@ -20,7 +20,7 @@ export function PostPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { full:'You', initials:'Y', avc:'linear-gradient(135deg,#159a76,#0a4a3c)' }
+  const me = user || { full:'You', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)' }
 
   const [post, setPost] = React.useState(null)
   const [comments, setComments] = React.useState([])
@@ -32,8 +32,20 @@ export function PostPage() {
   const [editValue, setEditValue] = React.useState('')
   const [replyTo, setReplyTo] = React.useState(null)       // comment id being replied to
   const [replyText, setReplyText] = React.useState('')
+  const [replyTarget, setReplyTarget] = React.useState(null)
   const [repliesMap, setRepliesMap] = React.useState({})   // commentId → [reply views]
   const [openReplies, setOpenReplies] = React.useState({}) // commentId → shown?
+
+  const replyHandleOf = React.useCallback((reply, parentComment) => {
+    if (reply?._replyToHandle) return reply._replyToHandle
+    if (reply?.replyToUserId) {
+      const parentAuthor = authorOf(parentComment)
+      if (parentAuthor.handle && parentComment?.author === reply.replyToUserId) return parentAuthor.handle
+      const targetReply = (repliesMap[parentComment?.id] || []).find((entry) => entry.id === reply.replyToCommentId)
+      if (targetReply) return authorOf(targetReply).handle
+    }
+    return authorOf(parentComment).handle
+  }, [repliesMap])
 
   React.useEffect(() => {
     let alive = true
@@ -65,7 +77,7 @@ export function PostPage() {
         setComments(cs => cs.some(c => c.id === evt.commentId) ? cs : [...cs, {   // dedup: never echo a comment we already have
           id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
-                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#159a76,#0a4a3c)' },
+                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#c9382f,#8f1f18)' },
           body: evt.textContent || '', time: 'now', likes: 0,
         }])
       }
@@ -75,7 +87,7 @@ export function PostPage() {
         setRepliesMap(m => m[pid] ? { ...m, [pid]: m[pid].some(r => r.id === evt.commentId) ? m[pid] : [...m[pid], {
           id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
-                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#159a76,#0a4a3c)' },
+                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#c9382f,#8f1f18)' },
           body: evt.textContent || '', time: 'now', likes: 0,
         }] } : m)
       }
@@ -149,14 +161,16 @@ export function PostPage() {
   }
   const submitReply = async (cid) => {
     const v = replyText.trim(); if (!v) return
-    setReplyText(''); setReplyTo(null)
-    const tmp = { id: 'tmp-' + Date.now(), _author: me, author: me.id, body: v, time: 'now', likes: 0 }
+    const handle = replyTarget?.handle || null
+    const body = handle && !new RegExp(`^@${handle}(\\s|$)`, 'i').test(v) ? `@${handle} ${v}` : v
+    setReplyText(''); setReplyTo(null); setReplyTarget(null)
+    const tmp = { id: 'tmp-' + Date.now(), _author: me, author: me.id, body, time: 'now', likes: 0, _replyToHandle: handle }
     setRepliesMap(m => ({ ...m, [cid]: [...(m[cid] || []), tmp] }))
     setOpenReplies(o => ({ ...o, [cid]: true }))
     setComments(cs => cs.map(c => c.id === cid ? { ...c, replyCount: (c.replyCount || 0) + 1 } : c))
     setPost(p => p ? { ...p, comments: (p.comments || 0) + 1 } : p)
     try {
-      const saved = await api.posts.addReply(cid, { text: v })
+      const saved = await api.posts.addReply(cid, { text: body })
       setRepliesMap(m => ({ ...m, [cid]: (m[cid] || []).map(r => r.id === tmp.id ? saved : r) }))
     } catch { showToast('Could not post reply') }
   }
@@ -238,7 +252,12 @@ export function PostPage() {
                           <button onClick={() => reactComment(c.id)} style={c.liked ? { color:'var(--rose)' } : undefined}>
                             <Icon name="heart" className="xs" style={c.liked ? { fill:'var(--rose)', stroke:'var(--rose)' } : undefined}/>{c.likes || 0}
                           </button>
-                          <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>Reply</button>
+                          <button onClick={() => {
+                            const open = replyTo === c.id
+                            setReplyTo(open ? null : c.id)
+                            setReplyTarget(open ? null : { handle: cu.handle, userId: c.author, commentId: c.id })
+                            setReplyText(open ? '' : `@${cu.handle} `)
+                          }}>Reply</button>
                           {cOwner && !editing && <button onClick={() => startEdit(c)}>Edit</button>}
                           {cOwner && <button onClick={() => delComment(c.id)} style={{ color:'var(--rose)' }}>Delete</button>}
                           <span>{c.time}</span>
@@ -247,16 +266,15 @@ export function PostPage() {
                         {replyTo === c.id && (
                           <div className="cmt-box" style={{ marginTop:8 }}>
                             <Avatar initials={me.initials} color={me.avc} size={28} src={me.profileImage}/>
-                            <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText}
+                            <MentionBox className="field" autoFocus placeholder={replyTarget?.handle ? `Replying to @${replyTarget.handle}…` : `Reply to ${cu.full}…`} value={replyText}
                               onChange={e => setReplyText(e.target.value)}
-                              onKeyDown={e => { if (e.key==='Enter') submitReply(c.id); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
+                              onKeyDown={e => { if (e.key==='Enter') submitReply(c.id); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyTarget(null) } }}/>
                             <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c.id)}><Icon name="send" className="sm"/></button>
                           </div>
                         )}
 
                         {(c.replyCount > 0 || repliesMap[c.id]?.length > 0) && (
-                          <button onClick={() => toggleReplies(c.id)}
-                            style={{ marginTop:6, fontSize:'12.5px', color:'var(--ink-2)', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <button className="cmt-toggle" onClick={() => toggleReplies(c.id)}>
                             <Icon name={openReplies[c.id] ? 'chevup' : 'chevdown'} className="xs"/>
                             {openReplies[c.id] ? 'Hide replies' : `View ${c.replyCount || repliesMap[c.id]?.length || 0} ${(c.replyCount || repliesMap[c.id]?.length) === 1 ? 'reply' : 'replies'}`}
                           </button>
@@ -264,6 +282,7 @@ export function PostPage() {
 
                         {openReplies[c.id] && (repliesMap[c.id] || []).map((r, ri) => {
                           const ru = authorOf(r)
+                          const replyHandle = replyHandleOf(r, c)
                           const rOwner = !!me.id && r.author === me.id && !String(r.id).startsWith('tmp-')
                           const rEditing = editingId === r.id
                           return (
@@ -280,7 +299,7 @@ export function PostPage() {
                                   </div>
                                 ) : (
                                   <div className="cmt-bubble">
-                                    <div className="cmt-name" role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}</div>
+                                    <div className="cmt-name" role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}{replyHandle && <span className="muted text-xs"> · <Icon name="reply" className="xs"/>@{replyHandle}</span>}</div>
                                     <p>{linkify(r.body)}</p>
                                   </div>
                                 )}
@@ -288,7 +307,7 @@ export function PostPage() {
                                   <button onClick={() => reactReply(c.id, r.id)} style={r.liked ? { color:'var(--rose)' } : undefined}>
                                     <Icon name="heart" className="xs" style={r.liked ? { fill:'var(--rose)', stroke:'var(--rose)' } : undefined}/>{r.likes || 0}
                                   </button>
-                                  <button onClick={() => { setReplyTo(c.id); setReplyText(`@${ru.handle} `) }}>Reply</button>
+                                  <button onClick={() => { setReplyTo(c.id); setReplyTarget({ handle: ru.handle, userId: r.author, commentId: r.id }); setReplyText(`@${ru.handle} `) }}>Reply</button>
                                   {rOwner && !rEditing && <button onClick={() => startEdit(r)}>Edit</button>}
                                   {rOwner && <button onClick={() => delReply(c.id, r.id)} style={{ color:'var(--rose)' }}>Delete</button>}
                                   <span>{r.time}</span>

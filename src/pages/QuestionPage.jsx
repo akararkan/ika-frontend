@@ -361,7 +361,7 @@ export function QuestionPage() {
 
   const u = authorOf(q)
   return (
-    <div className="main center">
+    <div className="main center qd-page">
       <div className="col-main">
         <button className="back-btn" onClick={() => navigate('/qna')}><Icon name="chevleft" className="sm"/>Back to questions</button>
         <input ref={attachRef} type="file" hidden onChange={onAttachPicked}/>
@@ -388,8 +388,8 @@ export function QuestionPage() {
             </div>
           ) : (
             <>
-              <h1>{q.title}</h1>
-              <p className="qd-body">{linkify(q.body)}</p>
+              <h1 dir="auto">{q.title}</h1>
+              <p className="qd-body" dir="auto">{linkify(q.body)}</p>
             </>
           )}
 
@@ -441,7 +441,7 @@ export function QuestionPage() {
                 </div>
               ) : (
                 <>
-                  <div className="ans-body">{renderBody(a.body)}</div>
+                  <div className="ans-body" dir="auto">{renderBody(a.body)}</div>
                   {a.mediaUrl && (a.mediaType === 'VIDEO'
                     ? <video src={a.mediaUrl} poster={a.mediaThumbnailUrl || undefined} controls playsInline style={{ width:'100%', borderRadius:12, marginTop:12, background:'#000' }}/>
                     : <img src={a.mediaUrl} alt="" style={{ width:'100%', borderRadius:12, marginTop:12 }}/>)}
@@ -464,7 +464,7 @@ export function QuestionPage() {
                       <h5>Attachments</h5>
                       {a.attachments.map(at => (
                         <a key={at.id} className="src-row" href={at.url} target="_blank" rel="noreferrer" style={{ textDecoration:'none' }}>
-                          <span className="src-ic" style={{ background:'#15302a' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
+                          <span className="src-ic" style={{ background:'#2a251d' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
                           <div className="src-info"><b>{at.name}</b><small className="muted">{at.caption || at.mediaType.toLowerCase()}</small></div>
                           <span className="src-tag">{at.mediaType}</span>
                         </a>
@@ -522,7 +522,7 @@ export function QuestionPage() {
                     ) : (
                       <div key={at.id} style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <a className="src-row" href={at.url} target="_blank" rel="noreferrer" style={{ textDecoration:'none', flex:1 }}>
-                          <span className="src-ic" style={{ background:'#15302a' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
+                          <span className="src-ic" style={{ background:'#2a251d' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
                           <div className="src-info"><b>{at.name}</b><small className="muted">{at.caption || at.mediaType.toLowerCase()}</small></div>
                           <span className="src-tag">{at.mediaType}</span>
                         </a>
@@ -538,7 +538,7 @@ export function QuestionPage() {
               {/* reply composer + thread */}
               {replyTo === a.id && (
                 <div className="cmt-box" style={{ marginTop:10 }}>
-                  <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#159a76,#0a4a3c)" size={28} src={user?.profileImage}/>
+                  <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={28} src={user?.profileImage}/>
                   <MentionBox className="field" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
                     onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null) } }}/>
                   <input ref={replyFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setReplyFile(f); e.target.value='' }}/>
@@ -607,8 +607,8 @@ export function QuestionPage() {
             {(ansMedia || ansVoice) && (
               <div style={{ marginTop:12 }}>
                 {ansMediaUrl && <img src={ansMediaUrl} alt="" style={{ maxWidth:'100%', borderRadius:12 }}/>}
-                {ansMedia && !ansMediaUrl && <div className="src-row"><span className="src-ic" style={{ background:'#15302a' }}><Icon name="video" className="sm"/></span><div className="src-info"><b>{ansMedia.name}</b><small className="muted">video</small></div></div>}
-                {ansVoice && <div className="src-row"><span className="src-ic" style={{ background:'#15302a' }}><Icon name="mic" className="sm"/></span><div className="src-info"><b>{ansVoice.name}</b><small className="muted">voice note</small></div></div>}
+                {ansMedia && !ansMediaUrl && <div className="src-row"><span className="src-ic" style={{ background:'#2a251d' }}><Icon name="video" className="sm"/></span><div className="src-info"><b>{ansMedia.name}</b><small className="muted">video</small></div></div>}
+                {ansVoice && <div className="src-row"><span className="src-ic" style={{ background:'#2a251d' }}><Icon name="mic" className="sm"/></span><div className="src-info"><b>{ansVoice.name}</b><small className="muted">voice note</small></div></div>}
                 <button className="btn btn-ghost btn-sm mt-12" style={{ color:'var(--rose)' }} onClick={() => { setAnsMedia(null); setAnsVoice(null) }}><Icon name="close" className="xs"/>Remove attachment</button>
               </div>
             )}

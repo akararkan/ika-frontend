@@ -91,17 +91,18 @@ export function QnaPage() {
           <span className="lk" role="button" onClick={goAuthor}><Avatar initials={u.initials} color={u.avc} size={38} src={u.profileImage}/></span>
           <div>
             <div className="qna-name lk" role="button" onClick={goAuthor}><b>{u.full}</b> {u.verified && <Verify scholar={u.role==='SCHOLAR'}/>}</div>
-            <div className="qna-sub">@{u.handle} · {q.time}</div>
+            <div className="qna-sub">{u.role === 'SCHOLAR' ? 'Scholar' : u.role === 'RESEARCHER' ? 'Researcher' : 'Member'} · @{u.handle}</div>
           </div>
-          {badge(q)}
         </header>
-        <h3>{q.title}</h3>
-        <p className="qna-body">{q.body}</p>
+        {q.status && <div className={'status ' + String(q.status).toLowerCase()} style={{ margin:'2px 0 7px' }}>{q.status === 'OPEN' ? 'Open · awaiting scholars' : q.status === 'ANSWERED' ? 'Answered · verified' : String(q.status).toLowerCase()}</div>}
+        <h3 dir="auto">{q.title}</h3>
+        <p className="qna-body" dir="auto">{q.body}</p>
         {tagPills(q.tags)}
         <footer>
           <span className="qna-ans"><Icon name="comment" className="xs"/>{q.answers} answers</span>
           <span><Icon name="eye" className="xs"/>{fmt(q.views)}</span>
           <span><Icon name="bookmark" className="xs"/>{q.saves}</span>
+          <span className="qna-by">asked by {u.full} · {q.time}</span>
         </footer>
       </article>
     )
@@ -142,12 +143,12 @@ export function QnaPage() {
   const groupKey = (q) => q.hasAcceptedAnswer ? 'resolved' : (q.status || '').toLowerCase()
 
   return (
-    <div className="main center">
+    <div className="main center qna-page">
       <div className="col-main">
         <div className="phead">
           <div>
             <span className="phead-kicker">Islamic Knowledge Archive</span>
-            <h1>Academic <em>Q&amp;A</em></h1>
+            <h1>Academic <em>Q&amp;A</em> <span className="phead-ar" lang="ar" dir="rtl">الأسئلة</span></h1>
             <p className="sub">Ask, answer, and verify. Scholars mark best answers; question authors accept and rate responses.</p>
           </div>
           <button className="btn btn-primary btn-lg" onClick={() => openCompose('QUESTION')}><Icon name="compose" className="sm"/>Ask a question</button>
