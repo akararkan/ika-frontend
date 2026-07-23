@@ -15,6 +15,7 @@ import { VoicePlayer } from '../components/VoicePlayer.jsx'
 import { PlayableVideo } from '../components/PlayableVideo.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
+import { makeZip, makeTarGz, saveBlob, safeEntryName, uniqueNames } from '../lib/archive.js'
 import { useRealtime } from '../hooks/useRealtime.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api, adapters, applyResearchDelta } from '../api/index.js'
@@ -168,6 +169,8 @@ export function ResearchDetailPage() {
   const [progress, setProgress] = React.useState(0)
   const [showFab, setShowFab] = React.useState(false)
   const [followed, setFollowed] = React.useState(null)       // author follow state: null = unknown, true/false once socialStatus resolves
+  const [archFmt, setArchFmt] = React.useState('zip')        // bundle format for "Download all"
+  const [packing, setPacking] = React.useState('')           // '' = idle, else progress label
 
   const loadComments = React.useCallback(() => {
     api.research.comments(id).then(res => setComments((res?.content || res || []).map(adapters.researchCommentFrom))).catch(() => {})
@@ -341,8 +344,64 @@ export function ResearchDetailPage() {
       else showToast('Download recorded')
     } catch (e) { showToast(e?.code === 'DOWNLOADS_DISABLED' ? 'Downloads are turned off' : 'Download unavailable') }
   }
-  // main "Download PDF" → first DOCUMENT media (the server needs a mediaId to return a URL, §18.2)
-  const download = () => { const doc = r?.mediaFiles?.find(m => m.type === 'DOCUMENT') || r?.mediaFiles?.[0]; downloadMedia(doc?.id) }
+  // Bundle every attached file into one archive. Each file already has its own
+  // per-row download, so the rail button packs them all instead of duplicating
+  // the single-PDF action. Resolves each signed URL (§18.2), fetches the bytes,
+  // and writes a ZIP or TAR.GZ client-side. If the bytes can't be read
+  // cross-origin, fall back to opening each file individually.
+  // Read one file's bytes. The media DTO's own `url` is same-origin
+  // (/api/v1/media/…) so fetch() can read it; the URL returned by the
+  // POST /download endpoint may be an external signed URL that CORS blocks —
+  // so that one is only a fallback. The POST still fires either way because
+  // it is what records the download metric.
+  const fetchFileBytes = async (m) => {
+    const candidates = []
+    if (m.url) candidates.push(m.url)
+    try {
+      const res = await api.research.download(id, m.id)
+      const signed = typeof res === 'string' ? res : res?.url
+      if (signed) candidates.push(signed)
+    } catch { /* metric/record failed — the direct URL may still work */ }
+    for (const url of candidates) {
+      try {
+        const resp = await fetch(url)
+        if (resp.ok) return new Uint8Array(await resp.arrayBuffer())
+      } catch { /* CORS or network — try the next candidate */ }
+    }
+    return null
+  }
+
+  const downloadAll = async () => {
+    const list = (r?.mediaFiles || []).filter(m => m.type === 'DOCUMENT' || m.type === 'OTHER')
+    if (!list.length) return
+    setPacking('Preparing…')
+    try {
+      const picked = []
+      const failed = []
+      for (let i = 0; i < list.length; i++) {
+        setPacking(`Fetching ${i + 1}/${list.length}…`)
+        const bytes = await fetchFileBytes(list[i])
+        if (bytes) picked.push({ raw: bytes, name: safeEntryName(list[i].name || list[i].caption, `file-${i + 1}`) })
+        else failed.push(list[i].name || `file ${i + 1}`)
+      }
+      if (!picked.length) { showToast('Could not read these files to bundle them'); return }
+
+      setPacking('Packing…')
+      const names = uniqueNames(picked.map(p => p.name))
+      const entries = picked.map((p, i) => ({ name: names[i], bytes: p.raw }))
+      const base = safeEntryName(r?.title, 'research').slice(0, 60) || 'research'
+      let blob, ext
+      if (archFmt === 'zip') { blob = await makeZip(entries); ext = 'zip' }
+      else { const t = await makeTarGz(entries); blob = t.blob; ext = t.ext }
+      saveBlob(blob, `${base}.${ext}`)
+      setR(p => p && ({ ...p, metrics:{ ...p.metrics, downloads:(p.metrics.downloads || 0) + entries.length } }))
+      showToast(failed.length
+        ? `Downloaded ${entries.length} of ${list.length} as .${ext} — ${failed.length} unreadable`
+        : `Downloaded ${entries.length} file${entries.length > 1 ? 's' : ''} as .${ext}`)
+    } catch {
+      showToast('Could not build the archive')
+    } finally { setPacking('') }
+  }
   // render a comment's attached media / voice (§5 CommentResponse)
   const commentMedia = (c) => (<>
     {c.mediaUrl && (c.mediaType === 'VIDEO'
@@ -592,8 +651,10 @@ export function ResearchDetailPage() {
                         <span className={'rd-file-ic ' + (EXT_CLASS[ext] || 'ext-default')}><span className="rd-file-ext">{ext}</span></span>
                         <div className="rd-file-info">
                           <b dir="auto">{m.name || m.caption || 'file'}</b>
-                          <small>{[m.mimeType || m.type?.toLowerCase(), fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
-                          {m.caption && m.name && <p dir="auto">{m.caption}</p>}
+                          {/* friendly type (DOCX · 319 KB), not the raw MIME string —
+                              the long unbroken MIME used to overflow onto the button */}
+                          <small title={m.mimeType || ''}>{[ext, fmtBytes(m.fileSize)].filter(Boolean).join(' · ')}</small>
+                          {m.caption && m.caption !== m.name && <p dir="auto">{m.caption}</p>}
                         </div>
                         <span className="rd-file-action"><Icon name="download" className="sm"/><span className="rd-file-action-tx">Download</span></span>
                       </button>
@@ -636,7 +697,7 @@ export function ResearchDetailPage() {
               <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="comment" className="sm"/></span><h2>Comments</h2><span className="rd-sec-n">{fmt(r.metrics.comments)}</span></div>
               {r.commentsEnabled ? (
                 <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
-                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={32} src={user?.profileImage}/>
+                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#2d5f97,#16283f)" size={32} src={user?.profileImage}/>
                   <MentionBox className="field" placeholder={cFile ? `${cFile.name} attached…` : 'Add a comment…'} value={cText} onChange={e => setCText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') addComment() }}/>
                   <input ref={cFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setCFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={cFile ? cFile.name : 'Attach image / video / voice'} onClick={() => cFileRef.current?.click()} style={cFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
@@ -665,7 +726,7 @@ export function ResearchDetailPage() {
 
                   {replyTo === c.id && (
                     <div className="cmt-box" style={{ marginTop:8 }}>
-                      <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={28} src={user?.profileImage}/>
+                      <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#2d5f97,#16283f)" size={28} src={user?.profileImage}/>
                       <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(c); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
                       <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c)}><Icon name="send" className="sm"/></button>
                     </div>
@@ -702,9 +763,26 @@ export function ResearchDetailPage() {
 
           <aside className="rd-rail2">
             <div className="card rd-panel">
-              <button className="rd-dlpdf" onClick={download} disabled={!r.downloadsEnabled}
-                title={r.downloadsEnabled ? 'Download the main paper' : 'Downloads are turned off'}>
-                <Icon name="download" className="sm"/>{r.downloadsEnabled ? 'Download PDF' : 'Downloads off'}</button>
+              <button className="rd-dlpdf" onClick={downloadAll}
+                disabled={!r.downloadsEnabled || !files.length || !!packing}
+                title={!r.downloadsEnabled ? 'Downloads are turned off'
+                  : !files.length ? 'This publication has no attached files'
+                  : `Bundle all ${files.length} file${files.length > 1 ? 's' : ''} into one .${archFmt === 'zip' ? 'zip' : 'tar.gz'}`}>
+                <Icon name="download" className="sm"/>
+                {!r.downloadsEnabled ? 'Downloads off'
+                  : packing ? packing
+                  : !files.length ? 'No files'
+                  : `Download all · ${files.length}`}
+              </button>
+              {r.downloadsEnabled && files.length > 0 && (
+                <div className="rd-fmt" role="group" aria-label="Archive format">
+                  <span className="rd-fmt-l">Format</span>
+                  {[['zip', 'ZIP'], ['targz', 'TAR.GZ']].map(([v, label]) => (
+                    <button key={v} type="button" className={'rd-fmt-b' + (archFmt === v ? ' on' : '')}
+                      aria-pressed={archFmt === v} disabled={!!packing} onClick={() => setArchFmt(v)}>{label}</button>
+                  ))}
+                </div>
+              )}
               <div className="rd-act-row">
                 <button className={'btn btn-secondary btn-sm rd-act ' + (me.liked ? 'on-rose' : '')} onClick={react}><Icon name="heart" className="xs"/>{me.liked ? 'Reacted' : 'React'}</button>
                 <button className={'btn btn-secondary btn-sm rd-act ' + (me.saved ? 'on-brass' : '')} onClick={save}><Icon name="bookmark" className="xs"/>{me.saved ? 'Saved' : 'Save'}</button>

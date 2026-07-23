@@ -44,6 +44,18 @@ export function UserProfilePage() {
   if (loading) return <div className="main center"><div className="col-main"><Loader label="Loading profile…"/></div></div>
   if (!u) return <div className="main center"><div className="col-main"><EmptyState icon="user" title="User not found"/></div></div>
 
+  /* Open (or reuse) the DM with this person. `createDirect` is get-or-create on
+     the backend — a deterministic direct_key means tapping Message twice can
+     never fork the thread — so we just route to whatever id comes back. */
+  const message = async () => {
+    try {
+      const convo = await api.chat.conversations.createDirect(id)
+      if (convo?.id) navigate(`/chat/${convo.id}`)
+    } catch (e) {
+      showToast(e?.code === 'BLOCKED' ? 'You can’t message this account.' : (e?.message || 'Could not open the chat'))
+    }
+  }
+
   const following = status?.isFollowing
   const toggleFollow = () => {
     const was = following
@@ -88,6 +100,11 @@ export function UserProfilePage() {
             ) : (
               <button className={'btn ' + (following ? 'btn-secondary is-following' : 'btn-primary')} onClick={toggleFollow}>
                 <Icon name={following ? 'followed' : 'follow'} className="sm"/>{following ? 'Following' : 'Follow'}
+              </button>
+            )}
+            {!blockedByThem && (
+              <button className="btn btn-secondary" onClick={message} title="Send a direct message">
+                <Icon name="chat" className="sm"/>Message
               </button>
             )}
             <button className={'btn btn-secondary' + (restricting ? ' on-brass' : '')} onClick={toggleRestrict} title="Restrict — their comments show only to them"><Icon name="eye" className="sm"/>{restricting ? 'Restricted' : 'Restrict'}</button>

@@ -404,7 +404,7 @@ img,video{max-width:100%;height:auto}
   .ntf-group{margin:14px 18px 7px;font-size:11px;letter-spacing:.5px}
   .ntf-row{padding:12px 16px;gap:12px}
   .ntf-row.unread::before{display:none}     /* unread dot consumes width; use bg tint only */
-  .ntf-row.unread{background:rgba(201,56,47,.05)}
+  .ntf-row.unread{background:rgba(45,95,151,.05)}
   .ntf-badge{width:21px;height:21px;border-width:2px}
   .ntf-badge .ico{width:11px;height:11px}
   .ntf-body p{font-size:13.5px;line-height:1.45}
@@ -494,7 +494,7 @@ img,video{max-width:100%;height:auto}
 .rv-mute{position:absolute;top:62px;right:14px;z-index:6;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.42);backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);border:1px solid rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;transition:transform .16s ease,background .16s ease;box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .rv-mute:hover{background:rgba(0,0,0,.6)}
 .rv-mute:active{transform:scale(.9)}
-.rv-mute.off{background:rgba(194,69,63,.32);border-color:rgba(255,255,255,.22)}   /* muted state stands out */
+.rv-mute.off{background:rgba(179,69,62,.32);border-color:rgba(255,255,255,.22)}   /* muted state stands out */
 
 /* ============================================================
    10.1 · PHONE  (≤720px) — the bulk of the mobile overhaul
@@ -571,7 +571,7 @@ img,video{max-width:100%;height:auto}
   .rv-mtabbar a small{font-size:10px;font-weight:600}
   .rv-mtabbar a.active{color:#fff}
   .rv-mtabbar a.mid{flex:0 0 auto}
-  .rv-mtabbar a.mid .plus{width:44px;height:36px;border-radius:13px;background:var(--rubric);display:grid;place-items:center;color:#fff;margin-top:-10px;box-shadow:0 5px 14px rgba(143,31,24,.4)}
+  .rv-mtabbar a.mid .plus{width:44px;height:36px;border-radius:13px;background:var(--rubric);display:grid;place-items:center;color:#fff;margin-top:-10px;box-shadow:0 5px 14px rgba(29,58,95,.4)}
   /* story-only: invisible left=prev / right=next tap zones (chevrons are hidden) */
   .reels-view.is-story .rv-nav{display:flex;flex-direction:row;justify-content:space-between;position:absolute;inset:0;top:calc(70px + var(--safe-t));bottom:120px;left:0;right:0;transform:none;background:transparent;z-index:3;gap:0}
   .reels-view.is-story .rv-nav button{flex:1;height:auto;width:auto;border-radius:0;background:transparent;color:transparent;opacity:0}
@@ -756,7 +756,7 @@ img,video{max-width:100%;height:auto}
   .botnav a .ico{transition:transform .16s ease,color .16s ease}
   .botnav a.active .ico{transform:translateY(-1px) scale(1.07)}
   .botnav a.active small{font-weight:700}
-  .botnav a.mid .plus{box-shadow:0 7px 18px -6px rgba(179,39,30,.62),inset 0 1px 0 rgba(255,255,255,.28)}
+  .botnav a.mid .plus{box-shadow:0 7px 18px -6px rgba(29,58,95,.62),inset 0 1px 0 rgba(255,255,255,.28)}
 
   /* Comfortable reading rhythm for long bodies on phones */
   .post-body,.ans-body,.rd-body,.qd-body,.prose{line-height:1.62}

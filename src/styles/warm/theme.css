@@ -1,0 +1,193 @@
+/* =============================================================
+   IKA — "Warm Archive" theme (redesign 2026)
+   Navy from the IKA seal · gold accents · warm paper surfaces
+   Lora (serif) · IBM Plex Sans (UI) · Amiri (Arabic/Kurdish)
+
+   Token base of the warm/ override layer. Imported AFTER the base
+   styles and BEFORE the warm/* area files. Style-only: re-maps the
+   token layer every existing rule reads, then re-skins shell
+   primitives. No markup or JS changes needed.
+   ============================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Amiri:ital,wght@0,400;0,700&display=swap');
+
+:root{
+  /* Ink / paper — warm archive */
+  --ink:#221e17;
+  --ink-2:#2a251d;
+  --ink-soft:#57503f;
+  --muted:#8b8371;
+  --paper:#f4f0e7;
+  --paper-2:#faf6ec;
+  --card:#fffdf8;
+  --card-2:#f6f2e8;
+  --line:#e6dfcf;
+  --line-soft:#efe9db;
+
+  /* Brand — navy primary. Legacy token names re-pointed so every
+     existing rule (buttons, active nav, badges…) goes navy. */
+  --rubric:#1d3a5f;
+  --wash:#e8eef5;
+  --emerald:#1d3a5f;
+  --emerald-deep:#16283f;
+  --emerald-bright:#2d5f97;
+  --emerald-glow:#3a6ca5;
+  --brass:#b3873e;           /* verify seal & scholarly gold */
+  --brass-soft:#e5d3ac;
+  --brass-tint:#f6ecd8;
+  --rose:#b3453e;
+  --blue:#2d5f97;
+
+  /* Warm-archive vocabulary (aliases used by the warm/* layer) */
+  --navy:#1d3a5f;
+  --navy-deep:#16283f;
+  --blue-wash:#e8eef5;
+  --gold:#b3873e;
+  --gold-deep:#7a662f;
+  --gold-wash:#f6ecd8;
+  --good:#3d6b4f;
+  --good-wash:#e7f0e9;
+  --danger:#a03e36;
+  --like:#b3453e;
+
+  /* Discipline spine colors — same warmth, navy-anchored */
+  --d-hadith:#8a4a5b;
+  --d-tafsir:#1d3a5f;
+  --d-aqidah:#6b5b8a;
+  --d-fiqh:#7a5b3f;
+  --d-science:#2f6b72;
+  --d-history:#5b7a67;
+
+  /* Shadows — warm ink */
+  --shadow-sm:0 1px 2px rgba(34,30,23,.05),0 2px 6px rgba(34,30,23,.04);
+  --shadow:0 4px 16px -6px rgba(34,30,23,.12),0 1px 4px rgba(34,30,23,.05);
+  --shadow-lg:0 20px 60px -16px rgba(34,30,23,.28);
+
+  /* Radii — soft, friendly */
+  --r-xs:8px; --r-sm:10px; --r:14px; --r-lg:16px; --r-xl:18px;
+
+  /* Type */
+  --sans:"IBM Plex Sans","Helvetica Neue",system-ui,"Segoe UI","SF Arabic","Geeza Pro","Noto Sans Arabic",Tahoma,Arial,sans-serif;
+  --serif:"Lora","Amiri",Georgia,"Noto Naskh Arabic","Geeza Pro",serif;
+  --arabic:"Amiri","Noto Naskh Arabic","Geeza Pro",serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+
+/* ---------- Global surface & selection ---------- */
+body{background:var(--paper)}
+::selection{background:#dbe6f2;color:var(--ink)}
+a{color:var(--blue)}
+a:hover{color:var(--rubric)}
+
+/* ---------- Buttons ---------- */
+.btn{border-radius:10px}
+.btn-primary{
+  background:var(--rubric);
+  box-shadow:0 8px 18px -10px rgba(29,58,95,.55);
+}
+.btn-primary:hover{background:var(--emerald-deep)}
+.btn-lg{border-radius:12px}
+.cta-compose{
+  background:var(--rubric);
+  box-shadow:0 10px 22px -10px rgba(29,58,95,.45);
+}
+.cta-compose:hover{box-shadow:0 14px 28px -12px rgba(29,58,95,.55)}
+
+/* ---------- Topbar ---------- */
+.topbar{
+  background:rgba(255,253,248,.9);
+  backdrop-filter:blur(14px) saturate(140%);
+}
+.brand .word b{color:var(--brass)}
+.brand .mark{color:var(--rubric)}
+.brand .mark svg{stroke:var(--rubric)}
+.tb-search input{background:var(--card-2);border-radius:999px}
+.tb-search input:focus{border-color:var(--blue);background:#fff}
+.icon-btn .dot{background:var(--brass)}
+
+/* ---------- Sidebar ---------- */
+.sidebar{background:var(--paper-2)}
+.nav-item{border-radius:10px}
+.nav-item.active{background:#eae2cf;color:var(--rubric)}
+.nav-item.active .ico{color:var(--rubric)}
+.nav-item .badge{background:var(--brass)}
+.nav-item.active .badge{background:var(--brass)}
+
+/* ---------- Inputs — boxed, warm ---------- */
+.field{
+  border:1px solid #ddd4c0;border-bottom-color:#ddd4c0;
+  border-radius:10px;background:#fcfaf4;padding:0 13px;height:42px;
+}
+.field:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.field::placeholder{font-family:var(--sans);font-style:normal;color:#a39a85}
+textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
+.tag-input .tag-chips{
+  border:1px solid #ddd4c0;border-radius:10px;background:#fcfaf4;padding:6px 10px;
+}
+
+/* ---------- Chips & tabs — filled pills ---------- */
+.chip{
+  padding:7px 16px;border:1px solid var(--line);border-left:1px solid var(--line);
+  border-radius:999px;background:var(--card);
+  text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:600;color:var(--ink-soft);
+}
+.chip:first-child{border-left:1px solid var(--line);padding-left:16px}
+.chip:hover{border-color:var(--blue);color:var(--rubric)}
+.chip.on{background:var(--rubric);border-color:var(--rubric);color:#f7f3ea}
+.chips{gap:8px}
+.tab.on{color:var(--rubric);border-bottom-color:var(--brass)}
+
+/* ---------- Pills / status / verify ---------- */
+.pill{
+  padding:2px 10px;border-radius:999px;background:var(--brass-tint);
+  letter-spacing:.4px;font-size:11px;
+}
+.pill.scholar,.pill.role{color:var(--brass)}
+.verify{background:var(--blue)}
+.verify.scholar{background:var(--brass)}
+.status{padding:3px 11px;border-radius:999px;letter-spacing:.5px}
+.status.published{color:#3d6b4f;background:#e7f0e9}
+.status.answered{color:var(--blue);background:var(--wash)}
+.status.open{color:var(--ink-soft);background:var(--card-2)}
+
+/* ---------- Cards ---------- */
+.card{box-shadow:none;border-radius:var(--r)}
+.card h3.title{color:var(--rubric)}
+.card h3.title .ico{color:var(--brass)}
+
+/* ---------- Page headers ---------- */
+.phead h1{color:var(--rubric)}
+.phead h1 em{color:var(--brass)}
+
+/* ---------- Bottom nav ---------- */
+.botnav{background:rgba(255,253,248,.96)}
+.botnav a.active,.botnav a.active .ico{color:var(--rubric)}
+.botnav a.mid .plus{
+  background:var(--rubric);
+  box-shadow:0 7px 16px -7px rgba(29,58,95,.5);
+}
+
+/* ---------- Modal & toast ---------- */
+.overlay{background:rgba(20,17,12,.55)}
+.mhead h3{color:var(--rubric)}
+.toast{background:var(--ink);color:#f3ecdd;border-radius:999px}
+.toast .ico{color:var(--brass-soft)}
+
+/* ---------- Placeholder swatch — subtle warm stripes ---------- */
+.ph-bg{
+  background:repeating-linear-gradient(45deg,#efe9db 0 14px,#e7dfcc 14px 28px);
+}
+.ph-bg::after{color:var(--muted);background:rgba(255,253,248,.85)}
+
+/* ---------- Scrollbars ---------- */
+*{scrollbar-color:rgba(139,131,113,.45) transparent}
+*::-webkit-scrollbar-thumb{background:rgba(139,131,113,.4);background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:rgba(87,80,63,.55);background-clip:padding-box}
+
+/* ---------- Ayah / quote block ---------- */
+.ayah-block{
+  background:var(--card-2);
+  border-inline-start:3px solid var(--brass);
+  border-radius:10px;padding:16px 18px;text-align:center;
+}
+.ayah-block .ar{font-family:var(--arabic);font-size:24px;color:var(--rubric);line-height:1.8;direction:rtl}
+.ayah-block .tr{font-size:13px;color:var(--ink-soft);font-style:italic;margin-top:8px}

@@ -7,7 +7,7 @@
 import { Icon } from './ui.jsx'
 
 const ICON_MAP  = { URL:'link', BOOK:'book', ARTICLE:'doc', ISBN:'book', MEDIA_FILE:'doc', MANUAL:'cite' }
-const COLOR_MAP = { URL:'#b3271e', BOOK:'#8a221b', ARTICLE:'#1f3a6e', ISBN:'#8a221b', MEDIA_FILE:'#2a251d', MANUAL:'#5e574b' }
+const COLOR_MAP = { URL:'#2d5f97', BOOK:'#7a5b3f', ARTICLE:'#1d3a5f', ISBN:'#7a5b3f', MEDIA_FILE:'#6b5b8a', MANUAL:'#8b8371' }
 
 function bytes(n) {
   if (n == null || n < 0) return ''

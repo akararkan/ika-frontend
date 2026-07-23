@@ -41,9 +41,10 @@ function useLiveCounters(item) {
         ? api.research.get(item.id).then(raw => ({
             a: raw?.reactionCount || 0,
             b: raw?.commentCount || 0,
+            v: raw?.viewCount || 0,
             cover: raw?.coverImageUrl ? `center/cover no-repeat url("${assetUrl(raw.coverImageUrl)}")` : '',
           }))
-        : api.qna.get(item.id).then(q => ({ a: q?.answers || 0, b: q?.views || 0 }))
+        : api.qna.get(item.id).then(q => ({ a: q?.answers || 0, v: q?.views || 0 }))
       req.then(c => { counterCache.set(item.id, c); setCounts(c) }).catch(() => {})
     }, { rootMargin: '300px' })
     io.observe(el)
@@ -78,6 +79,7 @@ export function FeedResearchCard({ item, navigate }) {
           {counts && <>
             <span><Icon name="heart" className="xs"/>{fmt(counts.a)}</span>
             <span><Icon name="comment" className="xs"/>{fmt(counts.b)}</span>
+            <span title={`${fmt(counts.v)} views`}><Icon name="eye" className="xs"/>{fmt(counts.v)}</span>
           </>}
           <a className="fx-cta" onClick={e => { e.stopPropagation(); open() }}>Open paper<Icon name="chevright" className="xs"/></a>
         </footer>
@@ -104,7 +106,12 @@ export function FeedQuestionCard({ item, navigate }) {
       </header>
       <h3>{item.title}</h3>
       <footer>
-        {counts ? <span className="qna-ans"><Icon name="comment" className="xs"/>{fmt(counts.a)} answers</span> : <span className="qna-ans muted">Open question</span>}
+        {counts ? (
+          <>
+            <span className="qna-ans"><Icon name="comment" className="xs"/>{fmt(counts.a)} answers</span>
+            <span className="qna-views" title={`${fmt(counts.v)} views`}><Icon name="eye" className="xs"/>{fmt(counts.v)} views</span>
+          </>
+        ) : <span className="qna-ans muted">Open question</span>}
         <a className="fx-cta" onClick={e => { e.stopPropagation(); open() }}>Answer this<Icon name="chevright" className="xs"/></a>
       </footer>
     </article>

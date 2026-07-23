@@ -85,7 +85,7 @@ function StoryDraftPreview({ draft, onEdit, onClear }) {
 
 export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublished, onEdited }) {
   const { user } = useAuth()
-  const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#c9382f,#8f1f18)' }
+  const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#2d5f97,#16283f)' }
   const isEdit = !!editPost   // edit mode → PATCH /api/v1/posts/{id} (§6.4)
 
   const [tab, setTab] = React.useState(isEdit ? (editPost.type || 'TEXT') : type)
@@ -424,8 +424,8 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         <div className="cm-footbar">
           <div className="cm-tools">
             {!isEdit && <button style={{ color:'var(--ink-soft)' }} title="Add photo / video" onClick={pickFiles}><Icon name="image"/></button>}
-            <button style={{ color:'#b3271e' }} title="Mention someone" onClick={() => insertToken('@')}><Icon name="at"/></button>
-            <button style={{ color:'#b3271e' }} title="Add hashtag" onClick={() => insertToken('#')}><Icon name="hash"/></button>
+            <button style={{ color:'var(--blue)' }} title="Mention someone" onClick={() => insertToken('@')}><Icon name="at"/></button>
+            <button style={{ color:'var(--blue)' }} title="Add hashtag" onClick={() => insertToken('#')}><Icon name="hash"/></button>
           </div>
           <span className="cm-count font-mono">{(tab === 'QUESTION' ? title : text).length}/5000</span>
         </div>

@@ -1,0 +1,184 @@
+/* IKA "Warm Archive" — responsive (replaces tadhhib/responsive.css) */
+/* =============================================================
+   Loaded LAST (after every base + warm/ sibling). Jobs:
+     1 · re-skin the hardcoded old-theme values that survive the
+         token remap inside styles-responsive.css (red FAB shadow,
+         white glass bars, red unread tint, dark auth hero…)
+     2 · re-assert the mobile shell chrome the old override layer
+         patched: warm topbar glass, paper-2 drawer, warm scrim,
+         warm botnav + navy actives, navy compose plus
+     3 · m-* guardrails: pill tabs stay pills, active pill is
+         FILLED NAVY (never ink, never underline), tracks card-2
+     4 · dark reels surfaces stay dark (#141210) under mobile
+     5 · defensive sheet-slide re-assert (a sibling's unqualified
+         .modal/.dlg animation must not stomp the phone sheets)
+     6 · touch physics: hover lifts stand down on touch, presses
+         stay alive; reduced-motion guard re-stated last
+   No layout metrics or breakpoints are changed — colors, shadows
+   and interaction guards only. Breakpoints mirror the base file:
+   900 / 720 / 600 / 460 / 380 / hover:none / landscape.
+   ============================================================= */
+
+/* ---------- 1 · Base hooks (all sizes — matches base §10.0 scope) ---------- */
+/* muted-state cue on the reels mute toggle: old red → warm danger */
+.rv-mute.off{background:rgba(160,62,54,.4)}
+
+/* ============================================================
+   2 · PHONE SHELL (≤720px) — topbar / drawer / scrim / botnav
+   ============================================================ */
+@media(max-width:720px){
+  /* warm topbar glass (base is rgba(255,255,255,.88)) */
+  .topbar{
+    background:rgba(255,253,248,.9);
+    backdrop-filter:blur(14px) saturate(140%);
+    -webkit-backdrop-filter:blur(14px) saturate(140%);
+  }
+
+  /* drawer sidebar rides on paper-2, warm hairline + warm shadow
+     (base ≤720 drawer sets var(--paper)) */
+  .sidebar{background:var(--paper-2)}
+
+  /* drawer backdrop: warm ink, not the old #1b1813 */
+  .nav-scrim{background:rgba(34,30,23,.5)}
+
+  /* botnav: warm glass, hairline top border */
+  .botnav{background:rgba(255,253,248,.96);border-top:1px solid var(--line)}
+  .botnav a.active,
+  .botnav a.active .ico{color:var(--navy)}
+  /* active tick riding the top edge (geometry from base §10.1) */
+  .botnav a.active::after{background:var(--navy)}
+  /* center compose plus: navy fill, navy glow (base §11 ships a red
+     rgba(179,39,30,…) shadow that the token remap cannot reach) */
+  .botnav a.mid .plus{
+    background:var(--navy);color:#f7f3ea;
+    box-shadow:0 7px 18px -6px rgba(29,58,95,.62),inset 0 1px 0 rgba(255,255,255,.28);
+  }
+}
+
+/* ============================================================
+   3 · m-* PATTERNS (≤720px) — pill tabs / seg tracks / rows
+   ============================================================ */
+@media(max-width:720px){
+  /* base §12 already converts .tab to pills — keep the spec, swap
+     the active fill from ink-2 to navy (chips/tabs are FILLED navy
+     pills in Warm Archive; never underlines) */
+  .tab{border-color:var(--line);background:var(--card);color:var(--ink-soft)}
+  .tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+
+  /* segmented switchers: track card-2, active cell card + navy text */
+  .seg{background:var(--card-2)}
+  .seg button.on{background:var(--card);color:var(--navy);box-shadow:0 1px 3px rgba(34,30,23,.14)}
+  /* view switcher active cell: bg goes navy via the token remap —
+     only the old red glow needs replacing (mobile lane; desktop
+     .vseg is the content-area file's job) */
+  .vseg.on{box-shadow:0 5px 12px -5px rgba(22,40,63,.5)}
+
+  /* notifications: unread tint was rgba(201,56,47,.05) — warm wash */
+  .ntf-row.unread{background:#fbf7ec}
+
+  /* mobile comment composer keeps its underline layout; warm the
+     hairline and give focus a plain blue underline (theme.css's
+     boxed .field:focus ring doesn't suit the underline input) */
+  .cmt-box .field{border-bottom-color:#ddd4c0}
+  .cmt-box .field:focus{border-bottom-color:var(--blue);box-shadow:none}
+}
+
+/* ============================================================
+   4 · AUTH MOBILE HERO (≤720px) — base ≤720 hard-codes the old
+   dark-ink gradient + red radials; swap for the approved navy
+   panel (desktop auth colors belong to warm/user.css)
+   ============================================================ */
+@media(max-width:720px){
+  .auth-left{background:linear-gradient(165deg,#16283f,#1d3a5f 55%,#274b78)}
+  .auth-left::after{
+    background:
+      radial-gradient(800px 400px at 80% 0%,rgba(217,185,108,.14),transparent 60%),
+      radial-gradient(700px 500px at 0% 100%,rgba(45,95,151,.28),transparent 60%);
+  }
+  .auth-mark{background:rgba(217,185,108,.14);border-color:rgba(217,185,108,.4)}
+}
+
+/* ============================================================
+   5 · DARK REELS SURFACES (≤720px) — the only dark pages; they
+   must stay #141210 under mobile widths
+   ============================================================ */
+@media(max-width:720px){
+  .reels-view{background:#141210}
+  /* in-viewer glass tab bar: warm-black gradient (was 16,14,11) */
+  .rv-mtabbar{background:linear-gradient(180deg,rgba(20,18,16,0),rgba(20,18,16,.64))}
+  /* its compose plus: navy fill, navy glow (base glow is red) */
+  .rv-mtabbar a.mid .plus{background:var(--navy);box-shadow:0 5px 14px rgba(22,40,63,.5)}
+  /* watch-history remove chip: warm ink */
+  .watched-x{background:rgba(34,30,23,.85)}
+}
+
+/* ============================================================
+   6 · SHEETS (defensive cascade repair — the old layer proved an
+   unqualified sibling `.modal{animation:…}` out-cascades the base
+   phone sheets; re-assert the slide-up here, where nothing can
+   load after us. `sheet` keyframes live in styles-responsive.css.)
+   ============================================================ */
+@media(max-width:720px){
+  .cm-modal{animation:sheet .3s cubic-bezier(.2,.8,.3,1)}
+}
+@media(max-width:600px){
+  .modal,.cm-modal{animation:sheet .3s cubic-bezier(.2,.8,.3,1)}
+  .dlg{animation:sheet .3s cubic-bezier(.2,.8,.3,1)}
+  /* dialog scrim: warm ink to match .overlay's rgba(20,17,12,.55) */
+  .dlg-overlay{background:rgba(34,30,23,.55)}
+}
+
+/* ============================================================
+   7 · TOUCH PHYSICS — hover lifts stand down where no pointer
+   exists; presses stay alive (:not(:active) keeps press physics).
+   Transform/opacity-only; auto-disabled by the reduced-motion
+   guard below.
+   ============================================================ */
+@media(max-width:720px){
+  /* compact list rows join the base §10.5 press family */
+  .qrow:active,.rrow:active{transform:scale(.99)}
+}
+@media(hover:none){
+  /* big card lifts: settle back to the resting shadow */
+  .r-card:hover:not(:active){transform:none;box-shadow:var(--shadow-sm)}
+  /* research-cover Ken-Burns zoom (warm/research.css) stands down too:
+     a tap's sticky :hover must not leave the cover stuck at 1.03 */
+  .r-card:hover .r-cover .t-zoom{transform:none}
+  .qrow:hover:not(:active),
+  .rrow:hover:not(:active){transform:none;box-shadow:var(--shadow-sm)}
+  .qna-card:hover:not(:active){transform:none}
+
+  /* row / tile / button hover-slides become no-ops on pure touch */
+  .tag-pill:hover:not(:active),
+  .pa-list li a:hover:not(:active),
+  .rail-q:hover:not(:active),
+  .trend-row:hover:not(:active),
+  .rm-cand:hover:not(:active),
+  .rm-src-item:hover:not(:active),
+  .rd-toc-a:hover:not(:active),
+  .hero-reel:hover:not(:active),
+  .plate-reel:hover:not(:active),
+  .share-act:hover:not(:active),
+  .prof-counts button:hover:not(:active),
+  .src-row:hover:not(:active),
+  .rd-figure:hover:not(:active),
+  .rd-file:hover:not(:active),
+  .rd-hero-ava:hover:not(:active),
+  .rd-hero-follow:hover:not(:active),
+  .btn-primary:hover:not(:active),
+  .cta-compose:hover:not(:active){transform:none}
+  .rvr:hover:not(:active) > span{transform:none}
+}
+
+/* ============================================================
+   8 · REDUCED MOTION — re-stated last so no warm/ sibling (all of
+   which load before this file) can re-enable motion. !important
+   mirrors the base §9 guard: it must beat every inline-adjacent
+   animation regardless of specificity.
+   ============================================================ */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important;
+  }
+}

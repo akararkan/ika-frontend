@@ -2,9 +2,9 @@
    IKA — Islamic Knowledge Archive · Frontend
    MIDAD (مداد) — the Critical Edition theme
    Pure-white paper · warm black ink · cinnabar rubrication
-   Newsreader (Latin) · Scheherazade New (Arabic) · Archivo (UI)
+   Lora (Latin) · Amiri (Arabic) · IBM Plex Sans (UI)
    ============================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Scheherazade+New:wght@400;500;600;700&family=Archivo:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Amiri:ital,wght@0,400;0,700&display=swap');
 
 :root{
   /* Ink / paper — pure white body, archival quiet surfaces */
@@ -13,28 +13,28 @@
   --ink-soft:#5e574b;
   --muted:#9b948e;
   --paper:#ffffff;
-  --paper-2:#fbfaf6;
+  --paper-2:#faf6ec;
   --card:#ffffff;
-  --card-2:#fbfaf6;
+  --card-2:#faf6ec;
   --line:#ece9e1;
-  --line-soft:#f2f0ea;
+  --line-soft:#f6f2e8;
 
   /* Brand — rubrication. Legacy token names kept so every existing
      rule keeps working; --emerald IS the rubric red now. */
-  --rubric:#b3271e;
-  --wash:#f8ecea;
-  --emerald:#b3271e;
-  --emerald-deep:#8f1f18;
-  --emerald-bright:#c9382f;
-  --emerald-glow:#d8453a;
+  --rubric:#1d3a5f;
+  --wash:#e8eef5;
+  --emerald:#1d3a5f;
+  --emerald-deep:#16283f;
+  --emerald-bright:#2d5f97;
+  --emerald-glow:#3a6ca5;
   --brass:#1b1813;          /* default verify seal = ink */
-  --brass-soft:#e9c4bf;
-  --brass-tint:#f8ecea;
-  --rose:#c2453f;
+  --brass-soft:#e5d3ac;
+  --brass-tint:#e8eef5;
+  --rose:#b3453e;
   --blue:#1f3a6e;
 
   /* Discipline spine colors (classic cloth-binding palette) */
-  --d-hadith:#b3271e;
+  --d-hadith:#1d3a5f;
   --d-tafsir:#1f3a6e;
   --d-aqidah:#4a3a78;
   --d-fiqh:#6e4a2f;
@@ -50,9 +50,9 @@
   --r-xs:7px; --r-sm:9px; --r:12px; --r-lg:14px; --r-xl:18px;
 
   /* Type — Latin first; Arabic-script (Arabic / Sorani-Kurdish) glyphs the
-     primary lacks fall through to Scheherazade New, then system Arabic. */
-  --sans:"Archivo","Helvetica Neue",system-ui,"Segoe UI","SF Arabic","Geeza Pro","Noto Sans Arabic","Noto Naskh Arabic",Tahoma,Arial,sans-serif;
-  --serif:"Newsreader","Scheherazade New",Georgia,"Noto Naskh Arabic","Geeza Pro",serif;
+     primary lacks fall through to Amiri, then system Arabic. */
+  --sans:"IBM Plex Sans","Helvetica Neue",system-ui,"Segoe UI","SF Arabic","Geeza Pro","Noto Sans Arabic","Noto Naskh Arabic",Tahoma,Arial,sans-serif;
+  --serif:"Lora","Amiri",Georgia,"Noto Naskh Arabic","Geeza Pro",serif;
   --mono:"IBM Plex Mono",ui-monospace,monospace;
 }
 
@@ -169,7 +169,7 @@ img{display:block;max-width:100%}
   font-size:10.5px;font-weight:600;letter-spacing:1.3px;
   text-transform:uppercase;
 }
-.pill.scholar{color:#8a221b}
+.pill.scholar{color:#7a662f}
 .pill.role{color:var(--rubric)}
 .pill.dot::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor}
 
@@ -195,12 +195,12 @@ img{display:block;max-width:100%}
 }
 .btn-primary{
   background:var(--rubric);color:#fff;
-  box-shadow:0 6px 14px -8px rgba(143,31,24,.45);
+  box-shadow:0 6px 14px -8px rgba(29,58,95,.45);
 }
 .btn-primary:hover{background:var(--emerald-deep);transform:translateY(-1px)}
 .btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn-secondary{background:var(--card);border-color:var(--line);color:var(--ink-2)}
-.btn-secondary:hover{background:var(--card-2);border-color:#d8d4cb}
+.btn-secondary:hover{background:var(--card-2);border-color:#d8cfba}
 .btn-ghost{background:transparent;color:var(--ink-2)}
 .btn-ghost:hover{background:var(--card-2)}
 .btn-lg{height:48px;padding:0 24px;font-size:15px;border-radius:11px}
@@ -347,10 +347,10 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
   background:var(--rubric);
   color:#fff;font-weight:600;font-size:14.5px;
   display:flex;align-items:center;justify-content:center;gap:9px;
-  box-shadow:0 10px 22px -10px rgba(179,39,30,.4);
+  box-shadow:0 10px 22px -10px rgba(29,58,95,.4);
   transition:.16s;
 }
-.cta-compose:hover{transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(179,39,30,.5)}
+.cta-compose:hover{transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(29,58,95,.5)}
 
 .you-card{
   margin-top:auto;display:flex;align-items:center;gap:10px;
@@ -408,7 +408,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .phead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:22px;flex-wrap:wrap}
 .phead h1{font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.6px;color:var(--ink);line-height:1.1}
 .phead h1 em{font-style:italic;color:var(--rubric);font-weight:500}
-.phead-ar{font-family:'Scheherazade New',serif;font-weight:400;font-size:.72em;color:var(--muted);margin-inline-start:14px;letter-spacing:0;vertical-align:2px}
+.phead-ar{font-family:'Amiri',serif;font-weight:400;font-size:.72em;color:var(--muted);margin-inline-start:14px;letter-spacing:0;vertical-align:2px}
 .phead .sub{color:var(--ink-soft);font-size:14.5px;margin-top:5px;max-width:520px}
 
 /* ---------- Tabs / chips ---------- */
@@ -486,7 +486,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .botnav a.mid .plus{
   width:48px;height:38px;border-radius:13px;display:grid;place-items:center;
   background:var(--rubric);
-  color:#fff;box-shadow:0 7px 16px -7px rgba(179,39,30,.45);
+  color:#fff;box-shadow:0 7px 16px -7px rgba(29,58,95,.45);
 }
 .botnav a.mid .plus .ico{width:22px;height:22px;stroke-width:2.4}
 @media(max-width:720px){.botnav{display:flex}}
@@ -495,7 +495,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .toast{
   position:fixed;bottom:96px;left:50%;
   transform:translateX(-50%) translateY(20px);
-  z-index:200;background:var(--ink);color:#fbfaf6;
+  z-index:200;background:var(--ink);color:#faf6ec;
   padding:11px 18px;border-radius:11px;font-weight:500;font-size:13.5px;
   box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;
   transition:.25s ease;display:flex;align-items:center;gap:9px;
@@ -564,7 +564,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .ph-bg{
   background:
     repeating-linear-gradient(135deg,rgba(31,27,22,.04) 0 8px,transparent 8px 16px),
-    linear-gradient(140deg,#d8d4cb,#a8a399);
+    linear-gradient(140deg,#d8cfba,#c9bfa5);
   position:relative;
 }
 .ph-bg::after{

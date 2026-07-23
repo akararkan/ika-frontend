@@ -1,0 +1,228 @@
+/* IKA "Warm Archive" — core (replaces tadhhib/core.css) */
+/* =============================================================
+   App shell + primitives: topbar / brand / search / icon buttons /
+   me-chip / sidebar nav / compose CTA / you-card / drawer + scrim ·
+   buttons, fields, chips-as-pills, tabs-as-pills, page headers,
+   view-seg · avatars / verify / token links · modal + dialog chrome ·
+   shared states (loader / empty / error / toast) · lightbox.
+   Loads AFTER base styles + warm/theme.css — equal specificity wins.
+   ============================================================= */
+
+/* ---------------- Motion primitives ---------------- */
+@keyframes wc-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes wc-shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
+
+/* Stagger helper — .t-stagger stays in the JSX (FollowListModal, PostCard
+   comments); tadhhib owned it, warm/core re-homes it with a quieter rise. */
+.t-stagger>*{animation:wc-rise .4s cubic-bezier(.22,1,.36,1) backwards}
+.t-stagger>*:nth-child(1){animation-delay:.02s}
+.t-stagger>*:nth-child(2){animation-delay:.06s}
+.t-stagger>*:nth-child(3){animation-delay:.1s}
+.t-stagger>*:nth-child(4){animation-delay:.14s}
+.t-stagger>*:nth-child(5){animation-delay:.18s}
+.t-stagger>*:nth-child(6){animation-delay:.22s}
+.t-stagger>*:nth-child(7){animation-delay:.26s}
+.t-stagger>*:nth-child(8){animation-delay:.3s}
+.t-stagger>*:nth-child(n+9){animation-delay:.34s}
+
+/* Focus ring — interactive blue on warm paper (tadhhib used gold) */
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* Connected-script guard (Arabic / Sorani Kurdish): drop caps are a Latin
+   device — a detached first letter breaks a connected-script word. Carried
+   over from the old core layer; !important is required so this correctness
+   rule beats any area-layer ::first-letter decoration at any specificity. */
+:dir(rtl)::first-letter,
+[dir="rtl"] ::first-letter{
+  float:none!important;
+  font-size:inherit!important;line-height:inherit!important;
+  font-family:inherit!important;font-weight:inherit!important;
+  color:inherit!important;
+  margin:0!important;padding:0!important;
+}
+
+/* ---------------- Topbar ---------------- */
+.brand .word{font-family:var(--serif);font-weight:700;font-size:19px;letter-spacing:-.2px;color:var(--navy);line-height:1.1}
+.brand .word b{color:var(--gold)}
+.brand small{color:var(--muted);letter-spacing:.4px}
+.brand .mark:has(.brand-img){
+  background:var(--card);
+  box-shadow:0 0 0 1px var(--line),0 4px 12px -6px rgba(34,30,23,.3);
+}
+
+/* Search — one warm pill (theme.css already rounds + tints the input) */
+.tb-search input{
+  height:40px;border:1px solid var(--line);background:var(--card-2);
+  padding-block:0;padding-inline:40px 14px;               /* RTL-safe: icon side = inline-start */
+  transition:border-color .15s ease,background .15s ease,box-shadow .15s ease;
+}
+.tb-search .ico{left:auto;inset-inline-start:14px}
+.tb-search input::placeholder{font-family:var(--sans);font-style:normal;color:#a39a85}
+.tb-search input:focus{
+  border-color:var(--blue);background:var(--card);
+  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+}
+
+/* Icon buttons — 38px bordered circles on card; .tint is the solid navy one */
+.icon-btn{
+  position:relative;                                       /* anchors the unread dot everywhere */
+  border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+  transition:background .15s ease,border-color .15s ease,color .15s ease,transform .14s ease;
+}
+.icon-btn:hover{background:var(--card-2);color:var(--ink)}
+.icon-btn:active{transform:scale(.92)}
+.icon-btn.tint{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+.icon-btn.tint:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
+.icon-btn .dot{
+  top:6px;right:auto;inset-inline-end:7px;                 /* RTL-safe corner */
+  background:var(--gold);border-color:var(--card);
+}
+
+.me-chip{background:var(--card);border-color:var(--line)}
+.me-chip:hover{background:var(--card-2)}
+.me-chip .nm{font-size:13.5px;color:var(--ink)}
+
+.sidebar-toggle:hover,.topbar-menu:active{background:var(--card-2)}
+
+/* ---------------- Sidebar nav ---------------- */
+.nav-item{color:var(--ink-soft)}
+.nav-item .ico{color:var(--ink-soft)}
+.nav-item:hover{background:#efe9da;color:var(--ink)}
+.nav-item.active,
+.nav-item.active:hover{background:#eae2cf;color:var(--navy)}
+.nav-item.active .ico{color:var(--navy)}
+.nav-item .badge,
+.nav-item.active .badge{background:var(--gold);color:#fff}
+
+.cta-compose{border-radius:11px;background:var(--navy);color:#f7f3ea}
+.cta-compose:hover{background:var(--navy-deep)}
+
+.you-card{background:var(--card);border-color:var(--line);border-radius:12px}
+.you-card small{color:var(--muted)}
+.side-section h5{color:var(--muted);letter-spacing:.6px}
+
+/* Drawer + scrim (phones — same breakpoint as the base drawer rules) */
+.nav-scrim{background:rgba(20,17,12,.55)}
+@media(max-width:720px){
+  .sidebar{background:var(--paper-2)}
+  .sidebar-head{border-bottom:1px solid var(--line)}
+}
+
+/* ---------------- Buttons ---------------- */
+.btn:active{transform:scale(.97)}
+.btn-primary:disabled{transform:none;box-shadow:none}
+.btn-secondary{background:transparent;border-color:var(--line);color:var(--ink-soft)}
+.btn-secondary:hover{background:var(--card-2);border-color:#d5cbb4;color:var(--ink)}
+.btn-ghost{color:var(--ink-soft)}
+.btn-ghost:hover{background:var(--card-2);color:var(--ink)}
+/* Danger = quiet outline (prototype) — not a filled red slab */
+.btn-danger{background:transparent;border-color:#d9a49e;color:var(--danger);box-shadow:none}
+.btn-danger:hover{background:#f6e4e2;transform:none}
+
+/* ---------------- Fields & popovers ---------------- */
+.field-label{
+  text-transform:none;letter-spacing:.2px;
+  font-size:12.5px;font-weight:600;color:var(--muted);
+}
+.tag-input .tag-suggest{border-radius:12px;border-color:var(--line);box-shadow:var(--shadow)}
+.tag-input .tag-suggest-row:hover{background:var(--card-2)}
+.mention-pop{border-color:var(--line);box-shadow:var(--shadow)}
+
+/* ---------------- Page headers ---------------- */
+.phead h1{
+  font-family:var(--serif);font-size:clamp(22px,4.5vw,26px);
+  font-weight:600;letter-spacing:-.3px;color:var(--navy);
+}
+.phead h1 em{color:var(--gold);font-style:italic;font-weight:500}
+.phead .sub{color:var(--muted);font-size:14px}
+.phead-ar{font-family:var(--arabic);color:var(--muted)}
+.phead-kicker{color:var(--gold-deep)}
+.phead-kicker::before{background:var(--gold)}
+
+/* ---------------- Tabs — filled pills, never underlines ---------------- */
+.tabs{gap:8px;border-bottom:0}
+/* Desktop-only wrap: phones keep the base one-row overflow-x scroll pattern
+   (styles-responsive.css §12 pill row + sticky .col-main > .tabs). */
+@media(min-width:721px){
+  .tabs{flex-wrap:wrap}
+}
+.tab{
+  padding:7px 16px;margin-bottom:0;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  font-size:13.5px;font-weight:600;letter-spacing:0;text-transform:none;
+  color:var(--ink-soft);transition:.15s;
+}
+.tab:hover{border-color:var(--blue);color:var(--navy)}
+.tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+
+/* View-mode switcher — active segment goes navy (base shadow was rubric red) */
+.view-seg{background:var(--card);border-color:var(--line)}
+.vseg:hover{color:var(--navy)}
+.vseg.on{background:var(--navy);color:#f7f3ea;box-shadow:0 5px 12px -6px rgba(29,58,95,.45)}
+.vseg.on .ico{color:#f7f3ea}
+
+/* ---------------- Cards ---------------- */
+.card{transition:border-color .15s ease,box-shadow .15s ease}
+
+/* ---------------- Avatars / links ---------------- */
+.avatar{font-family:var(--sans);font-weight:700;background:var(--navy)}
+.tk-tag,.tk-mention{color:var(--blue);font-weight:600}
+.tk-tag:hover,.tk-mention:hover{color:var(--navy);text-decoration:underline}
+
+/* ---------------- Modal chrome ---------------- */
+/* no border-radius here: base .modal already rounds on desktop, and the
+   ≤600px bottom-sheet radius (styles-responsive.css §4) must survive */
+.modal{box-shadow:var(--shadow-lg)}
+.mhead h3{color:var(--navy)}
+.mhead .x{background:var(--card-2);transition:background .15s ease,color .15s ease}
+.mhead .x:hover{background:#efe9da;color:var(--ink)}
+.mfoot{background:var(--paper-2);border-top:1px solid var(--line-soft)}
+
+/* ---------------- Dialogs (.dlg — confirm / prompt / share / follow-list) --- */
+.dlg-overlay{background:rgba(20,17,12,.55)}
+/* no border-radius here: base .dlg already rounds on desktop, and the
+   ≤600px bottom-sheet radius (styles-responsive.css §10.2) must survive */
+.dlg{border-color:var(--line);box-shadow:var(--shadow-lg)}
+.dlg-head h3{color:var(--navy)}
+.dlg-ic{background:var(--blue-wash);color:var(--navy)}
+.dlg-ic.danger{background:#f6e4e2;color:var(--danger)}
+.dlg-x:hover{background:var(--card-2);color:var(--ink)}
+.dlg-msg{color:var(--ink-soft)}
+.dlg-foot{background:var(--paper-2)}          /* kills the base pink-tinted gradient */
+
+/* ---------------- Shared states (states.jsx) ---------------- */
+.t-loader{text-align:center;color:var(--muted);font-size:14px}
+.t-loader-bar{
+  display:block;width:130px;height:2px;margin:12px auto 0;border-radius:2px;
+  background:linear-gradient(100deg,var(--line-soft) 35%,var(--gold) 50%,var(--line-soft) 65%);
+  background-size:220% 100%;
+  animation:wc-shimmer 1.5s ease-in-out infinite;
+}
+.t-empty{text-align:center;padding:44px 20px}
+.t-empty-ic{
+  width:60px;height:60px;border-radius:50%;
+  display:grid;place-items:center;margin:0 auto 14px;
+  background:var(--card-2);border:1px solid var(--line);color:var(--navy);
+}
+.t-empty-title{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink)}
+.t-empty-sub{margin-top:6px;color:var(--muted);font-size:13.5px}
+.t-error{text-align:center;padding:32px 20px}
+.t-error p{color:var(--danger);font-weight:600;font-size:13.5px}
+
+/* Toast — warm ink pill (theme.css sets bg/radius; add depth + gold glint) */
+.toast{box-shadow:0 14px 34px -12px rgba(20,17,12,.5)}
+.toast .ico{color:#d9b96c}
+
+/* ---------------- Lightbox ---------------- */
+.lightbox{background:rgba(20,17,12,.93)}
+.lb-img{border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.lb-close,.lb-nav{background:rgba(255,253,248,.14);color:#f3ecdd;transition:background .15s ease}
+.lb-close:hover,.lb-nav:hover{background:rgba(255,253,248,.26)}
+.lb-count{background:rgba(20,17,12,.6);color:#f3ecdd}
+
+/* ---------------- Reduced motion ---------------- */
+@media (prefers-reduced-motion:reduce){
+  .t-stagger>*{animation:none}
+  .t-loader-bar{animation:none;background:var(--line)}
+  .btn:active,.icon-btn:active{transform:none}
+}

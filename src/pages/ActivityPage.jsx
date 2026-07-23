@@ -15,17 +15,17 @@ import { api } from '../api/index.js'
 // Per-activity-type glyph + tint for the row badge (the title text comes from
 // the server's `label`, so this is purely the icon).
 const META = {
-  POST_CREATED:['compose','#b3271e'], POST_REACTION:['heart','#c2453f'], POST_COMMENT:['comment','#b3271e'],
-  POST_COMMENT_REACTION:['heart','#c2453f'], POST_SHARE:['share','#1f3a6e'], POST_SAVED:['bookmark','#b3271e'],
-  REEL_WATCH:['reels','#c2453f'],
-  GLOBAL_SEARCH:['search','#9b948e'], HASHTAG_SEARCH:['hash','#b3271e'], MENTION_LOOKUP:['at','#b3271e'],
-  USER_MENTIONED:['at','#b3271e'], PROFILE_VIEW:['eye','#1f3a6e'], FOLLOWED_USER:['follow','#1f3a6e'],
-  QNA_QUESTION_CREATED:['qna','#c9382f'], QNA_QUESTION_SAVED:['bookmark','#b3271e'], QNA_ANSWER_CREATED:['reply','#b3271e'],
-  QNA_REANSWER_CREATED:['reply','#b3271e'], QNA_ANSWER_REACTION:['heart','#c2453f'],
-  RESEARCH_PUBLISHED:['research','#b3271e'], RESEARCH_SAVED:['bookmark','#b3271e'], RESEARCH_REACTION:['heart','#c2453f'],
-  RESEARCH_COMMENT:['comment','#b3271e'], RESEARCH_COMMENT_REACTION:['heart','#c2453f'],
-  STORY_VIEWED:['eye','#1f3a6e'], STORY_REACTED:['heart','#c2453f'], STORY_REPLIED:['reply','#b3271e'], STORY_POLL_VOTED:['qna','#c9382f'],
-  SOUND_USED:['music','#b3271e'],
+  POST_CREATED:['compose','#3d6b4f'], POST_REACTION:['heart','#b3453e'], POST_COMMENT:['comment','#2d5f97'],
+  POST_COMMENT_REACTION:['heart','#b3453e'], POST_SHARE:['share','#2d5f97'], POST_SAVED:['bookmark','#b3873e'],
+  REEL_WATCH:['reels','#6b5b8a'],
+  GLOBAL_SEARCH:['search','#8b8371'], HASHTAG_SEARCH:['hash','#2d5f97'], MENTION_LOOKUP:['at','#6b5b8a'],
+  USER_MENTIONED:['at','#6b5b8a'], PROFILE_VIEW:['eye','#2d5f97'], FOLLOWED_USER:['follow','#3d6b4f'],
+  QNA_QUESTION_CREATED:['qna','#8b8371'], QNA_QUESTION_SAVED:['bookmark','#b3873e'], QNA_ANSWER_CREATED:['reply','#2d5f97'],
+  QNA_REANSWER_CREATED:['reply','#2d5f97'], QNA_ANSWER_REACTION:['heart','#b3453e'],
+  RESEARCH_PUBLISHED:['research','#3d6b4f'], RESEARCH_SAVED:['bookmark','#b3873e'], RESEARCH_REACTION:['heart','#b3453e'],
+  RESEARCH_COMMENT:['comment','#2d5f97'], RESEARCH_COMMENT_REACTION:['heart','#b3453e'],
+  STORY_VIEWED:['eye','#2d5f97'], STORY_REACTED:['heart','#b3453e'], STORY_REPLIED:['reply','#2d5f97'], STORY_POLL_VOTED:['qna','#6b5b8a'],
+  SOUND_USED:['music','#b3873e'],
 }
 
 // Tabs → the activity `types` they request from the server.
@@ -52,7 +52,7 @@ function bucketOf(createdAt) {
 export function ActivityPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)' }
+  const me = user || { initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)' }
   const [filter, setFilter] = React.useState('ALL')
   const [items, setItems] = React.useState([])
   const [loading, setLoading] = React.useState(true)
@@ -113,7 +113,7 @@ export function ActivityPage() {
           : (
             <div className="card t-stagger" style={{ overflow:'hidden' }}>
               {grouped.map(({ a, head }) => {
-                const [icon, tint] = META[a.type] || ['bell', '#5e574b']
+                const [icon, tint] = META[a.type] || ['bell', '#8b8371']
                 return (
                   <React.Fragment key={a.id}>
                     {head && <div className="ntf-group">{head}</div>}

@@ -1,0 +1,225 @@
+/* IKA "Warm Archive" — user (replaces tadhhib/user.css) */
+/* Profile (own + /u/:id) · ProfileDetails · FollowListModal ·
+   Settings · Auth. Loads after every base file, so equal
+   specificity wins by order. Tokens come from warm/theme.css.
+   Notifications / Explore / Messages surfaces from the old
+   tadhhib/user.css are owned by other warm/ area files. */
+
+/* ===================== PROFILE — header card ===================== */
+
+/* Cover: 120px navy gradient, radius 18, avatar pulled up over it */
+.prof-cover{
+  height:120px;margin-bottom:-46px;
+  border-radius:var(--r-xl);
+  border:1px solid var(--line);
+}
+.prof-cover-grad{background:linear-gradient(120deg,#16283f,#1d3a5f 55%,#2d5f97)}
+/* default (no photo): navy gradient + faint gold diagonal stripes */
+.prof-cover-pattern{
+  background:
+    repeating-linear-gradient(135deg,rgba(217,185,108,.08) 0 2px,transparent 2px 16px),
+    linear-gradient(120deg,#16283f,#1d3a5f 55%,#2d5f97);
+}
+.prof-cover-edit{
+  right:auto;inset-inline-end:12px;                /* RTL-safe repositioning of base right:12px */
+  border-radius:999px;
+  background:rgba(22,40,63,.55);
+  border:1px solid rgba(255,255,255,.22);
+  transition:background .15s ease,border-color .15s ease;
+}
+.prof-cover-edit:hover{background:rgba(22,40,63,.75);border-color:rgba(217,185,108,.5)}
+
+/* avatar wrapper kept from markup; no ornament ring in Warm Archive */
+.t-ring{position:relative;display:inline-flex;flex:none;border-radius:50%}
+/* !important needed: Avatar renders inline width/height (size prop = 132)
+   and base/responsive .prof-avatar already use !important */
+.prof-avatar{
+  width:92px!important;height:92px!important;
+  border:4px solid var(--card)!important;
+  font-size:32px!important;
+  box-shadow:0 0 0 1px var(--line),0 10px 24px -12px rgba(34,30,23,.3);
+}
+
+/* action row: quiet outline pills; Follow stays a navy filled pill */
+.prof-actions .btn{
+  height:36px;padding:0 16px;border-radius:999px;
+  font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;
+}
+.prof-actions .btn .ico{width:16px;height:16px}
+.prof-actions .btn-secondary{background:var(--card);border-color:var(--line);color:var(--ink-soft)}
+.prof-actions .btn-secondary:hover{background:var(--card-2);border-color:var(--blue);color:var(--ink)}
+.prof-actions .btn-primary{background:var(--navy);color:#f7f3ea;box-shadow:none}
+
+/* Follow ↔ Following (profile header + follow-list modal rows) */
+.btn.is-following{background:var(--card);border-color:#b9c9dc;color:var(--navy)}
+.btn.is-following:hover{background:var(--blue-wash);border-color:var(--blue)}
+.btn.is-following .ico{color:var(--blue)}
+/* Restrict armed state — gold wash instead of old red-tinted brass */
+.btn.on-brass{background:var(--gold-wash);border-color:#dcc89a;color:var(--gold-deep)}
+
+/* name block: serif 23, no rubric bar */
+.prof-meta h1{font-size:23px;letter-spacing:-.3px;color:var(--ink);padding-bottom:0;margin-bottom:8px}
+.prof-meta h1::after{content:none}
+.prof-handle{font-size:13px;color:var(--muted)}
+.prof-handle .pill.role{
+  padding:2px 10px;border-radius:999px;
+  background:var(--gold-wash);color:var(--gold);
+  font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:capitalize;
+}
+.prof-handle .pill.hire{
+  padding:2px 10px;border-radius:999px;
+  background:var(--good-wash);color:var(--good);
+  font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:none;
+}
+.prof-handle .pill.locked{
+  padding:2px 10px;border-radius:999px;
+  background:var(--card-2);color:var(--muted);
+  font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:none;
+}
+.prof-tagline{color:var(--ink-2)}
+.prof-bio{color:var(--ink-soft)}
+
+/* stats row: bold serif counts + muted labels (RTL-safe separators) */
+.prof-counts{border-top-color:var(--line);border-bottom-color:var(--line)}
+.prof-counts button{
+  padding:12px 0;padding-inline-end:18px;
+  margin-right:0;margin-inline-end:18px;
+  border-right:0;border-inline-end:1px solid var(--line-soft);
+  text-align:start;
+}
+.prof-counts button:last-child{border-inline-end:0;margin-inline-end:0}
+.prof-counts b{color:var(--ink)}
+.prof-counts small{color:var(--muted)}
+
+/* ---------- Highlights rail: 58px gold rings ---------- */
+.prof-meta .stories{gap:14px;padding:6px 2px 10px}
+.prof-meta .st{width:66px}
+.prof-meta .st b{font-size:11.5px;color:var(--ink-soft)}
+.prof-meta .st-ring{width:58px;height:58px;padding:2.5px;border-color:var(--line)}
+.prof-meta .st-ring.unseen{border:0;background:linear-gradient(135deg,#d9b96c,#b3873e)}
+.prof-meta .st:hover .st-ring.unseen{border-color:transparent;filter:brightness(.96)}
+.prof-meta .st-ring.add{border:2px dashed #c9bfa5;background:var(--card-2);color:var(--muted)}
+.prof-meta .st-cover{
+  border:2px solid var(--card);
+  /* Load-time backdrop behind cover photos (inline style only sets
+     background-image). Cover-less highlights already carry a warm gold
+     gradient inline in ProfilePage.jsx — nothing to override here. */
+  background-color:var(--navy);
+}
+
+/* ---------- Profile tab row → filled pill chips ---------- */
+.prof-meta ~ .tabs{border-bottom:0;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.prof-meta ~ .tabs .tab{
+  flex:none;padding:7px 16px;margin-bottom:0;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  font-size:13.5px;font-weight:600;letter-spacing:0;text-transform:none;
+  color:var(--ink-soft);
+  transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+.prof-meta ~ .tabs .tab:hover{border-color:var(--blue);color:var(--navy)}
+.prof-meta ~ .tabs .tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+
+/* ---------- ProfileDetails panel ---------- */
+.prof-about{margin-top:18px}
+a.pa-fact{color:var(--blue)}
+a.pa-fact:hover{color:var(--navy)}
+.pa-h{color:var(--gold-deep);letter-spacing:.14em}
+.pa-chip{
+  background:var(--blue-wash);border:1px solid #d7e2ee;color:var(--blue);
+  font-weight:500;font-size:12.5px;padding:4px 12px;border-radius:999px;
+}
+.pa-list li a,.pa-list li .pa-row{border-radius:10px;border-color:var(--line);background:var(--card)}
+.pa-list li a:hover{background:var(--card-2);border-color:var(--blue)}
+.pa-ic{background:var(--card-2);color:var(--muted);transition:background .15s ease,color .15s ease}
+.pa-list li a:hover .pa-ic{background:var(--blue-wash);color:var(--blue)}
+
+/* ================= FOLLOWERS / FOLLOWING MODAL ================= */
+.follow-list .dlg-ic{background:var(--blue-wash);color:var(--blue)}
+.fl-body{padding-top:8px}
+.fl-row{padding:10px 6px;border-radius:10px;transition:background .14s ease}
+.fl-row:hover{background:var(--card-2)}
+.fl-who{text-align:start}
+.fl-id b{color:var(--ink)}
+.fl-who:hover b{color:var(--navy)}
+.fl-row .btn{border-radius:999px}
+
+/* ===================== SETTINGS ===================== */
+.settings-shell .card{border-radius:var(--r-lg)}
+.settings-shell .card-pad{padding:22px 24px}
+.settings-shell .card h3.title{font-family:var(--serif);font-size:17px;color:var(--navy)}
+.settings-shell .card h3.title .ico{color:var(--gold)}
+
+/* side nav: navy filled pill when active (base handles shape/mobile strip) */
+.set-item{color:var(--ink-soft)}
+.set-item:hover{background:var(--card-2);color:var(--ink)}
+.set-item.on{background:var(--navy);color:#f7f3ea}
+.set-item.on .ico{color:#d9b96c}
+
+.set-avatar-row{border:1px dashed #d6cbb0;border-radius:12px;background:var(--paper-2)}
+
+/* toggles → prototype .tgl: navy on-track, 42×24 */
+.sw{width:42px;height:24px;background:#d8cfba;transition:background .16s ease,box-shadow .16s ease}
+.sw::after{top:3px;left:3px;width:18px;height:18px;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .16s ease}
+.sw:hover{box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.sw.on{background:var(--navy)}
+.sw.on::after{left:21px}
+
+/* ===================== AUTH — split layout ===================== */
+.auth-left{
+  background:linear-gradient(165deg,#16283f,#1d3a5f 55%,#274b78);
+  color:#f3ecdd;
+}
+/* replace the old red radial scrims with faint gold/blue light */
+.auth-left::after{
+  background:
+    radial-gradient(720px 420px at 85% 0%,rgba(217,185,108,.10),transparent 60%),
+    radial-gradient(640px 480px at 0% 100%,rgba(45,95,151,.22),transparent 60%);
+}
+.auth-mark{background:rgba(217,185,108,.10);border:1px solid #3a557a}
+.auth-name{color:#f3ecdd}
+.auth-name b{color:#d9b96c}
+.auth-tag{color:rgba(243,236,221,.6)}
+.auth-hero em{color:#d9b96c}
+.auth-sub{color:rgba(243,236,221,.78)}
+.auth-bullets li{color:rgba(243,236,221,.88)}
+.auth-bullets li span{
+  background:rgba(217,185,108,.08);
+  border:1px solid #3a557a;color:#d9b96c;border-radius:9px;
+}
+.auth-left .muted{color:rgba(243,236,221,.55)}
+
+/* right: 400px soft card */
+.auth-card{
+  max-width:400px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-xl);
+  box-shadow:0 20px 60px rgba(34,30,23,.08);
+  padding:26px 24px 24px;
+}
+/* segmented Sign in / Create tabs on a #f0ebdf track */
+.auth-tabs{background:#f0ebdf;border-radius:11px;padding:4px;gap:4px;margin-bottom:20px}
+.auth-tab{
+  border-radius:8px;font-size:14px;color:var(--ink-soft);
+  transition:background .15s ease,color .15s ease,box-shadow .15s ease;
+}
+.auth-tab.on{background:var(--card);color:var(--navy);box-shadow:0 1px 3px rgba(34,30,23,.12)}
+.auth-card .btn-primary{border-radius:10px}
+.auth-switch a{color:var(--blue)}
+.auth-switch a:hover{color:var(--navy)}
+/* desktop-only headline size — mobile keeps the responsive clamps */
+@media(min-width:881px){
+  .auth-hero{font-size:40px}
+}
+
+/* ================= MOBILE RE-STATEMENTS ================= */
+/* This file imports after styles-responsive.css — restore the mobile
+   values our full-width rules would otherwise stomp. */
+@media(max-width:720px){
+  .prof-cover{margin-inline:-14px;border-radius:0}         /* full-bleed cover strip */
+  .prof-counts button{padding:10px 0;padding-inline-end:14px;margin-inline-end:14px}
+  .prof-actions .btn{padding:0 14px}
+  .settings-shell .card-pad{padding:18px 16px}
+}
+@media(hover:none){
+  .fl-row:hover{background:transparent}                    /* no sticky hover wash on touch */
+}

@@ -1,0 +1,1794 @@
+/* =============================================================
+   IKA "Warm Archive" — chat / messaging
+   -------------------------------------------------------------
+   Covers the whole messaging surface: the two-pane shell, the
+   inbox rail, the thread (header · pinned bar · message list ·
+   composer), the info panel, message requests and the new-chat
+   modal.
+
+   Design notes that explain the non-obvious choices:
+   · The shell is a FIXED-HEIGHT grid (100vh − topbar), not a
+     document-flow column. A chat thread must scroll INSIDE its
+     own pane so the composer can stay pinned to the bottom and
+     the inbox can scroll independently — page-level scrolling
+     would drag the composer off screen on every new message.
+   · Bubbles are navy (mine) vs. card (theirs). The tail is a
+     single squared corner (`border-end-*-radius:6px`) rather
+     than an SVG notch: it survives RTL for free because the
+     radius properties are logical.
+   · Everything sized from the token layer in warm/theme.css —
+     no hardcoded palette values except the two translucent
+     inks (scrims/overlays) that need alpha.
+   ============================================================= */
+
+/* =========================================================
+   1 · Shell — the page grid
+   ========================================================= */
+
+/* Chat opts out of the document column layout: the panes scroll, not the page.
+   `.main.wide` (2 classes) sets a single column, so this must also be a
+   two-class selector to win — and chat.css loads after the base sheet. */
+/* The shell is exactly "viewport minus the topbar". The topbar is 60px on
+   desktop but `56px + safe-area-inset-top` on phones (styles-responsive.css
+   §3), so the offset is a variable rather than a magic number — hardcoding 60
+   left the composer clipped below the fold on notched devices. */
+.main.ch-main{
+  --ch-top:60px;
+  --ch-bottom:0px;                    /* raised to clear the botnav in list view */
+  position:relative;                  /* anchors the slide-over search panel */
+  padding:0;
+  display:grid;
+  grid-template-columns:minmax(280px,340px) minmax(0,1fr);
+  gap:0;
+  align-items:stretch;
+  height:calc(100vh - var(--ch-top));
+  height:calc(100dvh - var(--ch-top));
+  overflow:hidden;
+  background:var(--paper);
+}
+/* the info panel becomes a real third column on wide screens */
+.main.ch-main.ch-info-open{
+  grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(280px,330px);
+}
+@media(max-width:1180px){
+  .main.ch-main.ch-info-open{ grid-template-columns:minmax(260px,300px) minmax(0,1fr); }
+}
+/* single-pane variant (the invite-redemption route has no inbox rail) */
+.main.ch-main.ch-solo{ grid-template-columns:minmax(0,1fr); }
+
+.ch-pane{ display:flex;flex-direction:column;min-width:0;min-height:0; }
+
+/* =========================================================
+   2 · Inbox rail (left pane)
+   ========================================================= */
+
+.ch-pane-list{
+  background:var(--card);
+  border-inline-end:1px solid var(--line);
+}
+
+.ch-list-head{
+  flex:0 0 auto;
+  padding:16px 16px 10px;
+  border-bottom:1px solid var(--line-soft);
+  background:var(--card);
+}
+.ch-list-title{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:12px;
+}
+.ch-list-title h1{
+  flex:1;min-width:0;margin:0;
+  font-family:var(--serif);
+  font-size:23px;font-weight:700;letter-spacing:-.2px;
+  color:var(--ink);
+}
+/* the masthead's italic second half — the platform's serif signature */
+.ch-list-title h1 em{ font-style:italic;color:var(--gold-deep);font-weight:600; }
+
+/* search field inside the rail */
+.ch-list-search{
+  position:relative;display:flex;align-items:center;gap:8px;
+  padding:0 12px;height:38px;
+  border:1px solid var(--line);border-radius:10px;
+  background:var(--card-2);
+  transition:border-color .15s,background .15s;
+}
+.ch-list-search:focus-within{ border-color:var(--blue);background:var(--card); }
+.ch-list-search .ico{ width:16px;height:16px;color:var(--muted);flex:0 0 auto; }
+/* the shared .field is a bordered box — strip it back inside the pill */
+.ch-list-search .field{
+  flex:1;min-width:0;height:auto;
+  border:0;outline:0;background:transparent;box-shadow:none;padding:0;
+  font:inherit;font-size:13.5px;color:var(--ink);
+}
+.ch-list-search .field:focus{ border:0;box-shadow:none; }
+
+/* rail tabs — the pill vocabulary from social.css, sized for a narrow rail */
+.ch-list-tabs{ margin:10px 0 0;gap:6px;border-bottom:0; }
+.ch-list-tabs .tab{
+  flex:1;min-width:0;padding:6px 8px;
+  font-size:12.5px;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+}
+.ch-list-tabs .tab .badge{
+  position:static;min-width:17px;height:17px;padding:0 5px;
+  border-radius:999px;background:var(--gold);color:#fff;
+  font-size:10.5px;font-weight:700;line-height:17px;
+}
+.ch-list-tabs .tab.on .badge{ background:rgba(247,243,234,.26);color:#f7f3ea; }
+
+/* the scrolling list itself */
+.chat-list{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:6px 8px 20px;
+}
+
+/* --- conversation row --- */
+.cv-row{
+  position:relative;
+  display:flex;align-items:center;gap:11px;
+  width:100%;
+  padding:10px 10px;
+  border:0;border-radius:12px;
+  background:transparent;cursor:pointer;text-align:start;
+  color:inherit;font:inherit;
+  transition:background .14s;
+}
+.cv-row:hover{ background:var(--card-2); }
+.cv-row.active{ background:var(--blue-wash); }
+.cv-row.active:hover{ background:#dfe8f2; }
+
+.cv-av{ position:relative;flex:0 0 auto; }
+/* group medallion — gold-washed square-ish tile, distinct from a person */
+.cv-medallion{
+  width:44px;height:44px;border-radius:13px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--gold-wash);color:var(--gold-deep);
+  border:1px solid var(--brass-soft);overflow:hidden;
+}
+.cv-medallion .ico{ width:21px;height:21px; }
+.cv-medallion-img{ width:100%;height:100%;object-fit:cover;display:block; }
+/* presence dot rides the avatar's end-bottom corner */
+.cv-dot{
+  position:absolute;inset-block-end:0;inset-inline-end:0;
+  width:12px;height:12px;border-radius:50%;
+  background:var(--muted);border:2.5px solid var(--card);
+}
+.cv-row.active .cv-dot{ border-color:var(--blue-wash); }
+.cv-dot.on{ background:var(--good); }
+
+.cv-body{ flex:1;min-width:0;display:flex;flex-direction:column;gap:2px; }
+.cv-line1{ display:flex;align-items:center;gap:6px;min-width:0; }
+.cv-name{
+  flex:1;min-width:0;
+  font-size:14.5px;font-weight:600;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cv-row.unread .cv-name{ font-weight:700; }
+.cv-time{
+  flex:0 0 auto;font-size:11.5px;color:var(--muted);
+  font-variant-numeric:tabular-nums;
+}
+.cv-row.unread .cv-time{ color:var(--gold-deep);font-weight:600; }
+
+.cv-line2{ display:flex;align-items:center;gap:6px;min-width:0; }
+.cv-preview{
+  flex:1;min-width:0;
+  font-size:12.8px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cv-row.unread .cv-preview{ color:var(--ink-soft); }
+.cv-preview .cv-you{ color:var(--muted);font-weight:600; }
+/* someone is typing / recording / sending — replaces the preview, gold +
+   italic so it reads live; the icon says WHAT is happening (mic, photo, clip) */
+.cv-preview.typing{ color:var(--gold-deep);font-style:italic;font-weight:600; }
+.cv-preview .cv-typing-ico{
+  width:13px;height:13px;
+  vertical-align:-2px;margin-inline-end:4px;
+  animation:chLiveIco 1.5s ease-in-out infinite;
+}
+/* the animated "…" every live label shares (rail preview, header status line,
+   in-thread indicator). Typewriter reveal via a stepped width — `content` is
+   not animatable in Firefox, width is animatable everywhere. Sits at the end
+   of its line, so the reveal shifts no other layout. */
+.ch-ell{
+  display:inline-block;overflow:hidden;white-space:nowrap;
+  vertical-align:bottom;width:1.1em;
+  animation:chEllTick 1.6s steps(4,jump-none) infinite;
+}
+.ch-ell::after{ content:'…'; }
+@keyframes chEllTick{ 0%{ width:.1em } 100%{ width:1.1em } }
+@keyframes chLiveIco{ 0%,100%{ opacity:.65 } 50%{ opacity:1 } }
+
+/* The unread count. Gold-lit and keyed on its value in JSX: every change
+   remounts the pill, so chBadgeIn replays and the number visibly "beats"
+   as messages land — realtime feedback with zero animation JS. */
+.cv-badge{
+  flex:0 0 auto;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:20px;height:20px;padding:0 6px;border-radius:999px;
+  background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
+  color:#fffdf8;
+  font-size:11px;font-weight:800;line-height:1;text-align:center;
+  font-variant-numeric:tabular-nums;letter-spacing:.2px;
+  box-shadow:0 0 0 2px var(--card),0 3px 8px -3px rgba(122,102,47,.55);
+  animation:chBadgeIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+.cv-row:hover .cv-badge{ box-shadow:0 0 0 2px var(--card-2),0 3px 8px -3px rgba(122,102,47,.55); }
+.cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--blue-wash),0 3px 8px -3px rgba(122,102,47,.55); }
+/* muted conversations still count, they just don't shout */
+.cv-row.muted-row .cv-badge{ background:var(--muted); }
+@keyframes chBadgeIn{
+  0%{ transform:scale(.35);opacity:0 }
+  62%{ transform:scale(1.14) }
+  100%{ transform:scale(1);opacity:1 }
+}
+/* the countless "there is something new" indicator (large groups) */
+.cv-unread-dot{
+  flex:0 0 auto;
+  width:9px;height:9px;border-radius:50%;
+  background:var(--gold);
+  box-shadow:0 0 0 3px rgba(179,135,62,.18);
+  animation:chBadgeIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+/* muted conversations still count, they just don't shout */
+.cv-flags{ display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--muted); }
+.cv-flags .ico{ width:13px;height:13px; }
+
+/* row hover menu — the host is the positioning context for both the
+   floating trigger and the dropdown (a row can't nest a button). */
+.cv-menu-host{ position:relative; }
+.cv-menu{ inset-block-start:38px;inset-inline-end:6px; }
+/* Revealed by opacity, NOT display:none — `display:none` takes the button out
+   of the tab order, and the only rule that would bring it back
+   (aria-expanded="true") can only fire once it has already been activated, so
+   a keyboard user could never reach it at all. */
+.cv-menu-btn{
+  position:absolute;inset-inline-end:8px;inset-block-start:8px;
+  width:26px;height:26px;border-radius:8px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:var(--card);
+  color:var(--ink-soft);cursor:pointer;
+  opacity:0;
+  transition:opacity .13s;
+}
+.cv-menu-host:hover .cv-menu-btn,
+.cv-menu-host:focus-within .cv-menu-btn,
+.cv-menu-btn:focus-visible,
+.cv-menu-btn[aria-expanded="true"]{ opacity:1; }
+.cv-menu-btn:hover{ background:var(--card-2);color:var(--navy); }
+.cv-menu-btn .ico{ width:14px;height:14px; }
+
+/* paging sentinel at the foot of the rail */
+.cv-more{ display:flex;justify-content:center;padding:14px 8px 8px; }
+.cv-more-txt{ font-size:12.5px;color:var(--muted); }
+
+/* rail section label ("Pinned", "Requests") */
+.chat-group-label{
+  padding:12px 12px 6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--muted);
+}
+
+/* =========================================================
+   3 · Requests rows
+   ========================================================= */
+
+.rq-row{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:12px 10px;border-radius:12px;
+  transition:background .14s;
+}
+.rq-row:hover{ background:var(--card-2); }
+.rq-body{ flex:1;min-width:0; }
+.rq-name{ font-size:14px;font-weight:650;color:var(--ink);display:flex;align-items:center;gap:5px; }
+.rq-handle{ font-size:12px;color:var(--muted);margin-top:1px; }
+.rq-meta{ font-size:11.5px;color:var(--muted);margin-top:4px; }
+.rq-actions{ display:flex;gap:6px;margin-top:9px;flex-wrap:wrap; }
+.rq-btn{
+  padding:5px 12px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink-soft);
+  font-size:12.5px;font-weight:600;cursor:pointer;
+  transition:background .14s,border-color .14s,color .14s;
+}
+.rq-btn:hover{ background:var(--card-2);color:var(--ink); }
+.rq-btn.primary{ background:var(--navy);border-color:var(--navy);color:#f7f3ea; }
+.rq-btn.primary:hover{ background:var(--navy-deep); }
+.rq-btn.danger{ color:var(--danger);border-color:#e8cfcb; }
+.rq-btn.danger:hover{ background:#faeeec;color:var(--danger); }
+.rq-btn:disabled{ opacity:.55;cursor:default; }
+
+/* =========================================================
+   4 · Thread pane
+   ========================================================= */
+
+.ch-pane-thread{
+  background:var(--paper-2);
+  /* a whisper of parchment tooth behind the bubbles */
+  background-image:
+    radial-gradient(circle at 20% 12%, rgba(179,135,62,.05), transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(29,58,95,.045), transparent 46%);
+}
+/* A bare loader / error dropped straight into the pane centres itself rather
+   than sticking to the top edge of a flex column. */
+.ch-pane-thread > .t-loader,
+.ch-pane-thread > .t-empty,
+.ch-pane-thread > .t-error{ margin:auto;max-width:420px; }
+/* the rail's own empty/loading states get breathing room, not a card edge */
+.chat-list > .t-empty,
+.chat-list > .t-loader{ margin:18px 6px;border:0;background:transparent;box-shadow:none; }
+
+/* --- no conversation selected --- */
+.ch-blank{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:13px;
+  padding:40px 28px;text-align:center;
+}
+.ch-blank-mark{
+  width:82px;height:82px;border-radius:26px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--gold-wash);border:1px solid var(--brass-soft);
+  color:var(--gold-deep);
+}
+.ch-blank-mark .ico{ width:34px;height:34px; }
+.ch-blank-title{
+  font-family:var(--serif);font-size:23px;font-weight:700;color:var(--ink);margin:0;
+}
+.ch-blank-title em{ font-style:italic;color:var(--gold-deep);font-weight:600; }
+.ch-blank-sub{ font-size:13.5px;color:var(--muted);max-width:340px;margin:0;line-height:1.55; }
+
+/* --- header --- */
+.ch-hd{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:10px;
+  padding:9px 14px;
+  min-height:62px;
+  border-bottom:1px solid var(--line);
+  background:rgba(255,253,248,.92);
+  backdrop-filter:blur(12px) saturate(140%);
+  -webkit-backdrop-filter:blur(12px) saturate(140%);
+  /* `backdrop-filter` CREATES A STACKING CONTEXT. Without an explicit z-index
+     here, the header's own dropdown (z 60) is sealed inside that context and
+     cannot out-paint the thread below — message bubbles are position:relative
+     and come later in DOM order, so they rendered straight THROUGH the open
+     menu. Lifting the whole header above the scroller fixes it at the root;
+     the menu itself also portals out (see ConversationHeader) as a belt. */
+  position:relative;
+  z-index:30;
+}
+/* Same reasoning: the pinned bar sits between the header and the thread. */
+.ch-pinbar{ position:relative;z-index:20; }
+/* the back chevron only exists on the single-pane layout */
+.ch-hd-back{ display:none; }
+
+.ch-hd-id{
+  flex:1;min-width:0;
+  display:flex;align-items:center;gap:11px;
+  border:0;background:transparent;padding:2px 4px;
+  border-radius:10px;cursor:pointer;text-align:start;color:inherit;font:inherit;
+  transition:background .14s;
+}
+.ch-hd-id:hover{ background:var(--card-2); }
+.ch-hd-avatar{ position:relative;flex:0 0 auto;display:inline-flex; }
+.ch-hd-medallion{
+  width:40px;height:40px;border-radius:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--gold-wash);color:var(--gold-deep);
+  border:1px solid var(--brass-soft);overflow:hidden;
+}
+.ch-hd-medallion .ico{ width:19px;height:19px; }
+.ch-hd-medallion-img{ width:100%;height:100%;object-fit:cover;display:block; }
+.ch-hd-dot{
+  position:absolute;inset-block-end:0;inset-inline-end:0;
+  width:11px;height:11px;border-radius:50%;
+  background:var(--muted);border:2.5px solid var(--card);
+}
+.ch-hd-dot.on{ background:var(--good); }
+
+.ch-hd-text{ min-width:0;display:flex;flex-direction:column;gap:1px; }
+.ch-hd-title{ display:flex;align-items:center;gap:5px;min-width:0; }
+.ch-hd-name{
+  font-size:15px;font-weight:700;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-hd-muted{ display:inline-flex;color:var(--muted); }
+.ch-hd-muted .ico{ width:13px;height:13px; }
+.ch-hd-sub{
+  font-size:12px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-hd-sub.live{ color:var(--gold-deep);font-weight:600;font-style:italic; }
+.ch-hd-sub .ch-hd-sub-ico{
+  width:13px;height:13px;
+  vertical-align:-2px;margin-inline-end:4px;
+  animation:chLiveIco 1.5s ease-in-out infinite;
+}
+
+.ch-hd-actions{ display:flex;align-items:center;gap:2px;flex:0 0 auto; }
+.ch-hd-act{ color:var(--ink-soft); }
+.ch-hd-act:hover{ color:var(--navy);background:var(--card-2); }
+.ch-hd-act.active{ color:var(--navy);background:var(--blue-wash); }
+
+/* header dropdown */
+.ch-hd-menu-wrap{ position:relative; }
+.ch-hd-menu{
+  position:absolute;inset-block-start:calc(100% + 6px);inset-inline-end:0;
+  z-index:60;min-width:196px;padding:6px;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow-lg);
+  animation:chPop .16s cubic-bezier(.22,.8,.24,1);
+}
+@keyframes chPop{ from{ opacity:0;transform:translateY(-5px) scale(.98) } to{ opacity:1;transform:none } }
+
+.ch-menu-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 11px;border:0;border-radius:9px;
+  background:transparent;cursor:pointer;text-align:start;
+  font:inherit;font-size:13.5px;font-weight:550;color:var(--ink-soft);
+  transition:background .12s,color .12s;
+}
+.ch-menu-item:hover{ background:var(--card-2);color:var(--ink); }
+/* Keep a REAL ring: `outline:0` here used to cancel the global focus-visible
+   style, leaving keyboard users with no indication of where they were in any
+   of the four menus that share this class. */
+.ch-menu-item:focus-visible{
+  background:var(--card-2);color:var(--ink);
+  outline:2px solid var(--blue);outline-offset:-2px;
+}
+.ch-menu-item .ico{ width:16px;height:16px;flex:0 0 auto;color:var(--muted); }
+.ch-menu-item:hover .ico{ color:var(--navy); }
+.ch-menu-item.danger{ color:var(--danger); }
+.ch-menu-item.danger .ico,.ch-menu-item.danger:hover .ico{ color:var(--danger); }
+.ch-menu-item.danger:hover{ background:#faeeec; }
+.ch-menu-item:disabled{ opacity:.5;cursor:default; }
+.ch-menu-sep{ height:1px;margin:5px 8px;background:var(--line-soft); }
+
+/* --- pinned bar --- */
+.ch-pinbar{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:10px;
+  padding:8px 14px;
+  border-bottom:1px solid var(--line);
+  background:var(--gold-wash);
+  cursor:pointer;
+}
+.ch-pinbar:hover{ background:#f2e5cb; }
+/* the jump-to-pin action is its own button so the close control can be a
+   sibling rather than an (inaccessible) nested one */
+.ch-pinbar-main{
+  flex:1;min-width:0;
+  display:flex;align-items:center;gap:10px;
+  border:0;background:transparent;padding:0;
+  font:inherit;color:inherit;text-align:start;cursor:pointer;
+}
+.ch-pinbar-body{ display:flex;flex-direction:column;min-width:0; }
+.ch-pinbar .ico.pin-ico{ width:15px;height:15px;color:var(--gold-deep);flex:0 0 auto; }
+.ch-pinbar-body{ flex:1;min-width:0; }
+.ch-pinbar-label{ font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--gold-deep); }
+.ch-pinbar-text{
+  font-size:13px;color:var(--ink-soft);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-pinbar-count{ font-size:11px;color:var(--gold-deep);font-weight:600;flex:0 0 auto; }
+.ch-pinbar-x{
+  border:0;background:transparent;cursor:pointer;color:var(--gold-deep);
+  display:inline-flex;padding:4px;border-radius:6px;flex:0 0 auto;
+}
+.ch-pinbar-x:hover{ background:rgba(122,102,47,.14); }
+
+/* --- search slide-over (ChatSearchPanel) ---------------------------------
+   A panel, not a bar: it overlays the END edge of the shell so the thread
+   stays legible behind it and the same component serves both the
+   "this chat" and "all chats" scopes. */
+.ch-search{
+  position:absolute;inset-block:0;inset-inline-end:0;
+  z-index:80;width:min(380px,100%);
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--card);
+  border-inline-start:1px solid var(--line);
+  box-shadow:-18px 0 44px -28px rgba(34,30,23,.4);
+  animation:chSlideIn .2s cubic-bezier(.22,.8,.24,1);
+}
+@keyframes chSlideIn{ from{ transform:translateX(14px);opacity:0 } to{ transform:none;opacity:1 } }
+@media(prefers-reduced-motion:reduce){ .ch-search{ animation:none } }
+[dir="rtl"] .ch-search{ box-shadow:18px 0 44px -28px rgba(34,30,23,.4); }
+
+.ch-search-head{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--line-soft);
+}
+.ch-search-head h3{ flex:1;margin:0;font-size:15px;font-weight:700;color:var(--ink); }
+.ch-search-tabs{ margin:12px 16px 0;gap:6px;border-bottom:0; }
+.ch-search-tabs .tab{ flex:1;padding:6px 10px;font-size:12.5px; }
+
+/* the shared search field, reused by the panel and the modals */
+.ch-search-field{
+  position:relative;display:flex;align-items:center;gap:8px;
+  margin:12px 16px 0;padding:0 12px;height:38px;
+  border:1px solid var(--line);border-radius:10px;
+  background:var(--card-2);
+  transition:border-color .15s,background .15s;
+}
+.ch-search-field:focus-within{ border-color:var(--blue);background:var(--card); }
+.ch-search-field > .ico{ color:var(--muted);flex:0 0 auto; }
+.ch-search-field .field{
+  flex:1;min-width:0;height:auto;
+  border:0;outline:0;background:transparent;box-shadow:none;padding:0;
+  font:inherit;font-size:13.5px;color:var(--ink);
+}
+.ch-search-field .field:focus{ border:0;box-shadow:none; }
+.ch-search-clear{ width:26px;height:26px;flex:0 0 auto;color:var(--muted); }
+.ch-search-clear:hover{ color:var(--ink); }
+
+.ch-search-body{ flex:1;min-height:0;overflow-y:auto;padding:12px 12px 28px; }
+.ch-search-hint{
+  padding:22px 14px;text-align:center;
+  font-size:13px;color:var(--muted);line-height:1.55;
+}
+
+/* one search hit */
+.ch-hitrow{
+  display:flex;gap:10px;align-items:flex-start;width:100%;
+  padding:10px 11px;margin-bottom:5px;
+  border:1px solid var(--line);border-radius:12px;
+  background:var(--card);cursor:pointer;font:inherit;color:inherit;text-align:start;
+  transition:border-color .14s,background .14s;
+}
+.ch-hitrow:hover{ border-color:var(--blue);background:var(--card-2); }
+.ch-hitrow-main{ flex:1;min-width:0;display:flex;flex-direction:column;gap:3px; }
+.ch-hitrow-top{ display:flex;align-items:center;gap:6px;min-width:0; }
+.ch-hitrow-top b{ font-size:12.5px;font-weight:650;color:var(--navy); }
+.ch-hitrow-in{
+  font-size:11.5px;color:var(--muted);min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-hitrow-date{ font-size:11px;color:var(--muted);margin-inline-start:auto;flex:0 0 auto; }
+.ch-hitrow-body{
+  font-size:13px;color:var(--ink-soft);line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ch-hit{ background:var(--brass-tint);color:var(--ink);border-radius:3px;padding:0 2px; }
+
+/* =========================================================
+   5 · Message list
+   ========================================================= */
+
+/* The scroller and its floating affordances are siblings inside this wrapper.
+   The jump pill CANNOT live inside .ch-scroll: an absolutely-positioned child
+   of a scroll container resolves against the scrolled content box, so it
+   would drift upward as you scrolled instead of hovering. */
+.ch-scrollwrap{
+  position:relative;
+  flex:1;min-height:0;
+  display:flex;flex-direction:column;
+}
+.ch-scroll{
+  flex:1;min-height:0;
+  overflow-y:auto;overscroll-behavior:contain;
+  padding:16px 18px 10px;
+  scroll-behavior:smooth;
+  /* momentum scrolling on iOS + a calmer scrollbar */
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+.ch-scroll::-webkit-scrollbar{ width:10px; }
+.ch-scroll::-webkit-scrollbar-track{ background:transparent; }
+.ch-scroll::-webkit-scrollbar-thumb{
+  background:var(--line);border-radius:999px;
+  border:3px solid transparent;background-clip:content-box;
+}
+.ch-scroll::-webkit-scrollbar-thumb:hover{ background:var(--brass-soft);background-clip:content-box; }
+@media(prefers-reduced-motion:reduce){ .ch-scroll{ scroll-behavior:auto; } }
+
+.ch-msgs{ display:flex;flex-direction:column;gap:2px;max-width:900px;margin:0 auto; }
+
+/* day separator + the unread rule share a centred-label pattern */
+.ch-day{
+  display:flex;align-items:center;gap:12px;
+  margin:16px 0 10px;
+  color:var(--muted);
+}
+.ch-day::before,.ch-day::after{ content:"";flex:1;height:1px;background:var(--line); }
+.ch-day span{
+  font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  padding:3px 12px;border-radius:999px;
+  background:var(--card);border:1px solid var(--line);
+}
+.ch-unread-rule{ margin:14px 0 8px;color:var(--gold-deep); }
+.ch-unread-rule::before,.ch-unread-rule::after{ background:var(--brass-soft); }
+.ch-unread-rule span{ background:var(--gold-wash);border-color:var(--brass-soft);color:var(--gold-deep); }
+
+/* load-older sentinel */
+.ch-older{ display:flex;justify-content:center;padding:10px 0 4px; }
+.ch-older-btn{
+  padding:5px 14px;border-radius:999px;
+  border:1px solid var(--line);background:var(--card);
+  font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+}
+.ch-older-btn:hover{ border-color:var(--blue);color:var(--navy); }
+.ch-start{
+  text-align:center;padding:18px 12px 10px;
+  font-size:12px;color:var(--muted);
+}
+
+/* --- the row that carries one bubble --- */
+.ch-row{
+  display:flex;align-items:flex-end;gap:8px;
+  margin-top:2px;
+  padding-inline:2px;
+}
+.ch-row.mine{ flex-direction:row-reverse; }
+/* first message of a run gets breathing room above */
+.ch-row.run-start{ margin-top:10px; }
+
+.ch-row-av{ width:30px;flex:0 0 auto;align-self:flex-end;margin-bottom:2px; }
+.ch-row-av.hidden{ visibility:hidden; }
+
+.ch-stack{ display:flex;flex-direction:column;min-width:0;max-width:min(68%,560px); }
+.ch-row.mine .ch-stack{ align-items:flex-end; }
+
+/* sender name above the first bubble of a run (groups only) */
+.ch-sender{
+  font-size:11.5px;font-weight:700;color:var(--navy);
+  margin:0 0 3px 10px;
+  display:flex;align-items:center;gap:4px;
+}
+
+/* --- the bubble --- */
+.ch-bubble{
+  position:relative;
+  padding:8px 12px 7px;
+  border-radius:16px;
+  background:var(--card);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow-sm);
+  font-size:14.5px;line-height:1.5;color:var(--ink);
+  word-break:break-word;overflow-wrap:anywhere;
+  min-width:0;
+}
+.ch-row.mine .ch-bubble{
+  background:var(--navy);
+  border-color:var(--navy);
+  color:#f5f1e8;
+  box-shadow:0 6px 16px -10px rgba(29,58,95,.5);
+}
+.ch-row.mine .ch-bubble a{ color:#cfe0f0;text-decoration:underline; }
+/* the tail: square off the corner nearest the avatar on the run's last bubble */
+.ch-row.run-end .ch-bubble{ border-end-start-radius:6px; }
+.ch-row.mine.run-end .ch-bubble{ border-end-start-radius:16px;border-end-end-radius:6px; }
+
+.ch-bubble.pending{ opacity:.66; }
+.ch-bubble.failed{ border-color:var(--danger);background:#faeeec; }
+.ch-row.mine .ch-bubble.failed{ background:#8f3a33;border-color:#8f3a33;color:#fbeae8; }
+.ch-bubble.deleted{
+  font-style:italic;color:var(--muted);
+  background:var(--card-2);border-style:dashed;box-shadow:none;
+}
+.ch-row.mine .ch-bubble.deleted{ background:rgba(29,58,95,.1);border-color:var(--line);color:var(--muted); }
+/* a bubble that is only media needs no padding around it */
+.ch-bubble.media-only{ padding:4px;overflow:hidden; }
+/* highlight when jumped to from search / a reply quote */
+.ch-bubble.flash{ animation:chFlash 1.5s ease-out; }
+@keyframes chFlash{
+  0%,22%{ box-shadow:0 0 0 3px var(--gold); }
+  100%{ box-shadow:var(--shadow-sm); }
+}
+
+.ch-text{ white-space:pre-wrap; }
+.ch-text .mention{ font-weight:650; }
+
+/* meta line (time · edited · receipt) tucked into the bubble's end */
+.ch-meta{
+  display:inline-flex;align-items:center;gap:4px;
+  float:inline-end;
+  margin:6px 0 -2px 10px;
+  font-size:10.5px;color:var(--muted);
+  font-variant-numeric:tabular-nums;
+  user-select:none;
+}
+.ch-row.mine .ch-meta{ color:rgba(245,241,232,.66); }
+.ch-meta .ico{ width:13px;height:13px; }
+.ch-meta-edited{ font-style:italic; }
+
+/* --- receipt ticks: sent ✓ · delivered ✓✓ · seen ✓✓ (lit) ---
+   Dedicated SVG (MessageBubble.Ticks). The second check draws itself in when
+   the delivery receipt lands (it mounts with the receipt, so the animation IS
+   the event), and the pair pops + lights up sky-blue on "seen" — the classic
+   WhatsApp grammar, in this theme's voice. */
+.ch-receipt{ display:inline-flex;align-items:center; }
+.ch-tick{ width:17px;height:11px;display:block;transition:color .18s; }
+.ch-tick .ch-tick-2{
+  stroke-dasharray:14;stroke-dashoffset:0;
+  animation:chTickDraw .3s ease-out;
+}
+@keyframes chTickDraw{ from{ stroke-dashoffset:14 } to{ stroke-dashoffset:0 } }
+.ch-tick.seen{
+  color:#8fd8ff;
+  filter:drop-shadow(0 0 3px rgba(143,216,255,.5));
+  animation:chSeenPop .45s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes chSeenPop{
+  0%{ transform:scale(1) }
+  45%{ transform:scale(1.3) }
+  100%{ transform:scale(1) }
+}
+
+/* media-only bubbles overlay the meta on the asset instead */
+.ch-bubble.media-only .ch-meta{
+  position:absolute;inset-block-end:9px;inset-inline-end:11px;
+  float:none;margin:0;z-index:2;
+  padding:2px 7px;border-radius:999px;
+  background:rgba(22,40,63,.6);color:#f2ede2;
+  backdrop-filter:blur(4px);
+}
+.ch-bubble.media-only .ch-tick.seen{ color:#a9dcff; }
+
+/* --- reply quote inside a bubble --- */
+.ch-quote{
+  display:block;width:100%;text-align:start;
+  border:0;border-inline-start:3px solid var(--gold);
+  background:var(--card-2);
+  border-radius:8px;
+  padding:5px 9px;margin-bottom:5px;
+  cursor:pointer;font:inherit;
+  transition:background .14s;
+}
+.ch-quote:hover{ background:var(--brass-tint); }
+/* a deleted target is not navigable — drop the affordance, keep the quote */
+.ch-quote:disabled{ cursor:default; }
+.ch-quote:disabled:hover{ background:var(--card-2); }
+.ch-row.mine .ch-quote:disabled:hover{ background:rgba(255,253,248,.14); }
+.ch-row.mine .ch-quote{ background:rgba(255,253,248,.14);border-inline-start-color:var(--brass-soft); }
+.ch-row.mine .ch-quote:hover{ background:rgba(255,253,248,.22); }
+.ch-quote-who{ font-size:11.5px;font-weight:700;color:var(--gold-deep);display:block; }
+.ch-row.mine .ch-quote-who{ color:var(--brass-soft); }
+.ch-quote-txt{
+  font-size:12.5px;color:var(--ink-soft);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ch-row.mine .ch-quote-txt{ color:rgba(245,241,232,.8); }
+.ch-quote-txt.gone{ font-style:italic;color:var(--muted); }
+
+/* forwarded marker (NOT .ch-fwd — that is the forward-target picker) */
+.ch-fwdmark{
+  display:flex;align-items:center;gap:4px;
+  font-size:11px;font-style:italic;color:var(--muted);
+  margin-bottom:3px;
+}
+.ch-row.mine .ch-fwdmark{ color:rgba(245,241,232,.62); }
+.ch-fwdmark .ico{ width:12px;height:12px; }
+
+/* --- media --- */
+.ch-media{ display:grid;gap:3px;border-radius:12px;overflow:hidden; }
+.ch-media.n-1{ grid-template-columns:1fr; }
+.ch-media.n-2{ grid-template-columns:1fr 1fr; }
+.ch-media.n-3,.ch-media.n-4{ grid-template-columns:1fr 1fr; }
+.ch-media.n-3 > :first-child{ grid-column:1 / -1; }
+
+.ch-asset{
+  position:relative;display:block;width:100%;
+  border:0;padding:0;background:var(--card-2);cursor:pointer;
+  overflow:hidden;line-height:0;
+}
+.ch-media.n-1 .ch-asset img,.ch-media.n-1 .ch-asset video{ max-height:340px;width:100%;object-fit:cover;display:block; }
+.ch-media:not(.n-1) .ch-asset{ aspect-ratio:1;height:100%; }
+.ch-media:not(.n-1) .ch-asset img,.ch-media:not(.n-1) .ch-asset video{ width:100%;height:100%;object-fit:cover;display:block; }
+.ch-asset-play{
+  position:absolute;inset:0;margin:auto;
+  width:48px;height:48px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(22,40,63,.62);color:#fff;
+  backdrop-filter:blur(3px);pointer-events:none;
+}
+.ch-asset-play .ico{ width:22px;height:22px; }
+.ch-asset-more{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(22,40,63,.58);color:#fff;
+  font-size:20px;font-weight:700;pointer-events:none;
+}
+
+/* file attachment row */
+.ch-file{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:10px;
+  background:var(--card-2);border:1px solid var(--line);
+  text-decoration:none;color:inherit;min-width:200px;
+  transition:border-color .14s;
+}
+.ch-file:hover{ border-color:var(--blue); }
+.ch-row.mine .ch-file{ background:rgba(255,253,248,.13);border-color:rgba(255,253,248,.22); }
+.ch-row.mine .ch-file:hover{ background:rgba(255,253,248,.2); }
+.ch-file-ico{
+  width:36px;height:36px;flex:0 0 auto;border-radius:9px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--blue-wash);color:var(--navy);
+}
+.ch-row.mine .ch-file-ico{ background:rgba(255,253,248,.2);color:#f5f1e8; }
+.ch-file-body{ min-width:0;flex:1; }
+.ch-file-name{
+  font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-file-size{ font-size:11px;color:var(--muted); }
+.ch-row.mine .ch-file-size{ color:rgba(245,241,232,.66); }
+
+/* voice note */
+.ch-voice{ display:flex;align-items:center;gap:10px;min-width:210px;padding:2px 0; }
+.ch-voice-play{
+  width:36px;height:36px;flex:0 0 auto;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;cursor:pointer;
+  background:var(--navy);color:#f7f3ea;
+}
+.ch-row.mine .ch-voice-play{ background:rgba(255,253,248,.9);color:var(--navy); }
+.ch-voice-play .ico{ width:16px;height:16px; }
+.ch-voice-body{ flex:1;min-width:0; }
+.ch-wave{
+  display:flex;align-items:center;gap:2px;height:26px;cursor:pointer;
+}
+.ch-wave-bar{
+  flex:1;min-width:2px;border-radius:2px;
+  background:var(--brass-soft);
+  transition:background .1s;
+}
+.ch-wave-bar.played{ background:var(--gold); }
+.ch-row.mine .ch-wave-bar{ background:rgba(255,253,248,.35); }
+.ch-row.mine .ch-wave-bar.played{ background:#f5f1e8; }
+.ch-voice-time{
+  font-size:11px;color:var(--muted);margin-top:2px;
+  font-variant-numeric:tabular-nums;
+}
+.ch-row.mine .ch-voice-time{ color:rgba(245,241,232,.7); }
+
+/* --- reactions --- */
+.ch-reacts{
+  display:flex;flex-wrap:wrap;gap:4px;
+  margin-top:-6px;padding-inline:6px;
+  position:relative;z-index:2;
+}
+.ch-row.mine .ch-reacts{ justify-content:flex-end; }
+.ch-react{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);background:var(--card);
+  font-size:12px;cursor:pointer;
+  box-shadow:var(--shadow-sm);
+  transition:border-color .14s,background .14s,transform .1s;
+}
+.ch-react:hover{ border-color:var(--blue); }
+.ch-react:active{ transform:scale(.93); }
+.ch-react.mine{ background:var(--blue-wash);border-color:#b9cde2; }
+.ch-react-n{ font-size:11px;font-weight:650;color:var(--ink-soft);font-variant-numeric:tabular-nums; }
+.ch-react.mine .ch-react-n{ color:var(--navy); }
+
+/* --- hover action rail --- */
+.ch-tools{
+  display:flex;align-items:center;gap:1px;
+  align-self:center;flex:0 0 auto;
+  opacity:0;pointer-events:none;
+  transition:opacity .13s;
+}
+.ch-row:hover .ch-tools,
+.ch-row:focus-within .ch-tools,
+.ch-tools.open{ opacity:1;pointer-events:auto; }
+.ch-tool{
+  width:28px;height:28px;border-radius:8px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:var(--card);
+  color:var(--ink-soft);cursor:pointer;
+  transition:background .13s,color .13s,border-color .13s;
+}
+.ch-tool:hover{ background:var(--card-2);color:var(--navy);border-color:var(--blue); }
+.ch-tool .ico{ width:15px;height:15px; }
+.ch-tool-wrap{ position:relative; }
+
+/* Both bubble menus render through <Popover>, i.e. portalled to <body> with
+   position:fixed and coordinates measured from their trigger. They therefore
+   carry NO inset rules of their own — placement is JS's job, because these
+   open inside `.ch-scroll` (overflow-y:auto), which would otherwise clip them
+   at the top and bottom of the thread. Only the skin lives here.
+   `.ch-pop` is the portal wrapper's base layer. */
+/* z 100: above every piece of page chrome a menu must clear (topbar 50,
+   botnav 60, header 30) but BELOW all the overlays (chat modals 130, sheet
+   140, lightbox 150, dialogs/toasts 200) — a menu must never float over a
+   modal that replaced it. */
+.ch-pop{ z-index:100; }
+/* The wrapper also carries a SKIN class that may bring its own placement
+   (.ch-hd-menu is absolute/inset-inline-end:0, .cv-menu offsets by 38px…).
+   JS supplies position/top/left inline; a leftover `right`/`bottom` from the
+   skin would then stretch the box between two opposite edges. Doubling the
+   class out-specifies every skin without reaching for !important. */
+.ch-pop.ch-pop{
+  inset-block-start:auto;inset-block-end:auto;
+  inset-inline-start:auto;inset-inline-end:auto;
+  right:auto;bottom:auto;margin:0;
+}
+
+.ch-tool-menu{
+  min-width:172px;padding:5px;
+  background:var(--card);border:1px solid var(--line);border-radius:11px;
+  box-shadow:var(--shadow-lg);
+  animation:chPop .15s cubic-bezier(.22,.8,.24,1);
+}
+
+/* quick-reaction strip */
+.ch-quickreact{
+  display:flex;gap:2px;padding:4px;
+  background:var(--card);border:1px solid var(--line);border-radius:999px;
+  box-shadow:var(--shadow-lg);
+  animation:chPop .15s cubic-bezier(.22,.8,.24,1);
+}
+@media(prefers-reduced-motion:reduce){
+  .ch-tool-menu,.ch-quickreact{ animation:none; }
+}
+.ch-qr{
+  width:32px;height:32px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;background:transparent;cursor:pointer;font-size:18px;line-height:1;
+  transition:background .12s,transform .12s;
+}
+.ch-qr:hover{ background:var(--card-2);transform:scale(1.18); }
+
+/* avatar button in the gutter */
+.ch-av-btn{
+  border:0;background:transparent;padding:0;margin:0;
+  display:block;cursor:pointer;border-radius:50%;
+}
+.ch-av-btn:focus-visible{ outline:2px solid var(--blue);outline-offset:2px; }
+
+/* failed-send retry affordance */
+.ch-retry{
+  align-self:flex-start;margin-top:4px;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 11px;border-radius:999px;
+  border:1px solid #e8cfcb;background:#faeeec;
+  font-size:12px;font-weight:600;color:var(--danger);cursor:pointer;
+}
+.ch-row.mine .ch-retry{ align-self:flex-end; }
+.ch-retry:hover{ background:#f6e2df; }
+.ch-retry .ico{ width:12px;height:12px; }
+
+/* --- touch action sheet (long-press) ---
+   z 140: above chat's own modals (130) but BELOW the app's dialog host and
+   toasts (both 200). A `uiConfirm` raised from this sheet, or a toast fired
+   by an action in it, must never render behind it. See the ladder note at
+   the top of §12. */
+.ch-sheet-scrim{
+  position:fixed;inset:0;z-index:140;
+  display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(34,30,23,.44);
+  animation:chFade .15s ease-out;
+}
+.ch-sheet{
+  width:100%;max-width:520px;
+  padding:8px 8px calc(14px + env(safe-area-inset-bottom));
+  background:var(--card);
+  border-radius:20px 20px 0 0;
+  box-shadow:var(--shadow-lg);
+  animation:chSheetUp .22s cubic-bezier(.22,.8,.24,1);
+}
+@keyframes chSheetUp{ from{ transform:translateY(100%) } to{ transform:none } }
+@media(prefers-reduced-motion:reduce){ .ch-sheet{ animation:none } }
+.ch-sheet-reacts{
+  display:flex;justify-content:space-around;gap:2px;
+  padding:6px 4px 10px;margin-bottom:6px;
+  border-bottom:1px solid var(--line-soft);
+}
+.ch-sheet .ch-qr{ width:40px;height:40px;font-size:22px; }
+.ch-sheet .ch-menu-item{ padding:12px 14px;font-size:14.5px; }
+
+/* --- system message --- */
+.ch-system{
+  display:flex;justify-content:center;
+  margin:12px 0;
+}
+.ch-system span{
+  max-width:80%;text-align:center;
+  padding:5px 14px;border-radius:999px;
+  background:var(--card-2);border:1px solid var(--line-soft);
+  font-size:12px;color:var(--muted);
+}
+
+/* --- live indicator row: typing · recording a voice note · sending files ---
+   The bubble mirrors a real incoming message (same chrome, same tail) so the
+   eye reads "a message is on its way". Groups put the typer's avatar in the
+   avatar column; a caption beside the bubble names who/what — it doubles as
+   the screen-reader text, so nothing here is aria-hidden except the motion. */
+.ch-typing{ display:flex;align-items:flex-end;gap:8px;padding:6px 2px 2px; }
+.ch-typing .ch-row-av{ display:flex;justify-content:center; }
+.ch-typing-bubble{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:11px 14px;border-radius:16px;border-end-start-radius:6px;
+  background:var(--card);border:1px solid var(--line);
+  box-shadow:var(--shadow-sm);
+  animation:chPop .18s cubic-bezier(.22,.8,.24,1);
+}
+.ch-typing-bubble.with-ico{ gap:8px;padding:9px 13px; }
+.ch-typing-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--muted);
+  animation:chBounce 1.3s infinite ease-in-out;
+}
+.ch-typing-dot:nth-child(2){ animation-delay:.18s; }
+.ch-typing-dot:nth-child(3){ animation-delay:.36s; }
+@keyframes chBounce{
+  0%,60%,100%{ transform:translateY(0);opacity:.45 }
+  30%{ transform:translateY(-4px);opacity:1 }
+}
+/* what-is-happening icon: gold for sending, live red + pulse for the mic */
+.ch-typing-ico{ width:15px;height:15px;color:var(--gold-deep); }
+.ch-typing.act-recording_voice .ch-typing-ico{
+  color:var(--danger);
+  animation:chMicPulse 1.2s ease-in-out infinite;
+}
+@keyframes chMicPulse{
+  0%,100%{ transform:scale(1);opacity:.75 }
+  50%{ transform:scale(1.18);opacity:1 }
+}
+/* mini equaliser beside the mic — "sound is being captured right now" */
+.ch-typing-eq{ display:inline-flex;align-items:center;gap:2.5px;height:14px; }
+.ch-typing-eq i{
+  width:2.5px;height:30%;border-radius:2px;background:var(--danger);
+  animation:chEq 1s ease-in-out infinite;
+}
+.ch-typing-eq i:nth-child(2){ animation-delay:.14s; }
+.ch-typing-eq i:nth-child(3){ animation-delay:.28s; }
+.ch-typing-eq i:nth-child(4){ animation-delay:.42s; }
+.ch-typing-eq i:nth-child(5){ animation-delay:.56s; }
+@keyframes chEq{ 0%,100%{ height:26% } 50%{ height:100% } }
+/* the caption ("Aisha is recording a voice message") */
+.ch-typing-label{
+  font-size:11.5px;color:var(--gold-deep);font-style:italic;
+  padding-bottom:5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+@media(prefers-reduced-motion:reduce){
+  .ch-typing-dot{ animation:none;opacity:.6 }
+  .ch-typing-bubble{ animation:none }
+  .ch-typing-ico,.ch-typing.act-recording_voice .ch-typing-ico{ animation:none;opacity:1 }
+  .ch-typing-eq i{ animation:none;height:60% }
+}
+
+/* jump-to-bottom pill */
+.ch-jump{
+  position:absolute;inset-block-end:14px;inset-inline-end:18px;
+  z-index:14;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 13px;border-radius:999px;
+  border:1px solid var(--line);background:var(--card);
+  color:var(--ink-soft);font-size:12.5px;font-weight:600;cursor:pointer;
+  box-shadow:var(--shadow);
+  animation:chPop .18s cubic-bezier(.22,.8,.24,1);
+}
+.ch-jump:hover{ border-color:var(--blue);color:var(--navy); }
+.ch-jump .ico{ width:15px;height:15px; }
+.ch-jump-n{
+  min-width:18px;height:18px;padding:0 5px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
+  color:#fffdf8;
+  font-size:11px;font-weight:800;line-height:1;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+
+/* =========================================================
+   6 · Composer
+   ========================================================= */
+
+.ch-composer{
+  flex:0 0 auto;
+  border-top:1px solid var(--line);
+  background:var(--card);
+  padding:10px 14px 12px;
+}
+
+/* reply / edit context strip above the input */
+.ch-ctx{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 11px;margin-bottom:8px;
+  border-radius:10px;
+  background:var(--card-2);
+  border-inline-start:3px solid var(--gold);
+}
+.ch-ctx.editing{ border-inline-start-color:var(--blue); }
+.ch-ctx-body{ flex:1;min-width:0; }
+.ch-ctx-label{ font-size:11.5px;font-weight:700;color:var(--gold-deep); }
+.ch-ctx.editing .ch-ctx-label{ color:var(--navy); }
+.ch-ctx-text{
+  font-size:12.5px;color:var(--ink-soft);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-ctx-x{
+  border:0;background:transparent;cursor:pointer;color:var(--muted);
+  display:inline-flex;padding:5px;border-radius:7px;flex:0 0 auto;
+}
+.ch-ctx-x:hover{ background:var(--line-soft);color:var(--ink); }
+
+/* attachment tray */
+.ch-tray{ display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px; }
+.ch-tray-item{
+  position:relative;width:66px;height:66px;border-radius:10px;
+  overflow:hidden;border:1px solid var(--line);background:var(--card-2);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);
+}
+.ch-tray-item img,.ch-tray-item video{ width:100%;height:100%;object-fit:cover;display:block; }
+.ch-tray-name{
+  position:absolute;inset-block-end:0;inset-inline:0;
+  padding:2px 4px;font-size:9px;text-align:center;
+  background:rgba(22,40,63,.66);color:#f2ede2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-tray-x{
+  position:absolute;inset-block-start:3px;inset-inline-end:3px;
+  width:19px;height:19px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;cursor:pointer;
+  background:rgba(22,40,63,.72);color:#fff;
+}
+.ch-tray-x .ico{ width:11px;height:11px; }
+
+/* drag-and-drop target state */
+.ch-composer.dropping{
+  background:var(--blue-wash);
+  box-shadow:inset 0 0 0 2px var(--blue);
+}
+
+/* the input row */
+.ch-inputrow{ display:flex;align-items:flex-end;gap:7px; }
+/* anchors the emoji popover */
+.ch-emoji-wrap{ position:relative;flex:0 0 auto; }
+.ch-cbtn{
+  width:38px;height:38px;flex:0 0 auto;border-radius:10px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid transparent;background:transparent;
+  color:var(--ink-soft);cursor:pointer;
+  transition:background .13s,color .13s;
+}
+.ch-cbtn:hover{ background:var(--card-2);color:var(--navy); }
+.ch-cbtn.on{ background:var(--blue-wash);color:var(--navy); }
+.ch-cbtn:disabled{ opacity:.45;cursor:default; }
+.ch-cbtn .ico{ width:19px;height:19px; }
+
+.ch-inputwrap{
+  flex:1;min-width:0;
+  display:flex;align-items:flex-end;
+  border:1px solid var(--line);border-radius:18px;
+  background:var(--card-2);
+  padding:3px 4px 3px 12px;
+  transition:border-color .15s,background .15s;
+}
+.ch-inputwrap:focus-within{ border-color:var(--blue);background:var(--card); }
+.ch-input{
+  flex:1;min-width:0;
+  border:0;outline:0;background:transparent;resize:none;
+  font:inherit;font-size:14.5px;line-height:1.45;color:var(--ink);
+  padding:8px 0;max-height:160px;overflow-y:auto;
+}
+.ch-input::placeholder{ color:var(--muted); }
+
+.ch-send{
+  width:38px;height:38px;flex:0 0 auto;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;cursor:pointer;
+  background:var(--navy);color:#f7f3ea;
+  box-shadow:0 8px 18px -10px rgba(29,58,95,.6);
+  transition:background .14s,transform .12s,opacity .14s;
+}
+.ch-send:hover{ background:var(--navy-deep); }
+.ch-send:active{ transform:scale(.92); }
+.ch-send:disabled{ opacity:.4;cursor:default;box-shadow:none; }
+.ch-send .ico{ width:18px;height:18px;margin-inline-start:-1px; }
+
+/* recording state */
+.ch-rec{
+  flex:1;display:flex;align-items:center;gap:11px;
+  padding:9px 14px;border-radius:18px;
+  background:#faeeec;border:1px solid #e8cfcb;
+}
+.ch-rec-dot{
+  width:10px;height:10px;border-radius:50%;background:var(--danger);
+  animation:chPulse 1.1s infinite;
+}
+@keyframes chPulse{ 0%,100%{ opacity:1 } 50%{ opacity:.28 } }
+@media(prefers-reduced-motion:reduce){ .ch-rec-dot{ animation:none } }
+.ch-rec-time{
+  font-size:13.5px;font-weight:650;color:var(--danger);
+  font-variant-numeric:tabular-nums;
+}
+.ch-rec-hint{ flex:1;font-size:12px;color:var(--ink-soft); }
+.ch-rec-x{
+  border:0;background:transparent;cursor:pointer;color:var(--danger);
+  font-size:12.5px;font-weight:650;padding:4px 8px;border-radius:8px;
+}
+.ch-rec-x:hover{ background:rgba(160,62,54,.1); }
+
+/* emoji picker */
+/* Portalled through <Popover> like every other floating surface — in-flow it
+   was the last one still clipped by the shell's overflow:hidden on short
+   viewports (the composer is pinned to the bottom of a fixed-height box and
+   the picker opens ~250px upward). Placement is JS's; only the skin is here. */
+.ch-emoji{
+  width:288px;padding:8px;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow-lg);
+  animation:chPop .16s cubic-bezier(.22,.8,.24,1);
+}
+.ch-emoji-grid{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:2px;
+  max-height:210px;overflow-y:auto;
+}
+.ch-emoji-b{
+  aspect-ratio:1;border:0;border-radius:8px;background:transparent;
+  font-size:19px;line-height:1;cursor:pointer;
+  transition:background .12s,transform .12s;
+}
+.ch-emoji-b:hover{ background:var(--card-2);transform:scale(1.16); }
+.ch-emoji-label{
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted);padding:4px 4px 6px;
+}
+
+/* read-only notice (restricted member / left group) */
+.ch-locked{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:9px;justify-content:center;
+  padding:16px;border-top:1px solid var(--line);
+  background:var(--card-2);
+  font-size:13px;color:var(--muted);
+}
+.ch-locked .ico{ width:16px;height:16px; }
+
+/* =========================================================
+   7 · Info panel
+   ========================================================= */
+
+.chat-info{
+  display:flex;flex-direction:column;
+  min-height:0;
+  background:var(--card);
+  border-inline-start:1px solid var(--line);
+}
+.ci-head{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--line-soft);
+}
+.ci-head h2{ flex:1;margin:0;font-size:15px;font-weight:700;color:var(--ink); }
+.ci-body{ flex:1;min-height:0;overflow-y:auto;padding:18px 16px 32px; }
+
+.ci-hero{ text-align:center;padding-bottom:18px;border-bottom:1px solid var(--line-soft);margin-bottom:16px; }
+.ci-hero-av{ display:inline-flex;position:relative;margin-bottom:10px; }
+.ci-medallion{
+  width:84px;height:84px;border-radius:24px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--gold-wash);color:var(--gold-deep);
+  border:1px solid var(--brass-soft);overflow:hidden;
+}
+.ci-medallion .ico{ width:34px;height:34px; }
+.ci-medallion img{ width:100%;height:100%;object-fit:cover;display:block; }
+.ci-hero-name{
+  font-family:var(--serif);font-size:19px;font-weight:700;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.ci-hero-sub{ font-size:12.5px;color:var(--muted);margin-top:3px; }
+.ci-hero-actions{ display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap; }
+
+.ci-section{ margin-bottom:20px; }
+.ci-label{
+  font-size:10.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;
+  display:flex;align-items:center;gap:6px;
+}
+.ci-label .ci-label-n{ color:var(--ink-soft); }
+
+/* settings toggle rows */
+.ci-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:10px;
+  transition:background .14s;
+}
+.ci-row + .ci-row{ margin-top:2px; }
+.ci-row.click{ cursor:pointer;width:100%;border:0;background:transparent;font:inherit;text-align:start;color:inherit; }
+.ci-row.click:hover{ background:var(--card-2); }
+.ci-row .ico{ width:17px;height:17px;color:var(--muted);flex:0 0 auto; }
+.ci-row-body{ flex:1;min-width:0; }
+.ci-row-title{ font-size:13.5px;font-weight:600;color:var(--ink); }
+.ci-row-sub{ font-size:11.5px;color:var(--muted);margin-top:1px; }
+.ci-row.danger .ci-row-title,.ci-row.danger .ico{ color:var(--danger); }
+.ci-row.danger:hover{ background:#faeeec; }
+
+/* switch */
+.ci-switch{
+  width:38px;height:22px;border-radius:999px;flex:0 0 auto;
+  border:0;cursor:pointer;padding:0;position:relative;
+  background:var(--line);transition:background .18s;
+}
+.ci-switch::after{
+  content:"";position:absolute;inset-block-start:3px;inset-inline-start:3px;
+  width:16px;height:16px;border-radius:50%;background:var(--card);
+  box-shadow:var(--shadow-sm);
+  transition:transform .18s cubic-bezier(.22,.8,.24,1);
+}
+.ci-switch.on{ background:var(--navy); }
+.ci-switch.on::after{ transform:translateX(16px); }
+[dir="rtl"] .ci-switch.on::after{ transform:translateX(-16px); }
+
+/* select */
+.ci-select{
+  padding:5px 9px;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);font:inherit;font-size:12.5px;color:var(--ink);
+  cursor:pointer;flex:0 0 auto;
+}
+.ci-select:focus{ outline:0;border-color:var(--blue); }
+
+/* member rows */
+.ci-member{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 8px;border-radius:10px;
+  transition:background .14s;
+}
+.ci-member:hover{ background:var(--card-2); }
+.ci-member-body{ flex:1;min-width:0; }
+.ci-member-name{
+  font-size:13.5px;font-weight:600;color:var(--ink);
+  display:flex;align-items:center;gap:5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ci-member-sub{ font-size:11.5px;color:var(--muted); }
+.ci-tag{
+  padding:1px 7px;border-radius:999px;
+  font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;
+  flex:0 0 auto;
+}
+.ci-tag.owner{ background:var(--gold-wash);color:var(--gold-deep);border:1px solid var(--brass-soft); }
+.ci-tag.admin{ background:var(--blue-wash);color:var(--navy);border:1px solid #c3d3e4; }
+.ci-tag.restricted{ background:#faeeec;color:var(--danger);border:1px solid #e8cfcb; }
+
+/* invite link block */
+.ci-invite{
+  padding:11px;border-radius:11px;
+  background:var(--card-2);border:1px solid var(--line);
+}
+.ci-invite-token{
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);
+  word-break:break-all;line-height:1.5;
+  padding:7px 9px;border-radius:8px;background:var(--card);
+  border:1px solid var(--line-soft);margin-bottom:8px;
+}
+.ci-invite-actions{ display:flex;gap:6px;flex-wrap:wrap; }
+
+/* media/pin strips inside the panel */
+.ci-grid{ display:grid;grid-template-columns:repeat(3,1fr);gap:4px; }
+.ci-grid-item{
+  aspect-ratio:1;border-radius:8px;overflow:hidden;border:0;padding:0;
+  background:var(--card-2);cursor:pointer;line-height:0;
+}
+.ci-grid-item img,.ci-grid-item video{ width:100%;height:100%;object-fit:cover;display:block; }
+
+.ci-pin{
+  display:block;width:100%;text-align:start;
+  padding:9px 11px;border-radius:10px;
+  border:1px solid var(--line);background:var(--card);
+  cursor:pointer;font:inherit;color:inherit;margin-bottom:6px;
+  transition:border-color .14s;
+}
+.ci-pin:hover{ border-color:var(--blue); }
+.ci-pin-who{ font-size:11.5px;font-weight:650;color:var(--navy);margin-bottom:2px; }
+.ci-pin-txt{
+  font-size:12.5px;color:var(--ink-soft);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* =========================================================
+   8 · Empty / placeholder states
+   ========================================================= */
+
+/* skeleton rows while the inbox loads */
+.cv-skel{ display:flex;align-items:center;gap:11px;padding:10px; }
+.cv-skel-av{ width:44px;height:44px;border-radius:50%;flex:0 0 auto; }
+.cv-skel-l{ flex:1;display:flex;flex-direction:column;gap:6px; }
+.cv-skel-b{ height:11px;border-radius:6px; }
+.cv-skel-b.w1{ width:52%; }
+.cv-skel-b.w2{ width:78%; }
+.cv-skel-av,.cv-skel-b{
+  background:linear-gradient(90deg,var(--card-2) 25%,var(--line-soft) 50%,var(--card-2) 75%);
+  background-size:220% 100%;
+  animation:chShimmer 1.35s infinite;
+}
+@keyframes chShimmer{ from{ background-position:180% 0 } to{ background-position:-40% 0 } }
+@media(prefers-reduced-motion:reduce){ .cv-skel-av,.cv-skel-b{ animation:none } }
+
+/* =========================================================
+   9 · New-chat modal + the forward picker
+   ========================================================= */
+
+.ch-modal-overlay,
+.ch-fwd-overlay{
+  position:fixed;inset:0;z-index:130;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:48px 16px;overflow:auto;
+  background:rgba(34,30,23,.5);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  animation:chFade .2s ease-out;
+}
+
+.ch-modal,
+.ch-fwd{
+  width:100%;max-width:520px;
+  display:flex;flex-direction:column;
+  max-height:calc(100dvh - 96px);overflow:hidden;
+  background:var(--card);
+  border-radius:var(--r-xl);
+  box-shadow:var(--shadow-lg);
+  animation:chPopIn .24s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes chPopIn{ from{ transform:translateY(16px) scale(.98);opacity:0 } to{ transform:none;opacity:1 } }
+@media(prefers-reduced-motion:reduce){ .ch-modal,.ch-fwd{ animation:none } }
+
+.ch-modal-head,
+.ch-fwd-head{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:10px;
+  padding:16px 18px;border-bottom:1px solid var(--line);
+}
+.ch-modal-head h3,
+.ch-fwd-head h3{
+  flex:1;margin:0;
+  font-family:var(--serif);font-size:18px;font-weight:600;color:var(--navy-deep);
+}
+.ch-modal-head h3 em{ font-style:italic;color:var(--gold-deep); }
+
+.ch-modal-tabs{ margin:14px 18px 0;gap:6px;border-bottom:0; }
+.ch-modal-body{ flex:1;min-height:0;overflow-y:auto;padding:14px 18px 18px; }
+.ch-modal-body .field-label{ margin-top:2px; }
+.ch-modal-body .ch-search-field{ margin:12px 0 0; }
+
+.ch-modal-foot{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:12px;
+  padding:14px 18px 18px;border-top:1px solid var(--line-soft);
+}
+.ch-modal-count{ flex:1;min-width:0;font-size:12.5px;color:var(--muted); }
+
+/* selected-people chips */
+.ch-chips{ display:flex;flex-wrap:wrap;gap:6px;margin-top:10px; }
+.ch-chips .chip{ display:inline-flex;align-items:center;gap:5px;padding-inline-end:5px; }
+.ch-chip-x{
+  border:0;background:transparent;cursor:pointer;color:inherit;
+  display:inline-flex;padding:2px;border-radius:50%;opacity:.75;
+}
+.ch-chip-x:hover{ opacity:1;background:rgba(255,255,255,.22); }
+
+/* a person row in the picker */
+.ch-ulist{ margin-top:10px;max-height:340px;overflow-y:auto; }
+.ch-urow{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 10px;border:0;border-radius:11px;
+  background:transparent;cursor:pointer;text-align:start;font:inherit;color:inherit;
+  transition:background .14s;
+}
+.ch-urow:hover{ background:var(--card-2); }
+.ch-urow.on{ background:var(--blue-wash); }
+.ch-urow .ico{ color:var(--navy);flex:0 0 auto; }
+.ch-urow-main{ flex:1;min-width:0;display:flex;flex-direction:column;gap:1px; }
+.ch-urow-nm{
+  display:flex;align-items:center;gap:5px;
+  font-size:14px;font-weight:600;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-urow-main small{ font-size:12px;color:var(--muted); }
+
+/* forward picker */
+.ch-fwd{ max-width:440px; }
+.ch-fwd-snip{
+  margin:12px 18px 0;padding:9px 11px;
+  border-radius:10px;border-inline-start:3px solid var(--gold);
+  background:var(--card-2);
+  font-size:12.5px;color:var(--ink-soft);line-height:1.5;
+}
+.ch-fwd-q{ margin:12px 18px 0;width:calc(100% - 36px); }
+.ch-fwd-list{ flex:1;min-height:0;overflow-y:auto;padding:10px 12px 18px; }
+.ch-fwd-row{
+  display:flex;align-items:center;gap:9px;width:100%;
+  padding:11px 12px;border:0;border-radius:11px;
+  background:transparent;cursor:pointer;text-align:start;font:inherit;color:inherit;
+  transition:background .14s;
+}
+.ch-fwd-row:hover{ background:var(--card-2); }
+.ch-fwd-nm{
+  flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-fwd-empty{ padding:22px 14px;text-align:center;font-size:13px;color:var(--muted); }
+
+/* =========================================================
+   10 · Responsive — one pane at a time below 900px
+   ========================================================= */
+
+/* One pane at a time: the list, or the thread. The root carries
+   `ch-thread-open` whenever a conversation id is routed, so the switch is a
+   pure CSS consequence of the URL — nothing unmounts, nothing re-fetches. */
+@media(max-width:900px){
+  .main.ch-main,
+  .main.ch-main.ch-info-open{ grid-template-columns:minmax(0,1fr); }
+
+  .ch-pane-list{ border-inline-end:0; }
+  .main.ch-main.ch-thread-open .ch-pane-list{ display:none; }
+  .main.ch-main:not(.ch-thread-open) .ch-pane-thread{ display:none; }
+
+  /* the info panel and the search panel become full sheets */
+  .chat-info{
+    position:absolute;inset:0;z-index:90;
+    border-inline-start:0;
+  }
+  .ch-search{ width:100%;border-inline-start:0; }
+
+  .ch-hd-back{ display:inline-flex; }
+  .ch-stack{ max-width:min(82%,520px); }
+}
+
+@media(max-width:720px){
+  /* phone topbar = 56px + notch (styles-responsive.css §3) */
+  .main.ch-main{ --ch-top:calc(56px + var(--safe-t,0px)); }
+
+  /* In LIST view the fixed .botnav (z 60) sits over the bottom of the rail,
+     so the last conversation row was unreachable. Reserve its height —
+     9px+10px padding + ~34px content + safe area — instead of letting the
+     nav crop the list. In THREAD view the nav is hidden, so no reservation. */
+  .main.ch-main:not(.ch-thread-open) .chat-list{
+    padding-bottom:calc(72px + var(--safe-b,0px));
+  }
+
+  .ch-list-head{ padding:12px 12px 9px; }
+  .ch-list-title h1{ font-size:21px; }
+  .ch-scroll{ padding:12px 12px 8px; }
+  .ch-composer{ padding:8px 10px calc(10px + env(safe-area-inset-bottom)); }
+  .ch-hd{ padding:8px 10px;min-height:58px; }
+  .ch-stack{ max-width:86%; }
+  .ch-bubble{ font-size:15px; }
+  /* Touch has no hover, so the rail is normally out of the way and the
+     long-press sheet takes over. It must NOT be display:none, though: that
+     also removes it from the tab order, leaving reply/react/forward/delete
+     unreachable for anyone on a keyboard at this width. Hidden but focusable. */
+  .ch-tools{ opacity:0;pointer-events:none; }
+  .ch-tools:focus-within,.ch-tools.open{ opacity:1;pointer-events:auto; }
+  .ci-body{ padding:16px 14px 40px; }
+
+  /* The fixed bottom nav would sit on top of the composer, so inside a thread
+     the composer owns the bottom edge instead; the list view keeps its nav.
+     The botnav lives outside <main>, so no combinator rooted at .ch-main can
+     reach it — hence :has(), PLUS a body class ChatPage sets as the fallback
+     for engines without :has(). Split into two rules on purpose: an
+     unsupported :has() invalidates its whole selector list, which would take
+     the fallback down with it if they shared one. */
+  body:has(.main.ch-main.ch-thread-open) .botnav{ display:none; }
+  body.chat-thread-open .botnav{ display:none; }
+
+  .ch-modal-overlay,.ch-fwd-overlay{ padding:0;align-items:flex-end; }
+  .ch-modal,.ch-fwd{
+    max-width:none;border-radius:20px 20px 0 0;
+    max-height:calc(100dvh - 40px);
+    padding-bottom:env(safe-area-inset-bottom);
+    animation:chSheetUp .24s cubic-bezier(.22,.8,.24,1);
+  }
+}
+
+@media(max-width:460px){
+  .ch-stack{ max-width:90%; }
+  .ch-row-av{ width:26px; }
+  .ch-emoji{ width:min(288px,calc(100vw - 32px)); }
+}
+
+/* touch: keep the row menu button visible (no hover to reveal it) */
+@media(hover:none){
+  .cv-menu-btn{ display:inline-flex;background:transparent;border-color:transparent; }
+  .ch-react:active{ transform:none; }
+}
+
+/* =========================================================
+   10.4 · Topbar unread bubble
+   ---------------------------------------------------------
+   `.count` had NO styles anywhere in the codebase, so the chat
+   button rendered its unread number as bare text that fell
+   BELOW the icon. It gets the same corner treatment as the
+   bell's `.dot`, but as a real counted bubble.
+   ========================================================= */
+.icon-btn{ position:relative; }        /* the badge's containing block */
+.icon-btn .count{
+  position:absolute;
+  inset-block-start:1px;
+  inset-inline-end:1px;
+  min-width:17px;height:17px;
+  padding:0 4px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:999px;
+  background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
+  border:2px solid var(--card);
+  color:#fff;
+  font-family:var(--sans);
+  font-size:10px;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:0;
+  box-shadow:0 2px 6px -2px rgba(34,30,23,.4);
+  pointer-events:none;
+  /* keyed on the count in Layout — every change remounts + replays the pop */
+  animation:chBadgeIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+/* 99+ needs to breathe; a single digit stays a perfect circle */
+.icon-btn .count.wide{ inset-inline-end:-3px; }
+
+/* reduced-motion pairs for the receipt/badge/live-label animations above —
+   every keyframe added by the seen/typing/badge work is stilled here */
+@media(prefers-reduced-motion:reduce){
+  .cv-badge,.cv-unread-dot,.icon-btn .count{ animation:none }
+  .ch-ell{ animation:none;width:1.1em }
+  .cv-preview .cv-typing-ico,.ch-hd-sub .ch-hd-sub-ico{ animation:none;opacity:1 }
+  .ch-tick .ch-tick-2,.ch-tick.seen{ animation:none }
+}
+
+@media(max-width:720px){
+  .icon-btn .count{
+    min-width:16px;height:16px;font-size:9.5px;
+    border-width:1.5px;
+  }
+}
+
+/* Visually-hidden but announced. The codebase had no such utility, and chat
+   needs one for the live region and the typing announcement. */
+.sr-only{
+  position:absolute;width:1px;height:1px;
+  padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);
+  white-space:nowrap;border:0;
+}
+
+/* =========================================================
+   10.5 · Motion & focus polish
+   ---------------------------------------------------------
+   The brief was "smooth, never janky". Three rules do most of
+   the work: incoming bubbles rise instead of popping, every
+   interactive surface shares one easing curve, and every focus
+   ring is visible without being loud. All of it stands down
+   under prefers-reduced-motion.
+   ========================================================= */
+
+/* A newly arrived bubble eases in. `will-change` is deliberately absent —
+   promoting every bubble to its own layer costs more than the animation. */
+@keyframes chRise{
+  from{ opacity:0;transform:translateY(6px) scale(.985) }
+  to{ opacity:1;transform:none }
+}
+.ch-row{ animation:chRise .19s cubic-bezier(.22,.8,.24,1); }
+/* Rows rendered by a history page must NOT animate — a 50-bubble cascade on
+   every "load earlier" is exactly the jank we're avoiding. The list marks
+   only the live tail. */
+.ch-scroll.no-anim .ch-row{ animation:none; }
+
+/* one shared curve for the interactive surfaces */
+.cv-row,.ch-bubble,.ch-react,.ch-tool,.ch-cbtn,.ch-send,
+.rq-btn,.ci-row.click,.ch-urow,.ch-fwd-row,.ch-hitrow{
+  transition:
+    background-color .15s cubic-bezier(.22,.8,.24,1),
+    border-color .15s cubic-bezier(.22,.8,.24,1),
+    color .15s cubic-bezier(.22,.8,.24,1),
+    transform .12s cubic-bezier(.22,.8,.24,1),
+    box-shadow .15s cubic-bezier(.22,.8,.24,1);
+}
+
+/* visible, consistent focus rings (keyboard only) */
+.cv-row:focus-visible,.ch-react:focus-visible,.ch-tool:focus-visible,
+.ch-cbtn:focus-visible,.ch-send:focus-visible,.ch-urow:focus-visible,
+.ch-hitrow:focus-visible,.ch-fwd-row:focus-visible,.ci-row.click:focus-visible,
+.rq-btn:focus-visible,.ch-quote:focus-visible,.ch-pinbar:focus-visible,
+.chat-list .cv-row:focus-visible{
+  outline:2px solid var(--blue);
+  outline-offset:2px;
+  border-radius:10px;
+}
+.ch-input:focus-visible{ outline:none; }
+
+/* the composer grows without a step-jump */
+.ch-input{ transition:height .1s ease-out; }
+
+/* NOTE: `content-visibility:auto` on .ch-row was tried and removed on purpose.
+   It makes off-screen row heights ESTIMATES, and the prepend-anchoring in
+   MessageList restores scroll position from measured scrollHeight — the two
+   together made "load earlier" jump. Paint cost here is not the bottleneck. */
+
+@media(prefers-reduced-motion:reduce){
+  .ch-row{ animation:none; }
+  .cv-row,.ch-bubble,.ch-react,.ch-tool,.ch-cbtn,.ch-send,
+  .rq-btn,.ci-row.click,.ch-urow,.ch-fwd-row,.ch-hitrow,.ch-input{ transition:none; }
+}
+
+/* =========================================================
+   11 · RTL guards
+   ========================================================= */
+
+[dir="rtl"] .ch-meta{ margin:6px 10px -2px 0; }
+[dir="rtl"] .ch-sender{ margin:0 10px 3px 0; }
+[dir="rtl"] .ch-send .ico{ transform:scaleX(-1); }
+[dir="rtl"] .ch-hd-back .ico{ transform:scaleX(-1); }
+[dir="rtl"] .ch-fwdmark .ico{ transform:scaleX(-1); }
+
+/* =========================================================
+   12 · Dark-ish media viewer (shared lightbox for chat assets)
+   ---------------------------------------------------------
+   THE STACKING LADDER chat participates in (app-wide values in
+   styles.css / styles-richtext.css):
+
+     14   .ch-jump                floating pill inside the thread
+     60   .botnav
+     100  .ch-pop  (ALL menus — portalled to <body>)
+     70   .ch-emoji
+     80   .ch-search              slide-over
+     90   .chat-info              (mobile sheet only)
+     120  .overlay                app modal base
+     130  .ch-modal-overlay/.ch-fwd-overlay
+     140  .ch-sheet-scrim         long-press sheet
+     150  .ch-lightbox            media viewer
+     200  .dlg-overlay · .toast   ALWAYS the top of the app
+
+   Nothing in chat may exceed 199, or a confirm dialog / toast
+   raised from a chat surface would be buried behind it.
+   ========================================================= */
+
+.ch-lightbox{
+  position:fixed;inset:0;z-index:150;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(18,16,13,.92);
+  padding:24px;
+  animation:chFade .16s ease-out;
+}
+@keyframes chFade{ from{ opacity:0 } to{ opacity:1 } }
+.ch-lightbox img,.ch-lightbox video{
+  max-width:100%;max-height:100%;
+  border-radius:10px;box-shadow:0 30px 80px -20px rgba(0,0,0,.7);
+}
+.ch-lightbox-x{
+  position:absolute;inset-block-start:18px;inset-inline-end:18px;
+  width:40px;height:40px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;cursor:pointer;
+  background:rgba(255,253,248,.14);color:#f7f3ea;
+  backdrop-filter:blur(6px);
+}
+.ch-lightbox-x:hover{ background:rgba(255,253,248,.24); }
+.ch-lightbox-dl{
+  position:absolute;inset-block-start:18px;inset-inline-start:18px;
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 14px;border-radius:999px;
+  border:0;cursor:pointer;text-decoration:none;
+  background:rgba(255,253,248,.14);color:#f7f3ea;
+  font-size:13px;font-weight:600;
+  backdrop-filter:blur(6px);
+}
+.ch-lightbox-dl:hover{ background:rgba(255,253,248,.24); }
+
+/* album paging */
+.ch-lightbox-nav{
+  position:absolute;inset-block-start:50%;transform:translateY(-50%);
+  width:44px;height:44px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;cursor:pointer;
+  background:rgba(255,253,248,.14);color:#f7f3ea;
+  backdrop-filter:blur(6px);
+}
+.ch-lightbox-nav:hover{ background:rgba(255,253,248,.26); }
+.ch-lightbox-nav.prev{ inset-inline-start:16px; }
+.ch-lightbox-nav.next{ inset-inline-end:16px; }
+.ch-lightbox-n{
+  position:absolute;inset-block-end:20px;inset-inline:0;
+  text-align:center;font-size:12.5px;font-weight:600;
+  color:rgba(247,243,234,.78);
+  font-variant-numeric:tabular-nums;
+}
+@media(max-width:600px){
+  .ch-lightbox{ padding:12px; }
+  .ch-lightbox-nav{ width:38px;height:38px; }
+  .ch-lightbox-dl span{ display:none; }
+}

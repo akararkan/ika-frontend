@@ -17,22 +17,22 @@ import { Icon } from './ui.jsx'
 /* ---------- Editor preset palette ---------- */
 
 const BACKGROUNDS = [
-  { id:'g1', label:'Rubric',   bg:'linear-gradient(160deg,#8f1f18,#b3271e)' },
-  { id:'g2', label:'Ink',      bg:'linear-gradient(160deg,#2a251d,#100e0b)' },
-  { id:'g3', label:'Midnight', bg:'linear-gradient(160deg,#232b42,#100e0b)' },
-  { id:'g4', label:'Lapis',    bg:'linear-gradient(160deg,#1f3a6e,#16264a)' },
-  { id:'g5', label:'Walnut',   bg:'linear-gradient(160deg,#6e4a2f,#3a2415)' },
-  { id:'g6', label:'Paper',    bg:'linear-gradient(160deg,#ffffff,#d8d4cb)' },
+  { id:'g1', label:'Navy',   bg:'linear-gradient(160deg,#16283f,#2d5f97)' },
+  { id:'g2', label:'Gold',   bg:'linear-gradient(160deg,#5c422a,#b3873e)' },
+  { id:'g3', label:'Sage',   bg:'linear-gradient(160deg,#3a5244,#5b7a67)' },
+  { id:'g4', label:'Rose',   bg:'linear-gradient(160deg,#5c2f3a,#8a4a5b)' },
+  { id:'g5', label:'Violet', bg:'linear-gradient(160deg,#463a5c,#6b5b8a)' },
+  { id:'g6', label:'Paper',  bg:'linear-gradient(160deg,#fffdf8,#e6dfcf)' },
 ]
 
 const FONTS = [
-  { id:'serif',   label:'Serif',  family:'"Newsreader", "Scheherazade New", Georgia, serif' },
-  { id:'sans',    label:'Sans',   family:'"Archivo", system-ui, sans-serif' },
+  { id:'serif',   label:'Serif',  family:'"Lora", "Amiri", Georgia, serif' },
+  { id:'sans',    label:'Sans',   family:'"IBM Plex Sans", system-ui, sans-serif' },
   { id:'mono',    label:'Mono',   family:'"IBM Plex Mono", ui-monospace, monospace' },
-  { id:'display', label:'Display',family:'"Newsreader", "Scheherazade New", Georgia, serif', italic:true, weight:500 },
+  { id:'display', label:'Display',family:'"Amiri", "Lora", Georgia, serif', italic:true, weight:500 },
 ]
 
-const COLORS = ['#ffffff', '#1b1813', '#b3271e', '#c9382f', '#c2453f', '#1f3a6e', '#e9c4bf', '#8f1f18']
+const COLORS = ['#ffffff', '#221e17', '#d9b96c', '#b3873e', '#2d5f97', '#1d3a5f', '#e5d3ac', '#b3453e']
 
 /* Story canvas is 1080×1920 (Instagram-equivalent 9:16). The on-screen
    preview is scaled to fit the modal viewport; all positions are stored
@@ -100,7 +100,7 @@ function TextLayer({ layer, selected, onSelect, onChange, onDelete }) {
     touchAction:'none',
     userSelect: 'none',
     textShadow: layer.bgOn ? 'none' : '0 2px 8px rgba(0,0,0,.45)',
-    outline:    selected ? '2px dashed rgba(179,39,30,.85)' : 'none',
+    outline:    selected ? '2px dashed rgba(29,58,95,.85)' : 'none',
     outlineOffset: 4,
   }
   return (
@@ -121,7 +121,7 @@ function TextLayer({ layer, selected, onSelect, onChange, onDelete }) {
           onClick={(e) => { e.stopPropagation(); onDelete(layer.id) }}
           style={{
             position:'absolute', top:-12, right:-12, width:26, height:26,
-            borderRadius:'50%', background:'#1b1813', color:'#fff', border:'2px solid #fff',
+            borderRadius:'50%', background:'#221e17', color:'#fff', border:'2px solid #fff',
             display:'grid', placeItems:'center', boxShadow:'0 2px 6px rgba(0,0,0,.3)',
             zIndex:5,
           }}
@@ -254,7 +254,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
     const onPaper = bgPreset?.id === 'g6'
     setLayers(prev => [...prev, {
       id, text:'۞', x:50, y:50, rotation:0, scale:1,
-      font:'serif', size:96, color: onPaper ? '#b3271e' : '#ffffff',
+      font:'serif', size:96, color: onPaper ? '#1d3a5f' : '#ffffff',
       align:'center', bold:false, italic:false, bgOn:false, bgColor:'rgba(27,24,19,.5)',
     }])
     setSelectedId(id)
@@ -302,7 +302,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
       // Parse the preset gradient and reapply on canvas (canvas can't render
       // CSS gradients directly). We use two-stop linear gradient extracted
       // from the preset background string.
-      const colors = (bgPreset.bg.match(/#[0-9a-f]{6}/gi) || ['#8f1f18','#b3271e'])
+      const colors = (bgPreset.bg.match(/#[0-9a-f]{6}/gi) || ['#16283f','#2d5f97'])
       // Reproduce CSS `linear-gradient(<deg>, …)` exactly: 0deg points up,
       // clockwise; the gradient line spans the box projection at that angle.
       const deg = +(bgPreset.bg.match(/linear-gradient\((\d+)deg/) || [0, 160])[1]
@@ -518,7 +518,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
             <div className="se-colors">
               {COLORS.map(c => (
                 <button key={c} className={'se-color ' + (selected.color === c ? 'on' : '')}
-                  style={{ background: c, borderColor: c === '#ffffff' ? '#d8d4cb' : 'transparent' }}
+                  style={{ background: c, borderColor: c === '#ffffff' ? '#d8cfba' : 'transparent' }}
                   onClick={() => patchSelected({ color: c })}/>
               ))}
             </div>

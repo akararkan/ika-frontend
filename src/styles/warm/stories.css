@@ -1,0 +1,175 @@
+/* IKA "Warm Archive" — stories (replaces tadhhib/stories.css; old coverage
+   lived in tadhhib/reels.css §7–8 + the .is-story parts of §1–6).
+   Area: StoryViewer.jsx + HighlightViewer.jsx (.reels-view.is-story chrome,
+   .sv-poll* ballot) and StoryEditor.jsx (.story-editor / .se-*).
+   Story chrome is scoped under .reels-view.is-story so warm/reels.css
+   (loaded after this file) keeps sole ownership of the reels look.
+   Per base contract, styles-responsive.css owns safe-area positions on
+   .rv-top/.rv-progress/.rv-meta/.sv-poll-wrap — nothing here moves them. */
+
+/* =============== 1 · Story / highlight viewer — the warm dark room ========== */
+/* Prototype .story-overlay backdrop */
+.reels-view.is-story{background:rgba(12,10,7,.92)}
+
+/* head: avatar + name in white over a soft warm scrim */
+.reels-view.is-story .rv-top{background:linear-gradient(180deg,rgba(10,8,5,.62),transparent)}
+.reels-view.is-story .rvm-time{font-variant-numeric:tabular-nums}
+
+/* close = outlined circle (prototype .story-nav treatment) */
+.reels-view.is-story .rv-close{
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.25);
+  color:#e5ddc9;
+}
+.reels-view.is-story .rv-close:hover{background:rgba(255,255,255,.14)}
+
+/* progress bars — white on rgba(255,255,255,.3), per prototype .story-bars */
+.reels-view.is-story .rv-progress i{height:3px;border-radius:2px;background:rgba(255,255,255,.3)}
+.reels-view.is-story .rv-progress i.done{background:rgba(255,255,255,.92)}
+.reels-view.is-story .rv-progress i.cur::after{background:#fff}
+
+/* foot gradient (prototype .story-foot) + cream foot ink */
+.reels-view.is-story .rv-bg::after{background:linear-gradient(180deg,transparent 55%,rgba(10,8,5,.78))}
+.reels-view.is-story .rv-meta{color:#f2ecdf}
+
+/* center text (prototype .story-center .big) — serif, big, soft shadow */
+.reels-view.is-story .rv-center{
+  color:#fff;font-family:var(--serif);font-size:26px;line-height:1.5;
+  text-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+
+/* reply pill / "Seen by" — white-on-translucent */
+.reels-view.is-story .rvm-sound{
+  background:rgba(255,255,255,.12);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+  color:#fff;
+  transition:background .15s ease;
+}
+.reels-view.is-story .rvm-sound:hover{background:rgba(255,255,255,.18)}
+
+/* Desktop only: prototype .story-stage — floating 9/16 leaf, radius 18, deep
+   shadow. ≤720px styles-responsive.css owns the full-bleed stage and turns
+   .rv-nav into invisible tap zones, so all of this stays behind a guard
+   (same breakpoint the base uses). */
+@media(min-width:721px){
+  .reels-view.is-story .rv-card{
+    height:min(86vh,700px);
+    max-height:min(86vh,700px);
+    width:auto;
+    aspect-ratio:9/16;
+    border-radius:18px;
+    box-shadow:0 30px 80px rgba(0,0,0,.6);
+  }
+  /* nav circles — outlined (prototype .story-nav) */
+  .reels-view.is-story .rv-nav button{
+    width:46px;height:46px;
+    background:transparent;
+    border:1px solid rgba(255,255,255,.25);
+    color:#e5ddc9;
+    transition:background .15s ease,border-color .15s ease;
+  }
+  .reels-view.is-story .rv-nav button:hover:not(:disabled){background:rgba(255,255,255,.12)}
+}
+
+/* =============== 2 · Story poll (viewer) — white-on-translucent ballot ====== */
+.sv-poll{
+  background:rgba(12,10,7,.58);
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:18px;
+  box-shadow:0 16px 44px rgba(0,0,0,.4);
+}
+.sv-poll-head{color:rgba(242,236,223,.85)}
+.sv-poll-opt{
+  background:rgba(255,255,255,.16);
+  transition:border-color .15s ease,background .15s ease;
+}
+.sv-poll-opt:not(:disabled):hover{background:rgba(255,255,255,.24)}
+.sv-poll-opt.mine{border-color:#fffdf8}
+.sv-poll-fill{background:rgba(255,255,255,.25)}
+/* winning side fills gold — the archive's accent for "accepted" */
+.sv-poll-opt.win .sv-poll-fill{background:linear-gradient(90deg,rgba(179,135,62,.6),rgba(179,135,62,.35))}
+.sv-poll-foot{color:rgba(255,255,255,.85);transition:color .15s ease}
+.sv-poll-foot:not(.static):hover{color:#fff}
+
+/* =============== 3 · Story editor — the atelier, re-skinned warm =========== */
+.story-editor{background:#141210}
+
+/* top bar: warm scrim, no gilded hairline */
+.se-bar{background:linear-gradient(180deg,rgba(10,8,5,.6),transparent)}
+.se-kicker{color:rgba(242,236,223,.55)}
+/* Arabic masthead — Amiri, quiet gold (kills base 'Scheherazade New' ref) */
+.se-bar-title b{font-family:var(--arabic);color:#d9b96c}
+
+/* buttons: rgba(255,255,255,.08), radius 12 */
+.se-bar-btn{
+  background:rgba(255,255,255,.08);
+  border-radius:12px;
+  transition:background .15s ease,transform .12s ease;
+}
+.se-bar-btn:hover{background:rgba(255,255,255,.16)}
+.se-bar-btn.ghost{background:transparent}
+.se-bar-btn.ghost:hover{background:rgba(255,255,255,.1)}
+.se-bar-btn.on{background:rgba(255,255,255,.2);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+/* share/Next pill — cream leaf, navy ink */
+.se-bar-btn.primary{
+  background:var(--card);
+  color:var(--navy);
+  box-shadow:0 8px 18px -7px rgba(0,0,0,.5);
+}
+.se-bar-btn.primary:hover{background:var(--card-2)}
+
+/* stage: prototype story-stage shadow + radius 18 */
+.se-stage{
+  border-radius:18px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.07);
+}
+/* selected text layer drag outline — StoryEditor.jsx paints it via an inline
+   style ('2px dashed rgba(179,39,30,.85)', old rubric red), which plain CSS
+   cannot beat; !important is genuinely required here (SPEC rule 6). Scope is
+   safe: text layers are the only class-less divs inside .se-stage (guides and
+   the poll sticker carry classes, bg media are img/video), and unselected
+   layers have inline outline:none, so outline-color stays inert on them.
+   Cream matches the .se-poll-sticker.on outline. */
+.se-stage > div:not([class]){outline-color:rgba(255,253,248,.85)!important}
+
+/* tools panel + controls: white-translucent tiles, radius 12, cream actives */
+.se-tools{background:linear-gradient(180deg,transparent,rgba(10,8,5,.62) 30%)}
+.se-fonts{background:rgba(255,255,255,.08);border-radius:12px}
+.se-font.on{background:var(--card);color:var(--navy)}
+.se-font.on i{color:rgba(29,58,95,.6)}
+.se-chip{background:rgba(255,255,255,.08);border-radius:12px;transition:background .14s ease,color .14s ease}
+.se-chip:hover{background:rgba(255,255,255,.16)}
+.se-chip.on{background:var(--card);color:var(--navy)}
+.se-color.on{outline-color:#fffdf8}
+.se-slider{background:rgba(255,255,255,.08);border-radius:12px}
+.se-slider input[type=range]{accent-color:#fffdf8}
+.se-bg-tile.on .se-bg-chip{border-color:#fffdf8}
+
+/* inline text-edit overlay — warm ink glass */
+.se-edit{background:rgba(20,17,12,.85)}
+
+/* =============== 4 · Poll sticker (editor) — matches the viewer ballot ===== */
+.se-poll-sticker{
+  background:rgba(12,10,7,.62);
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:18px;
+  box-shadow:0 16px 44px rgba(0,0,0,.4);
+}
+.se-poll-sticker.on{outline:2px dashed rgba(255,253,248,.85)}
+.se-poll-sticker-head{color:rgba(242,236,223,.85)}
+.se-poll-sticker-opts > span{
+  background:rgba(255,255,255,.16);
+  border-color:rgba(255,255,255,.18);
+}
+.se-poll-or{color:rgba(255,255,255,.65)}
+/* fabs: edit = navy seal · delete = warm ink */
+.se-poll-fab{border-color:#fffdf8}
+.se-poll-fab.edit{background:var(--navy)}
+.se-poll-fab.edit:hover{background:var(--navy-deep)}
+.se-poll-fab.del{background:#221e17}
+
+/* poll editor card — light modal, hairline + warm shadow */
+.se-poll-card{
+  border:1px solid var(--line);
+  box-shadow:var(--shadow-lg);
+}

@@ -1,0 +1,254 @@
+/* IKA "Warm Archive" — richtext (replaces tadhhib/richtext.css) */
+/* =============================================================
+   The .prose reading experience + the RichTextEditor chrome.
+   Loads after every base file (equal specificity wins by order)
+   and after warm/theme.css, so re-pointed legacy tokens
+   (--rubric/--emerald → navy, --brass → gold) already recolor
+   most base rules; this file overrides only what stays wrong
+   (raw red rgba() values, dark code slab…).
+   Everything stays scoped to .prose / .rte-* / .cm-* so it never
+   leaks into other areas' surfaces.
+   ============================================================= */
+
+/* ================================================================
+   1 · PROSE — body rhythm. Warm Archive reads in IBM Plex Sans at
+   15px/1.65 ink-2 (the prototype's post-body voice); headlines
+   stay Lora. Base set a serif 15.5/1.72 body.
+   ================================================================ */
+.prose{
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.65;
+  color:var(--ink-2);
+}
+
+/* Headings — serif navy (h5/h6 keep the base's muted small-caps kicker look) */
+.prose h1,.prose h2,.prose h3,.prose h4{
+  color:var(--navy);
+}
+.prose h2{border-bottom:1px solid var(--line)}
+
+/* Links — blue ink, quiet warm underline, navy on hover */
+.prose a{
+  color:var(--blue);
+  border-bottom:1px solid rgba(45,95,151,.3);
+}
+.prose a:hover{
+  color:var(--navy);
+  border-bottom-color:var(--navy);
+}
+
+/* ================================================================
+   2 · PROSE — blockquote. The ayah/quote treatment: card-2 plate,
+   3px gold spine (logical: flips for RTL), radius 10. An Arabic
+   quote block becomes the centred Amiri navy ayah.
+   ================================================================ */
+.prose blockquote{
+  padding:10px 16px;
+  border-inline-start:3px solid var(--gold);
+  border-radius:10px;
+  background:var(--card-2);
+  color:var(--ink-soft);
+}
+.prose blockquote:dir(rtl){
+  font-family:var(--arabic);
+  font-style:normal;
+  font-size:19px;
+  line-height:1.9;
+  color:var(--navy);
+  text-align:center;
+  padding:14px 18px;
+}
+
+/* ================================================================
+   3 · PROSE — code. The night slab becomes a warm card-2 plate:
+   mono on card-2, 1px line frame, radius 8.
+   ================================================================ */
+.prose code{
+  background:var(--card-2);
+  border-color:var(--line);
+}
+.prose pre{
+  background:var(--card-2);
+  color:var(--ink-2);
+  border:1px solid var(--line);
+  border-radius:8px;
+  box-shadow:none;
+}
+
+/* <hr> — a plain warm rule */
+.prose hr{
+  background:var(--line);
+}
+
+/* ================================================================
+   4 · PROSE — tables. Warm hairlines everywhere; zebra + hover in
+   paper tones (base zebra was a pink-red tint).
+   ================================================================ */
+.prose tbody tr:nth-child(2n) td{background:var(--paper-2)}
+.prose td{transition:background-color .14s ease}
+.prose tbody tr:hover td{background:var(--card-2)}
+
+/* ================================================================
+   5 · PROSE — images. Hairline warm frame + softer warm shadow;
+   the img-behind watermark mode stays frameless and inert.
+   ================================================================ */
+.prose img{
+  border:1px solid var(--line);
+  box-shadow:0 8px 24px -16px rgba(34,30,23,.3);
+}
+.prose img.img-behind{border:0;box-shadow:none}
+
+/* Scholarly details — citation marks read gold (spec: "[n] gold") */
+.prose sup a{
+  color:var(--gold-deep);
+  font-weight:600;
+  border-bottom:0;
+}
+.prose sup a:hover{color:var(--navy)}
+
+/* Mono span wash — base used a pink-red tint */
+.prose .ff-mono{background:rgba(230,223,207,.4)}
+
+/* NOTE: no .tc-* overrides here — the base .prose .tc-* rules
+   (styles-richtext.css) already carry the exact warm values that
+   match the editor's TEXT_COLORS swatches (WYSIWYG-correct). */
+
+/* ================================================================
+   7 · RTE — frame + head bar. Focus = the blue ring every warm
+   input speaks (base rang a red rgba glow).
+   ================================================================ */
+.rte:focus-within{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+}
+.rte-bar{background:var(--paper-2)}
+
+/* Format pills + Write/Preview tabs — filled navy pills when on
+   (Warm Archive never underlines tabs) on a warm segmented track */
+.rte-fmt{background:#f0ebdf;border-color:var(--line)}
+.rte-fmt-pill:hover{color:var(--navy)}
+.rte-fmt-pill.on{background:var(--navy);color:#f7f3ea}
+.rte-tabs{background:#f0ebdf;border-color:var(--line);border-radius:999px;padding:3px;gap:2px}
+.rte-tab{border-radius:999px}
+.rte-tab:hover{background:#efe9da;color:var(--navy)}
+.rte-tab.on{background:var(--navy);color:#f7f3ea}
+
+/* ================================================================
+   8 · RTE — toolbar. Paper-2 strip over its base 1px line-soft
+   bottom edge; 30px tools, radius 7, #efe9da hover, navy-on-wash
+   active state.
+   ================================================================ */
+.rte-tools{background:var(--paper-2)}
+.rte-tool{
+  min-width:30px;height:30px;
+  border-radius:7px;
+}
+.rte-tool:hover{background:#efe9da;color:var(--navy)}
+.rte-tool.on{
+  background:var(--blue-wash);
+  color:var(--navy);
+  box-shadow:inset 0 0 0 1px rgba(45,95,151,.25);
+}
+.rte-tool.on:hover{background:#dde7f1;color:var(--navy)}
+.rte-tool.on .rte-size-display{
+  background:#fff;
+  border-color:rgba(45,95,151,.4);
+  color:var(--navy);
+}
+.rte-tools select{background:var(--card);border-radius:7px}
+.rte-block-select:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+}
+
+/* ================================================================
+   9 · RTE — writing surfaces. Warm input paper (#fcfaf4), calm
+   sans placeholders, blue-wash selection (base selected in red).
+   ================================================================ */
+.rte-wysiwyg{background:#fcfaf4}
+.rte-area{
+  background:#fcfaf4;
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.65;
+}
+.rte-area::placeholder{color:#a39a85;font-style:normal}
+.rte-wysiwyg:empty::before,
+.rte-wysiwyg:has(> p:only-child:empty)::before{
+  color:#a39a85;font-style:normal;
+}
+.rte-wysiwyg ::selection{background:#dbe6f2}
+.rte-wysiwyg img:hover{outline-color:rgba(45,95,151,.55)}
+
+/* ================================================================
+   10 · RTE — popovers (size / family / colour / table). Base shell
+   is already card + radius 12 + shadow-lg; fix the red innards.
+   ================================================================ */
+.rte-size-input:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+}
+.rte-size-apply{
+  background:var(--navy);
+  box-shadow:0 4px 12px -4px rgba(29,58,95,.4);
+}
+.rte-size-apply:hover{background:var(--navy-deep)}
+.rte-size-row.on{
+  background:var(--blue-wash);
+  color:var(--navy);
+  box-shadow:inset 0 0 0 1px rgba(45,95,151,.28);
+}
+.rte-size-row.on .rte-size-num{color:var(--navy)}
+.rte-size-row.on .rte-size-hint{color:var(--blue)}
+
+/* Trigger glyph — the little A/H colour bar reads warm now */
+.rte-color-icon .bar{
+  background:linear-gradient(90deg,var(--navy),var(--gold),var(--blue));
+}
+
+/* ================================================================
+   11 · RTE — floating image toolbar. Active wrap/size buttons go
+   navy-filled; delete stays warm danger.
+   ================================================================ */
+.rte-img-btn.on{background:var(--navy);color:#f7f3ea}
+.rte-img-btn.on:hover{background:var(--navy-deep)}
+.rte-img-btn.danger{color:var(--danger)}
+.rte-img-btn.danger:hover{background:rgba(160,62,54,.08)}
+
+/* NOTE: no colour-picker swatch repaints needed — TEXT_COLORS in
+   RichTextEditor.jsx is already the warm palette, and each swatch
+   paints itself via its inline style. */
+
+/* ================================================================
+   13 · Research-composer save progress (lives in styles-richtext.css;
+   no tadhhib file covered it, so its raw reds surface here).
+   Running = blue wash; partial failure = gold warning.
+   ================================================================ */
+.cm-step.running{
+  background:rgba(29,58,95,.06);
+  border-color:rgba(29,58,95,.22);
+}
+.cm-step.running .cm-step-icon{
+  background:var(--blue-wash);
+  border-color:rgba(45,95,151,.4);
+  color:var(--navy);
+}
+.cm-save-err.partial{
+  background:linear-gradient(135deg,rgba(179,135,62,.08),rgba(179,135,62,.14));
+  border-color:rgba(179,135,62,.45);
+}
+.cm-save-err.partial .cm-save-err-ic{background:#f4ead0;color:var(--gold-deep)}
+.cm-save-err.partial .cm-save-err-body b{color:var(--gold-deep)}
+
+/* ================================================================
+   14 · MOBILE — same 720px breakpoint the base uses. Also restates
+   the base responsive .prose line-height (1.62) that this file's
+   unconditional 1.65 would otherwise override at phone widths.
+   ================================================================ */
+@media(max-width:720px){
+  .prose{line-height:1.62}
+  .prose blockquote{padding:9px 13px}
+  .prose blockquote:dir(rtl){padding:12px 14px}
+  .rte-wysiwyg{padding:20px 18px}
+}

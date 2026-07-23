@@ -1,0 +1,384 @@
+/* IKA "Warm Archive" — research (replaces tadhhib/research.css) */
+/* =============================================================
+   Research area re-skin: list cards (.r-card/.rrow/.r-hero),
+   the reader (.rd-page masthead + reading view + apparatus rail),
+   sources (.src-row) and the manuscript composer (.rm-*).
+   Loads after the base styles + warm/theme.css: equal-specificity
+   rules win by source order; legacy tokens (--rubric/--emerald/
+   --brass) already re-point to navy/gold, so this file only kills
+   literals the token swap can't reach and applies the prototype's
+   visual values onto the app's real selectors.
+   Density overrides that styles-responsive.css re-tunes on phones
+   are guarded with @media(min-width:721px) so the mobile layer
+   keeps winning (this file imports after it).
+   ============================================================= */
+
+/* ════════════════ 1 · RESEARCH LIST (.r-card) ════════════════ */
+
+/* Warm card chrome — radius 15, flat paper, GOLD hover border (scholarly) */
+.r-card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:15px;
+  box-shadow:none;
+}
+.r-card:hover{
+  transform:translateY(-2px);
+  border-color:var(--gold);
+  box-shadow:var(--shadow);
+}
+/* signature top hairline goes gold (base painted it rubric-red→navy) */
+.r-card::before{background:var(--gold);height:3px}
+
+/* desktop density per prototype (mobile keeps styles-responsive values) */
+@media(min-width:721px){
+  .r-body{padding:20px 22px}
+  .r-abs{font-size:14px;line-height:1.6}
+}
+
+/* serif 19 navy title, sans 2-line abstract, authors ink-soft */
+.r-body h3{color:var(--navy)}
+.r-card:hover h3{color:var(--navy-deep)}
+.r-abs{font-family:var(--sans);color:var(--ink-2)}
+.r-card .rail-name,.r-card .rail-name b{color:var(--ink-2)}
+
+/* cover: zoom layer restored (tadhhib-era span in the JSX) + gentle hover */
+.r-cover .t-zoom{
+  position:absolute;inset:0;z-index:0;
+  background-size:cover;background-position:center;
+  transition:transform .16s ease;
+}
+.r-card:hover .r-cover .t-zoom{transform:scale(1.03)}
+.r-play{transition:background .15s ease,transform .15s ease}
+.r-card:hover .r-play{background:rgba(255,255,255,.3)}
+.r-play:active{transform:scale(.94)}
+
+/* meta row muted; citations get the gold seal (base used #8a221b red) */
+.r-foot{color:var(--muted)}
+.r-foot span:last-child{color:var(--gold-deep);font-weight:700}
+.r-foot span:last-child .ico{color:var(--gold)}
+
+/* status pills on cards — filled pills per prototype
+   (published = good-wash · draft/review & archived = card-2 · retracted = danger) */
+.r-card .status,.rrow .status{
+  padding:3px 11px;border-radius:999px;
+  font-size:10.5px;font-weight:700;letter-spacing:.5px;
+}
+.r-card .status.published,.rrow .status.published{color:var(--good);background:var(--good-wash)}
+.r-card .status.draft,.rrow .status.draft,
+.r-card .status.archived,.rrow .status.archived{color:var(--muted);background:var(--card-2)}
+.r-card .status.retracted,.rrow .status.retracted{
+  color:var(--danger);background:#f6e4e2;text-decoration:none;
+}
+
+/* cover ribbons — flat warm tints instead of the old red/ink gradients */
+.r-status-ribbon.draft{background:rgba(87,80,63,.88)}
+.r-status-ribbon.archived{background:rgba(139,131,113,.9)}
+.r-status-ribbon.retracted{background:rgba(160,62,54,.92)}
+
+/* lifecycle card variants — no pure-white sheets, warm danger tints */
+.r-card.is-draft{background:linear-gradient(180deg,var(--card),var(--paper-2));border-color:rgba(87,80,63,.4)}
+.r-card.is-archived{background:linear-gradient(180deg,var(--card-2),#efe9db);border-color:var(--line)}
+.r-card.is-retracted{border-color:rgba(160,62,54,.42)}
+.r-card.is-retracted .r-cover::before{background:linear-gradient(135deg,rgba(160,62,54,.28),transparent 60%)}
+
+/* tag chips inside research cards → blue-wash pills (prototype .pill.tag) */
+.r-card .qna-tags a,.rrow .qna-tags a{
+  font-size:11.5px;font-weight:600;letter-spacing:0;text-transform:none;
+  color:var(--blue);background:var(--blue-wash);
+  padding:3px 10px;border-radius:999px;transition:background .14s ease;
+}
+.r-card .qna-tags a:hover,.rrow .qna-tags a:hover{background:#dce6f2;text-decoration:none}
+
+/* page-mast kicker: base hardcodes red #8a221b */
+.phead-kicker{color:var(--gold-deep)}
+
+/* ═══════ 2 · FEATURED HERO PLATE + COMPACT ROWS + OWNER BAR ═══════ */
+
+.r-hero{
+  background:var(--card);border:1px solid var(--line);border-radius:15px;
+  overflow:hidden;transition:border-color .15s ease,box-shadow .15s ease;
+}
+.r-hero:hover{border-color:var(--gold);box-shadow:var(--shadow)}
+.r-hero .rh-ph{border-radius:9px}
+.r-hero .rh-panel{
+  background:rgba(255,253,248,.96);
+  border:1px solid var(--line);
+  border-inline-start:4px solid var(--gold);
+  border-radius:10px;
+}
+.rh-st.is-published{color:var(--good)}
+
+.rrow{transition:background .15s ease,box-shadow .15s ease,border-color .15s ease,transform .15s ease}
+.rrow:hover{border-color:var(--gold);background:var(--card-2);box-shadow:var(--shadow)}
+.rrow-title{color:var(--navy)}
+.rrow:hover .rrow-title{color:var(--navy-deep)}
+
+/* owner lifecycle bar — navy primary (base shadow was rubric-red) */
+.r-owner-bar{background:rgba(255,253,248,.6)}
+.r-owner-bar button{transition:background .14s ease,color .14s ease,border-color .14s ease}
+.r-owner-bar button.primary{
+  background:var(--navy);color:#f7f3ea;
+  box-shadow:0 6px 14px -6px rgba(29,58,95,.45);
+}
+.r-owner-bar button.primary:hover{background:var(--navy-deep);border-color:var(--navy-deep)}
+.r-owner-bar button.danger{color:var(--danger)}
+.r-owner-bar button.danger:hover{background:rgba(160,62,54,.08);border-color:rgba(160,62,54,.3)}
+
+/* MINE-tab filter hint tints (base published/draft/retracted were red-washed) */
+.r-section-hint{border-radius:14px}
+.r-section-hint.published .ico-wrap{background:var(--good-wash);color:var(--good)}
+.r-section-hint.draft .ico-wrap{background:var(--gold-wash);color:var(--gold-deep)}
+.r-section-hint.retracted .ico-wrap{background:rgba(160,62,54,.1);color:var(--danger)}
+
+/* grouped-view section heads — rule warms to gold near the label */
+.lg-line{background:linear-gradient(90deg,rgba(179,135,62,.45),var(--line) 55%,transparent)}
+
+/* view-mode switcher active seg — base shadow was rubric-red */
+.vseg.on{box-shadow:0 5px 12px -5px rgba(29,58,95,.45)}
+
+/* ════════════ 3 · READER (.rd-page) — token re-point ════════════
+   The base reader scope re-points tokens to an evergreen palette and
+   IBM Plex Serif/Newsreader/Archivo stacks. Re-anchor everything to
+   the Warm Archive: navy accents, warm paper, Lora + IBM Plex Sans. */
+.rd-page{
+  --paper:#f4f0e7; --paper-2:#faf6ec;
+  --card:#fffdf8;  --card-2:#f6f2e8;
+  --line:#e6dfcf;  --line-soft:#efe9db;
+  --ink:#221e17; --ink-2:#2a251d; --ink-soft:#57503f; --muted:#8b8371;
+  --rubric:#1d3a5f; --wash:#e8eef5;
+  --emerald:#1d3a5f; --emerald-deep:#16283f;
+  --emerald-bright:#2d5f97; --emerald-glow:#3a6ca5;
+  --accent-bg:#e8eef5;
+  --brass:#b3873e; --brass-soft:#e5d3ac; --brass-tint:#f6ecd8;
+  --rose:#b3453e;
+  --serif:"Lora","Amiri",Georgia,"Noto Naskh Arabic","Geeza Pro",serif;
+  --sans:"IBM Plex Sans","Helvetica Neue",system-ui,"SF Arabic","Geeza Pro","Noto Sans Arabic",Tahoma,Arial,sans-serif;
+}
+
+/* reading-progress bar — gold thread */
+.rd-page .rd-progress{background:var(--gold)}
+
+/* toolbar: saved/active seal in gold wash (base literals were close but off-palette) */
+.rd-page .rd-toolbar-actions button.active{color:var(--gold-deep);background:var(--gold-wash);border-color:#e0cfa4}
+
+/* ---- masthead hero: illuminated navy cover, gold frame, glass ledger ---- */
+.rd-page .rd-hero{
+  border-radius:18px;
+  background:linear-gradient(135deg,#16283f 0%,#1d3a5f 55%,#274b78 100%);
+  box-shadow:0 26px 64px -28px rgba(22,40,63,.55);
+}
+/* the "illuminated edge" — a fine gold hairline frame + top light, above the
+   cover/scrim but below the text so it never obscures the title */
+.rd-page .rd-hero::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:inherit;
+  box-shadow:inset 0 0 0 1px rgba(217,185,108,.30),inset 0 1px 0 rgba(255,255,255,.16);
+}
+.rd-page .rd-hero-pattern{
+  opacity:.5;
+  background-image:radial-gradient(rgba(217,185,108,.16) 1px,transparent 1.4px);
+  background-size:18px 18px;
+}
+/* deeper, warmer bottom scrim so white text stays crisp over bright covers */
+.rd-page .rd-hero.has-cover .rd-hero-scrim{
+  background:linear-gradient(180deg,rgba(14,22,36,.5) 0%,rgba(14,22,36,.04) 24%,rgba(14,22,36,.34) 52%,rgba(11,17,29,.94) 100%);
+}
+.rd-page .rd-eyebrow{color:#d9b96c}
+.rd-page .rd-hero-title{font-size:clamp(28px,3.6vw,40px)}
+.rd-page .rd-hero-status.published .dot{background:#8fd0a8}
+/* top chips + play → warm-framed glass */
+.rd-page .rd-hero-id,
+.rd-page .rd-hero-status{background:rgba(14,22,36,.5);border-color:rgba(217,185,108,.35)}
+.rd-page .rd-hero-play{background:rgba(255,253,248,.92);border-color:rgba(255,255,255,.85);color:var(--navy)}
+.rd-page .rd-hero-play .ico{fill:var(--navy);stroke:none}
+.rd-page .rd-hero-follow{border-radius:999px;color:var(--navy)}
+/* facts → elegant glass chips: gold seal + serif numeral */
+.rd-page .rd-hero .rd-facts{border-top:none;margin-top:20px;padding-top:0;gap:9px}
+.rd-page .rd-hero .rd-fact{
+  margin:0;padding:7px 14px;border-radius:999px;
+  background:rgba(14,22,36,.34);border:1px solid rgba(217,185,108,.3);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  color:rgba(255,255,255,.9);font-size:13px;
+}
+.rd-page .rd-hero .rd-fact + .rd-fact{border-left:1px solid rgba(217,185,108,.3)}
+.rd-page .rd-hero .rd-fact .ico{color:#e0c079}
+.rd-page .rd-hero .rd-fact b{font-family:var(--serif);font-size:16px;font-weight:600;color:#fff;margin-inline-end:1px}
+
+/* ---- TOC: navy hover wash (base literal was evergreen) ---- */
+.rd-page .rd-toc-a:hover{background:rgba(29,58,95,.06)}
+
+/* ---- reading sections as warm cards: radius 18, generous padding ---- */
+.rd-page .card.rd-card2{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:28px 32px;margin-bottom:22px;border-bottom:1px solid var(--line);
+}
+.rd-page .card.rd-card2:last-child{border-bottom:1px solid var(--line);margin-bottom:0;padding-bottom:28px}
+@media(max-width:860px){
+  .rd-page .card.rd-card2{padding:20px 16px;margin-bottom:14px}
+}
+
+/* section heads — serif 19 navy over a rule, gold numeral */
+.rd-page .rd-sec-head::before{color:var(--gold);font-weight:600}
+.rd-page .rd-sec-head h2{
+  font-family:var(--serif);font-size:19px;font-weight:600;
+  letter-spacing:0;text-transform:none;color:var(--navy);
+}
+.rd-page .rd-sec-head::after{background:linear-gradient(90deg,rgba(179,135,62,.35),var(--line) 55%)}
+
+/* ABSTRACT block — card-2 plate + 3px gold inline-start bar */
+.rd-page .prose.rd-abstract{
+  background:var(--card-2);border:1px solid var(--line-soft);
+  border-radius:11px;color:var(--ink-2);
+}
+.rd-page .prose.rd-abstract::before{background:var(--gold)}
+.rd-page .prose.rd-text{color:var(--ink-2)}
+
+/* files — gold hover instead of the evergreen literals */
+/* ---- "Download all" archive-format picker under the rail button ---- */
+.rd-fmt{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  margin-top:10px;
+}
+.rd-fmt-l{
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-inline-end:2px;
+}
+.rd-fmt-b{
+  padding:5px 12px;border-radius:999px;
+  border:1px solid var(--line);background:var(--card);
+  font-size:11.5px;font-weight:700;letter-spacing:.03em;color:var(--ink-soft);
+  font-family:var(--mono);
+  transition:background-color .14s,border-color .14s,color .14s;
+}
+.rd-fmt-b:hover:not(:disabled){border-color:var(--blue);color:var(--navy)}
+.rd-fmt-b.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+/* the selected pill must stay light on hover — `:hover:not(:disabled)` (0,3,0)
+   outranks `.on` (0,2,0), which was repainting the label navy-on-navy */
+.rd-fmt-b.on:hover:not(:disabled){background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
+.rd-fmt-b:disabled{opacity:.5;cursor:not-allowed}
+
+.rd-page .rd-file:hover:not(:disabled){border-color:var(--gold);background:#fdfbf4}
+/* keep the download button clear of the file metadata: give it breathing room
+   and break any long token (filename / mime / caption) instead of letting it
+   overflow across the button */
+.rd-page .rd-file{gap:14px}
+.rd-page .rd-file-info{padding-inline-end:6px}
+.rd-page .rd-file-info small,
+.rd-page .rd-file-info p{overflow-wrap:anywhere;word-break:break-word}
+.rd-page .rd-file-action{flex:none;white-space:nowrap;align-self:center}
+
+/* sources & references — [n] gold serif bold, gold row hover.
+   (The base .rd-srcn count chip is orphaned — no JSX emits it; the real
+   references count renders as .rd-sec-n, already covered above.)
+   Source glyph plates (.src-ic) are painted inline by Source.jsx's
+   COLOR_MAP, which is already warm-palette per type — leave them alone. */
+.rd-page .rd-refs > li::before,.rd-refs > li::before{
+  font-family:var(--serif);font-size:13px;font-weight:700;color:var(--gold);
+}
+a.src-row{transition:border-color .15s ease,background .15s ease}
+a.src-row:hover{border-color:var(--gold);background:#fdfbf4}
+a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;background:var(--gold-wash)}
+
+/* ---- apparatus rail ---- */
+.rd-page .rd-panel-h{color:var(--gold-deep)}
+/* Download = navy primary (base hover literal was evergreen #1a5142) */
+.rd-page .rd-dlpdf{box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
+.rd-page .rd-dlpdf:hover:not(:disabled){background:var(--navy);box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
+/* React / Save toggles — warm like + gold seal (base .btn.on-* are red-washed) */
+.rd-page .rd-act.on-rose{background:rgba(179,69,62,.1);color:var(--like);border-color:rgba(179,69,62,.32)}
+.rd-page .rd-act.on-rose .ico{fill:var(--like);stroke:var(--like)}
+.rd-page .rd-act.on-brass{background:var(--gold-wash);color:var(--gold-deep);border-color:#e0cfa4}
+.rd-page .rd-act.on-brass .ico{fill:var(--gold);stroke:var(--gold)}
+/* cite panel — citation is a moment of endorsement: gold margin rule */
+.rd-page .cite-box{
+  background:var(--card-2);border:1px solid var(--line);
+  border-inline-start:3px solid var(--gold);border-radius:11px;
+}
+.rd-page .rd-topics-head .hash{color:var(--gold)}
+.rd-page .qna-tags a:hover{background:#dce6f2}
+
+/* full-screen promo player — base stage glow was rubric-red */
+.rd-vp-stage{box-shadow:0 40px 100px -25px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.08),0 0 90px -20px rgba(45,95,151,.25)}
+
+/* status banners — draft speaks gold (base scoped rule turned it navy) */
+.rd-page .rd-banner{border-radius:14px}
+.rd-page .rd-banner.draft b,
+.rd-page .rd-banner.draft .rd-banner-ico{color:var(--gold-deep)}
+.rd-page .rd-banner.draft .rd-banner-ico{background:var(--gold-wash)}
+.rd-page .rd-banner.retracted{background:linear-gradient(135deg,rgba(160,62,54,.05),rgba(160,62,54,.1));border-color:rgba(160,62,54,.3)}
+.rd-page .rd-banner.retracted .rd-banner-ico{background:rgba(160,62,54,.1);color:var(--danger)}
+.rd-page .rd-banner.retracted b{color:var(--danger)}
+
+/* scholarly discussion — comment bubbles on card-2 inside the section card */
+.rd-page .cmt-bubble{
+  background:var(--card-2);border:1px solid var(--line-soft);
+  border-radius:12px;padding:10px 14px;
+}
+.rd-page .cmt-meta{padding-top:6px}
+
+/* ══════════ 4 · COMPOSER — manuscript desk (.rm-*) ══════════ */
+
+/* desk surfaces: warm paper canvas, cream top bar */
+.rm-app{--studio:#faf6ec}
+.rm-top{background:rgba(255,253,248,.9)}
+
+/* publish CTA — navy primary (base shadow was rubric-red) */
+.rm-cta{box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
+
+/* form inputs per prototype f-input: warm boxed, radius 10, blue focus */
+.rm-app .inp{
+  border:1px solid #ddd4c0;border-radius:10px;background:#fcfaf4;
+}
+.rm-app .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.rm-search{border:1px solid #ddd4c0;border-radius:11px;background:#fcfaf4;transition:border-color .15s ease,box-shadow .15s ease}
+.rm-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+
+/* contents rail = the prototype's steps: navy numerals, navy done-check seals */
+.rm-rail-ck{background:var(--navy);color:#f7f3ea}
+.rm-rail-item{transition:background .14s ease}
+
+/* section ledger — gold numerals & gilded tags on the manuscript canvas */
+.rm-secno{color:var(--gold-deep)}
+.rm-secrule{background:linear-gradient(90deg,rgba(179,135,62,.35),var(--line) 60%)}
+
+/* masthead title line */
+.rm-mast-title{caret-color:var(--navy)}
+.rm-mast-kick{color:var(--gold-deep)}
+
+/* cover dropzone + file add tile — dashed warm, gold on hover (scholarly) */
+.rm-cover-empty{border-color:#c9bfa5}
+.rm-cover-empty:hover{border-color:var(--gold)}
+.rm-file-add{border-color:#c9bfa5}
+.rm-file-add:hover{border-color:var(--gold);background:#fdfbf4}
+.rm-file-ic{background:var(--gold-wash);color:var(--gold-deep)}
+
+/* source ledger — gold serif numerals + gold badges */
+.rm-src-no{font-family:var(--serif);font-weight:700;color:var(--gold)}
+.rm-src-badge{background:var(--gold-wash);color:var(--gold-deep)}
+.rm-src-item{transition:background .14s ease}
+.rm-src-item:hover{background:#fdfbf4}
+.rm-cand{transition:background .14s ease}
+.rm-cand:hover{background:var(--paper-2)}
+
+/* editor toolbar inside the composer — chip row on paper-2
+   (scoped to .rm-app; warm/richtext.css owns the global editor skin) */
+.rm-app .rte-tools{background:var(--paper-2);border-bottom:1px solid var(--line-soft)}
+.rm-app .rte-tool{border-radius:8px}
+.rm-app .rte-tool.on{background:var(--blue-wash);color:var(--navy);box-shadow:none}
+.rm-app .rte-tool.on:hover{background:#dce6f2}
+
+/* abstract lane — gold margin rule (base painted it rubric→navy) */
+.rm-abstract{border-left-color:var(--gold)}
+
+/* "no eligible co-authors" hint → prototype .note.gold */
+.rm-empty-hint{
+  background:var(--gold-wash);color:var(--gold-deep);
+  padding:12px 15px;border-radius:11px;font-size:13px;line-height:1.55;
+}
+
+/* ═══════════ 5 · MOTION GUARDS ═══════════ */
+@media(prefers-reduced-motion:reduce){
+  .r-card:hover,.rrow:hover,.r-hero:hover{transform:none}
+  .r-card:hover .r-cover .t-zoom{transform:none}
+  .r-cover .t-zoom{transition:none}
+}

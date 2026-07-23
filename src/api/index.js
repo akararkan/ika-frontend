@@ -5,6 +5,11 @@
 export { API_BASE, assetUrl, session } from './config.js'
 export { http, ApiError } from './http.js'
 export { openStream, applyPostDelta, applyResearchDelta } from './realtime.js'
+export {
+  convoFrom, msgFrom, memberFrom, requestFrom, participantFrom,
+  settingsFrom, scheduledFrom, channelFrom, callFrom, callSignalFrom,
+  liveStreamFrom, liveChatFrom,
+} from './chat.js'
 export * as adapters from './adapters.js'
 
 import { auth } from './auth.js'
@@ -20,8 +25,9 @@ import { tags } from './tags.js'
 import { activity } from './activity.js'
 import { mentions } from './mentions.js'
 import { notifications } from './notifications.js'
+import { chat } from './chat.js'
 
 export const api = {
   auth, users, posts, reels, stories, closeFriends, closeCircle, highlights, sounds,
-  qna, research, search, tags, activity, mentions, notifications,
+  qna, research, search, tags, activity, mentions, notifications, chat,
 }

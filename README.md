@@ -37,9 +37,13 @@ or set `VITE_API_BASE_URL` to the API origin.
 ## Routes
 
 `/login` · `/register` · `/` (feed) · `/explore` · `/reels` · `/qna` ·
-`/qna/:id` · `/research` · `/research/:id` · `/posts/:id` · `/notifications` ·
-`/activity` · `/saved` · `/profile` · `/settings`. Everything except auth is
-behind a sign-in guard (`RequireAuth`).
+`/qna/:id` · `/research` · `/research/:id` · `/posts/:id` · `/chat` ·
+`/chat/requests` · `/chat/:id` · `/chat/join/:token` · `/channels` · `/live` ·
+`/live/:id` · `/notifications` · `/activity` · `/saved` · `/profile` ·
+`/settings`. Everything except auth is behind a sign-in guard (`RequireAuth`).
+
+A channel is a conversation, so `/channels` only creates, discovers and
+subscribes — reading and posting happen at `/chat/<channelId>`.
 
 ## Structure
 
@@ -48,8 +52,12 @@ src/
   App.jsx                router + providers
   main.jsx               entry + global styles
   context/AuthContext    current user, sign in/up/out, RequireAuth guard
+  context/ChatContext    the ONE chat SSE stream, inbox, unread badge, presence,
+                         chat privacy switches
+  context/CallContext    voice/video calls — WebRTC over that same stream
   components/            Layout (shell), PostCard, ComposeModal, StoryViewer,
                          Reels, Source, ui (atoms), states (loader/empty)
+  components/chat/       messaging module — see CHAT_FRONTEND.md
   pages/                 one file per route (Feed, Explore, Qna, Question, …)
   hooks/useRealtime      React wrapper around the SSE stream
   lib/                   userView (author resolver), openCompose
@@ -59,9 +67,14 @@ src/
     realtime SSE streams + post counter deltas
     adapters backend DTO → view shapes
     auth posts stories sounds qna research search activity mentions notifications
+    chat     conversations, messages, members, requests, starred, scheduled,
+             privacy settings, channels, calls, live streams + the ONE
+             per-user messaging stream every one of them multiplexes onto
     index    `import { api } from '../api'`
   styles/                the design CSS (verbatim)
 ```
+
+The messaging module has its own implementation guide: **[CHAT_FRONTEND.md](CHAT_FRONTEND.md)**.
 
 ## Realtime ("always listen")
 

@@ -31,6 +31,56 @@ function ComposerBar({ me }) {
   )
 }
 
+/* Trending topics — pre-ranked tags (TAGS_API §1). Fetches the top 20 and
+   rotates through them a page (5) at a time with an animated cross-fade, so the
+   card feels alive; refetches periodically since the server leaderboard rebuilds
+   every ~10 min. */
+const TREND_PAGE = 5
+function TrendingCard({ navigate }) {
+  const [tags, setTags] = React.useState([])
+  const [page, setPage] = React.useState(0)
+  React.useEffect(() => {
+    let alive = true
+    const load = () => api.tags.trending({ scope: 'ALL', limit: 20 })
+      .then(rows => { if (alive) setTags((rows || []).filter(t => t.tag)) })
+      .catch(() => {})
+    load()
+    const refetch = setInterval(load, 180000)   // 3 min
+    return () => { alive = false; clearInterval(refetch) }
+  }, [])
+  const pages = Math.max(1, Math.ceil(tags.length / TREND_PAGE))
+  React.useEffect(() => {
+    setPage(0)
+    if (tags.length <= TREND_PAGE) return
+    const rot = setInterval(() => setPage(p => (p + 1) % pages), 5000)
+    return () => clearInterval(rot)
+  }, [tags.length, pages])
+  if (!tags.length) return null
+  const start = page * TREND_PAGE
+  let shown = tags.slice(start, start + TREND_PAGE)
+  if (shown.length < TREND_PAGE) shown = [...shown, ...tags.slice(0, TREND_PAGE - shown.length)]   // wrap the tail
+  return (
+    <div className="card card-pad">
+      <h3 className="title"><Icon name="trending" className="sm"/> Trending topics</h3>
+      <div className="trends" key={page}>
+        {shown.map((t, i) => (
+          <button key={t.tag} className="trend-row" style={{ animationDelay: `${i * 55}ms` }}
+            onClick={() => navigate(`/tags/${encodeURIComponent(t.tag)}`)}>
+            <span className="trend-ico"><Icon name="trending" className="xs"/></span>
+            <span className="trend-tag">#{t.tag}</span>
+            <span className="trend-n">{fmt(t.usageCount)} posts</span>
+          </button>
+        ))}
+      </div>
+      {pages > 1 && (
+        <div className="trend-dots">
+          {Array.from({ length: pages }).map((_, i) => <i key={i} className={i === page ? 'on' : ''}/>)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FeedRail({ navigate }) {
   const { user } = useAuth()
   const [questions, setQuestions] = React.useState([])
@@ -39,12 +89,16 @@ function FeedRail({ navigate }) {
   React.useEffect(() => {
     let alive = true
     api.qna.feed({ limit: 4 }).then(r => { if (alive) setQuestions((r.items || []).filter(q => q.status === 'OPEN').slice(0, 3)) }).catch(() => {})
-    // hydrated, self-excluded suggestions (server falls back to who-to-follow)
-    api.users.suggestions({ limit: 6 }).then(list => {
+    // hydrated, self-excluded suggestions (server falls back to who-to-follow).
+    // Verified scholars/researchers surface first so the card reads as "scholars
+    // to follow", then everyone else — never dropping non-scholar suggestions.
+    api.users.suggestions({ limit: 8 }).then(list => {
       if (!alive) return
-      const rows = (list || []).filter(u => u.id && String(u.id) !== String(user?.id)).slice(0, 4)   // defensive self-exclude
-      setPeople(rows)
-      setFollows(Object.fromEntries(rows.map(u => [u.id, u.isFollowing])))            // seed real follow state
+      const rows = (list || []).filter(u => u.id && String(u.id) !== String(user?.id))   // defensive self-exclude
+      const rank = (u) => (u.verified || u.role === 'SCHOLAR' || u.role === 'RESEARCHER') ? 0 : 1
+      const sorted = [...rows].sort((a, b) => rank(a) - rank(b)).slice(0, 4)
+      setPeople(sorted)
+      setFollows(Object.fromEntries(sorted.map(u => [u.id, u.isFollowing])))            // seed real follow state
     }).catch(() => {})
     return () => { alive = false }
   }, [user?.id])
@@ -56,9 +110,11 @@ function FeedRail({ navigate }) {
   const dismiss = (id) => { setPeople(ps => ps.filter(u => u.id !== id)); api.users.dismissSuggestion(id).catch(() => {}) }
   return (
     <div className="col-side">
+      <TrendingCard navigate={navigate}/>
+
       {!!people.length && (
         <div className="card card-pad">
-          <h3 className="title"><Icon name="award" className="sm"/> Who to follow</h3>
+          <h3 className="title"><Icon name="award" className="sm"/> Scholars to follow</h3>
           <div className="rail-list t-stagger">
             {people.map(u => (
               <div key={u.id} className="rail-row">
@@ -106,10 +162,15 @@ function FeedRail({ navigate }) {
   )
 }
 
+// A "scholar" author = a verified contributor: SCHOLAR/RESEARCHER role, or the
+// verified flag set. Drives the Scholars feed tab.
+const isScholarAuthor = (a) => !!a && (a.role === 'SCHOLAR' || a.role === 'RESEARCHER' || a.verified)
+const tsOf = (x) => (x?.createdAt ? new Date(x.createdAt).getTime() : 0)
+
 export function FeedPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)' }
+  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)' }
   const [posts, setPosts] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState(false)
@@ -119,6 +180,30 @@ export function FeedPage() {
   const [more, setMore] = React.useState(false)
   const [end, setEnd] = React.useState(false)
   const [feedTab, setFeedTab] = React.useState('FOR_YOU')   // For you · Following · Scholars (prototype .m-seg)
+  const [scholarExtra, setScholarExtra] = React.useState(null)   // research + scholar Q&A (null = not loaded yet)
+  const [scholarBusy, setScholarBusy] = React.useState(false)
+
+  // Scholars tab. The home feed is following-only, so filtering it misses
+  // scholars you don't follow (why the tab looked empty). Instead aggregate
+  // scholar-authored content from the GLOBAL surfaces — all research
+  // (publishing is role-gated to SCHOLAR/RESEARCHER) + scholar-authored
+  // questions — and merge with any scholar posts already in the home feed.
+  // Loaded once, lazily, the first time the tab is opened; degrades gracefully
+  // if either source fails.
+  const loadScholars = React.useCallback(() => {
+    setScholarBusy(true)
+    Promise.allSettled([api.research.feed({ size: 20 }), api.qna.feed({ limit: 30 })])
+      .then(([r, q]) => {
+        const research = r.status === 'fulfilled' ? (r.value || []) : []
+        const questions = (q.status === 'fulfilled' ? (q.value?.items || []) : [])
+          .filter(item => isScholarAuthor(item._author))
+        setScholarExtra([...research, ...questions])
+      })
+      .finally(() => setScholarBusy(false))
+  }, [])
+  React.useEffect(() => {
+    if (feedTab === 'SCHOLARS' && scholarExtra == null && !scholarBusy) loadScholars()
+  }, [feedTab, scholarExtra, scholarBusy, loadScholars])
 
   // Feed responses are authoritative for textPreview / mediaUrl now —
   // PostHydrator bulk-loads posts_by_id at read time and overlays the live
@@ -194,10 +279,24 @@ export function FeedPage() {
   const myStoryCover = (() => { const s = myStories.find(x => x.mediaUrl); return s ? assetUrl(s.mediaUrl) : null })()
 
   // Feed segmented control. The backend exposes one home (following) timeline, so
-  // For you / Following share it; Scholars filters the loaded feed to scholars.
-  const shown = feedTab === 'SCHOLARS'
-    ? posts.filter(p => { const a = authorOf(p); return a.role === 'SCHOLAR' || a.verified })
-    : posts
+  // For you / Following share it; Scholars merges globally-sourced scholar
+  // content (research + scholar Q&A) with scholar posts from the home feed,
+  // newest first.
+  const shown = React.useMemo(() => {
+    if (feedTab !== 'SCHOLARS') return posts
+    const scholarPosts = posts.filter(p => (p.kind === 'POST' || !p.kind) && isScholarAuthor(authorOf(p)))
+    // de-dupe by kind+id (ids can collide across entity types)
+    const seen = new Set()
+    return [...(scholarExtra || []), ...scholarPosts]
+      .filter(x => {
+        if (!x || x.id == null) return false
+        const k = (x.kind || 'POST') + ':' + x.id
+        if (seen.has(k)) return false
+        seen.add(k); return true
+      })
+      .sort((a, b) => tsOf(b) - tsOf(a))
+  }, [feedTab, posts, scholarExtra])
+  const scholarLoading = feedTab === 'SCHOLARS' && scholarExtra == null
 
   return (
     <div className="main">
@@ -242,17 +341,18 @@ export function FeedPage() {
 
         <ComposerBar me={me}/>
 
-        {loading ? <Loader label="Loading your feed…"/>
+        {(loading || scholarLoading) ? <Loader label={feedTab === 'SCHOLARS' ? 'Loading scholars…' : 'Loading your feed…'}/>
           : error ? <EmptyState icon="feed" title="Couldn’t load the feed" sub="Check your connection to the backend and try again."/>
-          : !shown.length ? <EmptyState icon="feed" title={feedTab === 'SCHOLARS' ? 'No scholar posts yet' : 'Your feed is quiet'} sub={feedTab === 'SCHOLARS' ? 'Posts from verified scholars will appear here.' : 'Follow scholars and creators, or create the first post.'}/>
+          : !shown.length ? <EmptyState icon="feed" title={feedTab === 'SCHOLARS' ? 'No scholar content yet' : 'Your feed is quiet'} sub={feedTab === 'SCHOLARS' ? 'Research, questions, and posts from verified scholars will appear here.' : 'Follow scholars and creators, or create the first post.'}/>
           : (
             <div className="feed-list t-stagger">
               {shown.map((p, i) => {
+                const key = (p.kind || 'POST') + ':' + p.id
                 // Mixed feed: dispatch on entityType (carried as `kind`) FIRST.
-                if (p.kind === 'RESEARCH') return <FeedResearchCard key={p.id} item={p} navigate={navigate}/>
-                if (p.kind === 'QUESTION') return <FeedQuestionCard key={p.id} item={p} navigate={navigate}/>
+                if (p.kind === 'RESEARCH') return <FeedResearchCard key={key} item={p} navigate={navigate}/>
+                if (p.kind === 'QUESTION') return <FeedQuestionCard key={key} item={p} navigate={navigate}/>
                 return (
-                  <PostCard key={p.id} post={p} index={i} onLike={like} onSave={save} onShare={share}
+                  <PostCard key={key} post={p} index={i} onLike={like} onSave={save} onShare={share}
                     onOpenComments={() => navigate(`/posts/${p.id}`)}
                     owner={!!me.id && p.author === me.id} onEdit={() => openComposeEdit(p)} onDelete={del}/>
                 )
@@ -260,7 +360,7 @@ export function FeedPage() {
             </div>
           )}
 
-        {!loading && !error && posts.length > 0 && !end && (
+        {!loading && !error && feedTab !== 'SCHOLARS' && posts.length > 0 && !end && (
           <button className="btn btn-secondary btn-block mt-12" disabled={more} onClick={loadMore}>
             {more ? 'Loading…' : 'Load more'}
           </button>

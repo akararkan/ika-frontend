@@ -89,7 +89,7 @@ function PostMenu({ post, owner, onEdit, onDelete }) {
             <button style={item} onClick={copyLink}><Icon name="link" className="sm"/>Copy link</button>
             <button style={item} onClick={() => { close(); doRepost(post) }}><Icon name="repost" className="sm"/>Repost</button>
             {owner && onEdit && <button style={item} onClick={() => { close(); onEdit(post.id) }}><Icon name="compose" className="sm"/>Edit post</button>}
-            {owner && onDelete && <button style={{ ...item, color:'var(--rose, #c2453f)' }} onClick={() => { close(); onDelete(post.id) }}><Icon name="close" className="sm"/>Delete post</button>}
+            {owner && onDelete && <button style={{ ...item, color:'var(--rose, #b3453e)' }} onClick={() => { close(); onDelete(post.id) }}><Icon name="close" className="sm"/>Delete post</button>}
           </div>
         </>,
         document.body
@@ -223,7 +223,8 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
   const openReel = () => navigate(`/reels/${post.id}`)
 
   // Record a view once the card is meaningfully visible (≥50% for ~1s),
-  // then seed the label from the authoritative viewCount (POST_ENGAGEMENT §2).
+  // then seed the count from the authoritative viewCount (POST_ENGAGEMENT §2).
+  // Views render as a quiet muted line above the action buttons.
   const [views, setViews] = React.useState(post.views || 0)
   React.useEffect(() => { setViews(post.views || 0) }, [post.views])
   const cardRef = React.useRef(null)
@@ -301,20 +302,8 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
 
       <PostMedia post={post} onOpenReel={openReel} onOpenImage={openImage}/>
 
-      <div className="pc-stats">
-        <span className="ps-likes">
-          <span className="ps-heart"><Icon name="heart" className="xs"/></span>
-          <span>Rubricated by {fmt(post.likes)} readers</span>
-        </span>
-        <span className="ps-right">
-          <span role="button" style={{ cursor:'pointer' }} onClick={toggleComments}>{fmt(cCount)} comments</span>
-          <span>{fmt(views)} views</span>
-          <span>{fmt(shares)} shares</span>
-        </span>
-      </div>
-
       <div className="pc-actions">
-        <button className={'pca ' + (post.liked ? 'on' : '')} onClick={() => onLike?.(post.id)} aria-label="Rubricate">
+        <button className={'pca ' + (post.liked ? 'on' : '')} onClick={() => onLike?.(post.id)} aria-label="Like">
           <Icon name="heart"/><span>{fmt(post.likes)}</span>
         </button>
         <button className={'pca ' + (showC ? 'active' : '')} onClick={toggleComments}>
@@ -326,6 +315,9 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
         <button className="pca" onClick={() => openShare({ kind:'post', id:post.id, title: post.body ? post.body.slice(0, 90) : 'this post', count: shares, onShared: setShares })}>
           <Icon name="share"/><span>Share</span>
         </button>
+        {views > 0 && (
+          <span className="pc-views" title={`${fmt(views)} views`}><Icon name="eye" className="xs"/><span>{fmt(views)}</span></span>
+        )}
         <button className={'pca pca-end ' + (post.saved ? 'saved' : '')} onClick={() => onSave?.(post.id)}>
           <Icon name="bookmark"/><span>Save</span>
         </button>

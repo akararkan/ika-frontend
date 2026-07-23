@@ -1,0 +1,263 @@
+/* IKA "Warm Archive" — social (replaces tadhhib/social.css) */
+/* Covers: Notifications · Activity · Saved · Explore · TagPage ·
+   ShareSheet · TagInput · MentionBox.
+   Loads after warm/theme.css — legacy tokens (--rubric/--emerald/--brass)
+   are already re-pointed to navy/gold, so this file only re-skins the
+   surfaces those tokens can't reach. */
+
+/* =========================================================
+   1 · Tabs → filled pills (never underline)
+   .tabs is a shell primitive shared by Saved / Explore /
+   Activity / Notifications (and other areas). Kept at base
+   (single-class) specificity so a warm/core.css version, if
+   present, can coexist; values are the prototype .chip pair.
+   ========================================================= */
+.tabs{gap:8px;row-gap:8px;border-bottom:0;margin-bottom:18px}
+.tab{
+  padding:7px 16px;border:1px solid var(--line);border-radius:999px;
+  background:var(--card);margin-bottom:0;
+  font-size:13.5px;font-weight:600;letter-spacing:0;text-transform:none;
+  color:var(--ink-soft);
+  transition:background .15s,border-color .15s,color .15s;
+}
+.tab:hover{color:var(--navy);border-color:var(--blue);background:var(--card)}
+.tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+.tab.on:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
+/* count badges inside a selected pill (Explore tabs render <i class="muted">) */
+.tab.on i,.tab.on .muted{color:rgba(247,243,234,.8)}
+
+/* =========================================================
+   2 · Notifications — /notifications
+   Row list = prototype .n-row; unread = #fbf7ec wash + 9px
+   gold dot; date-group headers re-skinned, not moved.
+   ========================================================= */
+.ntf-count{background:var(--gold);color:#fff}
+
+.ntf-unread-toggle{border:1px solid var(--line);background:var(--card);color:var(--ink-soft)}
+.ntf-unread-toggle:hover{background:var(--card-2)}
+.ntf-unread-toggle.on{background:var(--blue-wash);border-color:#c3d3e4;color:var(--navy)}
+.ntf-unread-toggle.on .ntf-dot{background:var(--gold);box-shadow:0 0 0 3px rgba(179,135,62,.22)}
+
+.ntf-group{font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--muted)}
+
+.ntf-list{border-radius:15px;border-color:var(--line)}
+.ntf-row{border-bottom:1px solid var(--line-soft)}
+.ntf-row:hover{background:var(--card-2)}
+.ntf-row.unread{background:#fbf7ec}
+.ntf-row.unread:hover{background:#f7f0dd}
+/* base drew a red accent rail; re-purpose the pseudo as the prototype's
+   9px gold unread dot (display:block also re-enables it on phones where
+   the base responsive layer hid the rail). It lives in the START gutter
+   where the old rail was (row start padding is 18px, so 6–15px is clear
+   of the avatar) — the row's end is occupied by the 30px .ntf-x dismiss
+   button, which is always visible on touch (@media(hover:none)). */
+.ntf-row.unread::before{
+  content:"";display:block;
+  left:auto;right:auto;top:24px;bottom:auto;
+  inset-inline-end:auto;inset-inline-start:6px;
+  width:9px;height:9px;border-radius:50%;background:var(--gold);
+}
+.ntf-row.unread .ntf-badge{border-color:#fbf7ec}
+.ntf-badge{box-shadow:0 2px 6px rgba(34,30,23,.18)}
+.ntf-tile{border-radius:12px}
+.ntf-body p{color:var(--ink-2)}
+.ntf-body p b{color:var(--ink)}
+.ntf-meta{color:#a39a85}
+.ntf-x:hover{background:var(--card-2);color:var(--ink)}
+/* quoted line under a notification — italic, muted, gold-edged */
+.ntf-snippet{
+  color:var(--muted);background:var(--card-2);
+  border-left:0;border-inline-start:2px solid var(--gold);
+}
+/* trending-digest tag chips inside a row → blue-wash tag pills */
+.ntf-body .chip{
+  padding:4px 12px;border:1px solid transparent;border-radius:999px;
+  background:var(--blue-wash);color:var(--blue);
+  font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;
+}
+.ntf-body .chip:hover{border-color:var(--blue);color:var(--navy);background:var(--blue-wash)}
+
+/* =========================================================
+   3 · Activity — /activity
+   The page's single .card.t-stagger (never .ntf-list — that is
+   the notifications list) becomes a timeline: 2px --line spine,
+   14px dots (3px paper border) on the row badges, time label
+   above the entry, entry cards radius 12.
+   ========================================================= */
+.ntf-page > .card.t-stagger:not(.ntf-list){
+  position:relative;background:transparent;border:0;border-radius:0;box-shadow:none;
+  /* neutralize the <=460px full-bleed hack (styles-responsive.css
+     `.ntf-page > .card{margin-left:-14px;margin-right:-14px}`) — the
+     skin is stripped here, so bleeding the transparent container past
+     the column edges only clips the inset row cards at the viewport */
+  margin-inline:0;
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-group{
+  margin:18px 0 12px;margin-inline-start:46px;
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-group:first-child{margin-top:2px}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-row{
+  position:relative;margin-inline-start:46px;margin-bottom:12px;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  transition:border-color .15s,background .14s;
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-row:hover{background:var(--card);border-color:var(--blue)}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-row.static:hover{border-color:var(--line)}
+/* the spine — drawn per row so date headers break it naturally */
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-row::after{
+  content:"";position:absolute;inset-inline-start:-26px;top:-14px;bottom:-14px;
+  width:2px;border-radius:2px;background:var(--line);
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-row:last-child::after{bottom:50%}
+/* the dot: hide the avatar, let the tinted .ntf-badge (inline background
+   from the JSX type map) sit on the spine as a 14px dot w/ 3px paper ring */
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-avatar{
+  position:absolute;inset-inline-start:-32px;top:16px;
+  width:14px;height:14px;z-index:1;align-self:auto;
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-avatar .avatar{display:none}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-badge{
+  position:static;display:block;width:14px;height:14px;
+  border:3px solid var(--paper);border-radius:50%;box-shadow:none;
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-badge .ico{display:none}
+/* time label above the entry text (DOM order is label → time) */
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body{display:flex;flex-direction:column-reverse;gap:2px}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body small{font-size:12px;color:#a39a85}
+/* per-row remove button — quiet ghost inside the entry card */
+.ntf-page > .card.t-stagger:not(.ntf-list) .icon-btn{
+  width:30px;height:30px;color:var(--muted);align-self:flex-start;
+}
+.ntf-page > .card.t-stagger:not(.ntf-list) .icon-btn:hover{background:var(--card-2);color:var(--ink)}
+
+/* =========================================================
+   4 · Explore — /explore
+   (Post/question/research hit cards themselves are re-skinned
+   by warm/qna.css / warm/research.css; here: the search box,
+   kickers, banners, media tiles, and the tag surfaces.)
+   ========================================================= */
+.explore-search{
+  border-radius:13px;background:var(--card);border:1px solid var(--line);
+  box-shadow:var(--shadow-sm);transition:border-color .15s,box-shadow .15s;
+}
+.explore-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.explore-search .ico{color:var(--muted)}
+button.kbd{cursor:pointer;transition:border-color .15s,color .15s}
+button.kbd:hover{border-color:var(--blue);color:var(--navy)}
+
+.x-kick{
+  font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;
+  color:var(--gold-deep);border-bottom:1px solid var(--line);
+}
+.x-kick small{color:var(--muted)}
+.x-note{background:var(--gold-wash);border:1px solid #e2cf9f;border-radius:11px}
+.x-empty{border:1px dashed #d3c8ac;border-radius:14px;background:var(--paper-2)}
+
+/* per-type group headers over the hit lists (serif navy + count chip) */
+.section-label{
+  font-family:var(--serif);font-size:19px;font-weight:600;
+  letter-spacing:0;text-transform:none;color:var(--navy);
+  border-bottom:1px solid var(--line);padding-bottom:8px;margin:20px 0 12px;
+}
+.section-label .ico{display:inline-block}
+.section-label i{
+  font-style:normal;font-family:var(--sans);font-size:12px;font-weight:700;
+  letter-spacing:0;color:var(--ink-soft);background:var(--card-2);
+  border:1px solid var(--line);border-radius:999px;
+  min-width:24px;height:22px;display:inline-grid;place-items:center;padding:0 8px;
+}
+
+/* featured research hero — warm card, gold accents, gold hover */
+.r-hero{
+  border:1px solid var(--line);background:var(--card);border-radius:15px;
+  padding:0;overflow:hidden;transition:border-color .15s;
+}
+.r-hero:hover{border-color:var(--gold)}
+.rh-ph{height:236px}
+.rh-panel{
+  left:18px;right:18px;bottom:18px;max-width:560px;
+  background:rgba(255,253,248,.96);border:1px solid var(--line);
+  border-inline-start:3px solid var(--gold);border-radius:11px;padding:14px 18px;
+}
+.rh-meta{
+  display:inline-block;background:var(--gold-wash);color:var(--gold-deep);
+  font-size:10.5px;font-weight:700;letter-spacing:1px;
+  padding:3px 9px;border-radius:999px;margin-bottom:6px;
+}
+.r-hero h3{color:var(--navy)}
+
+/* media tiles — hero reel + reel grid (gradient cover, mono label) */
+.hero-reel{
+  border:1px solid var(--line);background:var(--card);border-radius:15px;
+  padding:0;overflow:hidden;transition:border-color .15s;
+}
+.hero-reel:hover{border-color:var(--blue)}
+.hr-ph{border-radius:0}
+.hr-ov{left:0;right:0;bottom:0;padding:56px 18px 16px;background:linear-gradient(transparent,rgba(20,17,12,.84))}
+.hr-tx i{font-family:var(--mono);letter-spacing:1.2px;color:#e5ddc9}
+.explore-reels .plate-reel{
+  border:1px solid var(--line);background:var(--card);border-radius:14px;
+  padding:0;overflow:hidden;transition:border-color .15s;
+}
+.explore-reels .plate-reel:hover{border-color:var(--blue)}
+.explore-reels .pr-dur{
+  top:8px;right:auto;inset-inline-end:8px;
+  background:rgba(20,17,12,.66);border:0;border-radius:999px;
+  color:#f0e8d6;font-family:var(--mono);padding:3px 8px;
+}
+.explore-reels .pr-strip{
+  left:auto;inset-inline-start:11px;bottom:11px;
+  background:rgba(255,253,248,.92);border:1px solid var(--line);border-radius:8px;
+}
+.explore-reels .pr-title{color:var(--ink)}
+
+/* trending-sounds rail — play chip goes navy on hover */
+.rail-row .icon-btn.tint{background:var(--blue-wash);color:var(--navy)}
+.rail-row .icon-btn.tint:hover{background:var(--navy);color:#f7f3ea}
+
+/* (no .tag-pill rules: the base .tag-pill/.tagcloud classes are dead —
+   no JSX renders them; Explore's trending tags are .chip buttons,
+   already skinned by warm/theme.css + core.css chip rules) */
+
+/* =========================================================
+   5 · ShareSheet — bottom sheet / modal card
+   ========================================================= */
+.dlg.share-sheet{border-radius:18px}
+@media(max-width:600px){
+  /* re-assert the base responsive bottom-sheet shape our
+     higher-specificity radius above would otherwise beat */
+  .dlg.share-sheet{border-radius:20px 20px 0 0}
+}
+.share-sheet .dlg-ic{background:var(--blue-wash);color:var(--navy)}
+.share-title{font-family:var(--serif);font-size:15px;color:var(--ink-2)}
+.share-count{background:var(--blue-wash);border-color:transparent;color:var(--blue)}
+.share-act{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  color:var(--ink-2);
+}
+.share-act:hover{background:var(--card-2);border-color:#d8d0bd}
+.share-url{background:#fcfaf4;border:1px solid #ddd4c0;border-radius:10px;color:var(--ink-soft)}
+
+/* =========================================================
+   6 · TagInput — chips are blue-wash tag pills
+   (the boxed .tag-chips field itself is skinned by theme.css)
+   ========================================================= */
+.tag-input .tag-chips:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.tag-input .tag-chips .chip.on{
+  background:var(--blue-wash);border:1px solid transparent;border-radius:999px;
+  color:var(--blue);font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;
+  padding:4px 12px;
+}
+.tag-input .tag-chips .chip.on:hover{border-color:var(--blue);background:var(--blue-wash);color:var(--navy)}
+.tag-input .tag-suggest{border-color:var(--line);border-radius:12px;box-shadow:var(--shadow-lg);padding:5px}
+.tag-input .tag-suggest-row{border-radius:9px;font-size:13.5px;text-align:start}
+.tag-input .tag-suggest-row:hover{background:var(--blue-wash)}
+
+/* =========================================================
+   7 · MentionBox — popover card, active row blue-wash
+   ========================================================= */
+.mention-pop{border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg)}
+.mention-opt{border-radius:9px;text-align:start}
+.mention-opt.on,.mention-opt:hover{background:var(--blue-wash)}
+.mention-meta b{font-size:13.5px;color:var(--ink)}
+.mention-meta small{color:var(--muted)}

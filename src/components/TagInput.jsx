@@ -27,7 +27,11 @@ export function TagInput({ value = [], onChange, scope = 'ALL', placeholder = 'A
   const [suggestions, setSuggestions] = React.useState([])
   const [focused, setFocused] = React.useState(false)
 
-  const tags = Array.isArray(value) ? value : []
+  /* `value` defaults to a fresh `[]` on every render when the caller omits it,
+     so the guard has to be memoised on `value` itself — otherwise `tags` is a
+     new array each time and `tagsSet` below rebuilds on every keystroke
+     instead of only when the tags actually change. */
+  const tags = React.useMemo(() => (Array.isArray(value) ? value : []), [value])
   const canAddMore = tags.length < MAX_TAGS
 
   const tagsSet = React.useMemo(() => new Set(tags.map(t => t.toLowerCase())), [tags])

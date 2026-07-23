@@ -538,7 +538,7 @@ export function QuestionPage() {
               {/* reply composer + thread */}
               {replyTo === a.id && (
                 <div className="cmt-box" style={{ marginTop:10 }}>
-                  <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={28} src={user?.profileImage}/>
+                  <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#2d5f97,#16283f)" size={28} src={user?.profileImage}/>
                   <MentionBox className="field" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
                     onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null) } }}/>
                   <input ref={replyFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setReplyFile(f); e.target.value='' }}/>

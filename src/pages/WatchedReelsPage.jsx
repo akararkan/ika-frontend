@@ -5,7 +5,7 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Icon, Avatar, showToast } from '../components/ui.jsx'
+import { Icon, showToast } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { api } from '../api/index.js'

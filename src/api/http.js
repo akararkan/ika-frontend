@@ -9,6 +9,34 @@
    ========================================================= */
 import { API_BASE, session } from './config.js'
 
+/* ---------- big-integer-safe JSON ----------
+   Message ids are Snowflakes — 18-digit longs, an order of magnitude ABOVE
+   Number.MAX_SAFE_INTEGER (9007199254740991). `JSON.parse` turns them into
+   doubles, and the double's shortest decimal form is a DIFFERENT integer:
+   355456387759665152 comes back out of `String(n)` as 355456387759665150,
+   which the backend answers with 404. Ids are identity, never arithmetic, so
+   every integer too large to survive the round trip is kept as its exact
+   decimal STRING and compared with the helpers in ./ids.js.
+
+   The alternation consumes whole string literals first, so digits inside a
+   string are never touched, and a number is only quoted when it is preceded
+   by a JSON delimiter (`:`/`,`/`[`/space) — which is why the fractional part
+   of `1.2345678901234567` can't be mistaken for an id. */
+const BIG_INT_RE = /"(?:\\.|[^"\\])*"|([:,[\s])(-?\d{16,})(?![\d.eE])/g
+
+function quoteBigInts(text) {
+  return text.replace(BIG_INT_RE, (whole, lead, digits) => {
+    if (digits === undefined) return whole                       // a string literal — leave it alone
+    return Number.isSafeInteger(Number(digits)) ? whole : `${lead}"${digits}"`
+  })
+}
+
+/** JSON.parse that never silently rounds a Snowflake. Exported because the
+ *  SSE stream parses its own frames and must agree with the REST layer. */
+export function parseJson(text) {
+  return JSON.parse(quoteBigInts(text))
+}
+
 export class ApiError extends Error {
   constructor(status, code, message, payload) {
     super(message || code || `HTTP ${status}`)
@@ -53,7 +81,7 @@ function buildUrl(path, query) {
 async function parseError(res) {
   let body = null
   const text = await res.text().catch(() => '')
-  if (text) { try { body = JSON.parse(text) } catch { /* bare / non-json body */ } }
+  if (text) { try { body = parseJson(text) } catch { /* bare / non-json body */ } }
 
   // 429 can arrive as a JSON envelope OR a bare proxy/edge body that only carries a
   // `Retry-After` header — handle both so the friendly message + cooldown seconds work
@@ -120,7 +148,7 @@ function endSession() {
 }
 
 export async function request(method, path, opts = {}) {
-  const { body, query, headers = {}, multipart = false, signal, _retried = false } = opts
+  const { body, query, headers = {}, multipart = false, signal, keepalive = false, _retried = false } = opts
 
   const finalHeaders = { Accept: 'application/json', ...headers }
   const token = session.getToken()
@@ -140,13 +168,20 @@ export async function request(method, path, opts = {}) {
     body: payload,
     credentials: 'include',                 // send the access_token cookie too
     signal,
+    /* `keepalive` lets a request outlive the document — the only way to land a
+       "I'm leaving" call from a `pagehide` handler, where an ordinary fetch is
+       cancelled as the tab goes away. Preferred over navigator.sendBeacon
+       because that cannot set an Authorization header. Browsers cap the total
+       keepalive body at 64 KB, so only use it for small, fire-and-forget
+       writes. A failure here is unobservable by design. */
+    keepalive: keepalive || undefined,
   })
 
   if (res.ok) {
     if (res.status === 204) return null
     const text = await res.text()
     if (!text) return null
-    try { return JSON.parse(text) } catch { return text }   // some endpoints return plain string
+    try { return parseJson(text) } catch { return text }   // some endpoints return plain string
   }
 
   const err = await parseError(res)

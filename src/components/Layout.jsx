@@ -9,35 +9,47 @@ import { ToastHost, Loader } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
 import { ShareHost } from './ShareSheet.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
+import { CallOverlay } from './chat/CallOverlay.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
 
 const NAV = [
-  { to:'/',              icon:'home',     label:'Home', end:true },
-  { to:'/explore',       icon:'search',   label:'Explore' },
-  { to:'/reels',         icon:'reels',    label:'Reels' },
-  { to:'/qna',           icon:'qna',      label:'Q&A' },
-  { to:'/research',      icon:'research', label:'Research' },
-  { to:'/notifications', icon:'bell',     label:'Notifications' },
-  { to:'/activity',      icon:'list',     label:'Activity' },
-  { to:'/saved',         icon:'bookmark', label:'Saved' },
-  { to:'/profile',       icon:'user',     label:'Profile' },
-  { to:'/settings',      icon:'settings', label:'Settings' },
+  { to:'/',              icon:'home',      label:'Home', end:true },
+  { to:'/explore',       icon:'search',    label:'Explore' },
+  { to:'/reels',         icon:'reels',     label:'Reels' },
+  { to:'/qna',           icon:'qna',       label:'Q&A' },
+  { to:'/research',      icon:'research',  label:'Research' },
+  { to:'/notifications', icon:'bell',      label:'Notifications' },
+  { to:'/chat',          icon:'chat',      label:'Messages' },
+  { to:'/channels',      icon:'broadcast', label:'Channels' },
+  { to:'/live',          icon:'megaphone', label:'Live' },
+  { to:'/activity',      icon:'list',      label:'Activity' },
+  { to:'/saved',         icon:'bookmark',  label:'Saved' },
+  { to:'/profile',       icon:'user',      label:'Profile' },
+  { to:'/settings',      icon:'settings',  label:'Settings' },
 ]
 
-// Main pages → bottom tab bar; every page (incl. these) → the sidebar drawer.
+/* Main pages → bottom tab bar; every page (incl. these) → the sidebar drawer.
+   Messages is a first-class tab here, not just a topbar icon: on a phone the
+   topbar shortcut competes with the search field for the same row, and chat
+   is the one surface people return to on a loop. It carries the same live
+   `totalUnread` badge the sidebar and topbar read. */
 const BOTTOM_TABS = [
-  { to:'/',      icon:'home',  label:'Home', end:true },
-  { to:'/reels', icon:'reels', label:'Reels' },
-  { to:'/qna',   icon:'qna',   label:'Q&A' },
-  { to:'/profile', icon:'user', label:'You' },
+  { to:'/',        icon:'home',  label:'Home', end:true },
+  { to:'/reels',   icon:'reels', label:'Reels' },
+  { to:'/chat',    icon:'chat',  label:'Chats', badge:'chat' },
+  { to:'/profile', icon:'user',  label:'You' },
 ]
 
 export function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
-  const me = user || { full: 'You', handle: 'you', initials: 'Y', avc: '#1b1813' }
+  // Layout renders inside <ChatProvider> (App.jsx), so the chat badge reads the
+  // same live socket every chat surface uses — no second stream for the shell.
+  const { totalUnread } = useChat()
+  const me = user || { full: 'You', handle: 'you', initials: 'Y', avc: '#1d3a5f' }
   const [composeType, setComposeType] = React.useState(null)
   const [editPost, setEditPost] = React.useState(null)
   const [search, setSearch] = React.useState('')
@@ -143,7 +155,19 @@ export function Layout() {
         </div>
 
         <div className="tb-actions">
-          <button className="icon-btn" style={{ position:'relative' }} onClick={() => navigate('/notifications')}>
+          <button className="icon-btn" style={{ position:'relative' }} onClick={() => navigate('/chat')}
+            aria-label={totalUnread > 0 ? `Messages, ${totalUnread} unread` : 'Messages'} title="Messages">
+            <Icon name="chat"/>
+            {totalUnread > 0 && (
+              /* keyed on the value: a changed count remounts the bubble and
+                 restarts its pop animation — the badge beats in realtime */
+              <span key={totalUnread} className={'count' + (totalUnread > 9 ? ' wide' : '')} aria-hidden="true">
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </span>
+            )}
+          </button>
+          <button className="icon-btn" style={{ position:'relative' }} onClick={() => navigate('/notifications')}
+            aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} title="Notifications">
             <Icon name="bell"/>{unread > 0 && <span className="dot"/>}
           </button>
           <button className="icon-btn tint" onClick={() => setComposeType('TEXT')}><Icon name="feather"/></button>
@@ -168,6 +192,9 @@ export function Layout() {
               className={({ isActive }) => 'nav-item ' + (isActive ? 'active' : '')}>
               <Icon name={n.icon}/><span>{n.label}</span>
               {n.to === '/notifications' && unread > 0 && <span className="badge">{unread}</span>}
+              {n.to === '/chat' && totalUnread > 0 && (
+                <span className="badge">{totalUnread > 99 ? '99+' : totalUnread}</span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -196,21 +223,33 @@ export function Layout() {
       </main>
 
       <nav className="botnav">
-        <NavLink to={BOTTOM_TABS[0].to} end className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name={BOTTOM_TABS[0].icon}/><small>{BOTTOM_TABS[0].label}</small>
-        </NavLink>
-        <NavLink to={BOTTOM_TABS[1].to} className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name={BOTTOM_TABS[1].icon}/><small>{BOTTOM_TABS[1].label}</small>
-        </NavLink>
-        <a className="mid" onClick={() => setComposeType('TEXT')} aria-label="Create">
-          <span className="plus"><Icon name="feather"/></span>
-        </a>
-        <NavLink to={BOTTOM_TABS[2].to} className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name={BOTTOM_TABS[2].icon}/><small>{BOTTOM_TABS[2].label}</small>
-        </NavLink>
-        <NavLink to={BOTTOM_TABS[3].to} className={({ isActive }) => isActive ? 'active' : ''}>
-          <Icon name={BOTTOM_TABS[3].icon}/><small>{BOTTOM_TABS[3].label}</small>
-        </NavLink>
+        {/* Rendered from the table rather than four hand-written links so the
+            create button can sit in the middle without the tabs drifting out
+            of sync with BOTTOM_TABS. */}
+        {BOTTOM_TABS.map((t, i) => (
+          <React.Fragment key={t.to}>
+            {i === 2 && (
+              <a className="mid" onClick={() => setComposeType('TEXT')} aria-label="Create">
+                <span className="plus"><Icon name="feather"/></span>
+              </a>
+            )}
+            <NavLink to={t.to} end={t.end}
+              className={({ isActive }) => isActive ? 'active' : ''}
+              aria-label={t.badge === 'chat' && totalUnread > 0
+                ? `${t.label}, ${totalUnread} unread`
+                : undefined}>
+              <span className="botnav-ico">
+                <Icon name={t.icon}/>
+                {t.badge === 'chat' && totalUnread > 0 && (
+                  <span key={totalUnread} className="botnav-dot" aria-hidden="true">
+                    {totalUnread > 9 ? '9+' : totalUnread}
+                  </span>
+                )}
+              </span>
+              <small>{t.label}</small>
+            </NavLink>
+          </React.Fragment>
+        ))}
       </nav>
 
       {composeType && (
@@ -220,6 +259,9 @@ export function Layout() {
           onClose={closeCompose} onPublished={onPublished} onEdited={onEdited}/>
       )}
       <div className={'nav-scrim' + (navOpen ? ' open' : '')} aria-hidden={!navOpen} onClick={() => setNavOpen(false)}/>
+      {/* App-wide: a call has to be answerable from wherever you are, and its
+          <video> elements must survive route changes mid-negotiation. */}
+      <CallOverlay/>
       <ToastHost/>
       <DialogHost/>
       <ShareHost/>

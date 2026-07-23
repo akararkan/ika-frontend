@@ -53,17 +53,17 @@ const MD_TOOLS = [
    sees in the editor is what they get on the published research page.
    The classes themselves are defined in styles-richtext.css. */
 const TEXT_COLORS = [
-  { cls:'tc-ink',     val:'#1b1813' },
-  { cls:'tc-soft',    val:'#5e574b' },
-  { cls:'tc-muted',   val:'#9b948e' },
-  { cls:'tc-light',   val:'#d8d4cb' },
-  { cls:'tc-rose',    val:'#c2453f' },
-  { cls:'tc-brass',   val:'#b3271e' },
-  { cls:'tc-emerald', val:'#b3271e' },
-  { cls:'tc-blue',    val:'#1f3a6e' },
-  { cls:'tc-brown',   val:'#6e4a2f' },
-  { cls:'tc-deep',    val:'#5a2a1a' },
-  { cls:'tc-bright',  val:'#c9382f' },
+  { cls:'tc-ink',     val:'#221e17' },
+  { cls:'tc-soft',    val:'#57503f' },
+  { cls:'tc-muted',   val:'#8b8371' },
+  { cls:'tc-light',   val:'#d8cfba' },
+  { cls:'tc-rose',    val:'#b3453e' },
+  { cls:'tc-brass',   val:'#b3873e' },
+  { cls:'tc-emerald', val:'#1d3a5f' },
+  { cls:'tc-blue',    val:'#2d5f97' },
+  { cls:'tc-brown',   val:'#7a5b3f' },
+  { cls:'tc-deep',    val:'#16283f' },
+  { cls:'tc-bright',  val:'#3a6ca5' },
   { cls:'tc-white',   val:'#ffffff' },
 ]
 const HIGHLIGHT_COLORS = [

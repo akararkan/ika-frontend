@@ -1,8 +1,8 @@
 /* =========================================================
    Tiny shared state components — loader, empty, error.
-   TADHHIB-illuminated: girih empty states, floating medallion
-   icon, shimmering gold loader bar. Visuals live in
-   styles/tadhhib/core.css (.t-loader / .t-empty / .t-error).
+   Warm Archive: quiet warm-paper empty states, navy medallion
+   icon, gentle loader bar. Visuals live in
+   styles/warm/core.css (.t-loader / .t-empty / .t-error).
    ========================================================= */
 import { Icon } from './ui.jsx'
 

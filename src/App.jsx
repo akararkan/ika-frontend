@@ -12,6 +12,8 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, RequireAuth } from './context/AuthContext.jsx'
+import { ChatProvider } from './context/ChatContext.jsx'
+import { CallProvider } from './context/CallContext.jsx'
 import { Layout } from './components/Layout.jsx'
 import { Loader } from './components/states.jsx'
 
@@ -33,6 +35,10 @@ const ProfilePage        = named(() => import('./pages/ProfilePage.jsx'), 'Profi
 const UserProfilePage    = named(() => import('./pages/UserProfilePage.jsx'), 'UserProfilePage')
 const SettingsPage       = named(() => import('./pages/SettingsPage.jsx'), 'SettingsPage')
 const TagPage            = named(() => import('./pages/TagPage.jsx'), 'TagPage')
+const ChatPage           = named(() => import('./pages/ChatPage.jsx'), 'ChatPage')
+const ChatJoinPage       = named(() => import('./pages/ChatJoinPage.jsx'), 'ChatJoinPage')
+const ChannelsPage       = named(() => import('./pages/ChannelsPage.jsx'), 'ChannelsPage')
+const LivePage           = named(() => import('./pages/LivePage.jsx'), 'LivePage')
 
 const fullScreenLoader = <div className="main center"><div className="col-main"><Loader label="Loading…"/></div></div>
 
@@ -47,7 +53,20 @@ export default function App() {
             <Route path="/register" element={<AuthPage mode="SIGN_UP"/>}/>
 
             {/* protected app shell */}
-            <Route element={<RequireAuth><Layout/></RequireAuth>}>
+            {/* ChatProvider wraps the shell (not just the chat route) so the ONE
+                /messaging/stream socket and the unread badge live app-wide.
+                CallProvider sits INSIDE it — it consumes that socket's firehose
+                via subscribe() — and above <Layout/> so an incoming call rings
+                on the feed, not only on /chat. */}
+            <Route element={
+              <RequireAuth>
+                <ChatProvider>
+                  <CallProvider>
+                    <Layout/>
+                  </CallProvider>
+                </ChatProvider>
+              </RequireAuth>
+            }>
               <Route index element={<FeedPage/>}/>
               <Route path="explore" element={<ExplorePage/>}/>
               <Route path="tags/:tag" element={<TagPage/>}/>
@@ -59,6 +78,19 @@ export default function App() {
               <Route path="research" element={<ResearchPage/>}/>
               <Route path="research/:id" element={<ResearchDetailPage/>}/>
               <Route path="posts/:id" element={<PostPage/>}/>
+              <Route path="chat" element={<ChatPage/>}/>
+              <Route path="chat/requests" element={<ChatPage/>}/>
+              {/* invite links are shared as URLs, so joining has to be a real
+                  route — it redeems the token then replaces itself with the
+                  group's thread. Declared BEFORE chat/:id so "join" is never
+                  mistaken for a conversation id. */}
+              <Route path="chat/join/:token" element={<ChatJoinPage/>}/>
+              <Route path="chat/:id" element={<ChatPage/>}/>
+              {/* A channel IS a conversation — /channels only creates,
+                  discovers and subscribes; reading opens /chat/<channelId>. */}
+              <Route path="channels" element={<ChannelsPage/>}/>
+              <Route path="live" element={<LivePage/>}/>
+              <Route path="live/:id" element={<LivePage/>}/>
               <Route path="notifications" element={<NotificationsPage/>}/>
               <Route path="activity" element={<ActivityPage/>}/>
               <Route path="saved" element={<SavedPage/>}/>

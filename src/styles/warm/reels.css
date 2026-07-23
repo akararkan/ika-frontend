@@ -1,0 +1,362 @@
+/* IKA "Warm Archive" — reels (replaces tadhhib/reels.css) */
+/* =============================================================
+   The only dark surfaces of the Warm Archive: the reels viewer
+   (#141210 / #eee7d8) and the watched-history page. Comments ride
+   in on a LIGHT card. Loads after every base file — equal
+   specificity wins by order.
+
+   NOTE FOR INTEGRATOR — structure recreated here, not just skin:
+   .rv-track/.rv-cell (sliding track), .rv-flash (removed by JSX
+   onAnimationEnd — it MUST animate), .rv-ambient, .rv-seek-buf,
+   .rv-seek-time and the whole .rvc* comments panel had their only
+   structural rules in tadhhib/social.css (deleted). They live here
+   now; warm/social.css must not redefine them.
+   PlayableVideo internals (.media-video-shell, object-fit) are
+   deliberately untouched per the area contract.
+   ============================================================= */
+
+/* ---------- area keyframes (unique names) ---------- */
+@keyframes w-reels-fade{from{opacity:0}to{opacity:1}}
+@keyframes w-reels-up{from{transform:translateY(16%);opacity:0}to{transform:none;opacity:1}}
+@keyframes w-reels-flash{0%{opacity:0;transform:scale(.55)}18%{opacity:1;transform:scale(1.04)}55%{opacity:1}100%{opacity:0;transform:scale(1.3)}}
+@keyframes w-reels-cue{0%,100%{box-shadow:0 8px 22px rgba(0,0,0,.34)}50%{box-shadow:0 8px 30px rgba(179,135,62,.45)}}
+
+/* =============== 1 · The dark chamber =============== */
+.reels-view{background:#141210;color:#eee7d8}
+.rv-top{background:linear-gradient(180deg,rgba(10,8,5,.62),transparent)}
+
+/* =============== 2 · Top chrome — outlined dark pills =============== */
+/* pills outlined #3a352b, hover #26221b; active = warm paper leaf */
+.rv-segs{background:rgba(20,18,15,.6);border:1px solid #3a352b;box-shadow:0 6px 18px rgba(0,0,0,.32)}
+.rv-segs .rv-tab{opacity:1;color:#c9c1ad;transition:background .15s ease,color .15s ease}
+.rv-segs .rv-tab:hover:not(.on){background:#26221b;color:#fff}
+.rv-segs .rv-tab.on{background:#f4f0e7;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.rv-close{background:rgba(20,18,15,.5);border:1px solid #3a352b;color:#c9c1ad}
+.rv-close:hover{background:#26221b;color:#fff}
+
+/* =============== 3 · Stage — 9/16 plate on desktop =============== */
+@media(min-width:721px){
+  .rv-card{
+    width:auto;max-width:min(440px,96vw);
+    height:100%;max-height:calc(100vh - 96px);
+    aspect-ratio:9/16;
+    border-radius:20px;overflow:hidden;
+    /* soft rim + a deep, diffuse drop so the clip floats off the dark page */
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.07),
+      0 2px 6px rgba(0,0,0,.35),
+      0 28px 80px -12px rgba(0,0,0,.62);
+  }
+}
+/* gentle vignette — pulls the eye to the centre of the frame */
+.rv-card::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(120% 85% at 50% 45%,transparent 55%,rgba(0,0,0,.28) 100%);
+}
+.rv-card.rv-skel::after{content:none}
+.rv-stage{cursor:grab;touch-action:none}
+.rv-stage:active{cursor:grabbing}
+
+/* sliding track mechanics (structural — see header note).
+   Snappier spring than the original .55s: the clip is already buffered
+   (see .rv-preload), so a longer glide only made it feel sluggish. */
+.rv-track{
+  position:absolute;inset:0;
+  transition:transform .38s cubic-bezier(.22,.9,.24,1);
+  will-change:transform;backface-visibility:hidden;
+}
+.rv-track.dragging{transition:none}
+.rv-cell{
+  position:absolute;inset:0;display:grid;place-items:center;
+  transform:translate3d(0,calc(var(--i)*100%),0);   /* 3d → own compositor layer, no repaint mid-slide */
+  contain:layout paint;
+}
+.rv-card.rv-peek .rv-bg{filter:brightness(.62) saturate(.9);transition:filter .3s ease}
+
+/* hidden buffer element for the next clip — must stay rendered (not
+   display:none) or browsers skip the preload entirely */
+.rv-preload{
+  position:absolute;width:1px;height:1px;opacity:0;
+  pointer-events:none;z-index:-1;object-fit:cover;
+}
+
+/* first-load skeleton — a calm shimmer instead of bare "Loading reels…" text */
+@keyframes w-reels-sheen{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
+.rv-skel{
+  position:relative;overflow:hidden;
+  background:linear-gradient(165deg,#221d16,#141210);
+  display:grid;place-items:center;
+}
+.rv-skel-sheen{
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.07) 50%,transparent 70%);
+  animation:w-reels-sheen 1.5s ease-in-out infinite;
+}
+@media(prefers-reduced-motion:reduce){.rv-skel-sheen{animation:none}}
+
+/* warm scrims — chrome legible over any clip. Extra stops = a smoother ramp
+   with no visible banding edge across the middle of the frame. */
+.rv-scrim{
+  background:linear-gradient(180deg,
+    rgba(10,8,5,.55) 0%,
+    rgba(10,8,5,.18) 12%,
+    transparent 26%,
+    transparent 48%,
+    rgba(10,8,5,.22) 66%,
+    rgba(10,8,5,.58) 84%,
+    rgba(8,6,4,.9) 100%);
+}
+.rv-bg::after{background:linear-gradient(180deg,transparent 40%,rgba(10,8,5,.85))}
+
+/* letterbox glow behind the clip (poster arrives as an inline
+   background-image; this supplies position/size/blur + fallback) */
+.rv-ambient{
+  position:absolute;inset:-7%;z-index:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 30%,#26221b,#0d0b07) center/cover no-repeat;
+  filter:blur(46px) saturate(1.2) brightness(.55);
+  transform:scale(1.16);
+}
+
+/* spinner · pause · double-tap burst · play/pause flash */
+.rv-spin i{border-color:rgba(238,231,216,.18);border-top-color:#e5d3ac}
+.rv-pause{background:rgba(20,17,11,.6);box-shadow:inset 0 0 0 1px #3a352b,0 8px 26px rgba(0,0,0,.4)}
+.rv-burst .ico,.rv-burst .kh-ico{color:#e07a72;fill:#e07a72;stroke:#e07a72;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))}
+.rv-flash{position:absolute;inset:0;z-index:4;display:grid;place-items:center;pointer-events:none}
+.rv-flash .ico{
+  width:30px;height:30px;box-sizing:content-box;padding:22px;border-radius:50%;
+  color:#f4f0e7;fill:#f4f0e7;background:rgba(20,17,11,.6);
+  box-shadow:inset 0 0 0 1px #3a352b,0 14px 40px rgba(0,0,0,.45);
+  animation:w-reels-flash .55s ease-out forwards; /* JSX removes it onAnimationEnd */
+}
+
+/* "tap for sound" nudge — warm pulse instead of the base red glow */
+.rv-soundcue{
+  background:rgba(20,17,11,.7);border-color:rgba(179,135,62,.35);color:#eee7d8;
+  animation:rvCueIn .3s ease both,w-reels-cue 2.2s ease-in-out .3s infinite;
+}
+.rv-soundcue .ico{color:#e5d3ac}
+
+/* mute toggle */
+.rv-mute{background:rgba(38,34,27,.6);border-color:#3a352b}
+.rv-mute:hover{background:#26221b}
+.rv-mute.off{background:rgba(160,62,54,.5);border-color:rgba(224,122,114,.35)}
+
+/* =============== 4 · Foot — white author, outlined Follow, sound row === */
+.rv-meta{color:#fff}
+.rvm-time{font-variant-numeric:tabular-nums;color:rgba(238,231,216,.78);opacity:1}
+.rvm-follow{border-color:rgba(255,255,255,.9);transition:background .15s ease,border-color .15s ease,color .15s ease}
+.rvm-follow:hover{background:rgba(255,255,255,.14)}
+.rvm-follow.on{background:rgba(179,135,62,.18);border-color:rgba(179,135,62,.55);color:#e5d3ac}
+.rvm-caption{color:#f2ecdf}
+.rvm-more{color:#c9c1ad}
+.rvm-sound{background:rgba(20,17,11,.55);box-shadow:inset 0 0 0 1px #3a352b;color:#eee7d8}
+.rvm-sound .ico{color:#e5d3ac}
+
+/* =============== 5 · Action rail — 48px bubbles ===============
+   Must read clearly over ANY video frame (bright or dark). Solid,
+   near-opaque dark bubble + light hairline ring + strong shadow;
+   icons and counts are bright white with a drop-shadow so they never
+   sink into a light clip. */
+.rvr{color:#fff;transition:color .15s ease}
+.rvr:hover{color:#fff}
+.rvr > span{
+  width:48px;height:48px;
+  background:rgba(18,15,11,.9);
+  border:1px solid rgba(255,255,255,.28);
+  box-shadow:0 4px 16px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.35);
+  backdrop-filter:blur(6px) saturate(120%);
+}
+.rvr > span .ico{filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+/* re-assert the base small-phone sizing guards: this file loads after
+   styles-responsive.css, so the unqualified 48px above would otherwise
+   win over them at equal specificity and crowd the caption on tiny
+   screens (base 46px @≤460, 44px @≤380) */
+@media(max-width:460px){.rvr > span{width:46px;height:46px}}
+@media(max-width:380px){.rvr > span{width:44px;height:44px}}
+.rvr:hover > span{background:rgba(30,26,19,.94);border-color:rgba(255,255,255,.42);transform:scale(1.06)}
+.rvr small{
+  font-size:12.5px;font-weight:700;letter-spacing:.2px;color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,.75);
+}
+/* liked = bright, filled warm red — unmistakable */
+.rvr.on{color:#ff6b62}
+.rvr.on > span{
+  background:rgba(176,52,45,.95);border-color:rgba(255,180,174,.75);
+  box-shadow:0 4px 18px rgba(176,52,45,.55),0 2px 8px rgba(0,0,0,.5);
+}
+.rvr.on > span .ico{fill:#fff;stroke:#fff}
+/* saved = bright gold */
+.rvr.sv{color:#f0d9a4}
+.rvr.sv > span{
+  background:rgba(150,110,45,.95);border-color:rgba(233,211,172,.8);
+  box-shadow:0 4px 18px rgba(179,135,62,.5),0 2px 8px rgba(0,0,0,.5);
+}
+.rvr.sv > span .ico{fill:#fff;stroke:#fff}
+/* comments panel open = gold ring */
+.rvr.cv > span{background:rgba(150,110,45,.92);border-color:rgba(233,211,172,.7)}
+
+/* prev/next — 44px outlined circles */
+.rv-nav button{
+  width:44px;height:44px;background:rgba(20,18,15,.4);color:#c9c1ad;
+  border:1px solid #3a352b;transition:background .15s ease,color .15s ease;
+}
+.rv-nav button:hover{background:#26221b;color:#fff}
+
+/* =============== 6 · Seek — gold fill, mono position bubble ========== */
+.rv-seek-track{background:rgba(255,255,255,.24)}
+/* scrub line is WHITE (not gold) — it reads as a video control, not brand chrome */
+.rv-seek-fill{background:#fff;box-shadow:0 0 8px rgba(255,255,255,.45)}
+.rv-seek-thumb{background:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.55)}
+.rv-seek-buf{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:rgba(238,231,216,.16);transition:width .35s ease}
+/* time bubble = the position counter — mono-ish, muted */
+.rv-seek-time{
+  position:absolute;bottom:36px;
+  left:clamp(56px,var(--x),calc(100% - 56px));transform:translateX(-50%);
+  padding:6px 12px;border-radius:999px;white-space:nowrap;pointer-events:none;
+  background:rgba(20,17,11,.85);border:1px solid #3a352b;
+  font-family:var(--mono);font-size:12.5px;font-weight:600;color:#c9c1ad;
+  font-variant-numeric:tabular-nums;box-shadow:0 10px 28px rgba(0,0,0,.5);
+  animation:w-reels-fade .16s ease;
+}
+.rv-seek-time i{font-style:normal;opacity:.55;margin-inline-start:5px}
+.rv-stage.is-scrubbing .rv-seek-track{height:7px}
+.rv-stage.is-scrubbing .rv-seek-thumb{opacity:1;transform:translate(-50%,-50%) scale(1.25)}
+/* chrome steps aside while scrubbing */
+.rv-rail,.rv-meta{transition:opacity .28s ease}
+.rv-stage.is-scrubbing .rv-rail,
+.rv-stage.is-scrubbing .rv-meta{opacity:.12}
+
+/* =============== 7 · Comments — a LIGHT card over the dark page ====== */
+.rvc-scrim{position:absolute;inset:0;z-index:9;background:rgba(12,10,7,.5);animation:w-reels-fade .25s ease}
+.rvc{
+  position:absolute;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--card);color:var(--ink);
+  box-shadow:0 0 70px rgba(0,0,0,.5);
+}
+@media(max-width:720px){
+  .rvc{
+    left:0;right:0;bottom:0;max-height:66dvh;min-height:40dvh;
+    border-radius:16px 16px 0 0;
+    animation:w-reels-up .32s ease;
+  }
+  .rvc::before{ /* grab handle */
+    content:"";position:absolute;top:8px;left:50%;transform:translateX(-50%);
+    width:44px;height:4px;border-radius:4px;background:#d8cfba;
+  }
+}
+@media(min-width:721px){
+  .rvc{
+    top:0;bottom:0;inset-inline-end:0;width:min(400px,92vw);
+    border-start-start-radius:16px;border-end-start-radius:16px;
+    animation:w-reels-fade .25s ease;
+  }
+}
+.rvc-head{display:flex;align-items:center;gap:8px;padding:16px 18px 12px;border-bottom:1px solid var(--line-soft)}
+.rvc-head b{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--navy)}
+.rvc-n{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rvc-x{
+  margin-inline-start:auto;width:32px;height:32px;border-radius:50%;flex:none;
+  display:grid;place-items:center;color:var(--ink-soft);background:var(--card-2);
+  transition:background .15s ease;
+}
+.rvc-x:hover{background:#efe9db}
+.rvc-list{
+  flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  display:flex;flex-direction:column;gap:14px;padding:16px 18px;
+}
+.rvc-row{display:flex;gap:10px}
+.rvc-col{flex:1;min-width:0}
+.rvc-name{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);flex-wrap:wrap}
+.rvc-name b{font-weight:600}
+.rvc-name i{font-style:normal;font-size:11px;color:var(--muted)}
+.rvc-col p{font-size:14px;line-height:1.55;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
+.rvc-empty{color:var(--muted);text-align:center;padding:30px 0;font-size:13.5px}
+.rvc-box{
+  display:flex;align-items:center;gap:10px;flex:none;
+  padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));
+  border-top:1px solid var(--line-soft);background:var(--paper-2);
+}
+/* .rvc-box > .avatar needs NO override: Reels.jsx passes the Avatar an
+   inline blue→navy-deep gradient (#2d5f97,#16283f) that is already
+   on-palette — do not "fix" Reels.jsx:549, it is correct as-is */
+.rvc-field{
+  flex:1;height:40px;border-radius:999px;min-width:0;
+  border:1px solid #ddd4c0;background:var(--card-2);
+  padding:0 16px;color:var(--ink);font-size:14px;
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+.rvc-field::placeholder{color:#a39a85}
+.rvc-field:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.rvc-send{
+  width:38px;height:38px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--navy);color:#f7f3ea;
+  transition:background .15s ease,transform .15s ease,opacity .15s ease;
+}
+.rvc-send:disabled{opacity:.4}
+.rvc-send:not(:disabled):hover{background:var(--navy-deep)}
+.rvc-send:not(:disabled):active{transform:scale(.92)}
+
+/* =============== 8 · Mobile mirror tab bar (≤720px, same breakpoint as
+   base) — only kills the old red glow on the compose seal ============= */
+@media(max-width:720px){
+  .rv-mtabbar a.mid .plus{box-shadow:0 5px 14px rgba(22,40,63,.45)}
+}
+
+/* =============== 9 · Watched history — the dark shelf =============== */
+/* No page-level class exists in WatchedReelsPage.jsx, so the dark surface
+   is scoped with :has(); loader/empty states stay on light paper. */
+.main.center:has(.watched-grid){background:#141210;min-height:calc(100dvh - 58px)}
+.main.center:has(.watched-grid) .phead h1{color:#eee7d8}
+.main.center:has(.watched-grid) .phead h1 em{color:#d9b96c}
+.main.center:has(.watched-grid) .phead-ar{color:#8b8371}
+.main.center:has(.watched-grid) .phead .sub{color:#c9c1ad}
+.main.center:has(.watched-grid) .btn-secondary{background:transparent;border-color:#3a352b;color:#c9c1ad}
+.main.center:has(.watched-grid) .btn-secondary:hover{background:#26221b;border-color:#3a352b;color:#eee7d8}
+
+/* 9/14 tiles, radius 14, caption gradient overlay, gold watched bar */
+.watched-card.plate-reel{
+  position:relative;padding:0;gap:0;
+  background:#1b1712;border:1px solid #26221b;border-radius:14px;overflow:hidden;
+  transition:border-color .16s ease,transform .16s ease;
+}
+.watched-card.plate-reel:hover{border-color:rgba(179,135,62,.55);transform:translateY(-2px)}
+.watched-card .pr-scr::after{ /* full-width gold "watched" bar */
+  content:"";position:absolute;left:0;right:0;bottom:0;height:3px;
+  background:var(--gold);z-index:2;pointer-events:none;
+}
+.watched-card .pr-strip{
+  position:absolute;inset-inline:0;bottom:0;z-index:1;pointer-events:none;
+  padding:26px 12px 12px;gap:2px;
+  background:linear-gradient(transparent,rgba(10,8,5,.85));
+}
+.watched-card .pr-title{color:#f2ecdf}
+.watched-card .pr-sub{color:#c9c1ad;font-size:11px;font-weight:600;letter-spacing:.2px;text-transform:none}
+.watched-card .pr-play{
+  background:rgba(20,17,11,.62);z-index:1;
+  box-shadow:inset 0 0 0 1px #3a352b,0 6px 16px -6px rgba(0,0,0,.45);
+  transition:transform .16s ease,background .16s ease;
+}
+.watched-card:hover .pr-play{transform:translate(-50%,-50%) scale(1.08);background:rgba(20,17,11,.8)}
+.watched-card .pr-dur{
+  background:rgba(20,17,11,.78);color:#e5d3ac;
+  border:1px solid rgba(179,135,62,.4);border-radius:999px;z-index:2;
+}
+.watched-x{background:rgba(20,17,11,.75);z-index:3}
+.watched-x:hover{background:var(--danger)}
+.watched-fallback{background:linear-gradient(160deg,#2a2317,#141210)}
+
+/* =============== 10 · Sound picker (compose modal — light) ==========
+   Tokens already re-point its inline var()s to navy; just settle the
+   attach chip + row hovers onto warm card surfaces. */
+.cm-attach{background:var(--card-2)}
+.cm-attach-row button{color:var(--ink-soft)}
+.cm-attach-row button:hover{background:#efe9db}
+
+/* =============== 11 · Reduced motion =============== */
+@media(prefers-reduced-motion:reduce){
+  .rv-track{transition:none}
+  .rvc,.rvc-scrim,.rv-seek-time{animation:none}
+  .rv-soundcue{animation:none}
+  .rv-flash .ico{animation-duration:.25s} /* must still end — JSX unmounts onAnimationEnd */
+  .watched-card.plate-reel,.watched-card.plate-reel:hover{transform:none}
+}

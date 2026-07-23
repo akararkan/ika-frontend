@@ -74,6 +74,14 @@ export function Reels({ onClose, initialId }) {
   const videoUrl = m0 && m0.type === 'VIDEO' ? m0.url : null
   const u = reel ? authorOf(reel) : null
 
+  // Advancing used to buffer from scratch because only the active cell mounts a
+  // player. Warm the NEXT clip in a hidden, muted, never-played element so its
+  // data is already buffered by the time it becomes active. One clip ahead only
+  // — preloading more would fight the active stream for bandwidth.
+  const nextReel = reels[idx + 1]
+  const nextM = nextReel?.media?.[0]
+  const nextVideoUrl = nextM && nextM.type === 'VIDEO' ? nextM.url : null
+
   // Old rows have no videoUrl and may carry an image cover → on load error,
   // hydrate the full post once (mediaUrls/mediaTypes have the real VIDEO).
   const hydrated = React.useRef(new Set())
@@ -155,9 +163,17 @@ export function Reels({ onClose, initialId }) {
     return 0
   }
   const [buffered, setBuffered] = React.useState(0)
+  /* The clip's duration, mirrored into state from the video's own events.
+     The scrub readout used to call `durOf(videoRef.current)` inline in the
+     JSX — a ref read DURING RENDER, which React cannot track: the element it
+     points at can change without re-rendering, so the timestamp could show a
+     stale duration (or 0) with nothing to invalidate it. Feeding it through
+     state makes the readout a function of rendered data like everything else. */
+  const [duration, setDuration] = React.useState(0)
   const onTime = (e) => {
     const v = e.target, d = durOf(v)
     if (!d) return
+    setDuration(prev => (prev === d ? prev : d))     // functional: no churn, no stale closure
     try { if (v.buffered && v.buffered.length) setBuffered(Math.min(1, v.buffered.end(v.buffered.length - 1) / d)) } catch { /* ignore */ }
     if (!scrubbing.current) setProgress(v.currentTime / d)
   }
@@ -257,6 +273,16 @@ export function Reels({ onClose, initialId }) {
     wheelLock.current = now
     step(e.deltaY > 0 ? 1 : -1)
   }
+  /* Comments-sheet state, declared ABOVE the keydown effect that closes over
+     `setCmtOpen`. It read fine before only because the listener runs after the
+     first render, by which point the binding is initialised — but the source
+     order said "used before declared", which is a real trip hazard the next
+     time someone moves code here. Declaration order now matches use order. */
+  const [cmtOpen, setCmtOpen] = React.useState(false)
+  const [cmts, setCmts] = React.useState(null)          // null = not loaded yet
+  const [cText, setCText] = React.useState('')
+  const [cBusy, setCBusy] = React.useState(false)
+
   React.useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') { setCmtOpen(false); return }        // always works, even while typing
@@ -323,12 +349,8 @@ export function Reels({ onClose, initialId }) {
     ;(now ? api.users.follow(id) : api.users.unfollow(id)).catch(() => setFollowed(f => ({ ...f, [id]: !now })))
   }
 
-  // ---- In-place comments sheet — comment without ever leaving the reel ----
-  const [cmtOpen, setCmtOpen] = React.useState(false)
-  const [cmts, setCmts] = React.useState(null)          // null = not loaded yet
-  const [cText, setCText] = React.useState('')
-  const [cBusy, setCBusy] = React.useState(false)
-  React.useEffect(() => { setCmtOpen(false); setCmts(null); setCText(''); setProgress(0); setBuffered(0) }, [reel?.id])
+  // ---- In-place comments sheet (state hoisted above the keydown effect) ----
+  React.useEffect(() => { setCmtOpen(false); setCmts(null); setCText(''); setProgress(0); setBuffered(0); setDuration(0) }, [reel?.id])
   const openComments = () => {
     setCmtOpen(true)
     if (cmts == null) api.posts.comments(reel.id, { pageSize: 30 }).then(r => setCmts(r || [])).catch(() => setCmts([]))
@@ -357,7 +379,12 @@ export function Reels({ onClose, initialId }) {
       </div>
 
       {loading ? (
-        <div className="rv-stage" style={{ color:'#fff' }}>Loading reels…</div>
+        <div className="rv-stage">
+          <div className="rv-card rv-skel" role="status" aria-label="Loading reels">
+            <span className="rv-skel-sheen" aria-hidden="true"/>
+            <div className="rv-spin" aria-hidden="true"><i/></div>
+          </div>
+        </div>
       ) : !reel ? (
         <div className="rv-stage" style={{ color:'#fff' }}>
           <div style={{ textAlign:'center' }}>{tab === 'FOLLOWING' ? 'No reels from people you follow yet.' : 'No reels yet.'}</div>
@@ -368,6 +395,11 @@ export function Reels({ onClose, initialId }) {
               active index — it follows the finger live, then springs to rest.
               Only the active cell mounts the real player; its neighbours show
               their poster so the frame is already there mid-scroll. */}
+          {/* buffers the next clip so advancing is instant (see nextVideoUrl) */}
+          {nextVideoUrl && (
+            <video key={'pre-' + (nextReel.id || idx + 1)} className="rv-preload" src={nextVideoUrl}
+              preload="auto" muted playsInline aria-hidden="true" tabIndex={-1}/>
+          )}
           <div ref={trackRef} className={'rv-track' + (dragging ? ' dragging' : '')} style={{ transform: `translateY(${idx * -100}%)` }}>
           {reels.map((r, i) => (
           <div key={r.id || i} className="rv-cell" style={{ '--i': i }}>
@@ -496,7 +528,7 @@ export function Reels({ onClose, initialId }) {
               <div className="rv-seek" onPointerDown={onSeekDown} onPointerMove={onSeekMove} onPointerUp={onSeekUp} onPointerCancel={onSeekUp}>
                 {scrubUI && (
                   <span className="rv-seek-time" style={{ '--x': `${Math.round(progress * 100)}%` }}>
-                    {fmtT(progress * durOf(videoRef.current))}<i>/ {fmtT(durOf(videoRef.current))}</i>
+                    {fmtT(progress * duration)}<i>/ {fmtT(duration)}</i>
                   </span>
                 )}
                 <div className="rv-seek-track">
@@ -546,7 +578,7 @@ export function Reels({ onClose, initialId }) {
                   })}
             </div>
             <div className="rvc-box">
-              <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#c9382f,#8f1f18)" size={30} src={user?.profileImage}/>
+              <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#2d5f97,#16283f)" size={30} src={user?.profileImage}/>
               <input className="rvc-field" dir="auto" placeholder="Add a comment…" value={cText}
                 onChange={e => setCText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') postCmt() }}/>

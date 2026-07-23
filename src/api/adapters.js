@@ -38,12 +38,12 @@ export function handleOf(username, fallback = 'member') {
 }
 
 const AVATAR_GRADIENTS = [
-  '#b3271e',
-  '#1f3a6e',
-  '#4a3a78',
-  '#6e4a2f',
-  '#2f6b72',
-  '#57534b',
+  '#1d3a5f',
+  '#7a5b3f',
+  '#4a6b8a',
+  '#8a4a5b',
+  '#5b7a67',
+  '#6b5b8a',
 ]
 function gradientFor(id = '') {
   let h = 0
@@ -202,11 +202,12 @@ export function timeAgo(iso) {
 }
 
 function mediaFromUrls(urls = [], types = []) {
+  const tarr = types || []   // default param only catches `undefined`; the backend can send `mediaTypes: null`
   return (urls || []).map((url, i) => {
-    const t = types[i] || 'IMAGE'
+    const t = tarr[i] || 'IMAGE'
     const src = assetUrl(url)   // backend media URLs are relative → make absolute
     if (t === 'IMAGE') return { type: 'IMAGE', url: src, label: 'image', bg: `center/cover no-repeat url("${src}")`, ratio: '16/10' }
-    if (t === 'VIDEO') return { type: 'VIDEO', url: src, label: 'video', bg: 'linear-gradient(160deg,#232b42,#100e0b)', ratio: '16/10' }
+    if (t === 'VIDEO') return { type: 'VIDEO', url: src, label: 'video', bg: 'linear-gradient(160deg,#26221b,#141210)', ratio: '16/10' }
     return { type: t, url: src, label: t.toLowerCase() }
   })
 }
@@ -226,7 +227,7 @@ export function postFromFeedItem(dto) {
   const cover = dto.mediaUrl ? assetUrl(dto.mediaUrl) : null   // VOICE_POST: this is the audio URL
   let media = []
   if (isReel && (video || cover)) {
-    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#232b42,#100e0b)', ratio: '9/16' }]
+    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#26221b,#141210)', ratio: '9/16' }]
   } else if (!isVoice && dto.mediaUrl) {
     media = mediaFromUrls([dto.mediaUrl], ['IMAGE'])
   }
@@ -274,7 +275,7 @@ export function researchFromFeedItem(dto) {
     title: dto.textPreview || 'Untitled research',
     cover: dto.mediaUrl
       ? `center/cover no-repeat url("${assetUrl(dto.mediaUrl)}")`
-      : 'radial-gradient(120% 100% at 30% 10%,#564c40,#231d15)',
+      : 'radial-gradient(120% 100% at 30% 10%,#2d5f97,#16283f)',
     hasCover: !!dto.mediaUrl,
     time: timeAgo(dto.createdAt),
     createdAt: dto.createdAt || null,
@@ -360,8 +361,16 @@ export function commentFrom(dto) {
 
 /** QuestionResponse (§5) → view question. Every documented field is carried. */
 export function questionFrom(dto) {
-  const a = authorFrom({ username: dto.authorUsername, fullName: dto.authorFullName, profileImage: dto.authorProfileImage, id: dto.authorId })
+  const a = authorFrom({
+    username: dto.authorUsername, fullName: dto.authorFullName, profileImage: dto.authorProfileImage, id: dto.authorId,
+    // author role / verification carried when the backend provides it (field
+    // spelling varies across DTO revisions) — enables the Scholars feed filter
+    // and the Verify badge without breaking rows that omit them.
+    role: dto.authorRole || dto.authorAccountType || undefined,
+    verified: dto.authorVerified ?? dto.isAuthorVerified ?? undefined,
+  })
   return {
+    kind: 'QUESTION',
     id: dto.id,
     author: a.id,
     _author: a,
@@ -433,12 +442,20 @@ export function sourceFrom(s) {
 
 /** ResearchSummaryResponse → view research card. */
 export function researchFrom(dto) {
-  const a = authorFrom({ username: dto.researcherUsername, fullName: dto.researcherFullName, profileImage: dto.researcherProfileImage, id: dto.researcherId })
+  const a = authorFrom({
+    username: dto.researcherUsername, fullName: dto.researcherFullName, profileImage: dto.researcherProfileImage, id: dto.researcherId,
+    // researcher role / verification when present (publishing is role-gated, so
+    // this is effectively always SCHOLAR/RESEARCHER — carried for the badge).
+    role: dto.researcherRole || dto.researcherAccountType || 'RESEARCHER',
+    verified: dto.researcherVerified ?? true,
+  })
   return {
+    kind: 'RESEARCH',
     id: dto.id,
     author: a.id,
     _author: a,
     time: timeAgo(dto.publishedAt || dto.createdAt),
+    createdAt: dto.publishedAt || dto.createdAt || null,   // sortable timestamp for merged feeds
     status: dto.status || 'PUBLISHED',
     irc: dto.ircId || '',
     title: dto.title || '',
@@ -449,7 +466,7 @@ export function researchFrom(dto) {
     keywords: dto.keywords || '',
     visibility: dto.visibility || 'PUBLIC',
     tags: dto.tags || [],
-    cover: dto.coverImageUrl ? `center/cover no-repeat url("${assetUrl(dto.coverImageUrl)}")` : 'radial-gradient(120% 100% at 30% 10%,#564c40,#231d15)',
+    cover: dto.coverImageUrl ? `center/cover no-repeat url("${assetUrl(dto.coverImageUrl)}")` : 'radial-gradient(120% 100% at 30% 10%,#2d5f97,#16283f)',
     hasVideo: !!dto.videoPromoThumbnailUrl,
     metrics: {
       views: dto.viewCount || 0, downloads: dto.downloadCount || 0, reactions: dto.reactionCount || 0,
@@ -574,7 +591,7 @@ export function researchDetailFrom(dto) {
     })),
     sources: (dto.sources || []).map(sourceFrom),   // includes MEDIA_FILE → clickable fileUrl
     figures: (dto.mediaFiles || []).filter(m => m.mediaType === 'IMAGE').map(m => ({
-      bg: m.fileUrl ? `center/cover no-repeat url("${assetUrl(m.fileUrl)}")` : 'linear-gradient(140deg,#2a251d,#8f1f18)',
+      bg: m.fileUrl ? `center/cover no-repeat url("${assetUrl(m.fileUrl)}")` : 'linear-gradient(140deg,#5c422a,#b3873e)',
       label: m.caption || m.originalFileName || 'figure',
     })),
     citation: dto.citation || '',

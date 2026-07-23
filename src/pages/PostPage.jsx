@@ -20,7 +20,7 @@ export function PostPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { full:'You', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)' }
+  const me = user || { full:'You', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)' }
 
   const [post, setPost] = React.useState(null)
   const [comments, setComments] = React.useState([])
@@ -77,7 +77,7 @@ export function PostPage() {
         setComments(cs => cs.some(c => c.id === evt.commentId) ? cs : [...cs, {   // dedup: never echo a comment we already have
           id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
-                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#c9382f,#8f1f18)' },
+                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#2d5f97,#16283f)' },
           body: evt.textContent || '', time: 'now', likes: 0,
         }])
       }
@@ -87,7 +87,7 @@ export function PostPage() {
         setRepliesMap(m => m[pid] ? { ...m, [pid]: m[pid].some(r => r.id === evt.commentId) ? m[pid] : [...m[pid], {
           id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
-                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#c9382f,#8f1f18)' },
+                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#2d5f97,#16283f)' },
           body: evt.textContent || '', time: 'now', likes: 0,
         }] } : m)
       }

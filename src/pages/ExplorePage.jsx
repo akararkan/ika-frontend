@@ -40,11 +40,11 @@ const detailHref = (h) => {
 
 /* Stable colour from username so the avatar matches the one on the detail page. */
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg,#c9382f,#8f1f18)',
-  'linear-gradient(135deg,#b3271e,#8a221b)',
-  'linear-gradient(135deg,#1f3a6e,#2a251d)',
-  'linear-gradient(135deg,#5a2a1a,#160a06)',
-  'linear-gradient(135deg,#5e5447,#231d15)',
+  'linear-gradient(135deg,#2d5f97,#16283f)',
+  'linear-gradient(135deg,#b3873e,#5c422a)',
+  'linear-gradient(135deg,#5b7a67,#3a5244)',
+  'linear-gradient(135deg,#8a4a5b,#5c2f3a)',
+  'linear-gradient(135deg,#6b5b8a,#463a5c)',
 ]
 function gradientFor(seed = '') {
   let h = 0

@@ -344,7 +344,7 @@ function SecurityPanel() {
 
 export function SettingsPage() {
   const { user } = useAuth()
-  const me = user || { full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)', bio:'', field:'' }
+  const me = user || { full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)', bio:'', field:'' }
   const [tab, setTab] = React.useState('PROFILE')
 
   return (

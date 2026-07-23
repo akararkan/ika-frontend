@@ -17,7 +17,7 @@ import { api, assetUrl } from '../api/index.js'
 export function ProfilePage() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()
-  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#c9382f,#8f1f18)', role:'MEMBER', bio:'', field:'', followers:0, following:0, posts:0, contributions:0 }
+  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)', role:'MEMBER', bio:'', field:'', followers:0, following:0, posts:0, contributions:0 }
   const coverRef = React.useRef(null)
   const pickCover = (e) => { const f = e.target.files?.[0]; e.target.value=''; if (!f) return; api.users.uploadCover(f).then(() => { showToast('Cover updated'); refreshUser?.() }).catch(() => showToast('Could not upload cover')) }   // §10.6
   const [hlOpen, setHlOpen] = React.useState(null)   // open highlight archive viewer
@@ -139,7 +139,7 @@ export function ProfilePage() {
                 onClick={() => setHlOpen({ id: hid(h), title: h.title })}
                 title={`${h.title} — tap to view, drag to reorder`}>
                 <span className="st-ring unseen">
-                  <span className="st-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'#8f1f18' }}/>
+                  <span className="st-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'linear-gradient(135deg,#d9b96c,#b3873e)' }}/>
                 </span>
                 <b>{h.title}</b>
               </button>

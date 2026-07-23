@@ -11,9 +11,9 @@ import { api, adapters, assetUrl } from '../api/index.js'
 
 function gradientFor(id = '') {
   const grads = [
-    'linear-gradient(160deg,#8f1f18,#100e0b)', 'linear-gradient(160deg,#d8453a,#8f1f18)',
-    'linear-gradient(160deg,#b3271e,#8a221b)', 'linear-gradient(160deg,#1f3a6e,#2a251d)',
-    'linear-gradient(160deg,#5a2a1a,#160a06)',
+    'linear-gradient(160deg,#16283f,#2d5f97)', 'linear-gradient(160deg,#5c422a,#b3873e)',
+    'linear-gradient(160deg,#3a5244,#5b7a67)', 'linear-gradient(160deg,#5c2f3a,#8a4a5b)',
+    'linear-gradient(160deg,#463a5c,#6b5b8a)',
   ]
   let h = 0; for (let i = 0; i < String(id).length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
   return grads[h % grads.length]
@@ -108,13 +108,13 @@ function AddToHighlightSheet({ storyId, authorId, onClose }) {
         <div className="phead" style={{ padding:'14px 16px 4px' }}><h3 style={{ margin:0 }}><Icon name="star" className="sm"/> Add to highlight</h3><button className="icon-btn" onClick={onClose}><Icon name="close" className="sm"/></button></div>
         <div style={{ padding:'4px 16px 16px', maxHeight:'60vh', overflowY:'auto' }}>
           <button className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={newHl}>
-            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#b3271e' }}><Icon name="compose" className="sm"/></span>
+            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#1d3a5f' }}><Icon name="compose" className="sm"/></span>
             <div className="rail-info"><div className="rail-name"><b>New highlight</b></div></div>
           </button>
           {hls == null ? <div className="muted text-sm" style={{ padding:'10px 0' }}>Loading…</div>
             : hls.map(h => (
               <button key={h.highlightId || h.id} className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={() => addTo(h.highlightId || h.id)}>
-                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#d8453a,#8f1f18)' }}/>
+                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#5c422a,#b3873e)' }}/>
                 <div className="rail-info"><div className="rail-name"><b>{h.title}</b></div></div>
               </button>
             ))}
@@ -203,7 +203,7 @@ export function StoryViewer({ authorId, author, onClose }) {
       if (!alive) return
       setItems((rows || []).map(r => ({
         id: r.storyId, type: r.storyType, visibility: r.visibility,
-        bg: r.mediaUrl ? `#100e0b center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : gradientFor(r.storyId),
+        bg: r.mediaUrl ? `#141210 center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : gradientFor(r.storyId),
         text: r.textContent || '',
         // When the story has media, the StoryEditor has already baked the text
         // layers into the image. The `textContent` field is metadata for
