@@ -25,11 +25,14 @@ const SVC = {
 let openFn = null
 let seq = 0
 
-/** Open the share sheet. Falls back to a clipboard copy if no host is mounted. */
+/** Open the share sheet. Falls back to a clipboard copy if no host is mounted.
+ *  Pass `url` for surfaces whose response already carries a ready-to-share
+ *  link (channels' /c/{handle}, live's /live/{id}) — no share-link API is
+ *  fetched and no share is recorded for those. */
 export function openShare(opts = {}) {
   if (openFn) openFn({ id: ++seq, ...opts })
   else {
-    const url = `${window.location.origin}/${PATH[opts.kind] || 'posts'}/${opts.id}`
+    const url = opts.url || `${window.location.origin}/${PATH[opts.kind] || 'posts'}/${opts.id}`
     navigator.clipboard?.writeText(url).then(() => showToast('Link copied')).catch(() => {})
   }
 }
@@ -43,6 +46,10 @@ export function ShareHost() {
 
 function ShareModal({ sheet, onClose }) {
   const { kind, id, title, onShared } = sheet
+  /* A DIRECT url (channels /c/{handle}, live /live/{id}) arrives ready-made
+     on the response — there is no share-link service to consult and no share
+     counter to record for those surfaces. */
+  const direct = sheet.url || null
   const svc = SVC[kind] || SVC.post
   const [info, setInfo] = React.useState(null)
   const [count, setCount] = React.useState(typeof sheet.count === 'number' ? sheet.count : null)
@@ -51,19 +58,21 @@ function ShareModal({ sheet, onClose }) {
 
   React.useEffect(() => {
     let alive = true
-    svc.link(id).then(r => { if (alive && r) { setInfo(r); if (typeof r.shareCount === 'number') setCount(r.shareCount) } }).catch(() => {})
+    if (!direct) {
+      svc.link(id).then(r => { if (alive && r) { setInfo(r); if (typeof r.shareCount === 'number') setCount(r.shareCount) } }).catch(() => {})
+    }
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => { alive = false; window.removeEventListener('keydown', onKey) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  const url = info?.canonicalUrl || info?.shortUrl || `${window.location.origin}/${PATH[kind] || 'posts'}/${id}`
-  const shown = info?.shortUrl || url
+  const url = direct || info?.canonicalUrl || info?.shortUrl || `${window.location.origin}/${PATH[kind] || 'posts'}/${id}`
+  const shown = direct || info?.shortUrl || url
 
   // Record the share once per sheet (first explicit action), then sync the count.
   const record = () => {
-    if (recorded.current) return
+    if (direct || recorded.current) return
     recorded.current = true
     svc.record(id, kind === 'post' ? (caption.trim() || undefined) : undefined)
       .then(r => {

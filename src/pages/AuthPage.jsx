@@ -18,30 +18,135 @@ function authError(e, mode) {
   }
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const HANDLE_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/
+
+// Suggest a handle from the full name until the user edits the handle themselves.
+function suggestHandle(name) {
+  return name.trim().toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/\s+/g, '.')
+    .replace(/[^a-z0-9._-]/g, '')
+    .replace(/\.{2,}/g, '.')
+    .slice(0, 30)
+}
+
+// 0 = empty · 1 = too short · 2 = fair · 3 = good · 4 = strong
+function pwScore(p) {
+  if (!p) return 0
+  if (p.length < 8) return 1
+  let s = 1
+  if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++
+  if (/\d/.test(p)) s++
+  if (/[^A-Za-z0-9]/.test(p) || p.length >= 14) s++
+  return s
+}
+const PW_LABEL = ['', 'Too short', 'Fair', 'Good', 'Strong']
+
+// Client-side hints only — the server stays the authority (its errors are mapped above).
+function validate(mode, f, agree) {
+  const e = {}
+  if (mode === 'SIGN_IN') {
+    if (!f.identifier.trim()) e.identifier = 'Enter your email or username.'
+    if (!f.password) e.password = 'Enter your password.'
+  } else {
+    if (!f.full.trim()) e.full = 'Please tell us your name.'
+    const h = f.handle.trim()
+    if (!h) e.handle = 'Pick a handle — it’s your public @name.'
+    else if (!HANDLE_RE.test(h)) e.handle = '3–30 characters: lowercase letters, numbers, dots, dashes or underscores.'
+    const m = f.email.trim()
+    if (!m) e.email = 'Email is required.'
+    else if (!EMAIL_RE.test(m)) e.email = 'That doesn’t look like a valid email address.'
+    if (!f.password) e.password = 'Choose a password.'
+    else if (f.password.length < 8) e.password = 'Use at least 8 characters.'
+    if (!agree) e.agree = 'Please accept the Code of Conduct and Terms to continue.'
+  }
+  return e
+}
+
+// Defined outside AuthPage so React keeps the same component identity across
+// renders — inline definition would remount inputs and drop focus per keystroke.
+function Field({ id, label, icon, error, hint, children }) {
+  return (
+    <div className={'af' + (error ? ' bad' : '')}>
+      <label className="field-label" htmlFor={id}>{label}</label>
+      <div className="af-wrap">
+        <Icon name={icon} className="sm af-ico"/>
+        {children}
+      </div>
+      {error
+        ? <small className="af-err" role="alert">{error}</small>
+        : hint ? <small className="af-hint">{hint}</small> : null}
+    </div>
+  )
+}
+
 export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
   const { login, register } = useAuth()
   const navigate = useNavigate()
   const loc = useLocation()
   const [mode, setMode] = React.useState(initialMode)
+  const signIn = mode === 'SIGN_IN'
   // identifier = the sign-in login id (username OR email); handle = public username, email = private address — kept separate (§8.2)
   const [fields, setFields] = React.useState({ full:'', handle:'', identifier:'', email:'', password:'' })
-  const [busy, setBusy] = React.useState(false)
+  const [errs, setErrs] = React.useState({})
   const [error, setError] = React.useState('')
-  const set = k => e => setFields(f => ({ ...f, [k]: e.target.value }))
+  const [busy, setBusy] = React.useState(false)
+  const [showPw, setShowPw] = React.useState(false)
+  const [caps, setCaps] = React.useState(false)
+  const [agree, setAgree] = React.useState(false)
+  const handleTouched = React.useRef(false)
+  const firstRef = React.useRef(null)
+  const mounted = React.useRef(false)
 
-  const submit = async () => {
-    setBusy(true); setError('')
-    try {
-      if (mode === 'SIGN_IN') {
-        if (!fields.identifier.trim() || !fields.password) throw new Error('Enter your email or username and your password.')
-        await login(fields)
-      } else {
-        if (!fields.full.trim() || !fields.handle.trim() || !fields.email.trim() || !fields.password) throw new Error('Please fill in every field.')
-        await register(fields)
+  // Focus the first field when the mode flips (not on first paint — that would
+  // pop the keyboard over the hero on phones).
+  React.useEffect(() => {
+    if (mounted.current) firstRef.current?.focus()
+    else mounted.current = true
+  }, [mode])
+
+  const set = k => e => {
+    const v = e.target.value
+    setFields(f => {
+      const next = { ...f, [k]: v }
+      if (k === 'handle') {
+        handleTouched.current = v !== ''         // clearing it re-enables suggestions
+        next.handle = v.toLowerCase().replace(/\s+/g, '.')
       }
+      if (k === 'full' && !handleTouched.current) next.handle = suggestHandle(v)
+      return next
+    })
+    setErrs(x => (x[k] ? { ...x, [k]: undefined } : x))
+  }
+
+  // Validate only the field being left — don't flag untouched fields early.
+  const blur = k => () => {
+    const e = validate(mode, fields, agree)
+    if (e[k]) setErrs(x => ({ ...x, [k]: e[k] }))
+  }
+
+  const switchMode = m => {
+    if (m === mode || busy) return
+    setMode(m); setErrs({}); setError(''); setShowPw(false); setCaps(false)
+  }
+
+  const pwKeys = e => setCaps(e.getModifierState?.('CapsLock') ?? false)
+  const score = pwScore(fields.password)
+
+  const submit = async ev => {
+    ev.preventDefault()
+    if (busy) return
+    const e = validate(mode, fields, agree)
+    setErrs(e); setError('')
+    if (Object.keys(e).length) return
+    setBusy(true)
+    try {
+      if (signIn) await login(fields)
+      else await register(fields)
       navigate(loc.state?.from?.pathname || '/', { replace: true })
-    } catch (e) {
-      setError(authError(e, mode))
+    } catch (err) {
+      setError(authError(err, mode))
     } finally {
       setBusy(false)
     }
@@ -57,78 +162,111 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
             <div className="auth-tag">Islamic Knowledge Archive</div>
           </div>
         </div>
-        <h1 className="auth-hero">A scholarly community,<br/>built on <em>trust</em> and <em>isnad</em>.</h1>
+        {/* mobile hides the <br> (styles-responsive §) — the explicit space keeps "community, built" intact there */}
+        <h1 className="auth-hero">A scholarly community,<br/>{' '}built on <em>trust</em> and <em>isnad</em>.</h1>
         <p className="auth-sub">Share posts, publish peer-reviewed research with minted IRC identifiers, ask and answer questions, and learn from verified scholars across the world.</p>
         <ul className="auth-bullets">
           <li><span><Icon name="award" className="sm"/></span> Verified scholar program with a profile badge</li>
           <li><span><Icon name="research" className="sm"/></span> Publish research with a minted IRC identifier</li>
           <li><span><Icon name="users" className="sm"/></span> Follow, learn, and collaborate with colleagues</li>
-          <li><span><Icon name="shield" className="sm"/></span> Moderation & dispute resolution by elected scholars</li>
+          <li><span><Icon name="shield" className="sm"/></span> Moderation &amp; dispute resolution by elected scholars</li>
         </ul>
         <div className="auth-foot"><small className="muted">© 2026 Islamic Knowledge Archive · Erbil, Iraq</small></div>
       </div>
 
       <div className="auth-right">
         <div className="auth-card">
-          <div className="auth-tabs">
-            <button className={'auth-tab ' + (mode==='SIGN_IN'?'on':'')} onClick={() => setMode('SIGN_IN')}>Sign in</button>
-            <button className={'auth-tab ' + (mode==='SIGN_UP'?'on':'')} onClick={() => setMode('SIGN_UP')}>Create account</button>
+          <div className="auth-tabs" role="tablist" aria-label="Sign in or create account">
+            <span className={'auth-thumb' + (signIn ? '' : ' alt')} aria-hidden="true"/>
+            <button type="button" role="tab" aria-selected={signIn} className={'auth-tab ' + (signIn ? 'on' : '')} onClick={() => switchMode('SIGN_IN')}>Sign in</button>
+            <button type="button" role="tab" aria-selected={!signIn} className={'auth-tab ' + (!signIn ? 'on' : '')} onClick={() => switchMode('SIGN_UP')}>Create account</button>
           </div>
 
-          {mode==='SIGN_UP' && (
-            <>
-              <label className="field-label">Full name</label>
-              <input className="field lg" placeholder="Akar Arkan" value={fields.full} onChange={set('full')} autoComplete="name"/>
-              <label className="field-label" style={{marginTop:14}}>Handle</label>
-              <input className="field lg" placeholder="akar.arkan" value={fields.handle} onChange={set('handle')} autoComplete="username"/>
-              <small className="muted text-xs" style={{display:'block', marginTop:6}}>Your public @handle — shown on posts &amp; mentions. Separate from your private email.</small>
-            </>
-          )}
+          <form onSubmit={submit} noValidate>
+            {/* keyed remount = soft cross-rise between the two forms */}
+            <div className="af-pane" key={mode}>
+              <h2 className="auth-title">{signIn ? 'Welcome back' : 'Join the archive'}</h2>
+              <p className="auth-lede">{signIn ? 'Sign in to pick up where you left off.' : 'A few details and you’re in — free for scholars and students.'}</p>
 
-          {mode==='SIGN_IN' ? (
-            <>
-              <label className="field-label">Email or username</label>
-              <input className="field lg" placeholder="you@university.edu  ·  or  your.handle" value={fields.identifier} onChange={set('identifier')} autoComplete="username"
-                onKeyDown={e => { if (e.key === 'Enter') submit() }}/>
-            </>
-          ) : (
-            <>
-              <label className="field-label" style={{marginTop:14}}>Email</label>
-              <input className="field lg" type="email" placeholder="you@university.edu" value={fields.email} onChange={set('email')} autoComplete="email"
-                onKeyDown={e => { if (e.key === 'Enter') submit() }}/>
-            </>
-          )}
+              {!signIn && (
+                <>
+                  <Field id="f-full" label="Full name" icon="user" error={errs.full}>
+                    <input ref={firstRef} id="f-full" className="field lg" placeholder="Akar Arkan" value={fields.full}
+                      onChange={set('full')} onBlur={blur('full')} autoComplete="name" aria-invalid={!!errs.full}/>
+                  </Field>
+                  <Field id="f-handle" label="Handle" icon="at" error={errs.handle}
+                    hint="Your public @name on posts & mentions — separate from your private email.">
+                    <input id="f-handle" className="field lg" placeholder="akar.arkan" value={fields.handle}
+                      onChange={set('handle')} onBlur={blur('handle')} autoComplete="username"
+                      autoCapitalize="none" spellCheck={false} aria-invalid={!!errs.handle}/>
+                  </Field>
+                  <Field id="f-email" label="Email" icon="mail" error={errs.email}>
+                    <input id="f-email" className="field lg" type="email" placeholder="you@university.edu" value={fields.email}
+                      onChange={set('email')} onBlur={blur('email')} autoComplete="email" aria-invalid={!!errs.email}/>
+                  </Field>
+                </>
+              )}
 
-          <label className="field-label" style={{marginTop:14}}>Password</label>
-          <input className="field lg" type="password" placeholder="••••••••" value={fields.password} onChange={set('password')}
-            autoComplete={mode==='SIGN_IN' ? 'current-password' : 'new-password'}
-            onKeyDown={e => { if (e.key === 'Enter') submit() }}/>
+              {signIn && (
+                <Field id="f-id" label="Email or username" icon="user" error={errs.identifier}>
+                  <input ref={firstRef} id="f-id" className="field lg" placeholder="you@university.edu  ·  or  your.handle" value={fields.identifier}
+                    onChange={set('identifier')} onBlur={blur('identifier')} autoComplete="username"
+                    autoCapitalize="none" aria-invalid={!!errs.identifier}/>
+                </Field>
+              )}
 
-          {mode==='SIGN_IN' && (
-            <div className="flex-c" style={{justifyContent:'space-between', marginTop:10}}>
-              <label className="flex-c gap-8 text-sm muted"><input type="checkbox" defaultChecked/>Remember me</label>
-              {/* No forgot-password flow by design (§8.6): a password is only rotated from an active session via change-password. */}
+              <Field id="f-pw" label="Password" icon="lock" error={errs.password}>
+                <input id="f-pw" className="field lg" type={showPw ? 'text' : 'password'}
+                  placeholder={signIn ? '••••••••' : 'At least 8 characters'} value={fields.password}
+                  onChange={set('password')} onBlur={() => { setCaps(false); blur('password')() }}
+                  onKeyDown={pwKeys} onKeyUp={pwKeys}
+                  autoComplete={signIn ? 'current-password' : 'new-password'} aria-invalid={!!errs.password}/>
+                <button type="button" className="af-eye" onClick={() => setShowPw(s => !s)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'} title={showPw ? 'Hide password' : 'Show password'}>
+                  <Icon name={showPw ? 'eyeoff' : 'eye'} className="sm"/>
+                </button>
+              </Field>
+
+              {caps && <small className="af-caps" role="status">⇪ Caps Lock is on</small>}
+
+              {!signIn && fields.password && (
+                <div className={'pw-meter s' + score}>
+                  <div className="pw-bars" aria-hidden="true">{[1, 2, 3, 4].map(i => <i key={i} className={i <= score ? 'on' : ''}/>)}</div>
+                  <small aria-live="polite">{PW_LABEL[score]}</small>
+                </div>
+              )}
+
+              {signIn ? (
+                /* No forgot-password flow by design (§8.6): a password is only rotated
+                   from an active session via change-password. Sessions persist in
+                   localStorage regardless — say so instead of a dead "Remember me". */
+                <div className="auth-note"><Icon name="shield" className="sm"/><span>You’ll stay signed in on this device until you log out.</span></div>
+              ) : (
+                <>
+                  <label className={'auth-agree' + (errs.agree ? ' bad' : '')}>
+                    <input type="checkbox" checked={agree}
+                      onChange={e => { setAgree(e.target.checked); setErrs(x => (x.agree ? { ...x, agree: undefined } : x)) }}/>
+                    <span>I agree to the <a>Code of Conduct</a> and <a>Terms of Service</a>.</span>
+                  </label>
+                  {errs.agree && <small className="af-err" role="alert">{errs.agree}</small>}
+                </>
+              )}
+
+              {error && <div className="auth-alert" role="alert"><Icon name="alert" className="sm"/><span>{error}</span></div>}
+
+              <button type="submit" className="btn btn-primary btn-lg btn-block mt-16" disabled={busy}>
+                {busy && <span className="auth-spin" aria-hidden="true"/>}
+                {busy ? 'Please wait…' : signIn ? 'Sign in' : 'Create account'}
+              </button>
             </div>
-          )}
-          {mode==='SIGN_UP' && (
-            <label className="flex-c gap-8 text-xs muted mt-12">
-              <input type="checkbox"/>I agree to the <a style={{color:'var(--emerald)',fontWeight:600}}>Code of Conduct</a> and <a style={{color:'var(--emerald)',fontWeight:600}}>Terms of Service</a>.
-            </label>
-          )}
+          </form>
 
-          {error && <div className="text-sm" style={{color:'var(--rose)',fontWeight:600,marginTop:12}}>{error}</div>}
-
-          <button className="btn btn-primary btn-lg btn-block mt-16" onClick={submit} disabled={busy}>
-            {busy ? 'Please wait…' : (mode==='SIGN_IN' ? 'Sign in' : 'Create account')}
-          </button>
-
-          <div className="auth-or"><span>or continue with</span></div>
-          <div className="auth-social">
-            <button className="btn btn-secondary btn-block"><Icon name="google" className="sm"/>Continue with Google</button>
-            <button className="btn btn-secondary btn-block" style={{marginTop:8}}><Icon name="award" className="sm"/>Institutional SSO (SAML)</button>
-          </div>
+          {/* No social/SSO buttons until a real OAuth/SAML flow exists on the
+              backend — dead demo buttons on the front door erode trust. */}
           <div className="auth-switch">
-            {mode==='SIGN_IN' ? <>New here? <a onClick={() => setMode('SIGN_UP')}>Create an account</a></> : <>Already have an account? <a onClick={() => setMode('SIGN_IN')}>Sign in</a></>}
+            {signIn
+              ? <>New here? <a onClick={() => switchMode('SIGN_UP')}>Create an account</a></>
+              : <>Already have an account? <a onClick={() => switchMode('SIGN_IN')}>Sign in</a></>}
           </div>
         </div>
       </div>

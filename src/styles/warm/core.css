@@ -226,3 +226,22 @@
   .t-loader-bar{animation:none;background:var(--line)}
   .btn:active,.icon-btn:active{transform:none}
 }
+
+/* ---------------- Mobile nav drawer: pinned bottom ----------------
+   13 nav items + Create + the you-card overflow a phone drawer; the
+   you-card's inline marginTop:auto then collapses to 0 and the bottom
+   block jams into (or hides) the Create button. Make the NAV list the
+   scrolling region and pin head + Create + you-card, so both are ALWAYS
+   visible. Scoped to the ≤720 drawer on purpose: on desktop the sidebar's
+   own overflow:auto is the right behaviour and an unscoped .nav{flex:1}
+   would drag Create to the bottom of tall screens. */
+@media (max-width:720px){
+  .sidebar .sidebar-head{ flex:0 0 auto; }
+  .sidebar .nav{
+    flex:1 1 auto; min-height:0;
+    overflow-y:auto; overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  .sidebar .cta-compose{ flex:0 0 auto; }
+  .sidebar .side-section{ flex:0 0 auto; }
+}

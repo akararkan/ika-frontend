@@ -198,6 +198,8 @@ The botnav lives outside `<main>`, so no combinator rooted at `.ch-main` can rea
 
 Most of the `@media` at-rules in the file are `prefers-reduced-motion` companions sitting next to the animation they disable. The viewport/interaction breakpoints are the interesting minority: ≤1180, ≤900, ≤720 (twice), ≤600, ≤460, plus `hover:none`.
 
+[warm/channels-pro.css](src/styles/warm/channels-pro.css) is the newest layer and sits **after** `ika-messages-theme.css`, still **before** `responsive.css`. It is almost entirely new prefixes (`.cp-` profile, `.cm-` manage console, `.ca-` admins, `.cil-` invite links, `.cst-` statistics, `.cs-` stories, `.chl-` highlights, `.cc-` comment/tag panels, `.pc-` post composer) plus the in-bubble payload skins (`.ch-poll`, `.ch-loc`, `.ch-contact`, `.ch-vnote`, `.ch-postrail`). Only one surface in it stacks — `.cs-viewer` at **150**, the same rung as the chat lightbox — so the "nothing in chat may exceed 199" rule is intact.
+
 The ordering of the whole warm block after the base block is what makes the redesign win at equal specificity: `.main.ch-main` and `.main.wide` ([styles.css](src/styles/styles.css)) are both two-class selectors, so chat's `grid-template-columns` override carries on source order alone.
 
 
@@ -240,7 +242,12 @@ Routes: `chat`, `chat/requests`, `chat/:id` all mount [ChatPage.jsx](src/pages/C
 | `StreamTile` (local) | One `<video>` bound imperatively to a `MediaStream`, with an avatar fallback for audio-only peers. | [CallOverlay.jsx](src/components/chat/CallOverlay.jsx) |
 | `deleteIntentOf` | Single source of truth for what `DELETE /conversations/{id}` means to *this* user. | [conversationActions.js](src/components/chat/conversationActions.js) |
 | `MediaLightbox`, `ForwardPicker` (local) | Full-screen media viewer with focus trap; forward-target sheet filtered to `myStatus === 'ACTIVE'`. | [ChatPage.jsx](src/pages/ChatPage.jsx) |
-| `ChannelsPage` | Create / discover / subscribe. Reading and posting happen at `/chat/<channelId>` — a channel *is* a conversation. | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx) |
+| `ChannelsPage` | Create / discover / subscribe, the category directory and the live-story tray. Reading and posting happen at `/chat/<channelId>` — a channel *is* a conversation. | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx) |
+| `ChannelPage` | A channel's **profile** (`/channels/:id`): cover, verified badge, category, stories, highlights, and the admin console entry. Distinct from its timeline. | [ChannelPage.jsx](src/pages/ChannelPage.jsx) |
+| `ChannelManage` | The tabbed admin console — info, settings, admins & rights, invite links, join requests, discussion group + slow mode, statistics. Tabs are gated on the caller's own rights. | [ChannelManage.jsx](src/components/channels/ChannelManage.jsx) |
+| `PostExtras` | The typed payloads inside a bubble — `PollCard`, `LocationCard`, `ContactCard`, `VideoNote` — plus `PostRail` (tags, signature, view/forward/comment counters). | [PostExtras.jsx](src/components/chat/PostExtras.jsx) |
+| `PostComposer` | Sends the types a textarea can't express: POLL (incl. quiz), LOCATION, CONTACT. | [PostComposer.jsx](src/components/chat/PostComposer.jsx) |
+| `ChannelPanels` | `CommentsPanel` (a post's thread in the linked discussion group) and `TagPanel` (exact `#tag` lookup). Both ride the `.ch-search` slide-over rung. | [ChannelPanels.jsx](src/components/chat/ChannelPanels.jsx) |
 | `LivePage` | Go live, watch, and the ephemeral live chat. Media rides an external ingest/playback origin. | [LivePage.jsx](src/pages/LivePage.jsx) |
 
 ### (b) Prop contracts that are easy to get wrong
@@ -930,7 +937,178 @@ none:
 `discover` and `by-handle` are different questions and the page asks both:
 text search first, then the exact address lookup **only if** discovery came
 back empty and the query is handle-shaped. Falling back unconditionally would
-hide the list whenever a handle also matched some titles.
+hide the list whenever a handle also matched some titles. The fallback is
+skipped while a **category** filter is on — an exact address lookup ignores the
+category and would surface the channel the filter had just excluded.
+
+#### The channel surface beyond create/discover/subscribe
+
+The "only three things" above is no longer the whole story: a channel now has a
+**profile** (`/channels/:id`, [ChannelPage.jsx](src/pages/ChannelPage.jsx))
+distinct from its **timeline** (`/chat/:id`). The split is the organising idea —
+the profile carries everything that *describes* the channel (cover, verified
+badge, category, stories, highlights, the admin console), the timeline carries
+its posts. The discovery card offers both: "About" and "Open".
+
+[src/api/channels.js](src/api/channels.js) is the whole wire surface;
+`api.chat.channels` and `api.channels` are the **same object** (chat.js imports
+it and hangs it off the name every existing call site uses). The two modules
+import each other on purpose — chat.js needs `channels`, channels.js needs
+`msgFrom`/`convoFrom`/`channelFrom`. That cycle is safe **only** because all
+three are hoisted `function` declarations and neither side reads the other's
+`const` at module scope. Do not convert those adapters to `const` arrow
+functions.
+
+**Three viewer states, not two.** `subscribed` / `pendingJoinRequest` /
+neither. On a `joinByRequest` channel, `POST …/subscribe` **files a request and
+returns a non-member** — so "Open" must not navigate afterwards (the thread
+403s) and the subscribe toggle must not offer to file a second one. Every
+subscribe call site branches on the returned `pendingJoinRequest`.
+
+**Admin rights have an inverted null.** On the request side every flag is
+nullable and **null means `true`**, so a partial body can only ever *remove*
+capability and a bare `PUT` grants **full** rights. `rightsTo()` therefore sends
+every flag explicitly — an unchecked box must travel as `false`, not as an
+omission the server reads back as "yes". `rightsFrom()` handles the response
+side, where a null rights *object* (legacy admins **and the owner**) also means
+full rights. The manage console reads *my* rights off `GET …/admins`, never off
+`myRole`: "ADMIN" says nothing about which rights I hold, and every tab is gated
+on a specific one.
+
+**`settings` is a whole-object replacement.** `PATCH { settings: {…} }` resets
+every knob you omit. `channelSettingsFrom`/`channelSettingsTo` (chat.js) exist so
+the console always sends the complete blob.
+
+**Invite links: the token is returned exactly once.** Only a hash is stored, so
+`GET …/invite-links` has no token and the plaintext URL is unrecoverable. The
+freshly-created link is held in its own state and rendered with its URL selected
+— it is never merged into the list row, because merging would drop the one thing
+the admin still needs. A link dies three ways (revoked / expired / exhausted) and
+the row names which.
+
+**Counters are `null`-meaningful.** `views`, `forwards` and `comments` are
+`null` *outside* a channel — "this counter does not exist here", not "zero"
+(and `comments` is additionally null with no discussion group linked). Every
+render tests `!= null`, never truthiness: with `&&`, a zero-view post loses its
+counter row at exactly the moment its author looks at it.
+
+**Two realtime frames carry no actor**, unlike `message.reaction`:
+
+- `poll.updated` is **viewer-neutral** — no `myVotes`. Merging it wholesale
+  erases the viewer's own selection the instant anyone else votes, so
+  [useThread.js](src/components/chat/useThread.js) takes the counts, keeps
+  `myVotes`, and recomputes `voted`/`revealed`/`pct`. A poll *write* answers
+  with the viewer-specific aggregate and IS applied whole (`applyPoll`).
+- `message.comment` carries `{ messageId (the POST id), added }` and no user, so
+  "skip my own echo" is impossible. `bumpComments()` applies the local delta and
+  arms a one-shot suppression token that the matching echo consumes.
+
+**A post is not a message, and it is laid out like one.** `.ch-row.is-post`
+(set from `msg.isPost`) switches the bubble into broadcast anatomy, in this
+order: bubble → rail → reactions → comments bar.
+
+- **Views sit beside the clock**, inside the bubble's `.ch-meta`, which is where
+  a channel reader already looks for them — not in a counter row of their own.
+- **The rail is ONE wrapping line** (tags · forwards · signature). Stacking them
+  pushed the reactions and comments bar a full row down for information nobody
+  opened the post to read. The signature no longer takes `margin-inline-start:
+  auto` — across a 520px rail that opened a corridor between two things that
+  belong together.
+- **Reactions get real weight on a post** (`.ch-row.is-post .ch-react`): a
+  reaction in a DM is a private aside, but on a broadcast it is a public tally
+  and often the only signal thousands of readers send back. Bigger emoji,
+  legible count, filled pill. Ordinary chat is untouched.
+- **The comments bar is a hairline-topped full-width row**, not a chip and not a
+  bordered card — it is the foot of the post, the way a rule closes an article.
+  It sits BELOW the reactions because reacting is a one-tap response and
+  commenting is leaving for a thread.
+- **The avatar top-aligns on a post.** Bottom-aligning is right for a chat
+  message (the face belongs beside the last line said) but stranded the face
+  beside the comments bar, next to nothing it authored.
+
+Two details in the bar are easy to get wrong and are deliberate. The **faces
+are fetched** — the post row carries only a `comments` NUMBER — so the request
+fires from an IntersectionObserver rather than on mount (every loaded message
+is in the DOM; mounting would fire one request per post in the page), is
+memoised per `(post, count)`, and de-duplicates in flight. And the **dot is not
+"unread comments"**: there is no per-post comment read state on the wire, so it
+means only what it can honestly mean — `commentsUnseen`, the count moved while
+you were looking at the post and you have not opened the thread since.
+
+**Channel policy suppresses controls rather than disabling them.** `reactionsEnabled:
+false`, a non-empty `allowedReactions`, and `protectedContent` each remove an
+affordance the server would answer with a 403 — and the error copy names the
+policy ("this channel doesn't allow forwarding"), never a permission, so nobody
+goes hunting for a role they cannot be given. `protectedContent` also drops
+**copy**, which only the client can honour; ignoring it would make the admin's
+setting a lie. The policy comes from `GET /channels/{id}` and **not** from the
+inbox row — `ConversationResponse` carries no `ChannelSettings`, so reading it
+off `convo` would silently default everything to "allowed".
+
+**`silent` is per-post and resets after each send** — it is a choice about one
+message, not a mode. Offered only on a channel you can post to; the retry path
+replays it from the outbox, so a retry never wakes the subscribers the original
+send deliberately did not.
+
+**The channel masthead's four visual rules** (verified against rendered
+screenshots at 1180px and 520px — re-check them if you touch `.cp-*`):
+
+1. **Only the avatar straddles the cover seam.** The negative margin rides
+   `.cp-avatar`, never `.cp-ident` — pulling the whole row up floated the serif
+   title onto the cover, where navy on a dark photo was unreadable. Text starts
+   on paper at every width.
+2. **Derived cover art is composed, not flat**: tint gradient + corner glows +
+   the same concentric broadcast rings the discovery card wears, so profile and
+   card read as one identity. A photo suppresses the rings.
+3. **The gold conic halo means "live now" and nothing else.** Story rings (rail
+   and tray) wear it — as a painted `.cs-halo` circle with the art inset by its
+   own paper border, not a box-shadow, because a conic gradient can't ride a
+   shadow. Highlights are the *permanent* archive and deliberately wear the
+   quiet hairline double-ring instead; giving them gold would erase the
+   distinction the two rails exist to draw.
+4. **Console tabs are pills** (navy-filled `.on`, same vocabulary as `.cn-chip`)
+   — the style guide is explicit: pills, not underlines.
+
+One rendering quirk worth knowing: `-webkit-line-clamp` clips at the *content*
+box but still paints into the padding box — vertical padding on the clamped
+story-ring text leaked a ghost fourth line under the ellipsis. Horizontal
+padding only; the circle's grid centring supplies the vertical space.
+
+**Covers are a background LAYER, never a replacement.** The uploaded image goes
+in as a `--cover` custom property and the sheet stacks it over the derived
+gradient. An inline `background-image` overwrites the whole image list, so a
+cover that 404s (expired proxy URL, deleted object, slow network) would leave a
+bare transparent box where the masthead should be. Under a photo the discovery
+card also suppresses its decorative broadcast rings — concentric circles over
+someone's cover read as a rendering fault, not as ornament.
+
+**Views are reported, not counted.** Each (post, viewer) pair is deduped
+server-side by HyperLogLog, so re-reporting is free and
+[usePostViews.js](src/components/chat/usePostViews.js) keeps only a per-session
+`seen` set. MessageList observes the `[data-mid]` attributes the bubbles already
+carry — a post-render sweep rather than a wrapper element, so neither the DOM
+nor the CSS had to change to support counting. Every failure is swallowed: a
+view marker is not worth a toast.
+
+**Drafts must not race the send.** Sending clears the row server-side, so
+[useServerDraft.js](src/components/chat/useServerDraft.js) exposes `markSent()`
+to cancel the pending debounced write — a save landing behind a send would
+resurrect a message that was already delivered. It also refuses to restore over
+a non-empty box (the fetch is async; the reader may have started typing) and is
+disabled while editing, where the box holds an existing message's text.
+
+**Slow mode is the one throttle the composer can act on.** `sendText` therefore
+re-throws `429` — uniquely among send failures — so the composer can arm its
+countdown from the server's own `Retry-After` rather than a local guess that a
+second tab has already invalidated. ChatPage passes `slowModeSeconds={0}` for
+owners and admins, who are exempt server-side.
+
+Stories posted **as** a channel are ordinary stories whose `authorId` is the
+channel id and whose visibility is `CHANNEL` — TTL, view log, A/B poll and the
+tray SSE are the user-story machinery unchanged. Highlights **snapshot** a story,
+so the archive survives the TTL; only a *live* story can be archived (the call
+404s once it has expired), which is why the picker lists live stories instead of
+taking an id.
 
 ### Live streaming — the app owns everything except the video
 
@@ -1483,10 +1661,16 @@ symmetric NATs. `VITE_ICE_SERVERS` accepts a JSON array of
 `RTCIceServer` objects; a production deployment needs to set it or a meaningful
 share of calls will ring, connect the signalling, and never carry audio.
 
-**Live playback is HLS-only and unpolyfilled.** Non-Safari engines get an
-"open in a player" link instead of inline video. Adding `hls.js` would fix it,
-but it is a dependency this project does not currently carry, and the honest
-fallback was preferred over a silent black frame.
+**Live playback now ships `hls.js`** (added on request, 2026-07-23). Safari
+keeps native HLS; other engines get hls.js over MediaSource, dynamic-imported
+in [LivePage.jsx](src/pages/LivePage.jsx) so only the live route pays for the
+chunk. Failure stays honest: `unsupported` (no engine) and `failed` (fatal
+unrecoverable error after 3 network retries + media-error recovery) both
+surface the "open in a player" banner with distinct copy. NOTE: playback also
+requires a real media origin — the backend's `app.streaming.playback-base`
+defaults to a placeholder (`https://play.local/live`), and the URL shape is
+`{base}/{streamId}.m3u8` while ingest is keyed by the secret `streamKey`, so
+the media server must map ingest-key → stream-id output.
 
 **Call history is client-side, and stream recording does not exist.** Screen
 sharing now ships (`getDisplayMedia` + `replaceTrack`, with a renegotiation for

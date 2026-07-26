@@ -1,0 +1,684 @@
+/* =============================================================
+   IKA "Warm Archive" — Messages · Channels · Live REDESIGN LAYER
+   -------------------------------------------------------------
+   Handoff #3 (design/pkg-messages-channels-live), rebuilt against
+   this repo's REAL markup. Imported LAST after chat.css and
+   chat-extras.css and BEFORE responsive.css, so equal-specificity
+   rules here win on source order. Presentation only — no markup,
+   logic or network changes.
+
+   HOW THIS LAYER RELATES TO THE SHEETS BELOW IT
+   · chat.css       keeps every structural invariant (scrollwrap /
+     jump-pill siblinghood, .ch-meta float shape, media intrinsic
+     sizing, portal skins with no placement, the z-index ladder).
+     This file NEVER touches position/z-index/height mechanics.
+   · chat-extras.css §20/§21 stay as the channels base + chat
+     polish. The rules here override §20's *design* (warm plate →
+     the handoff's navy broadcast plate, gradient crests → solid
+     tint crests) property-by-property; §20's functional scaffold
+     (tint spine wiring, skeletons, handle states, button swap)
+     is kept and only re-skinned.
+
+   DEVIATIONS FROM THE RAW HANDOFF FILE, ON PURPOSE  [IKA-FIX]
+   1. .ch-list / .ch-datesep / .chat-grid / .cv-avatar … do not
+      exist here — the real vocabulary is .ch-scroll, .ch-day,
+      .main.ch-main, .cv-medallion. Everything below binds to the
+      real names; the handoff-only selectors were dropped, not
+      carried as dead weight.
+   2. No heights on chat media. The handoff's `.ch-media img
+      {height:130px}` breaks the intrinsic-ratio contract that
+      MessageList's prepend scroll-anchoring depends on.
+   3. No positioning on .ch-emoji / .ch-quickreact — both portal
+      through <Popover> (position:fixed from JS). Skin only.
+   4. The gold "live" identity (typing preview, header status) is
+      kept over the handoff's blue/green — it is this theme's
+      signature and already consistent across the app.
+   5. The receipt ticks, unread badge and quick-react mechanics in
+      chat.css/§21 are richer than the handoff's static versions
+      and are left in charge.
+   ============================================================= */
+
+/* =========================================================
+   0 · Local values
+   ========================================================= */
+:root{
+  --mx-ease:cubic-bezier(.22,.8,.24,1);
+  --mx-spring:cubic-bezier(.34,1.56,.64,1);
+  /* the handoff's warm-interaction family (paper derivatives) */
+  --mx-hover:#efe9da;        /* row hover        */
+  --mx-active:#eae2cf;       /* row active (tan) */
+  --mx-soft:#f0ebdf;         /* control hover    */
+  --mx-canvas:#f1ece1;       /* thread canvas    */
+  --mx-online:#3d9a5f;       /* presence green   */
+}
+
+/* =========================================================
+   1 · Messages — the inbox rail
+   The rail moves from card-white onto warm paper so the thread
+   pane (canvas) and the rail read as two sheets of the same
+   archive rather than one continuous slab.
+   ========================================================= */
+.ch-pane-list{ background:var(--paper-2); }
+.ch-list-head{ background:var(--paper-2); border-bottom:0; padding:15px 16px 8px; }
+.ch-list-title h1{ font-size:22px; }
+
+/* the search field becomes the handoff's full pill */
+.ch-list-search{
+  height:40px; border-radius:999px; padding:0 15px;
+  background:var(--card);
+}
+.ch-list-search:focus-within{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(45,95,151,.10);
+}
+
+.chat-list{ padding:4px 8px 20px; }
+
+/* conversation rows — warm hover, tan active with a gold spine */
+.cv-row{ padding:9px 11px; }
+.cv-row:hover{ background:var(--mx-hover); }
+.cv-row.active{ background:var(--mx-active); }
+.cv-row.active:hover{ background:#e4dbc4; }
+/* the active row is bookmarked, like a ribbon in a ledger */
+.cv-row.active::before{
+  content:""; position:absolute;
+  inset-block:12px; inset-inline-start:2px;
+  width:3px; border-radius:999px;
+  background:linear-gradient(180deg,var(--gold),var(--gold-deep));
+}
+/* presence: ring matches the rail paper; green freshened */
+.cv-dot{ border-color:var(--paper-2); }
+.cv-dot.on{ background:var(--mx-online); }
+.cv-row.active .cv-dot{ border-color:var(--mx-active); }
+.cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--mx-active),0 3px 8px -3px rgba(122,102,47,.55); }
+/* group medallions keep their gold wash but soften to the new radius */
+.cv-medallion{ border-radius:14px; }
+
+/* Live signals go BLUE (prototype spec): "typing…" in the rail,
+   under the thread title AND the in-thread caption + icon read as
+   activity, not as gold markers — gold stays reserved for pins,
+   stars and unread. (The recording-voice mic keeps its red via
+   chat.css's higher-specificity act- rule.) */
+.cv-preview.typing{ color:var(--blue); font-style:normal; font-weight:600; }
+.ch-hd-sub.live{ color:var(--blue); font-style:normal; font-weight:600; }
+.ch-typing-label{ color:var(--blue); font-style:normal; font-weight:600; }
+.ch-typing-ico{ color:var(--blue); }
+
+/* skeleton ring + section labels sit on the new paper */
+.cv-skel-av{ border-radius:14px; }
+.chat-group-label{ color:#a39a85; }
+
+/* request rows share the rail's warm hover family — card-2 is
+   invisible against the new paper-2 rail */
+.rq-row:hover{ background:var(--mx-hover); }
+
+/* =========================================================
+   2 · Messages — thread canvas, header, separators
+   ========================================================= */
+
+/* Flat warm canvas under the bubbles (the parchment-tooth
+   background-image from chat.css §4 stays on top of it). */
+.ch-pane-thread{ background-color:var(--mx-canvas); }
+
+/* day separators become quiet floating pills (the handoff's
+   .ch-datesep, on the real .ch-day). The unread rule keeps its
+   gold lines — it marks a position, not a date. */
+.ch-day:not(.ch-unread-rule)::before,
+.ch-day:not(.ch-unread-rule)::after{ background:transparent; }
+.ch-day span{
+  text-transform:none; letter-spacing:0;
+  font-size:11.5px; font-weight:600;
+  background:#e5ddc9; border-color:transparent; color:#7a7259;
+  padding:4px 14px;
+}
+.ch-unread-rule span{
+  background:var(--gold-wash); border-color:var(--brass-soft); color:var(--gold-deep);
+}
+/* NOTE: a sticky date pill was tried and removed on purpose — the
+   day rows are FLAT siblings in .ch-msgs, so every past day would
+   pile up at the stick line, and the full-width row would swallow
+   hover/clicks on bubbles passing beneath it. Don't re-add without
+   per-day wrappers + pointer-events handling. */
+
+/* the empty-thread mark gets the broadcast medallion's quiet pulse */
+.ch-blank-mark{ position:relative; }
+.ch-blank-mark::before,
+.ch-blank-mark::after{
+  content:""; position:absolute; inset:-1px; border-radius:26px;
+  border:1.5px solid rgba(179,135,62,.45);
+  animation:mxRing 3.2s ease-out infinite;
+  pointer-events:none;
+}
+.ch-blank-mark::after{ animation-delay:1.6s; }
+@keyframes mxRing{
+  0%{ transform:scale(1); opacity:.55 }
+  70%{ opacity:0 }
+  100%{ transform:scale(1.5); opacity:0 }
+}
+
+/* presence dot in the thread header matches the rail */
+.ch-hd-dot.on{ background:var(--mx-online); }
+
+/* system notices switch to the handoff's sage voice — a third
+   colour lane so chrome never reads as speech */
+.ch-system span{
+  background:#eef1e9; border-color:#dfe7d8; color:#5f6b52;
+}
+.ch-system-ico{ color:#5f6b52; }
+
+/* ---- bubbles go BORDERLESS (prototype spec) ----
+   The border was doing the lifting-off-the-canvas job; a soft
+   two-part shadow now does it instead. States that USED the
+   border (failed / deleted) restate their own, because border:0
+   here zeroes the width they were only recolouring. */
+.ch-bubble{
+  border:0; border-radius:18px;
+  padding:9px 13px 8px;
+  font-size:15px;
+  box-shadow:0 1px 1.5px rgba(34,30,23,.07), 0 6px 18px -12px rgba(34,30,23,.16);
+}
+.ch-row.mine .ch-bubble{
+  box-shadow:0 2px 4px rgba(22,40,63,.14), 0 10px 26px -14px rgba(22,40,63,.45);
+}
+.ch-bubble.failed{ border:1px solid var(--danger); }
+.ch-bubble.deleted{ border:1px dashed var(--line); box-shadow:none; }
+/* mine-side states must also drop/replace the navy drop shadow the
+   (0,3,0) mine rule above re-adds over the (0,2,0) states */
+.ch-row.mine .ch-bubble.deleted{ box-shadow:none; }
+.ch-row.mine .ch-bubble.failed{ box-shadow:0 2px 8px -4px rgba(143,58,51,.4); }
+/* chFlash redefined WITHOUT an end keyframe: the ring eases back to
+   each bubble's own resting shadow (mine and theirs differ now), so
+   the jump-to-message highlight no longer pops at the end. */
+@keyframes chFlash{
+  0%,22%{ box-shadow:0 0 0 3px var(--gold); }
+}
+
+/* reply quote — a nested card; on navy the accent bar goes light,
+   not gold, so the quote reads as a layer of the same bubble */
+.ch-quote{ border-radius:10px; }
+.ch-row.mine .ch-quote{
+  background:rgba(255,255,255,.12);
+  border-inline-start-color:rgba(255,255,255,.55);
+}
+.ch-row.mine .ch-quote:hover{ background:rgba(255,255,255,.18); }
+
+/* ---- hover tools become floating ghost icons (prototype spec) ----
+   §21's grouped card pill is unwrapped: bare glyphs beside the
+   bubble, stacked, that tint navy on hover. Only the SKIN changes —
+   the opacity/pointer-events reveal (incl. the ≤720px keyboard
+   rule in chat.css §10) is untouched. */
+.ch-tools{
+  gap:2px; padding:0;
+  background:transparent; border:0; border-radius:0; box-shadow:none;
+  transform:none;
+}
+/* stays a ROW: the rail is an in-flow flex item hidden by opacity
+   (invariant #12 — never display:none), so a vertical stack would
+   set every message row's height to the rail's ~88px */
+.ch-tool{
+  width:28px; height:28px; border:0; border-radius:50%;
+  background:transparent; box-shadow:none;
+  color:var(--muted);
+}
+.ch-tool:hover{ background:#e9e2d0; color:var(--navy); border-color:transparent; }
+
+/* ---- voice notes: the played wave + playhead go blue ----
+   (prototype/doc spec — blue is the activity colour; the halo,
+   rate chip and unheard dot keep their existing mechanics) */
+.ch-voice-play{ width:40px; height:40px; }
+.ch-voice-play .ico{ width:17px; height:17px; }
+.ch-wave-layer.played .ch-wave-bar{ background:var(--blue); }
+.ch-wave-head{ background:var(--blue); }
+
+/* =========================================================
+   3 · Messages — composer (prototype spec)
+   Round ghost satellites · one large pill envelope with the
+   schedule clock visually riding INSIDE its end · a 46px navy
+   send coin.
+   ========================================================= */
+.ch-composer{ padding:12px 16px 14px; }
+.ch-cbtn{ width:40px; height:40px; border-radius:50%; }
+.ch-cbtn .ico{ width:20px; height:20px; }
+/* scoped to :not(.on) — the open emoji/schedule toggle must keep
+   its blue-wash pressed state under the cursor */
+.ch-cbtn:not(.on):hover{ background:var(--mx-soft); }
+.ch-cbtn.on, .ch-cbtn.on:hover{ background:var(--blue-wash); }
+
+.ch-inputwrap{
+  border-radius:999px;
+  padding-block:3px;
+  /* the wide end inset is the clock's parking bay (see below) */
+  padding-inline:16px 46px;
+}
+.ch-inputwrap:focus-within{
+  box-shadow:0 0 0 3px rgba(45,95,151,.10);
+}
+.ch-input{ font-size:15px; padding:10px 0; }
+
+/* The schedule clock is a SIBLING after the pill in the markup
+   (Composer.jsx — the pill holds only the textarea). Pulling it
+   back over the pill's end inset makes it read as in-pill, like
+   the prototype, without touching the DOM or its Popover anchor. */
+.ch-inputrow .ch-sched-btn{
+  width:36px; height:36px;
+  margin-inline-start:-44px;
+  margin-block-end:5px;
+  position:relative; z-index:1;
+}
+.ch-inputrow .ch-sched-btn .ico{ width:18px; height:18px; }
+/* the pending-count badge, re-seated for a 36px circle */
+.ch-sched-btn .ch-sched-n{ inset-block-start:0; inset-inline-end:0; }
+
+.ch-send{ width:46px; height:46px; }
+.ch-send .ico{ width:20px; height:20px; }
+.ch-send:not(:disabled):hover{ transform:translateY(-1px); }
+.ch-send:not(:disabled):active{ transform:scale(.92); }
+
+/* the recording strip matches the pill envelope */
+.ch-rec{ border-radius:999px; }
+
+/* the reply/edit strip slides in with a slightly softer card */
+.ch-ctx{ background:var(--mx-soft); }
+
+/* emoji picker buttons share the round-control language (skin
+   only — placement belongs to the Popover portal) */
+.ch-emoji-b:hover{ background:var(--mx-soft); }
+
+/* =========================================================
+   4 · Messages — panels
+   ========================================================= */
+/* slide-over panels keep their shell; hits pick up the warm hover */
+.ch-hitrow:hover{ background:var(--mx-soft); border-color:var(--brass-soft); }
+/* info-panel hero medallion rounds to match the rail */
+.ci-medallion{ border-radius:26px; }
+
+/* =========================================================
+   5 · Channels — shared page vocabulary
+   .cn-title / .cn-sub serve two contexts: the navy hero on
+   /channels (§6 recolours them) and the plain page head that
+   /live shares (.cn-head, styled here — it had no rules at all).
+   ========================================================= */
+/* The discovery search reuses .ch-list-search, which §1 turned
+   into a 40px pill — beside the 42px filter chips that reads as
+   a misprint. Same pill, toolbar gauge. */
+.ch-list-search.cn-search{ height:42px; }
+
+.cn-head{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap:16px; flex-wrap:wrap;
+  margin:2px 0 22px;
+}
+.cn-head > div{ flex:1 1 320px; min-width:0; }
+.cn-head .cn-title{ font-size:clamp(26px,3vw,32px); margin:0; }
+.cn-head .cn-sub{ margin-top:6px; }
+.cn-head .btn{ flex:0 0 auto; }
+
+/* =========================================================
+   6 · Channels — the navy broadcast plate (handoff signature)
+   Replaces §20.1's warm plate: deep navy gradient, gold-lit
+   medallion with expanding broadcast rings, inverted CTA.
+   Every §20 property that would bleed through is restated.
+   ========================================================= */
+.cn-hero{
+  border:0; box-shadow:0 18px 44px -24px rgba(22,40,63,.55);
+  gap:22px; padding:26px 28px;
+  background:
+    radial-gradient(120% 160% at 88% -20%, rgba(45,95,151,.5) 0%, rgba(45,95,151,0) 55%),
+    linear-gradient(150deg,#16283f 0%,#1d3a5f 60%,#274b78 100%);
+  color:#f3ecdd;
+}
+[dir="rtl"] .cn-hero{
+  background:
+    radial-gradient(120% 160% at 12% -20%, rgba(45,95,151,.5) 0%, rgba(45,95,151,0) 55%),
+    linear-gradient(-150deg,#16283f 0%,#1d3a5f 60%,#274b78 100%);
+}
+.cn-hero-art{
+  width:68px; height:68px; border-radius:50%;
+  border:1px solid rgba(217,185,108,.4);
+  background:radial-gradient(circle at 50% 38%, rgba(255,255,255,.2), rgba(255,255,255,.07) 70%);
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.25);
+  color:#d9b96c;
+}
+.cn-hero-art .ico{ width:30px; height:30px; }
+/* the §20 pulse rings survive, re-inked for the navy plate */
+.cn-hero-art::before,
+.cn-hero-art::after{ border-color:rgba(217,185,108,.42); }
+.cn-hero .cn-eyebrow{ color:#a9b7cb; letter-spacing:.16em; }
+.cn-hero .cn-title{ color:#f7f3ea; font-size:clamp(27px,3.2vw,36px); }
+.cn-hero .cn-title em{ color:#d9b96c; }
+.cn-hero .cn-sub{ color:#c8bfa9; font-size:13.5px; }
+.cn-hero-stats{ color:#a9b7cb; }
+.cn-hero .cn-hero-stats b{ color:#f3ecdd; }
+.cn-hero .cn-hero-sep{ color:rgba(217,185,108,.55); }
+/* the CTA inverts: paper button on navy */
+.cn-hero .btn-primary{
+  background:#fffdf8; color:var(--navy);
+  box-shadow:0 10px 24px -12px rgba(0,0,0,.5);
+}
+.cn-hero .btn-primary:hover{ background:#e8e2d2; color:var(--navy-deep); }
+.cn-hero .btn-primary .ico{ color:var(--gold-deep); }
+
+/* =========================================================
+   7 · Channels — "Your channels" rail + crests
+   Crests go SOLID tint (the handoff's card identity): a white
+   serif letter on the discipline colour, everywhere the same.
+   ========================================================= */
+.cn-mine:hover{ border-color:var(--t,var(--gold)); }
+.cn-mine-crest{
+  background:var(--t,var(--navy));
+  border:0; color:#fffdf8;
+  box-shadow:inset 0 -10px 18px -12px rgba(0,0,0,.45);
+}
+.cn-mine-dot{
+  background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
+  color:#fffdf8;
+  box-shadow:0 0 0 2px var(--card);
+}
+.cn-section-n{ font-variant-numeric:tabular-nums; }
+
+/* =========================================================
+   8 · Channels — discovery cards
+   §20.4 keeps the geometry (cover · straddling crest · foot);
+   this deepens the cover into the handoff's plate gradient and
+   matches the crest to the rail's solid tint.
+   ========================================================= */
+.cn-card-cover{
+  background:
+    linear-gradient(150deg, rgba(0,0,0,.30) 0%, rgba(255,255,255,.10) 100%),
+    var(--t,var(--navy));
+}
+.cn-card-mark{ color:rgba(255,255,255,.22); }
+.cn-card-crest{
+  background:var(--t,var(--navy));
+  color:#fffdf8;
+  border:3px solid var(--card);
+  box-shadow:inset 0 -12px 20px -14px rgba(0,0,0,.5), var(--shadow-sm);
+}
+/* the skeleton crest must stay a quiet grey — restate over the
+   solid tint above (same trick §20.5 used) */
+.cn-skel .cn-card-crest{ background:var(--line-soft); color:transparent; box-shadow:none; }
+.cn-skel .cn-card-cover{ background:var(--card-2); }
+
+.cn-card:hover{ border-color:var(--t,var(--gold)); }
+.cn-card-title{ color:var(--navy); }
+
+/* The foot now carries THREE actions (share · open · subscribe) —
+   at the grid's minimum card width they overflowed and the card's
+   overflow:hidden clipped the subscribe button. Compact the row and
+   let the actions wrap under the meta as the last resort. */
+.cn-card-foot{ flex-wrap:wrap; row-gap:8px; }
+.cn-card-acts{ gap:6px; }
+.cn-card-acts .cn-btn{ padding:0 12px; }
+/* the icon-only share stays a tight square */
+.cn-card-acts .cn-btn[title="Share"]{ width:34px; padding:0; display:inline-grid; place-items:center; }
+
+/* /c/{handle} — the share-link landing card: one channel card,
+   centred like an invitation, nothing else competing with it */
+.cn-linkcard{ max-width:380px; margin:7vh auto 0; }
+.cn-linkcard .cn-card{ box-shadow:var(--shadow); }
+.cn-linkcard-note{
+  margin:14px 6px 0; text-align:center;
+  color:var(--muted); font-size:12.5px; line-height:1.6;
+}
+
+/* =========================================================
+   9 · Live — directory
+   ========================================================= */
+/* A stream card is a <button>, and Chrome vertically CENTRES a block
+   button's content — so on a grid-stretched card with a short
+   description the cover drifted off the top edge. Making the button
+   itself a column pins the cover to the top; the body absorbs the
+   leftover height so the meta row still hugs its text. */
+.lv-card{
+  display:flex; flex-direction:column; align-items:stretch;
+  transition:border-color .16s var(--mx-ease), box-shadow .16s var(--mx-ease),
+             transform .16s var(--mx-ease);
+}
+.lv-card-thumb{ width:100%; flex:0 0 auto; }
+.lv-card-body{ width:100%; flex:1 1 auto; }
+.lv-card:hover{
+  border-color:var(--live);
+  box-shadow:var(--shadow);
+  transform:translateY(-2px);
+}
+.lv-card:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+.lv-card-thumb{
+  background:
+    radial-gradient(120% 130% at 85% 12%, rgba(45,95,151,.55) 0%, rgba(45,95,151,0) 55%),
+    linear-gradient(135deg,#16283f 0%,#1d3a5f 70%,#22456b 100%);
+  color:rgba(247,243,234,.45);
+}
+.lv-card-body h3{ color:var(--navy-deep); font-size:15.5px; }
+.lv-card-meta .pill{
+  padding:1px 8px; font-size:10.5px; font-weight:700;
+  color:var(--gold-deep); background:var(--gold-wash);
+}
+
+/* the LIVE chip squares off — broadcast grammar, not a pill */
+.lv-badge{
+  border-radius:7px; padding:4px 11px;
+  font-size:12px; letter-spacing:.07em;
+  box-shadow:0 4px 12px -4px rgba(194,72,61,.6);
+}
+.lv-badge.sm{ border-radius:6px; padding:3px 8px; font-size:10px; }
+
+/* =========================================================
+   10 · Live — the room
+   The chat rail pins itself beside the stage on desktop, so
+   scrolling the description never scrolls the conversation away
+   — the handoff's fixed-room feel without fighting the page
+   shell. Releases below 900px (chat-extras §10 stacks it).
+   ========================================================= */
+.lv-room{ gap:18px; }
+.lv-stage{
+  box-shadow:0 26px 60px -30px rgba(11,18,32,.6);
+}
+.lv-meta-main h1{ color:var(--navy-deep); font-size:23px; }
+.lv-chat{
+  position:sticky; inset-block-start:76px;
+  height:calc(100dvh - 76px - 28px);
+  max-height:820px;
+  box-shadow:var(--shadow-sm);
+}
+.lv-chat-head h2{ font-family:var(--serif); font-size:15px; }
+.lv-chat-log{ padding:12px 12px; gap:6px; }
+.lv-chat-log .lv-line{
+  padding:4px 7px; border-radius:9px;
+  transition:background .14s var(--mx-ease);
+}
+.lv-chat-log .lv-line:not(.lv-line-presence):hover{ background:var(--mx-soft); }
+.lv-line-av{ border-radius:50%; }
+.lv-line-av:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+.lv-chat-send .ch-send{ width:38px; height:38px; }
+.lv-chat-send .ch-send .ico{ width:17px; height:17px; }
+
+/* ingest — the gold-sealed card it deserves */
+.lv-ingest{ border-radius:var(--r-lg); }
+.lv-ingest-t > .ico{ color:var(--gold-deep); }
+.lv-ingest-t b{ font-weight:650; }
+
+/* the ended plate */
+.lv-ended .ico.lg{ width:34px; height:34px; color:rgba(217,185,108,.8); }
+
+/* =========================================================
+   10.5 · Calls — the .cl-* surface joins the design language
+   Re-skins chat-extras §8/§18 property-by-property: the frame
+   becomes the navy broadcast plate (same gradient family as the
+   channels hero and live thumbs), controls go glassy with lift,
+   Answer breathes while ringing. MECHANISMS UNTOUCHED: the
+   z-ladder (pill 150 / overlay 160 / devmenu 170), the 1px
+   mounted <video> rules, the auto-hide chrome transitions on
+   .cl-head/.cl-bar, and every measured --lvl behaviour.
+   ========================================================= */
+
+/* the frame — flat navy-deep becomes the broadcast plate */
+.cl-frame{
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,.08);
+  background:
+    radial-gradient(120% 150% at 85% -12%, rgba(45,95,151,.42) 0%, rgba(45,95,151,0) 55%),
+    linear-gradient(165deg,#16283f 0%,#101d30 100%);
+  box-shadow:0 32px 80px -32px rgba(0,0,0,.7);
+}
+/* a VOICE call has no video to protect — let the plate glow through
+   instead of sitting on a near-black stage */
+.cl-overlay.voice .cl-stage{ background:transparent; }
+.cl-overlay.voice .cl-tile{ background:rgba(255,255,255,.05); }
+
+/* head — serif identity, gold ringing status (both already there);
+   just seat the actions in the glass language */
+.cl-head-id b{ font-size:17px; }
+.cl-head-acts .icon-btn{
+  background:rgba(255,255,255,.06);
+  transition:background .16s var(--mx-ease), color .16s var(--mx-ease);
+}
+
+/* the ringing card — a warm halo behind the seal */
+.cl-await-av::before{
+  content:""; position:absolute; inset:-34px; border-radius:50%;
+  background:radial-gradient(circle, rgba(217,185,108,.16) 0%, transparent 65%);
+  pointer-events:none;
+}
+.cl-await-nm{ font-size:23px; }
+.cl-await-sub{ font-size:13.5px; }
+.cl-overlay.ringing .cl-await-sub{ color:#f0cf7a; }
+
+/* controls — glass coins that lift; the off-inversion stays */
+.cl-ctl{
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  transition:background .16s var(--mx-ease), color .16s var(--mx-ease),
+             transform .14s var(--mx-ease), box-shadow .16s var(--mx-ease);
+}
+.cl-ctl:hover{ transform:translateY(-2px); box-shadow:0 10px 22px -10px rgba(0,0,0,.55); }
+.cl-ctl:active{ transform:scale(.94); }
+.cl-ctl:focus-visible,
+.cl-btn:focus-visible,
+.cl-pill-main:focus-visible,
+.cl-pill-ic:focus-visible,
+.cl-pill-x:focus-visible{ outline:2px solid #8fc1ee; outline-offset:2px; }
+
+/* Answer / End — weighted, and Answer breathes while it rings */
+.cl-btn{
+  transition:background .16s var(--mx-ease), transform .14s var(--mx-ease),
+             box-shadow .16s var(--mx-ease);
+}
+.cl-btn:hover{ transform:translateY(-2px); }
+.cl-btn:active{ transform:scale(.96); }
+.cl-btn.accept{
+  background:linear-gradient(180deg,#37905f,#2a6e4c);
+  box-shadow:0 10px 26px -10px rgba(47,122,85,.65);
+  animation:mxAnswer 1.8s ease-in-out infinite;
+}
+.cl-btn.accept:hover{ background:linear-gradient(180deg,#3d9a67,#2f7a55); }
+.cl-btn.decline{ box-shadow:0 10px 26px -10px rgba(194,72,61,.6); }
+@keyframes mxAnswer{
+  0%,100%{ box-shadow:0 10px 26px -10px rgba(47,122,85,.65); }
+  50%{ box-shadow:0 10px 34px -8px rgba(95,208,138,.75); }
+}
+
+/* self view — a framed miniature. max-height caps it on SHORT stages
+   (voice + screen-share, small windows): its fixed 3/4 ratio could
+   otherwise outgrow the stage and climb over the header. */
+.cl-self{
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 14px 34px -14px rgba(0,0,0,.6);
+  max-height:72%;
+}
+
+/* tiles — soften the video corners into the plate */
+.cl-tile{ border-radius:14px; }
+
+/* the collapsed pill — brand ring + gold seam so it reads as IKA,
+   not as a generic dark blob floating over the page */
+.cl-pill{
+  border:1px solid rgba(217,185,108,.35);
+  background:
+    radial-gradient(120% 150% at 80% -20%, rgba(45,95,151,.5) 0%, rgba(45,95,151,0) 60%),
+    var(--navy-deep);
+  padding:5px;
+}
+.cl-pill-t{ font-variant-numeric:tabular-nums; }
+
+@media (max-width:720px){
+  /* chat-extras §8's phone rules load BEFORE this layer — restate the
+     full-bleed frame or the 20px radius/border above leaks onto phones */
+  .cl-frame{ border-radius:0; border:0; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .cl-btn.accept{ animation:none; }
+  .cl-ctl,.cl-btn{ transition:none; }
+  .cl-ctl:hover,.cl-ctl:active,.cl-btn:hover,.cl-btn:active{ transform:none; }
+}
+
+/* =========================================================
+   11 · Entrances — cards rise in, once, quickly
+   (§20.4 already staggers .cn-card; .lv-card and .cn-mine join
+   the same motion so the three surfaces feel like one system.)
+   ========================================================= */
+/* `backwards`, NOT `both`: a held final keyframe (transform:none)
+   outranks normal author rules and would permanently suppress the
+   :hover lifts below — the exact trap chat-extras §21.2 documents. */
+@keyframes mxRise{ from{ opacity:0; transform:translateY(9px) } to{ opacity:1; transform:none } }
+.lv-grid > .lv-card{ animation:mxRise .32s var(--mx-ease) backwards; }
+.lv-grid > .lv-card:nth-child(2){ animation-delay:.04s }
+.lv-grid > .lv-card:nth-child(3){ animation-delay:.08s }
+.lv-grid > .lv-card:nth-child(4){ animation-delay:.12s }
+.lv-grid > .lv-card:nth-child(5){ animation-delay:.16s }
+.lv-grid > .lv-card:nth-child(6){ animation-delay:.20s }
+.cn-rail > .cn-mine{ animation:mxRise .3s var(--mx-ease) backwards; }
+.cn-rail > .cn-mine:nth-child(2){ animation-delay:.05s }
+.cn-rail > .cn-mine:nth-child(3){ animation-delay:.10s }
+.cn-rail > .cn-mine:nth-child(4){ animation-delay:.15s }
+
+/* =========================================================
+   12 · Responsive seams this layer adds
+   (chat.css §10 and chat-extras §20.7 keep everything they
+   already own — only the new pieces are handled here.)
+   ========================================================= */
+@media (max-width:900px){
+  /* stacked room: the chat card scrolls with the page again */
+  .lv-chat{ position:static; height:min(56vh,460px); max-height:none; }
+}
+@media (max-width:720px){
+  .cn-head{ align-items:stretch; flex-direction:column; }
+  .cn-head .btn{ width:100%; justify-content:center; }
+  .cn-hero{
+    box-shadow:0 14px 34px -20px rgba(22,40,63,.5);
+    /* restate chat-extras §20.7's phone metrics — this file loads
+       after it, so the desktop gap/padding above would win */
+    gap:16px; padding:22px;
+  }
+
+  /* CASCADE RULE OF THIS FILE: chat.css §10's phone compacts load
+     BEFORE this sheet, so every unconditional rule above that §10
+     also compacts must be restated here or desktop metrics leak
+     onto phones. The safe-area bottom padding is load-bearing —
+     in thread view the botnav is hidden and the composer owns the
+     bottom edge; without env() the send coin sits under the iPhone
+     home indicator. */
+  .ch-composer{ padding:10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .ch-list-head{ padding:12px 12px 9px; }
+  .ch-list-title h1{ font-size:21px; }
+}
+@media (max-width:460px){
+  /* three 40px satellites + a 46px coin crowd a small phone; the
+     row keeps its shape one size down and the pill wins the space */
+  .ch-cbtn{ width:36px; height:36px; }
+  .ch-cbtn .ico{ width:18px; height:18px; }
+  .ch-send{ width:42px; height:42px; }
+  .ch-inputwrap{ padding-inline-start:13px; }
+}
+
+/* =========================================================
+   13 · Reduced motion — still every animation this layer added
+   ========================================================= */
+@media (prefers-reduced-motion:reduce){
+  .ch-blank-mark::before,.ch-blank-mark::after{ animation:none; opacity:0; }
+  .lv-grid > .lv-card,.cn-rail > .cn-mine{ animation:none; }
+  .lv-card,.lv-chat-log .lv-line{ transition:none; }
+  .lv-card:hover{ transform:none; }
+  .ch-send:not(:disabled):hover,
+  .ch-send:not(:disabled):active{ transform:none; }
+}

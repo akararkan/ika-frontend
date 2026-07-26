@@ -17,7 +17,9 @@ import { api, assetUrl } from '../api/index.js'
 export function ProfilePage() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()
-  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)', role:'MEMBER', bio:'', field:'', followers:0, following:0, posts:0, contributions:0 }
+  // Hook-phase placeholder only — the render below is guarded on `user`,
+  // so this object can never surface in the UI as an invented identity.
+  const me = user || { id:'', initials:'', avc:'', followers:0, following:0, posts:0, contributions:0 }
   const coverRef = React.useRef(null)
   const pickCover = (e) => { const f = e.target.files?.[0]; e.target.value=''; if (!f) return; api.users.uploadCover(f).then(() => { showToast('Cover updated'); refreshUser?.() }).catch(() => showToast('Could not upload cover')) }   // §10.6
   const [hlOpen, setHlOpen] = React.useState(null)   // open highlight archive viewer
@@ -89,6 +91,13 @@ export function ProfilePage() {
   }
   // POSTS tab excludes reels (reels come from the dedicated §17.2 list); counts from stats
   const onlyPosts = posts.filter(p => p.type !== 'REEL')
+
+  // No invented "@you" identity: behind RequireAuth `user` is effectively
+  // always set; on the corrupt-cache race we show a loader, never a fake
+  // profile. (Guard sits AFTER every hook so the hook order never changes.)
+  if (!user) {
+    return <div className="main center"><div className="col-main"><Loader label="Loading your profile…"/></div></div>
+  }
 
   return (
     <div className="main center">

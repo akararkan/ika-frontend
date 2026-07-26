@@ -502,7 +502,10 @@ export function Reels({ onClose, initialId }) {
                   )}
                 </div>
               )}
-              <div className="rvm-sound"><Icon name="music" className="xs"/><span className="rvm-marquee">Original audio · @{u.handle}</span></div>
+              {/* No invented "Original audio" claim: the reels feed does not
+                  carry the attached sound's metadata, so there is nothing
+                  truthful to print here. Restore this row when the API
+                  hydrates the reel's sound (title · artist). */}
             </div>
 
             <div className="rv-rail">

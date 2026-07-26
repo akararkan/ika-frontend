@@ -49,7 +49,11 @@ export function Layout() {
   // Layout renders inside <ChatProvider> (App.jsx), so the chat badge reads the
   // same live socket every chat surface uses — no second stream for the shell.
   const { totalUnread } = useChat()
-  const me = user || { full: 'You', handle: 'you', initials: 'Y', avc: '#1d3a5f' }
+  /* No invented identity: Layout renders behind RequireAuth, so `user` is
+     effectively always present — and when it briefly isn't (corrupt cache
+     race), the me-chip and you-card simply don't render rather than
+     showing a fabricated "You / @you" account. */
+  const me = user
   const [composeType, setComposeType] = React.useState(null)
   const [editPost, setEditPost] = React.useState(null)
   const [search, setSearch] = React.useState('')
@@ -171,10 +175,12 @@ export function Layout() {
             <Icon name="bell"/>{unread > 0 && <span className="dot"/>}
           </button>
           <button className="icon-btn tint" onClick={() => setComposeType('TEXT')}><Icon name="feather"/></button>
-          <button className="me-chip" onClick={() => navigate('/profile')}>
-            <Avatar initials={me.initials} color={me.avc} size={30} src={me.profileImage}/>
-            <span className="nm">{me.full.split(' ')[0]}</span>
-          </button>
+          {me && (
+            <button className="me-chip" onClick={() => navigate('/profile')}>
+              <Avatar initials={me.initials} color={me.avc} size={30} src={me.profileImage}/>
+              <span className="nm">{(me.full || '').split(' ')[0]}</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -203,16 +209,18 @@ export function Layout() {
           <Icon name="compose" className="sm"/><span>Create</span>
         </button>
 
-        <div className="side-section" style={{ marginTop:'auto' }}>
-          <div className="you-card">
-            <Avatar initials={me.initials} color={me.avc} size={40} src={me.profileImage}/>
-            <div className="who">
-              <div className="nm">{me.full}</div>
-              <small>@{me.handle}</small>
+        {me && (
+          <div className="side-section" style={{ marginTop:'auto' }}>
+            <div className="you-card">
+              <Avatar initials={me.initials} color={me.avc} size={40} src={me.profileImage}/>
+              <div className="who">
+                <div className="nm">{me.full}</div>
+                <small>@{me.handle}</small>
+              </div>
+              <button className="icon-btn" title="Sign out" onClick={signOut}><Icon name="logout" className="sm"/></button>
             </div>
-            <button className="icon-btn" title="Sign out" onClick={signOut}><Icon name="logout" className="sm"/></button>
           </div>
-        </div>
+        )}
       </aside>
 
       <main style={{ minWidth:0 }}>

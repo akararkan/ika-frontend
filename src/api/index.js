@@ -8,8 +8,15 @@ export { openStream, applyPostDelta, applyResearchDelta } from './realtime.js'
 export {
   convoFrom, msgFrom, memberFrom, requestFrom, participantFrom,
   settingsFrom, scheduledFrom, channelFrom, callFrom, callSignalFrom,
-  liveStreamFrom, liveChatFrom,
+  liveStreamFrom, liveChatFrom, pollFrom, draftFrom,
+  channelSettingsFrom, channelSettingsTo,
 } from './chat.js'
+export {
+  adminFrom, inviteFrom, joinRequestFrom, statsFrom,
+  channelStoryFrom, channelHighlightFrom, highlightStoryFrom, trayItemFrom,
+  rightsFrom, rightsTo, can as canRight,
+  RIGHT_KEYS, RIGHT_LABELS, JOIN_SOURCE_LABELS,
+} from './channels.js'
 export * as adapters from './adapters.js'
 
 import { auth } from './auth.js'
@@ -26,8 +33,12 @@ import { activity } from './activity.js'
 import { mentions } from './mentions.js'
 import { notifications } from './notifications.js'
 import { chat } from './chat.js'
+import { channels } from './channels.js'
 
 export const api = {
   auth, users, posts, reels, stories, closeFriends, closeCircle, highlights, sounds,
   qna, research, search, tags, activity, mentions, notifications, chat,
+  // Same object as `api.chat.channels` — both names are load-bearing: the chat
+  // surface reaches it through `chat`, the channel pages import it directly.
+  channels,
 }

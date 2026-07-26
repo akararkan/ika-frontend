@@ -76,10 +76,20 @@ function schedulePresets() {
   const rows = [{ key: 'hour', label: 'In an hour', at: inHour }]
   // "Tonight" is meaningless once it is already past 20:00 — drop it rather
   // than offering a preset the server would reject as being in the past.
-  if (tonight > now) rows.push({ key: 'tonight', label: 'Tonight, 20:00', at: tonight })
-  rows.push({ key: 'tomorrow', label: 'Tomorrow, 09:00', at: tomorrow })
+  if (tonight > now) rows.push({ key: 'tonight', label: 'Tonight', at: tonight })
+  rows.push({ key: 'tomorrow', label: 'Tomorrow morning', at: tomorrow })
   rows.push({ key: 'week', label: 'Next week', at: nextWeek })
   return rows
+}
+
+/** The concrete time a preset resolves to, shown beside its label —
+ *  "14:52" today/tomorrow, "Fri 09:00" further out. */
+function presetTime(d) {
+  const t = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const now = new Date()
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1)
+  if (d.toDateString() === now.toDateString() || d.toDateString() === tomorrow.toDateString()) return t
+  return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${t}`
 }
 
 export function Composer({
@@ -98,8 +108,18 @@ export function Composer({
   onTyping,
   onSchedule,
   onOpenScheduled,
+  onExtras,
   scheduledCount = 0,
   disappearingSeconds = 0,
+  /* Slow mode: one message per window for NON-admins (the owner and admins
+     are exempt server-side). `0` means off, and it is off for an exempt
+     caller too — ChatPage resolves that before it reaches here, so this
+     component never has to know who is an admin. */
+  slowModeSeconds = 0,
+  /* Channel admins can post without waking anyone. Only shown where the wire
+     supports it (a channel you may post to) — elsewhere `silent` is a field
+     the server ignores, and a control that does nothing is worse than none. */
+  allowSilent = false,
   placeholder = 'Write a message…',
 }) {
   const [files, setFiles] = React.useState([])
@@ -117,6 +137,12 @@ export function Composer({
   // soon as the draft clears, so a double-click's second hit started a
   // recording instead of being a harmless no-op.
   const [sending, setSending] = React.useState(false)
+  /* Seconds left before slow mode lets the next message through. Armed
+     locally after a successful send AND corrected by a 429 — the server is the
+     authority on the window, and its `retryAfterSeconds` is what a second tab
+     (or a clock that drifted) is reconciled against. */
+  const [cooldown, setCooldown] = React.useState(0)
+  const [silent, setSilent] = React.useState(false)
 
   const taRef = React.useRef(null)
   const fileRef = React.useRef(null)
@@ -248,8 +274,28 @@ export function Composer({
     onDraftChange?.('')
     stopTyping()
     setSending(true)
-    try { await onSendText?.({ body }) } finally { setSending(false) }
-  }, [sending, text, files, editing, onCommitEdit, onDraftChange, onSendFiles, onSendText, revokeAll, stopTyping, withActivity])
+    try {
+      await onSendText?.({ body, silent })
+      // Per-post, not a mode: the next message gets a notification unless the
+      // author asks for silence again.
+      setSilent(false)
+      if (slowModeSeconds > 0) setCooldown(slowModeSeconds)
+    } catch (e) {
+      /* Over quota. The server's own `Retry-After` beats the local guess —
+         another device may have sent in this window, so our countdown was
+         never running. http.js has already surfaced the toast. */
+      if (e?.status === 429) setCooldown(e.retryAfterSeconds ?? slowModeSeconds ?? 5)
+    } finally { setSending(false) }
+  }, [sending, text, files, editing, onCommitEdit, onDraftChange, onSendFiles, onSendText,
+      revokeAll, stopTyping, withActivity, slowModeSeconds, silent])
+
+  /* One interval for the whole countdown, torn down when it reaches zero —
+     not a fresh timeout per tick, which would drift. */
+  React.useEffect(() => {
+    if (cooldown <= 0) return undefined
+    const t = setInterval(() => setCooldown(n => Math.max(0, n - 1)), 1000)
+    return () => clearInterval(t)
+  }, [cooldown > 0])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const onKeyDown = (e) => {
     // `isComposing` (or keyCode 229) means an IME candidate window is open —
@@ -374,7 +420,7 @@ export function Composer({
     )
   }
 
-  const canSend = !!text.trim() || files.length > 0
+  const canSend = (!!text.trim() || files.length > 0) && cooldown === 0
   const contextMsg = editing || replyTo
 
   return (
@@ -395,6 +441,16 @@ export function Composer({
         <div className="ch-ttlnote">
           <Icon name="hourglass" className="sm"/>
           <span>New messages disappear after <b>{ttlLabel(disappearingSeconds)}</b></span>
+        </div>
+      )}
+
+      {/* Slow mode. Shown ONLY while the clock is running: a standing "slow
+          mode is on" banner over an empty composer is nagging, whereas a
+          countdown answers the only question the writer actually has. */}
+      {cooldown > 0 && (
+        <div className="ch-ttlnote ch-slownote" role="status">
+          <Icon name="hourglass" className="sm"/>
+          <span>Slow mode — you can send again in <b>{cooldown}s</b></span>
         </div>
       )}
 
@@ -559,6 +615,34 @@ export function Composer({
             />
           </div>
 
+          {/* Silent posting — delivers normally, sends no push. Offered only
+              where it means something: a channel post reaches every
+              subscriber's lock screen, which is exactly the cost a correction
+              or a footnote should not pay. It is a per-post choice, so it
+              RESETS after each send rather than latching. */}
+          {!editing && allowSilent && (
+            <button
+              type="button"
+              className={'ch-cbtn' + (silent ? ' on' : '')}
+              onClick={() => setSilent(v => !v)}
+              aria-pressed={silent}
+              aria-label={silent ? 'Silent post — no notification' : 'Post silently'}
+              title={silent ? 'Silent — subscribers get no push' : 'Send without a notification'}
+            >
+              <Icon name={silent ? 'mute' : 'volume'}/>
+            </button>
+          )}
+
+          {/* The types a textarea cannot express — poll, location, contact.
+              Hidden while editing: an edit changes a message's BODY, and none
+              of these are a body. */}
+          {!editing && !!onExtras && (
+            <button type="button" className="ch-cbtn" onClick={onExtras}
+              aria-label="Send a poll, location or contact" title="Poll · location · contact">
+              <Icon name="qna"/>
+            </button>
+          )}
+
           {/* Send-later. Offered only for plain text: the schedule endpoint
               takes pre-uploaded storage keys, and chat has no separate upload
               step, so a queued message can never carry a picked file. */}
@@ -594,60 +678,63 @@ export function Composer({
                 align="end"
                 prefer="top"
               >
-                <div className="ch-emoji-label">Send later</div>
+                <div className="ch-schedpop-head">
+                  <Icon name="clock" className="sm"/>
+                  <span>Send later</span>
+                  {scheduledCount > 0 && !!onOpenScheduled && (
+                    <button type="button" className="ch-schedpop-queue"
+                      onClick={() => { setSchedOpen(false); onOpenScheduled() }}
+                      title="Open the scheduled queue">
+                      {scheduledCount} queued
+                    </button>
+                  )}
+                </div>
                 {!text.trim() && !files.length && (
                   <p className="ch-schedpop-hint">Write the message first, then pick a time.</p>
                 )}
-                {schedWindow.rows.map(p => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    className="ch-menu-item"
-                    disabled={!text.trim()}
-                    onClick={() => {
-                      setSchedOpen(false)
-                      onSchedule?.({ body: text, scheduledAt: localStamp(p.at) })
-                    }}
-                  >
-                    <Icon name="clock" className="sm"/>
-                    <span>{p.label}</span>
-                  </button>
-                ))}
-                <div className="ch-menu-sep"/>
-                <label className="ch-schedpop-custom">
-                  <span>Pick a time</span>
+                <div className="ch-schedpop-list">
+                  {schedWindow.rows.map(p => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      className="ch-schedpop-row"
+                      disabled={!text.trim()}
+                      onClick={() => {
+                        setSchedOpen(false)
+                        onSchedule?.({ body: text, scheduledAt: localStamp(p.at) })
+                      }}
+                    >
+                      <Icon name="clock" className="xs"/>
+                      <span className="ch-schedpop-lbl">{p.label}</span>
+                      <span className="ch-schedpop-at">{presetTime(p.at)}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="ch-schedpop-sep" aria-hidden="true"><span>or pick a time</span></div>
+                <div className="ch-schedpop-custom">
                   <input
                     type="datetime-local"
                     className="field"
+                    aria-label="Pick a date and time"
                     value={customWhen}
                     min={schedWindow.min}
                     onChange={(e) => setCustomWhen(e.target.value)}
                   />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-primary ch-schedpop-go"
-                  disabled={!customWhen || !text.trim()}
-                  onClick={() => {
-                    setSchedOpen(false)
-                    // <input type="datetime-local"> gives "yyyy-MM-ddTHH:mm";
-                    // the API wants seconds, and it must stay zone-less.
-                    onSchedule?.({ body: text, scheduledAt: `${customWhen}:00`.slice(0, 19) })
-                    setCustomWhen('')
-                  }}
-                >
-                  Schedule
-                </button>
-                {scheduledCount > 0 && (
-                  <>
-                    <div className="ch-menu-sep"/>
-                    <button type="button" className="ch-menu-item"
-                      onClick={() => { setSchedOpen(false); onOpenScheduled?.() }}>
-                      <Icon name="calendar" className="sm"/>
-                      <span>{scheduledCount} queued message{scheduledCount === 1 ? '' : 's'}</span>
-                    </button>
-                  </>
-                )}
+                  <button
+                    type="button"
+                    className="btn btn-primary ch-schedpop-go"
+                    disabled={!customWhen || !text.trim()}
+                    onClick={() => {
+                      setSchedOpen(false)
+                      // <input type="datetime-local"> gives "yyyy-MM-ddTHH:mm";
+                      // the API wants seconds, and it must stay zone-less.
+                      onSchedule?.({ body: text, scheduledAt: `${customWhen}:00`.slice(0, 19) })
+                      setCustomWhen('')
+                    }}
+                  >
+                    <Icon name="send" className="xs"/>Schedule
+                  </button>
+                </div>
               </Popover>
             </>
           )}

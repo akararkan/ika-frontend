@@ -38,6 +38,8 @@ const TagPage            = named(() => import('./pages/TagPage.jsx'), 'TagPage')
 const ChatPage           = named(() => import('./pages/ChatPage.jsx'), 'ChatPage')
 const ChatJoinPage       = named(() => import('./pages/ChatJoinPage.jsx'), 'ChatJoinPage')
 const ChannelsPage       = named(() => import('./pages/ChannelsPage.jsx'), 'ChannelsPage')
+const ChannelPage        = named(() => import('./pages/ChannelPage.jsx'), 'ChannelPage')
+const ChannelLinkPage    = named(() => import('./pages/ChannelLinkPage.jsx'), 'ChannelLinkPage')
 const LivePage           = named(() => import('./pages/LivePage.jsx'), 'LivePage')
 
 const fullScreenLoader = <div className="main center"><div className="col-main"><Loader label="Loading…"/></div></div>
@@ -86,9 +88,19 @@ export default function App() {
                   mistaken for a conversation id. */}
               <Route path="chat/join/:token" element={<ChatJoinPage/>}/>
               <Route path="chat/:id" element={<ChatPage/>}/>
-              {/* A channel IS a conversation — /channels only creates,
-                  discovers and subscribes; reading opens /chat/<channelId>. */}
+              {/* A channel IS a conversation, so its POSTS live at
+                  /chat/<channelId>. /channels discovers; /channels/:id is the
+                  channel's profile — cover, stories, highlights and the admin
+                  console, i.e. everything that describes the channel rather
+                  than carrying its posts. */}
               <Route path="channels" element={<ChannelsPage/>}/>
+              <Route path="channels/:id" element={<ChannelPage/>}/>
+              {/* The routes behind the server-minted share links:
+                  /c/{handle} on every public ChannelResponse.shareUrl, and
+                  /join/{token} on InviteLinkResponse.shareUrl (same page as
+                  the older /chat/join/:token, kept for existing links). */}
+              <Route path="c/:handle" element={<ChannelLinkPage/>}/>
+              <Route path="join/:token" element={<ChatJoinPage/>}/>
               <Route path="live" element={<LivePage/>}/>
               <Route path="live/:id" element={<LivePage/>}/>
               <Route path="notifications" element={<NotificationsPage/>}/>

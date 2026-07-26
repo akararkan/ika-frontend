@@ -23,6 +23,7 @@ import React from 'react'
 import { Icon, Avatar } from '../ui.jsx'
 import { Loader } from '../states.jsx'
 import { MessageBubble } from './MessageBubble.jsx'
+import { usePostViews } from './usePostViews.js'
 import { typingSentence, dominantActivity, activityIcon } from './activity.js'
 import { describeCall } from './callLog.js'
 import { gtId } from '../../api/ids.js'
@@ -106,6 +107,7 @@ export function MessageList({
   onLoadOlder,
   myId,
   isGroup,
+  isChannel,           // channel posts carry view/forward/comment counters
   canModerate,
   canPin,
   pinnedIds,
@@ -132,8 +134,18 @@ export function MessageList({
   onOpenMedia,
   onOpenProfile,
   onReachedBottom,
+  onPoll,
+  onTag,
+  onComments,
+  reactionsOff,
+  allowedReactions,
+  protectedContent,
 }) {
   const scrollRef = React.useRef(null)
+  /* Channel posts count unique viewers. The observer lives here because this
+     is the component that owns the scroll viewport — see usePostViews.js for
+     why re-reporting is free and every failure is swallowed. */
+  const observeView = usePostViews(conversationId, !!isChannel)
   const topRef = React.useRef(null)
   const bottomRef = React.useRef(null)
 
@@ -236,6 +248,22 @@ export function MessageList({
     })
     return () => cancelAnimationFrame(id)
   }, [loading, quietBulk])
+
+  /* ----- report which posts were actually seen (channels only) -----
+     Deliberately a post-render sweep over `[data-mid]` rather than a ref on
+     each row: the bubbles already carry that attribute (the jump-to-message
+     lookup uses it), so nothing about the DOM or the CSS has to change to
+     support counting. Runs after every render because prepending history and
+     arriving messages both add rows; `observeView` ignores anything it has
+     already counted, so the repeat is free. */
+  React.useEffect(() => {
+    if (!isChannel) return
+    const root = scrollRef.current
+    if (!root) return
+    for (const el of root.querySelectorAll('[data-mid]')) {
+      observeView(el, el.getAttribute('data-mid'))
+    }
+  })
 
   /* ----- infinite scroll upward ----- */
   React.useEffect(() => {
@@ -481,6 +509,12 @@ export function MessageList({
               onJumpTo={onJumpTo}
               onOpenMedia={onOpenMedia}
               onOpenProfile={onOpenProfile}
+              onPoll={onPoll}
+              onTag={onTag}
+              onComments={onComments}
+              reactionsOff={reactionsOff}
+              allowedReactions={allowedReactions}
+              protectedContent={protectedContent}
             />
           )
         })}

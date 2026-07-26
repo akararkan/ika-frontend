@@ -4,6 +4,7 @@
    two-option poll if one is attached. Reuses .reels-view/.rv-*.
    ========================================================= */
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, showToast } from './ui.jsx'
 import { uiConfirm, uiPrompt } from './Dialog.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -180,6 +181,7 @@ function PollWidget({ poll, isOwner, live }) {
 }
 
 export function StoryViewer({ authorId, author, onClose }) {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const isOwner = !!user?.id && user.id === authorId
   const [items, setItems] = React.useState([])
@@ -305,7 +307,17 @@ export function StoryViewer({ authorId, author, onClose }) {
                 <Icon name="eye" className="xs"/>Seen by — view
               </button>
             ) : (
-              <div className="rvm-sound" onClick={() => showToast('Reply sent')}>
+              /* A REAL reply path: open (or reuse) the DM with the author —
+                 createDirect is get-or-create on the backend, so this never
+                 duplicates a thread. (The old stub toasted "Reply sent"
+                 without sending anything.) */
+              <div className="rvm-sound" onClick={async () => {
+                try {
+                  const convo = await api.chat.conversations.createDirect(authorId)
+                  onClose?.()
+                  if (convo?.id) navigate(`/chat/${convo.id}`)
+                } catch { showToast('Could not open the conversation') }
+              }}>
                 <Icon name="send" className="xs"/>Reply to {u.full.split(' ')[0]}…
               </div>
             )}

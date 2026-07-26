@@ -32,6 +32,9 @@ import { StarredPanel } from '../components/chat/StarredPanel.jsx'
 import { ScheduledPanel } from '../components/chat/ScheduledPanel.jsx'
 import { ChatPrefsPanel } from '../components/chat/ChatPrefsPanel.jsx'
 import { SeenBySheet } from '../components/chat/SeenBySheet.jsx'
+import { CommentsPanel, TagPanel } from '../components/chat/ChannelPanels.jsx'
+import { useServerDraft } from '../components/chat/useServerDraft.js'
+import { PostComposer } from '../components/chat/PostComposer.jsx'
 import { VideoPlayer } from '../components/chat/VideoPlayer.jsx'
 import { deleteIntentOf, sendBlockReason, canSendIn } from '../components/chat/conversationActions.js'
 import { typingSentence, dominantActivity } from '../components/chat/activity.js'
@@ -229,6 +232,12 @@ export function ChatPage() {
   const [viewer, setViewer] = React.useState(null)           // { items, index } for the lightbox
   const [addingPeople, setAddingPeople] = React.useState(false)
   const [pinBarOpen, setPinBarOpen] = React.useState(true)
+  /* Channel-only sheets. They are NOT part of `panel`: both are opened from a
+     post rather than from the header rail, and either may sit over an already
+     open panel without evicting it. */
+  const [commentsFor, setCommentsFor] = React.useState(null)  // post whose comments are open
+  const [tagQuery, setTagQuery] = React.useState(null)        // hashtag being looked up
+  const [extrasOpen, setExtrasOpen] = React.useState(false)   // poll / location / contact composer
 
   const infoOpen = panel === PANELS.INFO
 
@@ -404,10 +413,35 @@ export function ChatPage() {
   React.useEffect(() => { setDraft('') }, [id])
   React.useEffect(() => { if (editing) setDraft(editing.body || '') }, [editing])
 
+  /* …and it is mirrored to the server, so a half-written message follows the
+     account across devices. Disabled while EDITING: the box then holds an
+     existing message's text, and saving that as a draft would resurrect it
+     as a new message the next time this thread is opened. */
+  const draftSent = useServerDraft(convo?.id, {
+    value: draft,
+    enabled: !editing,
+    onRestore: setDraft,
+  })
+
   /* Why you can't post, in the backend's own precedence order. `null` = you can. */
   /* Why you can't post, in the backend's own precedence order. `null` = you
      can. Shared with the forward picker so the two can never disagree. */
   const lockedReason = React.useMemo(() => sendBlockReason(convo), [convo])
+
+  /* Channel policy, fetched once per channel. The INBOX row
+     (`ConversationResponse`) does not carry `ChannelSettings` — only
+     `GET /channels/{id}` does — so reactions/protected-content gating would
+     silently default to "allowed" if it were read off `convo`. Fetching it is
+     what makes the suppression honest rather than decorative. */
+  const [channelPolicy, setChannelPolicy] = React.useState(null)
+  React.useEffect(() => {
+    if (!convo?.isChannel) { setChannelPolicy(null); return undefined }
+    let alive = true
+    api.channels.get(convo.id)
+      .then(ch => { if (alive) setChannelPolicy(ch?.settings || null) })
+      .catch(() => { /* leave everything permitted; the server still refuses */ })
+    return () => { alive = false }
+  }, [convo?.isChannel, convo?.id])
 
   const isStaff = convo?.myRole === 'OWNER' || convo?.myRole === 'ADMIN'
   const canModerate = !!convo?.isGroup && isStaff
@@ -815,6 +849,7 @@ export function ChatPage() {
               onLoadOlder={thread.loadOlder}
               myId={myId}
               isGroup={!!convo.isGroup}
+              isChannel={!!convo.isChannel}
               canModerate={canModerate}
               canPin={canPin}
               pinnedIds={pinnedIds}
@@ -840,6 +875,12 @@ export function ChatPage() {
               onJumpTo={(mid) => onJump(mid, id)}
               onOpenProfile={(uid) => uid && navigate(`/u/${uid}`)}
               onOpenMedia={(items, index) => setViewer({ items, index })}
+              onPoll={thread.applyPoll}
+              onTag={(tag) => setTagQuery(tag)}
+              onComments={(m) => { thread.seeComments(m.id); setCommentsFor(m) }}
+              reactionsOff={channelPolicy?.reactionsEnabled === false}
+              allowedReactions={channelPolicy?.allowedReactions || null}
+              protectedContent={!!channelPolicy?.protectedContent}
             />
             <Composer
               conversationId={convo.id}
@@ -849,12 +890,21 @@ export function ChatPage() {
               editing={editing}
               draft={draft}
               onDraftChange={setDraft}
+              /* The promise is RETURNED, not fired and forgotten: the composer
+                 awaits it to arm the slow-mode countdown, and a throttle
+                 rejection has to reach it to be reconciled with the server's
+                 Retry-After. */
               onSendText={({ body }) => {
-                thread.sendText({ body, replyToId: replyTo?.id ?? null })
+                const p = thread.sendText({ body, replyToId: replyTo?.id ?? null })
+                // Sending clears the server-side draft; tell the mirror so it
+                // does not write the text back in behind the send.
+                draftSent()
                 setReplyTo(null); setDraft('')
+                return p
               }}
               onSendFiles={({ files, body, durationMs }) => {
                 thread.sendFiles({ files, body, durationMs, replyToId: replyTo?.id ?? null })
+                draftSent()
                 setReplyTo(null); setDraft('')
               }}
               onCommitEdit={(body) => {
@@ -866,8 +916,18 @@ export function ChatPage() {
               onTyping={(isTyping) => sendTyping(convo.id, isTyping)}
               onSchedule={onSchedule}
               onOpenScheduled={toggleScheduled}
+              onExtras={() => setExtrasOpen(true)}
               scheduledCount={(thread.scheduled || []).length}
               disappearingSeconds={convo.disappearingSeconds || 0}
+              /* Slow mode throttles NON-admins only; the owner and admins are
+                 exempt server-side, so an exempt caller is given 0 and never
+                 sees a countdown they are not subject to. */
+              slowModeSeconds={isStaff ? 0 : (convo.slowModeSeconds || 0)}
+              /* Silent posting only means something on a broadcast, where a
+                 post reaches every subscriber's lock screen. In a DM or group
+                 the server ignores the flag, so the control is absent rather
+                 than present-and-inert. */
+              allowSilent={!!convo.isChannel && !lockedReason}
             />
           </>
         )}
@@ -910,6 +970,38 @@ export function ChatPage() {
       )}
 
       {panel === PANELS.PREFS && <ChatPrefsPanel onClose={() => setPanel(null)}/>}
+
+      {commentsFor && convo?.isChannel && (
+        <CommentsPanel
+          channelId={convo.id}
+          post={commentsFor}
+          linkedGroupId={convo.linkedGroupId}
+          onClose={() => setCommentsFor(null)}
+          onCountChange={(postId, delta) => thread.bumpComments(postId, delta)}
+          onOpenProfile={(uid) => { setCommentsFor(null); if (uid) navigate(`/u/${uid}`) }}
+        />
+      )}
+
+      {extrasOpen && convo && (
+        <PostComposer
+          conversationId={convo.id}
+          replyToId={replyTo?.id ?? null}
+          onClose={() => setExtrasOpen(false)}
+          /* The send already happened inside the modal, so the thread is
+             brought level by the same `message.new` echo every other send
+             uses — there is no optimistic bubble to reconcile. */
+          onSent={() => { setReplyTo(null); setExtrasOpen(false) }}
+        />
+      )}
+
+      {tagQuery && (
+        <TagPanel
+          conversationId={convo?.id}
+          tag={tagQuery}
+          onClose={() => setTagQuery(null)}
+          onJumpTo={(mid) => { setTagQuery(null); onJump(mid, id) }}
+        />
+      )}
 
       {seenFor && (
         <SeenBySheet

@@ -1,0 +1,1641 @@
+/* =========================================================
+   CHANNELS PRO — profile, management console, stories,
+   highlights, statistics, and the channel-post surfaces
+   ---------------------------------------------------------
+   Loaded AFTER ika-messages-theme.css, so anything here that
+   touches a shared class wins. It deliberately touches almost
+   none: every block below introduces its own prefix and leans on
+   the existing token layer for colour, radius and shadow.
+
+   Prefixes
+     .cp-*   channel PROFILE page (/channels/:id)
+     .cm-*   channel MANAGE console (the tabbed modal)
+     .ca-*   admins, rights, join requests
+     .cil-*  invite links
+     .cst-*  statistics (tiles + charts)
+     .cs-*   channel STORIES (rail, viewer, composer, tray)
+     .chl-*  HIGHLIGHTS (rail + sheet)
+     .cc-*   post comments + tag lookup panels
+     .pc-*   the poll/location/contact composer
+     .ch-poll / .ch-loc / .ch-contact / .ch-postrail / .ch-vnote
+             typed payloads and the post rail, inside a bubble
+
+   The `.tint-N` spine (chat-extras §20) supplies `--t` (the
+   discipline hue) and `--tw` (its wash) — channel art is keyed
+   on it so a channel wears one colour everywhere.
+
+   Z-INDEX. Only one surface here stacks: `.cs-viewer` at 150,
+   the same rung as the chat lightbox. Nothing exceeds 199 — the
+   confirm dialog (200) and the toast (200) are the app's
+   permanent ceiling and every destructive action in this file
+   raises one.
+   ========================================================= */
+
+/* =========================================================
+   1 · Channel profile — /channels/:id
+   ========================================================= */
+
+.cp-page .col-main{ padding-bottom:48px; }
+
+.cp-hero{ margin:0 0 18px; }
+
+/* THE COVER.
+   The uploaded photo is a background LAYER over the derived gradient, never a
+   replacement for it — passed in as `--cover` rather than as an inline
+   `background-image`, because an inline background-image overwrites the whole
+   image list and a cover that 404s (expired proxy URL, deleted object, slow
+   network) would then leave a bare transparent box where the masthead should
+   be. Layered, the gradient is simply what you see until — or instead of —
+   the photo. The background-COLOR is set for the same reason: it is the last
+   thing standing if both fail.
+
+   The derived art is COMPOSED, not flat: the tint gradient, a soft glow rising
+   from the corner the avatar occupies, and the same concentric broadcast rings
+   the discovery card wears — so a channel with no photo still has a masthead
+   that is unmistakably ITS masthead (the tint is keyed to the id), and the
+   profile and the card read as one identity. */
+.cp-cover{
+  position:relative;
+  height:200px;
+  border-radius:var(--r-lg);
+  background-color:var(--navy-deep);
+  background-image:
+    radial-gradient(90% 130% at 12% 108%, rgba(255,255,255,.14) 0%, transparent 55%),
+    radial-gradient(70% 110% at 88% -20%, rgba(255,255,255,.10) 0%, transparent 60%),
+    linear-gradient(135deg, var(--t,var(--navy)) 0%, var(--navy-deep) 88%);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  display:grid;place-items:center;
+  overflow:hidden;
+  /* Hairline seats the cover on the paper; the long soft shadow lifts it the
+     way the app's other mastheads sit. */
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07), var(--shadow-sm);
+}
+/* The broadcast rings, centred where the avatar will overlap the bottom edge —
+   the crest rises out of its own signal. Pure ornament, so `aria` never sees
+   it and a photo suppresses it (rings over someone's image read as a fault). */
+.cp-cover::before{
+  content:"";position:absolute;pointer-events:none;
+  inset-block-end:-84px;inset-inline-start:6px;
+  width:240px;height:240px;border-radius:50%;
+  background:radial-gradient(circle,
+    transparent 26%, rgba(255,255,255,.14) 27%, transparent 30%,
+    transparent 42%, rgba(255,255,255,.11) 43%, transparent 46%,
+    transparent 58%, rgba(255,255,255,.08) 59%, transparent 62%,
+    transparent 74%, rgba(255,255,255,.05) 75%, transparent 78%);
+}
+.cp-cover.has-img{
+  background-image:var(--cover),linear-gradient(135deg,var(--t,var(--navy)) 0%,var(--navy-deep) 100%);
+}
+.cp-cover.has-img::before{ display:none; }
+.cp-cover-mark{ width:52px;height:52px;color:rgba(255,255,255,.22); }
+/* The scrim only exists so the crest and title stay legible over an uploaded
+   photo of unknown brightness. It is absent by intent on the derived gradient
+   — there is nothing there to be illegible against. */
+.cp-cover-scrim{
+  position:absolute;inset:0;
+  background:linear-gradient(to bottom,rgba(22,40,63,0) 40%,rgba(22,40,63,.38) 100%);
+}
+.cp-cover:not(.has-img) .cp-cover-scrim{ display:none; }
+
+/* ONLY the avatar straddles the cover seam. The first cut pulled the whole
+   identity row up (`margin-top:-46px` on the row), which floated the serif
+   title onto the cover — navy on a dark photo was unreadable, and no scrim
+   should have to rescue text that simply belongs on the paper. The negative
+   margin now lives on the avatar alone; everything textual starts below the
+   cover's edge. */
+.cp-ident{
+  display:flex;align-items:flex-start;gap:18px;
+  margin:0 20px;position:relative;
+  flex-wrap:wrap;
+}
+
+.cp-avatar{
+  flex:0 0 auto;
+  margin-top:-46px;
+  width:96px;height:96px;border-radius:24px;
+  background:var(--card);
+  box-shadow:0 0 0 4px var(--card),var(--shadow);
+  display:grid;place-items:center;overflow:hidden;
+}
+.cp-avatar .av{ border-radius:20px; }
+.cp-crest{
+  position:relative;
+  width:100%;height:100%;
+  display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
+  color:#fff;font-family:var(--serif);font-size:42px;font-weight:600;
+  text-shadow:0 1px 2px rgba(22,40,63,.4);
+}
+/* A soft top-light across the crest — the same glass the app's medallions
+   carry, so the derived monogram doesn't read flatter than a real photo. */
+.cp-crest::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(165deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.05) 38%,transparent 55%);
+}
+
+.cp-ident-body{ flex:1;min-width:220px;padding-top:12px; }
+
+.cp-title{
+  margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-family:var(--serif);font-size:clamp(22px,2.6vw,28px);font-weight:600;line-height:1.2;
+  letter-spacing:-.01em;
+  color:var(--navy-deep);
+}
+.cp-sub{ display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px; }
+.cp-handle{ font-size:14px;color:var(--gold-deep);font-weight:600; }
+.cp-handle.muted{ color:var(--muted);display:inline-flex;align-items:center;gap:4px; }
+.cp-cat{
+  border:1px solid var(--line);background:var(--paper-2);color:var(--ink-soft);
+  border-radius:999px;padding:2px 10px;font-size:11.5px;cursor:pointer;
+  text-transform:lowercase;letter-spacing:.02em;
+}
+.cp-cat:hover{ border-color:var(--gold);color:var(--gold-deep); }
+
+.cp-stats{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin-top:8px;font-size:13px;color:var(--ink-soft);
+}
+.cp-stats b{ color:var(--navy-deep);font-weight:650; }
+.cp-dot{ color:var(--line); }
+
+.cp-acts{ display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:14px; }
+/* The subscribed button swaps its label on hover — a control that still says
+   "Subscribed" while clicking it unsubscribes you is the oldest trap in this
+   pattern. Same mechanism as the discovery card's .cn-btn.on. */
+.cp-acts .btn.on .cn-btn-b{ display:none; }
+.cp-acts .btn.on:hover .cn-btn-a,
+.cp-acts .btn.on:focus-visible .cn-btn-a{ display:none; }
+.cp-acts .btn.on:hover .cn-btn-b,
+.cp-acts .btn.on:focus-visible .cn-btn-b{ display:inline; }
+.cp-acts .btn.on{ border-color:var(--good);color:var(--good); }
+.cp-acts .btn.on:hover{ border-color:var(--danger);color:var(--danger); }
+.cp-acts .cn-btn-a{ display:inline-flex;align-items:center;gap:5px; }
+
+.cp-note{
+  display:flex;gap:10px;align-items:flex-start;
+  margin:16px 0 0;padding:12px 14px;
+  border:1px solid var(--brass-soft);background:var(--gold-wash);
+  border-radius:var(--r);font-size:13.5px;color:var(--ink-soft);line-height:1.5;
+}
+.cp-note b{ color:var(--gold-deep); }
+
+.cp-desc{
+  margin:16px 0 0;font-size:15px;line-height:1.65;color:var(--ink-soft);
+  max-width:68ch;
+}
+
+.cp-badges{ display:flex;flex-wrap:wrap;gap:6px;margin-top:14px; }
+.cp-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--line);background:var(--card);
+  border-radius:999px;padding:4px 11px;font-size:11.5px;color:var(--ink-soft);
+}
+/* The icon carries the brass, the words stay in ink — a full gold chip per
+   policy would shout six times over for settings that are merely facts. */
+.cp-badge .ico{ color:var(--gold-deep);width:13px;height:13px; }
+
+/* Section heads carry an editorial rule — the serif title, then a hairline
+   running to the actions, the way the app's other mastheads close a heading.
+   The rule is a flex-ordered pseudo so the actions stay AFTER it without any
+   extra markup. */
+.cp-section-head{
+  display:flex;align-items:center;gap:10px;
+  margin:30px 0 14px;
+}
+.cp-section-head::after{
+  content:"";flex:1;order:1;height:1px;
+  background:linear-gradient(90deg,var(--line) 0%,var(--line-soft) 70%,transparent 100%);
+}
+.cp-head-acts{ order:2;display:flex;gap:6px; }
+.cp-h2{
+  margin:0;font-family:var(--serif);font-size:18px;font-weight:600;color:var(--navy-deep);
+}
+.cp-count{
+  font-size:11.5px;color:var(--gold-deep);
+  border:1px solid var(--brass-soft);background:var(--gold-wash);
+  border-radius:999px;padding:1px 8px;font-weight:650;
+  font-variant-numeric:tabular-nums;
+}
+
+.cp-about{ margin-top:32px; }
+/* Index-style facts: small-caps keys, a dotted leader running to the value —
+   the reference-book idiom the Warm Archive is built around. The leader is a
+   bordered flex spacer, so RTL and long keys both just work. */
+.cp-facts{ margin:14px 0 0;display:grid;gap:0; }
+.cp-facts > div{
+  display:flex;gap:12px;align-items:baseline;
+  padding:9px 2px;font-size:13.5px;
+}
+.cp-facts > div + div{ border-top:1px solid var(--line-soft); }
+.cp-facts dt{
+  flex:0 0 auto;color:var(--muted);
+  font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;
+}
+.cp-facts dd{
+  flex:1;margin:0;color:var(--ink-soft);text-align:end;
+  overflow-wrap:anywhere;
+}
+.cp-link{
+  border:0;background:transparent;padding:0;cursor:pointer;
+  color:var(--gold-deep);font:inherit;text-decoration:underline;text-underline-offset:2px;
+}
+.cp-open{ margin-top:18px; }
+
+/* =========================================================
+   2 · Discovery card additions (cover image, category, waiting)
+   ========================================================= */
+
+/* Same layering rule as the profile cover: the photo rides OVER the card's
+   tint gradient, so a broken URL degrades to the art the card had before
+   anyone uploaded anything. The decorative broadcast rings are suppressed
+   under a photo — concentric circles over someone's cover image read as a
+   rendering fault, not as ornament. */
+.cn-card-cover.has-img{
+  background-image:var(--cover),
+    linear-gradient(150deg,rgba(0,0,0,.30) 0%,rgba(255,255,255,.10) 100%);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+}
+.cn-card-cover.has-img::before{ display:none; }
+/* An uploaded channel photo replaces the crest LETTER, never the medallion:
+   it keeps the card ring and the seam-straddling geometry, so a rail of
+   channels with and without photos still scans as one row of medallions. */
+.cn-card-crest img{ width:100%;height:100%;object-fit:cover;border-radius:inherit; }
+.cn-card-flag.wait{ background:var(--gold);color:#fff; }
+.cn-card-cat{
+  margin-inline-start:8px;padding:1px 7px;
+  border:1px solid var(--line);border-radius:999px;
+  font-size:10.5px;color:var(--muted);text-transform:lowercase;
+}
+.cn-card-sep{ margin:0 6px;color:var(--line); }
+
+.cn-cats{
+  display:flex;gap:6px;flex-wrap:wrap;
+  margin:0 0 18px;
+}
+
+/* =========================================================
+   3 · Manage console
+   ========================================================= */
+
+/* The console shell: fixed height so switching between a short pane and a
+   tall one never resizes the modal or shifts the rail under the pointer. */
+.cm-modal{
+  max-width:min(880px,calc(100vw - 32px));
+  height:min(720px,calc(100dvh - 96px));
+}
+.cm-split{ display:flex;flex:1;min-height:0; }
+.cm-body{ padding:20px 24px 0; }
+
+/* Head — the channel's own crest on its tint (the same identity the profile
+   masthead and the discovery card wear), a small-caps kicker, and the name in
+   serif. The h3 is a fit-content box: an RTL title therefore anchors at the
+   container's inline-start, directly under the kicker, instead of stranding
+   against the close button at the far edge of a full-width block. */
+.cm-head{ gap:12px; }
+.cm-head-mark{
+  flex:0 0 auto;width:38px;height:38px;border-radius:12px;overflow:hidden;
+  display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
+  color:#fffdf8;font-family:var(--serif);font-size:17px;font-weight:600;
+  box-shadow:inset 0 -8px 14px -10px rgba(0,0,0,.5);
+}
+.cm-head-mark img{ width:100%;height:100%;object-fit:cover;display:block; }
+.cm-head-t{ flex:1;min-width:0; }
+.cm-head-k{
+  display:block;
+  font:700 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold-deep);
+}
+.cm-head-t h3{
+  margin:3px 0 0;width:fit-content;max-width:100%;
+  font-family:var(--serif);font-size:17px;font-weight:600;color:var(--navy-deep);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* The rail. Desktop: a vertical stack on a wash — all seven destinations
+   permanently visible, nothing to scroll, nothing to clip. The items stay
+   PILLS (the style guide is explicit: pills, never underlines — and never a
+   start-edge indicator bar, which is an underline turned 90°): ghost at rest,
+   gold wash on hover, the house navy fill when current. Logical properties
+   throughout, so a ckb/ar UI mirrors for free. */
+.cm-tabs{
+  flex:0 0 200px;
+  display:flex;flex-direction:column;gap:4px;
+  padding:16px 12px;
+  overflow-y:auto;overflow-x:hidden;
+  border-inline-end:1px solid var(--line);border-bottom:0;
+  background:var(--card-2);
+  scrollbar-width:none;
+  -webkit-mask-image:none;mask-image:none;
+}
+.cm-tabs::-webkit-scrollbar{ display:none; }
+.cm-tab-btn{
+  display:inline-flex;align-items:center;gap:9px;
+  width:100%;justify-content:flex-start;
+  border:1px solid transparent;border-radius:999px;
+  background:transparent;cursor:pointer;
+  padding:9px 14px;
+  font:600 13px/1 var(--sans);color:var(--ink-soft);
+  white-space:nowrap;
+  transition:background .14s ease,border-color .14s ease,color .14s ease;
+}
+.cm-tab-btn .ico{ color:var(--muted);transition:color .14s ease; }
+.cm-tab-btn:hover{ background:var(--gold-wash);color:var(--navy); }
+.cm-tab-btn:hover .ico{ color:var(--gold-deep); }
+.cm-tab-btn.on{ background:var(--navy);border-color:var(--navy);color:#f7f3ea; }
+.cm-tab-btn.on .ico{ color:#d9b96c; }
+.cm-tab-btn:focus-visible{ outline:2px solid var(--blue);outline-offset:2px; }
+
+/* NOTE the names: .cm-pane / .cm-stack, not .cm-tab — the compose modal
+   already owns `.cm-tab` as a filled pill (warm/feed.css), and on a
+   full-height panel that pill's 999px border once drew a giant ellipse
+   across the whole console. */
+@keyframes cmPaneIn{ from{ opacity:0;transform:translateY(5px); } }
+.cm-pane{
+  display:grid;gap:16px;
+  padding-bottom:24px;
+  animation:cmPaneIn .18s ease-out both;
+}
+/* a pane that ends in the sticky save bar owns its own bottom edge */
+.cm-pane:has(.cm-save){ padding-bottom:0; }
+.cm-stack{ display:grid;gap:16px;min-width:0; }
+
+/* the editorial header every destination opens with: serif title, hairline
+   running to the trailing edge, one-line description — one consistent top
+   edge for all seven panes */
+.cm-pane-head{ display:grid;gap:5px; }
+.cm-pane-head h4{
+  margin:0;display:flex;align-items:center;gap:12px;
+  font-family:var(--serif);font-size:18px;font-weight:600;color:var(--navy-deep);
+}
+.cm-pane-head h4::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,var(--line),var(--line-soft) 70%,transparent);
+}
+[dir="rtl"] .cm-pane-head h4::after{
+  background:linear-gradient(-90deg,var(--line),var(--line-soft) 70%,transparent);
+}
+.cm-pane-head p{
+  margin:0;font-size:12.5px;line-height:1.5;color:var(--muted);max-width:60ch;
+}
+
+/* ---------------------------------------------------------
+   The identity banner — the SAME composition the profile
+   masthead and the discovery card wear (tint gradient, rings,
+   seam-straddling avatar), made editable in place. It reads
+   as "this is your channel", not as a pair of upload widgets.
+   --------------------------------------------------------- */
+.cm-art{
+  border:1px solid var(--line);border-radius:var(--r-lg);
+  background:var(--card);overflow:hidden;
+}
+.cm-art-cover{
+  position:relative;height:128px;
+  background-color:var(--navy-deep);
+  background-image:
+    radial-gradient(90% 130% at 12% 108%,rgba(255,255,255,.14) 0%,transparent 55%),
+    linear-gradient(135deg,var(--t,var(--navy)) 0%,var(--navy-deep) 88%);
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  display:flex;align-items:flex-start;justify-content:flex-end;
+  padding:10px;
+}
+/* the broadcast rings, rising from where the avatar straddles the seam */
+.cm-art-cover::before{
+  content:"";position:absolute;pointer-events:none;
+  inset-block-end:-64px;inset-inline-start:2px;
+  width:190px;height:190px;border-radius:50%;
+  background:radial-gradient(circle,
+    transparent 26%, rgba(255,255,255,.13) 27%, transparent 30%,
+    transparent 42%, rgba(255,255,255,.10) 43%, transparent 46%,
+    transparent 58%, rgba(255,255,255,.07) 59%, transparent 62%);
+}
+/* Layered, not replaced — see the note on `.cp-cover`. In this panel it also
+   means the buttons keep a legible backdrop while a freshly picked image is
+   still uploading. */
+.cm-art-cover.has-img{
+  background-image:var(--cover),linear-gradient(135deg,var(--t,var(--navy)) 0%,var(--navy-deep) 100%);
+}
+.cm-art-cover.has-img::before{ display:none; }
+
+.cm-art-acts{ display:flex;gap:6px; }
+/* glass chips over the cover — legible on the gradient AND on any photo */
+.cm-art-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.28);
+  background:rgba(22,40,63,.52);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  color:#fffdf8;font:600 12px/1.3 var(--sans);white-space:nowrap;
+  transition:background .14s ease,border-color .14s ease;
+}
+.cm-art-btn:hover{ background:rgba(22,40,63,.74);border-color:rgba(255,255,255,.45); }
+.cm-art-btn:focus-within{ outline:2px solid #fffdf8;outline-offset:1px; }
+.cm-art-btn .ico{ width:13px;height:13px; }
+.cm-art-spin{
+  width:12px;height:12px;border-radius:50%;flex:0 0 auto;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fffdf8;
+  animation:cnSpin .7s linear infinite;
+}
+
+/* identity strip under the cover — avatar straddling the seam, live name +
+   handle beside it, the photo-remove action on the trailing edge */
+.cm-art-id{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px 12px;
+}
+.cm-art-photo{
+  position:relative;flex:0 0 auto;
+  margin-top:-40px;
+  width:72px;height:72px;border-radius:18px;
+  background:var(--card);
+  box-shadow:0 0 0 3px var(--card),var(--shadow-sm);
+}
+.cm-art-photo img{
+  width:100%;height:100%;border-radius:16px;object-fit:cover;display:block;
+}
+.cm-art-crest{
+  width:100%;height:100%;border-radius:16px;
+  display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
+  color:#fffdf8;font-family:var(--serif);font-size:30px;font-weight:600;
+}
+/* the camera seal on the avatar's corner — the one obvious "change me" */
+.cm-art-cam{
+  position:absolute;inset-block-end:-6px;inset-inline-end:-6px;
+  width:28px;height:28px;border-radius:50%;cursor:pointer;
+  display:grid;place-items:center;
+  background:var(--navy);color:#f7f3ea;
+  box-shadow:0 0 0 2px var(--card);
+  transition:background .14s ease,transform .14s ease;
+}
+.cm-art-cam:hover{ background:var(--navy-deep);transform:scale(1.07); }
+.cm-art-cam:focus-within{ outline:2px solid var(--blue);outline-offset:1px; }
+.cm-art-cam .ico{ width:13px;height:13px; }
+.cm-art-cam .cm-art-spin{ border-color:rgba(255,255,255,.35);border-top-color:#fff; }
+.cm-art-meta{ flex:1;min-width:0; }
+.cm-art-name{
+  font:600 15px/1.3 var(--sans);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cm-art-sub{
+  margin-top:1px;
+  font:600 12px/1.4 var(--mono);color:var(--gold-deep);
+  unicode-bidi:plaintext;
+}
+.cm-art-clear{ flex:0 0 auto; }
+/* hard guard: no icon inside the banner may ever render unconstrained — a
+   missing size rule here once drew a viewport-wide ellipse across the form */
+.cm-art .ico{ width:14px;height:14px; }
+
+/* char counters riding the field labels */
+.cn-field > span{ display:flex;align-items:baseline; }
+.cn-count{
+  margin-inline-start:auto;font-style:normal;
+  font:500 10.5px/1 var(--mono);color:var(--muted);
+  font-variant-numeric:tabular-nums;
+}
+
+/* Save bar — sticky at the console's foot: the dirty state on the leading
+   edge, the action on the trailing one, a paper fade so content slides
+   beneath it instead of colliding. */
+.cm-save{
+  position:sticky;bottom:0;z-index:3;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-top:2px;margin-inline:-24px;
+  padding:12px 24px 16px;
+  border-top:1px solid var(--line-soft);
+  /* full-bleed across the pane gutters, tokenized so a paper-tone shift
+     cannot detach the fade from the card colour */
+  background:linear-gradient(180deg,transparent 0%,var(--card) 30%);
+}
+.cm-save .btn{ margin-inline-start:auto; }
+.cm-dirty{
+  display:inline-flex;align-items:center;gap:7px;
+  font:600 12px/1 var(--sans);color:var(--muted);
+}
+.cm-dirty::before{
+  content:"";width:7px;height:7px;border-radius:50%;
+  background:var(--line);transition:background .2s ease,box-shadow .2s ease;
+}
+.cm-dirty.on{ color:var(--gold-deep); }
+.cm-dirty.on::before{ background:var(--gold);box-shadow:0 0 0 3px rgba(179,135,62,.18); }
+.cm-save-note{ font-size:12px;color:var(--danger); }
+
+/* =========================================================
+   4 · Admins, rights, join requests
+   ========================================================= */
+
+.ca{ display:grid;gap:10px; }
+.ca-head{ display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap; }
+.ca-intro{
+  flex:1;min-width:220px;margin:0;
+  font-size:13px;line-height:1.55;color:var(--muted);
+}
+.ca-intro b{ color:var(--ink-soft); }
+
+.ca-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 12px;
+  border:1px solid var(--line-soft);border-radius:var(--r);
+  background:var(--card);
+}
+.ca-row.owner{ border-color:var(--brass-soft);background:var(--gold-wash); }
+.ca-row > .ico{ flex:0 0 auto;color:var(--muted); }
+.ca-row-body{ flex:1;min-width:0; }
+.ca-row-t{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:14px;font-weight:600;color:var(--navy-deep);
+}
+.ca-row-s{ margin-top:2px;font-size:12px;color:var(--muted); }
+.ca-row-acts{ display:flex;gap:4px;flex:0 0 auto; }
+.ca-you{
+  font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+}
+.ca-rights-head{ display:flex;align-items:center;gap:10px; }
+.ca-rights-head .ci-label{ flex:1;margin:0; }
+
+.icon-btn.danger:hover{ color:var(--danger); }
+
+/* =========================================================
+   5 · Invite links
+   ========================================================= */
+
+.cil{ display:grid;gap:12px; }
+
+.cil-make{
+  display:grid;gap:12px;
+  padding:14px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--paper-2);
+}
+.cil-opts{ display:grid;gap:12px; }
+.cil-opt{ display:grid;gap:6px; }
+.cil-opt-l{ font-size:12px;color:var(--muted); }
+
+.cil-row{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 14px;
+  border:1px solid var(--line-soft);border-radius:var(--r);
+  background:var(--card);
+}
+.cil-row.fresh{ border-color:var(--gold);background:var(--gold-wash); }
+.cil-row.dead{ opacity:.62; }
+.cil-main{ flex:1;min-width:0;display:grid;gap:6px; }
+
+.cil-fresh-label{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:12px;font-weight:600;color:var(--gold-deep);
+}
+.cil-url{ display:flex;gap:8px;align-items:center; }
+.cil-url .field{ flex:1;min-width:0;font-family:var(--mono);font-size:12px; }
+.cil-once{
+  margin:0;font-size:11.5px;line-height:1.5;color:var(--ink-soft);
+}
+.cil-title{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:14px;font-weight:600;color:var(--navy-deep);
+}
+.cil-meta{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:12px;color:var(--muted);
+}
+.cil-meta b{ color:var(--ink-soft); }
+.cn-tag.dead{ background:var(--card-2);color:var(--muted);border-color:var(--line); }
+
+.cil-dead > summary{
+  cursor:pointer;font-size:12.5px;color:var(--muted);
+  padding:6px 2px;list-style:none;
+}
+.cil-dead > summary::-webkit-details-marker{ display:none; }
+.cil-dead > summary::before{ content:'▸ ';color:var(--line); }
+.cil-dead[open] > summary::before{ content:'▾ '; }
+.cil-dead .cil-row{ margin-top:8px; }
+
+/* =========================================================
+   6 · Statistics — tiles and charts
+   ---------------------------------------------------------
+   One hue for every bar: each mark is labelled by its axis, so
+   colour would be encoding information the length already
+   carries. The peak column alone is emphasised, in gold.
+   ========================================================= */
+
+.cst{ display:grid;gap:22px; }
+
+.cst-tiles{
+  display:grid;gap:10px;
+  grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+}
+.cst-tile{
+  padding:12px 14px;
+  border:1px solid var(--line-soft);border-radius:var(--r);
+  background:var(--card);
+}
+.cst-tile-v{
+  font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.1;
+  color:var(--navy-deep);
+}
+.cst-tile.up .cst-tile-v{ color:var(--good); }
+.cst-tile.down .cst-tile-v{ color:var(--danger); }
+.cst-tile-l{ margin-top:3px;font-size:12px;color:var(--ink-soft); }
+.cst-tile-s{ margin-top:2px;font-size:11px;color:var(--muted); }
+
+.cst-fig{ margin:0;display:grid;gap:10px; }
+.cst-fig-cap{ display:grid;gap:2px; }
+.cst-fig-t{ font-size:13.5px;font-weight:600;color:var(--navy-deep); }
+.cst-fig-s{ font-size:11.5px;color:var(--muted); }
+
+/* --- column chart: joins per day --- */
+.cst-cols{
+  position:relative;
+  display:flex;align-items:flex-end;gap:2px;   /* 2px surface gap between bars */
+  height:120px;padding-top:6px;
+}
+/* solid hairline gridlines, one shade off the surface — never dashed */
+.cst-grid{
+  position:absolute;inset-inline:0;bottom:var(--at);
+  height:1px;background:var(--line-soft);pointer-events:none;
+}
+.cst-col{
+  position:relative;flex:1 1 0;min-width:0;
+  max-width:24px;                              /* cap the mark; leftover is air */
+  height:100%;
+  display:flex;align-items:flex-end;
+}
+.cst-col-bar{
+  width:100%;height:var(--h);min-height:2px;
+  background:var(--navy);
+  border-radius:4px 4px 0 0;                   /* rounded data-end, square at the baseline */
+  transition:background .12s ease;
+}
+.cst-col.peak .cst-col-bar{ background:var(--gold); }
+.cst-col:hover .cst-col-bar{ background:var(--emerald-bright); }
+
+.cst-col-tip{
+  position:absolute;bottom:calc(var(--h) + 6px);left:50%;
+  transform:translateX(-50%);
+  display:none;white-space:nowrap;z-index:2;
+  padding:4px 8px;border-radius:var(--r-xs);
+  background:var(--navy-deep);color:#fff;font-size:11px;
+  box-shadow:var(--shadow);
+}
+.cst-col-tip b{ margin-inline-start:6px; }
+.cst-col:hover .cst-col-tip,
+.cst-col:focus-within .cst-col-tip{ display:block; }
+
+.cst-axis{
+  display:flex;justify-content:space-between;
+  font-size:11px;color:var(--muted);
+}
+
+/* --- ranked horizontal bars --- */
+.cst-bars{ display:grid;gap:6px; }
+.cst-bar-row{
+  display:grid;grid-template-columns:132px 1fr 48px;
+  align-items:center;gap:10px;
+}
+.cst-bar-k{
+  font-size:12px;color:var(--ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cst-bar-track{
+  height:14px;border-radius:4px;background:var(--card-2);overflow:hidden;
+}
+.cst-bar-fill{
+  display:block;height:100%;width:var(--w);min-width:2px;
+  background:var(--navy);border-radius:4px;
+}
+/* the value wears TEXT ink, never the series colour */
+.cst-bar-v{ font-size:12px;color:var(--muted);text-align:end; }
+
+.cst-soft{
+  border-top:1px solid var(--line-soft);padding-top:18px;
+  display:grid;gap:18px;
+}
+.cst-soft-h{
+  margin:0;display:flex;align-items:center;gap:6px;
+  font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+}
+
+.cst-top{ display:grid;gap:6px; }
+.cst-top-h{ margin:0;font-size:13px;font-weight:600;color:var(--navy-deep); }
+.cst-top-row{
+  display:flex;align-items:center;gap:12px;
+  padding:8px 10px;border:1px solid var(--line-soft);border-radius:var(--r-sm);
+  background:var(--card);
+}
+.cst-top-body{
+  flex:1;min-width:0;font-size:13px;color:var(--ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cst-top-v{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:12px;color:var(--muted);flex:0 0 auto;
+}
+
+.cst-note{
+  margin:0;font-size:11.5px;line-height:1.55;color:var(--muted);
+}
+.cst-empty{
+  margin:0;padding:18px 4px;
+  font-size:13px;line-height:1.6;color:var(--muted);text-align:center;
+}
+.cst-empty b{ color:var(--ink-soft); }
+
+/* =========================================================
+   7 · Channel stories — rail, viewer, composer, tray
+   ========================================================= */
+
+.cs-rail-wrap{ margin-top:4px; }
+
+/* 4px head-room on every edge: the halo grows 4% on hover, and a rail with
+   `overflow-x:auto` clips on the cross axis too — without the padding the
+   hover scale would shave the top of the ring. */
+.cs-rail{ display:flex;gap:12px;overflow-x:auto;padding:4px 2px 6px;scrollbar-width:thin; }
+
+.cs-add,.cs-ring{
+  flex:0 0 auto;border:0;background:transparent;cursor:pointer;padding:0;
+  display:grid;gap:7px;justify-items:center;width:80px;
+}
+.cs-add-mark{
+  width:78px;height:78px;border-radius:50%;
+  display:grid;place-items:center;
+  border:2px dashed var(--brass-soft);color:var(--gold-deep);
+  background:var(--gold-wash);
+  transition:border-color .16s ease,background .16s ease,transform .16s ease;
+}
+.cs-add:hover .cs-add-mark{
+  border-color:var(--gold);background:var(--brass-tint);transform:scale(1.04);
+}
+.cs-add-label,.cs-ring-meta{
+  font-size:11px;color:var(--muted);
+  max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* The halo IS the live marker — the platform's story-ring anatomy: a conic
+   brass ring painted on its own circle, the art inset by its own paper-
+   coloured border so ring and image never touch. Drawn this way (not as a
+   box-shadow) because a conic gradient cannot ride a shadow, and the flat
+   gold ring read as a tag rather than as a story. */
+.cs-halo{
+  display:block;padding:3px;border-radius:50%;
+  background:conic-gradient(from 210deg,
+    var(--gold) 0%, #e0bc74 22%, var(--gold-deep) 48%,
+    var(--gold) 72%, #e8ca8a 88%, var(--gold) 100%);
+  transition:transform .16s ease;
+}
+.cs-ring:hover .cs-halo,
+.cs-tray-item:hover .cs-halo{ transform:scale(1.04); }
+
+.cs-ring-art{
+  width:72px;height:72px;border-radius:50%;overflow:hidden;
+  display:grid;place-items:center;
+  border:2.5px solid var(--paper);
+  background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
+}
+.cs-ring-art img{ width:100%;height:100%;object-fit:cover; }
+.cs-ring-text{
+  /* Horizontal padding ONLY. -webkit-line-clamp clips at the content box, but
+     the padding box still paints — vertical padding leaked a ghost fourth
+     line under the ellipsis. The circle's grid centring supplies the vertical
+     breathing room instead. */
+  padding:0 9px;font-size:10.5px;line-height:1.35;color:#fff;text-align:center;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+.cs-rail-empty{
+  margin:0;align-self:center;max-width:44ch;
+  font-size:12.5px;line-height:1.55;color:var(--muted);
+}
+
+/* ---- the viewer ---- */
+.cs-viewer{
+  position:fixed;inset:0;z-index:150;
+  display:grid;place-items:center;padding:24px 16px;
+  background:rgba(22,40,63,.86);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.cs-stage{
+  position:relative;
+  width:100%;max-width:460px;max-height:calc(100dvh - 48px);
+  display:flex;flex-direction:column;
+  background:var(--navy-deep);
+  border-radius:var(--r-xl);overflow:hidden;
+  box-shadow:var(--shadow-lg);
+}
+
+.cs-pips{ display:flex;gap:3px;padding:10px 12px 0; }
+.cs-pip{
+  flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.24);
+}
+.cs-pip.on{ background:var(--gold); }
+.cs-pip.done{ background:rgba(255,255,255,.55); }
+
+.cs-vhead{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;color:#fff;
+}
+.cs-vwho{ flex:1;min-width:0;display:flex;align-items:center;gap:8px; }
+.cs-vcrest{
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--gold);color:#fff;font-family:var(--serif);font-size:14px;
+}
+.cs-vtitle{
+  font-size:13.5px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cs-vtime{ font-size:11px;color:rgba(255,255,255,.6); }
+.cs-vacts{ display:flex;gap:2px;flex:0 0 auto; }
+.cs-vhead .icon-btn{ color:rgba(255,255,255,.8); }
+.cs-vhead .icon-btn:hover{ color:#fff;background:rgba(255,255,255,.12); }
+
+.cs-body{
+  flex:1;min-height:0;overflow-y:auto;
+  display:flex;flex-direction:column;
+}
+.cs-media{
+  width:100%;max-height:62vh;object-fit:contain;background:#000;
+  display:block;
+}
+.cs-textonly{
+  flex:1;display:grid;place-items:center;
+  padding:44px 24px;min-height:240px;
+  font-family:var(--serif);font-size:20px;line-height:1.5;color:#fff;text-align:center;
+}
+.cs-caption{
+  padding:12px 16px;font-size:13.5px;line-height:1.55;color:rgba(255,255,255,.88);
+}
+
+/* ---- the A/B poll on a story ---- */
+.cs-poll{ padding:14px 16px 18px;display:grid;gap:10px; }
+.cs-poll-q{ font-size:14px;font-weight:600;color:#fff; }
+.cs-poll-opts{ display:grid;gap:8px; }
+.cs-poll-opt{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:10px;
+  padding:11px 14px;border-radius:var(--r);
+  border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);
+  color:#fff;font:inherit;font-size:13.5px;cursor:pointer;text-align:start;
+}
+.cs-poll-opt:hover{ border-color:rgba(255,255,255,.45); }
+.cs-poll-opt.mine{ border-color:var(--gold); }
+.cs-poll-fill{
+  position:absolute;inset-inline-start:0;inset-block:0;
+  width:var(--pct,0%);background:rgba(179,135,62,.34);
+  transition:width .28s ease;
+}
+.cs-poll-label{ position:relative;flex:1;min-width:0; }
+.cs-poll-pct{ position:relative;font-weight:600;font-size:12.5px; }
+.cs-poll-total{ font-size:11.5px;color:rgba(255,255,255,.6); }
+
+.cs-nav{
+  position:absolute;top:50%;transform:translateY(-50%);
+  border:0;cursor:pointer;
+  width:36px;height:36px;border-radius:50%;
+  display:grid;place-items:center;
+  background:rgba(22,40,63,.6);color:#fff;
+}
+.cs-nav:hover{ background:rgba(22,40,63,.85); }
+.cs-nav.prev{ inset-inline-start:8px; }
+.cs-nav.next{ inset-inline-end:8px; }
+
+/* ---- the sheet that rides over the viewer (viewers, archive picker) ---- */
+.cs-sheet{
+  position:absolute;inset-inline:0;bottom:0;
+  max-height:70%;display:flex;flex-direction:column;
+  background:var(--card);border-radius:var(--r-xl) var(--r-xl) 0 0;
+  box-shadow:var(--shadow-lg);
+}
+.cs-sheet-head{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--line);
+}
+.cs-sheet-head h3{
+  flex:1;margin:0;display:flex;align-items:center;gap:6px;
+  font-family:var(--serif);font-size:15px;font-weight:600;color:var(--navy-deep);
+}
+.cs-sheet-body{ flex:1;min-height:0;overflow-y:auto;padding:10px 12px 16px; }
+.cs-sheet-empty{
+  margin:0;padding:20px 8px;text-align:center;
+  font-size:12.5px;line-height:1.6;color:var(--muted);
+}
+.cs-viewer-row{
+  display:flex;align-items:center;gap:10px;padding:7px 4px;
+  border-bottom:1px solid var(--line-soft);
+}
+.cs-viewer-id{
+  flex:1;min-width:0;font-size:12px;color:var(--ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cs-viewer-t{ font-size:11px;color:var(--muted); }
+
+/* ---- the composer ---- */
+.cn-modal-body.single{ display:block; }
+.cs-preview{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--paper-2);
+}
+.cs-preview img,.cs-preview video{
+  width:96px;height:96px;object-fit:cover;border-radius:var(--r-sm);
+}
+.cs-ttl{ display:flex;gap:6px;flex-wrap:wrap; }
+.cs-pollform{
+  display:grid;gap:10px;padding:12px;
+  border:1px solid var(--line);border-radius:var(--r);background:var(--paper-2);
+}
+.cs-pollrow{ display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+
+/* ---- the subscriber tray ---- */
+.cs-tray{ display:flex;gap:14px;overflow-x:auto;padding-bottom:6px; }
+.cs-tray-item{
+  flex:0 0 auto;border:0;background:transparent;cursor:pointer;padding:0;
+  display:grid;gap:6px;justify-items:center;width:76px;position:relative;
+}
+.cs-tray-ring{
+  width:62px;height:62px;border-radius:50%;overflow:hidden;
+  display:grid;place-items:center;
+  border:2.5px solid var(--paper);
+  background:linear-gradient(140deg,var(--navy),var(--navy-deep));
+}
+.cs-tray-ring img{ width:100%;height:100%;object-fit:cover; }
+.cs-tray-crest{ color:#fff;font-family:var(--serif);font-size:24px; }
+.cs-tray-name{
+  font-size:11px;color:var(--ink-soft);max-width:76px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cs-tray-n{
+  position:absolute;top:-2px;inset-inline-end:2px;
+  min-width:17px;height:17px;padding:0 4px;border-radius:999px;
+  display:grid;place-items:center;
+  background:var(--gold);color:#fff;font-size:10px;font-weight:700;
+}
+
+/* =========================================================
+   8 · Highlights
+   ========================================================= */
+
+.chl-wrap{ margin-top:4px; }
+.chl-empty{
+  margin:0;max-width:56ch;
+  font-size:12.5px;line-height:1.6;color:var(--muted);
+}
+.chl-empty b{ color:var(--ink-soft); }
+
+.chl-rail{ display:flex;gap:14px;overflow-x:auto;padding:2px 2px 6px; }
+.chl-item{ flex:0 0 auto;display:grid;gap:7px;justify-items:center;width:84px; }
+/* Deliberately NOT the story halo: gold conic = "live right now", and a
+   highlight is the permanent archive. It wears the quiet double-ring of a
+   plate in a book — hairline, paper gap, art — and only warms on hover. */
+.chl-cover{
+  width:76px;height:76px;border-radius:50%;overflow:hidden;cursor:pointer;
+  display:grid;place-items:center;padding:0;
+  border:2.5px solid var(--paper);
+  background:linear-gradient(150deg,var(--card-2),var(--paper-2));
+  color:var(--gold-deep);
+  box-shadow:0 0 0 1px var(--line);
+  transition:box-shadow .16s ease,transform .16s ease;
+}
+.chl-cover img{ width:100%;height:100%;object-fit:cover;border-radius:50%; }
+.chl-cover:hover{ box-shadow:0 0 0 1.5px var(--gold);transform:scale(1.04); }
+.chl-cover:focus-visible{ outline:2px solid var(--blue);outline-offset:3px; }
+.chl-cover-mark{ width:22px;height:22px;opacity:.8; }
+.chl-title{
+  font-size:11.5px;color:var(--ink-soft);max-width:84px;text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.chl-move{ display:flex;gap:2px; }
+
+.chl-pick{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:8px;border:1px solid var(--line-soft);border-radius:var(--r-sm);
+  background:var(--card);cursor:pointer;text-align:start;margin-bottom:6px;
+}
+.chl-pick:hover{ border-color:var(--gold); }
+.chl-pick-art{
+  width:44px;height:44px;border-radius:var(--r-xs);overflow:hidden;flex:0 0 auto;
+  display:grid;place-items:center;background:var(--card-2);color:var(--muted);
+}
+.chl-pick-art img{ width:100%;height:100%;object-fit:cover; }
+.chl-pick-body{ flex:1;min-width:0;display:grid;gap:2px; }
+.chl-pick-t{
+  font-size:13px;color:var(--ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.chl-pick-s{ font-size:11px;color:var(--muted); }
+
+/* =========================================================
+   9 · Typed payloads inside a bubble
+   ========================================================= */
+
+/* ---- poll ---- */
+.ch-poll{
+  display:grid;gap:9px;
+  margin:2px 0 6px;padding:11px 12px;
+  border-radius:var(--r);
+  border:1px solid var(--line);background:var(--card-2);
+  min-width:min(280px,68vw);
+}
+.ch-row.mine .ch-poll{
+  border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.1);
+}
+.ch-poll-head{ display:flex;align-items:center;gap:8px; }
+.ch-poll-kind{
+  flex:1;display:inline-flex;align-items:center;gap:5px;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+}
+.ch-row.mine .ch-poll-kind{ color:rgba(255,255,255,.65); }
+.ch-poll-closed{
+  font-size:10.5px;color:var(--gold-deep);text-transform:uppercase;letter-spacing:.06em;
+}
+.ch-poll-q{ font-size:14px;font-weight:600;line-height:1.4; }
+
+.ch-poll-opts{ display:grid;gap:6px; }
+.ch-poll-opt{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:8px;
+  padding:9px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--line);background:var(--card);
+  font:inherit;font-size:13px;color:inherit;text-align:start;cursor:pointer;
+}
+.ch-poll-opt:disabled{ cursor:default; }
+.ch-poll-opt:not(:disabled):hover{ border-color:var(--gold); }
+.ch-poll-opt.mine{ border-color:var(--navy); }
+.ch-poll-opt.right{ border-color:var(--good);background:var(--good-wash); }
+.ch-poll-opt.wrong{ border-color:var(--danger); }
+.ch-row.mine .ch-poll-opt{
+  border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;
+}
+.ch-poll-fill{
+  position:absolute;inset-inline-start:0;inset-block:0;
+  width:var(--pct,0%);background:var(--wash);
+  transition:width .3s cubic-bezier(.2,.8,.3,1);
+}
+.ch-row.mine .ch-poll-fill{ background:rgba(255,255,255,.16); }
+.ch-poll-opt.right .ch-poll-fill{ background:rgba(61,107,79,.16); }
+.ch-poll-mark{
+  position:relative;width:15px;flex:0 0 auto;
+  display:grid;place-items:center;color:var(--navy);
+}
+.ch-poll-opt.right .ch-poll-mark{ color:var(--good); }
+.ch-poll-opt.wrong .ch-poll-mark{ color:var(--danger); }
+.ch-row.mine .ch-poll-mark{ color:#fff; }
+.ch-poll-text{ position:relative;flex:1;min-width:0; }
+.ch-poll-pct{ position:relative;font-size:12px;font-weight:600;opacity:.75; }
+
+.ch-poll-why{
+  margin:0;padding:8px 10px;border-radius:var(--r-sm);
+  background:var(--gold-wash);border:1px solid var(--brass-soft);
+  font-size:12.5px;line-height:1.5;color:var(--ink-soft);
+}
+.ch-poll-foot{
+  display:flex;align-items:center;gap:12px;
+  font-size:11.5px;color:var(--muted);
+}
+.ch-row.mine .ch-poll-foot{ color:rgba(255,255,255,.6); }
+.ch-poll-act{
+  border:0;background:transparent;padding:0;cursor:pointer;
+  font:inherit;font-size:11.5px;color:var(--gold-deep);
+  text-decoration:underline;text-underline-offset:2px;
+}
+.ch-row.mine .ch-poll-act{ color:var(--brass-soft); }
+
+/* ---- location ---- */
+.ch-loc{
+  display:flex;align-items:center;gap:10px;
+  margin:2px 0 6px;padding:10px 12px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--card-2);
+  text-decoration:none;color:inherit;min-width:min(240px,64vw);
+}
+.ch-loc:hover{ border-color:var(--gold); }
+.ch-row.mine .ch-loc{ border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.1); }
+.ch-loc-pin{
+  width:34px;height:34px;border-radius:50%;flex:0 0 auto;
+  display:grid;place-items:center;
+  background:var(--wash);color:var(--navy);
+}
+.ch-row.mine .ch-loc-pin{ background:rgba(255,255,255,.16);color:#fff; }
+.ch-loc-body{ flex:1;min-width:0;display:grid;gap:1px; }
+.ch-loc-name{ font-size:13.5px;font-weight:600; }
+.ch-loc-addr,.ch-loc-co{ font-size:11.5px;opacity:.7; }
+.ch-loc-co{ font-family:var(--mono);font-size:10.5px; }
+.ch-loc-live{
+  font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+  color:#fff;background:var(--danger);border-radius:999px;padding:2px 7px;
+}
+.ch-loc-out{ opacity:.5;flex:0 0 auto; }
+
+/* ---- contact ---- */
+.ch-contact{
+  display:flex;align-items:center;gap:10px;
+  margin:2px 0 6px;padding:10px 12px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--card-2);
+  min-width:min(240px,64vw);
+}
+.ch-row.mine .ch-contact{ border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.1); }
+.ch-contact-av{
+  width:34px;height:34px;border-radius:50%;flex:0 0 auto;
+  display:grid;place-items:center;background:var(--wash);color:var(--navy);
+}
+.ch-row.mine .ch-contact-av{ background:rgba(255,255,255,.16);color:#fff; }
+.ch-contact-body{ flex:1;min-width:0;display:grid;gap:1px; }
+.ch-contact-name{ font-size:13.5px;font-weight:600; }
+.ch-contact-tel{ font-size:12px;color:inherit;opacity:.75;text-decoration:none; }
+.ch-contact-tel:hover{ text-decoration:underline; }
+.ch-contact-act{
+  border:1px solid var(--line);background:var(--card);cursor:pointer;
+  border-radius:999px;padding:4px 10px;font:inherit;font-size:11.5px;color:var(--ink-soft);
+}
+.ch-row.mine .ch-contact-act{
+  border-color:rgba(255,255,255,.3);background:transparent;color:#fff;
+}
+
+/* ---- video note (circular) ---- */
+.ch-vnote{
+  position:relative;border:0;padding:0;cursor:pointer;background:transparent;
+  width:180px;height:180px;border-radius:50%;overflow:hidden;
+  box-shadow:0 0 0 2px var(--card),var(--shadow-sm);
+  margin:2px 0 6px;display:block;
+}
+.ch-vnote video{ width:100%;height:100%;object-fit:cover;display:block; }
+.ch-vnote-play{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(22,40,63,.32);color:#fff;
+}
+
+/* ---- the channel-post rail ----
+   ONE wrapping row, not a stack. Tags, the forward count and the signature are
+   all small asides about the same post; giving each its own line pushed the
+   reactions and the comments bar a whole row further down for information
+   nobody came for. They share a line and wrap only when they genuinely can't. */
+.ch-postrail{
+  display:flex;flex-wrap:wrap;align-items:center;
+  gap:5px 10px;
+  margin:5px 2px 0;max-width:min(520px,78vw);
+}
+.ch-row.mine .ch-postrail{ justify-content:flex-end; }
+
+.ch-tags{ display:flex;flex-wrap:wrap;gap:5px;min-width:0; }
+.ch-tag{
+  border:1px solid var(--line);background:var(--card);cursor:pointer;
+  border-radius:999px;padding:2px 9px;
+  font:inherit;font-size:11px;color:var(--gold-deep);
+}
+.ch-tag:hover{ border-color:var(--gold);background:var(--gold-wash); }
+
+.ch-counters{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-size:11.5px;color:var(--muted);
+}
+.ch-counter{ display:inline-flex;align-items:center;gap:4px; }
+/* The signature sits WITH the counters rather than being flung to the far edge
+   by `margin-inline-start:auto` — across a 520px rail that auto-margin opened a
+   corridor of empty space between two things that belong together. */
+.ch-sig{
+  font-family:var(--mono);font-size:10.5px;color:var(--muted);
+}
+
+/* ---- reactions on a broadcast POST ----
+   A reaction in a DM is a private aside between two people and stays a small
+   chip. On a channel post it is a PUBLIC TALLY — often the only signal the
+   author gets back from thousands of readers — so it is given real weight:
+   a bigger emoji, a legible count, and a filled pill instead of an outline.
+   Scoped to `.is-post` so ordinary chat is left exactly as it was. */
+.ch-row.is-post .ch-reacts{
+  gap:6px;
+  margin-top:2px;padding-inline:2px;
+  /* No negative overlap here: the post's reactions are their own row rather
+     than a badge clipped onto the bubble's bottom edge. */
+}
+.ch-row.is-post .ch-react{
+  gap:6px;
+  padding:5px 12px;
+  border-color:transparent;
+  background:var(--wash);
+  box-shadow:none;
+  font-size:17px;                 /* the EMOJI size — the chip's real content */
+  line-height:1.1;
+}
+.ch-row.is-post .ch-react:hover{
+  border-color:transparent;background:var(--brass-tint);
+}
+.ch-row.is-post .ch-react.mine{
+  background:var(--blue-wash);
+  box-shadow:inset 0 0 0 1.5px var(--blue);
+}
+.ch-row.is-post .ch-react-n{
+  font-size:14px;font-weight:650;color:var(--blue);
+}
+.ch-row.is-post .ch-react.mine .ch-react-n{ color:var(--navy-deep); }
+
+/* The avatar column bottom-aligns for a chat message, which is right: the face
+   belongs beside the last line of what was said. A POST is not one utterance —
+   it is a bubble plus a rail plus a reaction tally plus a comments bar — and
+   bottom-aligning left the face stranded beside the comments bar, next to
+   nothing it authored. It aligns to the TOP of the stack instead, beside the
+   post itself. */
+.ch-row.is-post .ch-row-av{ align-self:flex-start;margin-top:22px;margin-bottom:0; }
+/* …and with no sender line above it (a run continuation, or a DM-shaped view)
+   there is nothing to clear, so the offset comes off again. */
+.ch-row.is-post:not(.run-start) .ch-row-av{ margin-top:2px; }
+
+/* Views sit beside the clock, inside the bubble — where a channel reader
+   already looks for them. Tabular figures so the number does not jitter as it
+   climbs. */
+.ch-meta-views{
+  display:inline-flex;align-items:center;gap:3px;
+  margin-inline-end:5px;
+  font-variant-numeric:tabular-nums;
+}
+.ch-meta-views .ico{ width:13px;height:13px;opacity:.8; }
+
+/* ---- the comments bar ----
+   A full-width row under the post, not a chip in the rail: on a broadcast
+   channel it is the reader's only way to reply, so it carries a button's
+   weight. The faces overlap by a third of their width — enough to read as a
+   stack, not so much that the second face becomes a sliver. */
+.ch-cbar{
+  display:flex;align-items:center;gap:11px;
+  width:100%;margin:2px 0 2px;padding:11px 14px;
+  /* A HAIRLINE ABOVE, not a box around: the bar is the foot of the post, the
+     way a footer rule closes an article — a full border would read as a
+     separate card floating under the message. */
+  border:0;border-top:1px solid var(--line-soft);
+  border-radius:0 0 var(--r) var(--r);
+  background:transparent;cursor:pointer;
+  font:inherit;text-align:start;
+  transition:background .14s ease;
+}
+.ch-cbar:hover{ background:var(--wash); }
+.ch-cbar:focus-visible{ outline:2px solid var(--blue);outline-offset:-2px; }
+
+.ch-cbar-faces{ display:flex;flex:0 0 auto;align-items:center; }
+.ch-cbar-face{ position:relative;display:block; }
+/* The overlap runs along the INLINE axis, so RTL mirrors the stack for free.
+   A QUARTER of the face is hidden — enough to read as a stack, little enough
+   that the middle face of three is still a face and not a crescent. */
+.ch-cbar-face + .ch-cbar-face{ margin-inline-start:-7px; }
+/* The ring is the SURFACE colour, so the faces separate without a border being
+   drawn around each one — and it tracks the hover background so the stack
+   never looks cut out of the wrong paper. */
+.ch-cbar-face .av{ box-shadow:0 0 0 2px var(--paper-2); }
+.ch-cbar:hover .ch-cbar-face .av{ box-shadow:0 0 0 2px var(--wash); }
+
+.ch-cbar-ico{ flex:0 0 auto;color:var(--blue);opacity:.75; }
+
+.ch-cbar-label{
+  flex:1;min-width:0;
+  font-size:15px;font-weight:650;color:var(--blue);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ch-cbar.empty .ch-cbar-label{ font-weight:600;color:var(--muted); }
+
+.ch-cbar-dot{
+  flex:0 0 auto;width:9px;height:9px;border-radius:50%;
+  background:var(--blue);
+}
+.ch-cbar-go{
+  flex:0 0 auto;width:20px;height:20px;
+  color:var(--blue);opacity:.55;transition:opacity .14s ease;
+}
+.ch-cbar:hover .ch-cbar-go{ opacity:1; }
+
+/* My own posts sit in a navy bubble, but the bar is OUTSIDE it and belongs to
+   the post rather than the utterance — so it keeps the light surface, stays
+   full-width, and its text stays start-aligned even though `.ch-stack` packs
+   my rows to the end edge. */
+.ch-row.mine .ch-cbar{ margin-inline-start:0;text-align:start; }
+
+/* =========================================================
+   10 · Comments + tag panels (slide-overs, .ch-search rung 80)
+   ========================================================= */
+
+.cc-panel{ display:flex;flex-direction:column; }
+.cc-post{
+  flex:0 0 auto;padding:10px 14px;
+  border-bottom:1px solid var(--line-soft);background:var(--paper-2);
+}
+.cc-post-body{
+  font-size:12.5px;line-height:1.5;color:var(--muted);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+.cc-list{ flex:1;min-height:0;overflow-y:auto;padding:10px 12px; }
+
+.cc-row{ display:flex;gap:9px;padding:7px 2px; }
+.cc-row-body{ flex:1;min-width:0; }
+.cc-row-who{
+  display:flex;align-items:baseline;gap:7px;
+  font-size:12.5px;font-weight:600;color:var(--navy-deep);
+}
+.cc-row-t{ font-size:10.5px;font-weight:400;color:var(--muted); }
+.cc-row-txt{ margin-top:2px;font-size:13.5px;line-height:1.5;color:var(--ink-soft); }
+
+.cc-compose{
+  flex:0 0 auto;padding:10px 12px;border-top:1px solid var(--line);
+  background:var(--card);
+}
+.cc-note{
+  margin:0 0 7px;font-size:11px;color:var(--muted);
+}
+.cc-compose-row{ display:flex;gap:8px;align-items:flex-end; }
+.cc-compose-row .field{ flex:1;min-width:0;resize:none; }
+
+.cc-foot{
+  flex:0 0 auto;padding:8px 14px;
+  border-top:1px solid var(--line-soft);
+  font-size:11px;color:var(--muted);
+}
+
+.cc-hit{
+  display:grid;gap:4px;width:100%;text-align:start;
+  padding:9px 10px;margin-bottom:6px;
+  border:1px solid var(--line-soft);border-radius:var(--r-sm);
+  background:var(--card);cursor:pointer;
+}
+.cc-hit:hover{ border-color:var(--gold); }
+.cc-hit-body{ font-size:13px;line-height:1.5;color:var(--ink-soft); }
+.cc-hit-meta{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--muted);
+}
+
+/* =========================================================
+   11 · The poll / location / contact composer
+   ========================================================= */
+
+.pc-kinds{ display:grid;gap:8px;margin-bottom:14px; }
+.pc-kind{
+  display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center;
+  padding:10px 12px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--card);
+  cursor:pointer;text-align:start;font:inherit;color:inherit;
+}
+.pc-kind:hover{ border-color:var(--gold); }
+.pc-kind.on{ border-color:var(--navy);background:var(--wash); }
+.pc-kind .ico{ grid-row:span 2;color:var(--navy); }
+.pc-kind-l{ font-size:13.5px;font-weight:600;color:var(--navy-deep); }
+.pc-kind-h{ font-size:11.5px;color:var(--muted); }
+
+.pc-opt{ display:flex;gap:6px;align-items:center;margin-bottom:6px; }
+.pc-opt .field{ flex:1;min-width:0; }
+.pc-correct{
+  flex:0 0 auto;width:26px;height:26px;border-radius:50%;cursor:pointer;
+  display:grid;place-items:center;
+  border:1px solid var(--line);background:var(--card);color:transparent;
+}
+.pc-correct:hover{ border-color:var(--good);color:var(--line); }
+.pc-correct.on{ border-color:var(--good);background:var(--good);color:#fff; }
+
+.pc-two{ display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+
+/* =========================================================
+   12 · Composer — the slow-mode countdown
+   ========================================================= */
+
+.ch-slownote{ color:var(--gold-deep); }
+.ch-slownote b{ font-variant-numeric:tabular-nums; }
+
+/* =========================================================
+   13 · Responsive
+   ---------------------------------------------------------
+   Stacking, not shrinking: below 720 the hero's identity block
+   goes full width and the actions become their own row, because
+   a 96px avatar plus three buttons cannot share a line on a
+   phone without one of them being unreachable.
+   ========================================================= */
+
+@media(max-width:900px){
+  .cst-bar-row{ grid-template-columns:96px 1fr 42px; }
+  .cm-modal{ max-width:none; }
+}
+
+@media(max-width:720px){
+  .cp-cover{ height:150px;border-radius:var(--r); }
+  /* Same rule as desktop: the negative offset rides the AVATAR, never the
+     row — the title must stay off the cover at every width. */
+  .cp-ident{ margin:0 12px;gap:12px; }
+  .cp-avatar{ width:76px;height:76px;border-radius:18px;margin-top:-36px; }
+  .cp-ident-body{ padding-top:10px; }
+  .cp-acts{ padding-top:6px; }
+  .cp-crest{ font-size:32px; }
+  .cp-title{ font-size:21px; }
+  .cp-acts{ width:100%;padding-top:4px; }
+  .cp-acts .btn{ flex:1; }
+  /* Stacked, the pair reads as a definition list — key above, value below,
+     BOTH start-aligned. Keeping the desktop's end-aligned value while stacked
+     left the two lines ragged against each other. */
+  .cp-facts > div{ display:grid;gap:3px; }
+  .cp-facts dt{ flex:none; }
+  .cp-facts dd{ text-align:start; }
+
+  .cs-pollrow,.pc-two{ grid-template-columns:1fr; }
+  .cs-stage{ max-width:none;height:100%;max-height:none;border-radius:0; }
+  .cs-viewer{ padding:0; }
+  .cs-media{ max-height:none;flex:1;min-height:0; }
+
+  .cst-tiles{ grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); }
+  .cst-cols{ height:96px; }
+
+  /* The label gets its own line rather than an ellipsis. "Approved req…" and
+     "Added by an …" are not categories anybody can read, and a ranked list
+     whose rows cannot be told apart has lost the only thing it was for. */
+  .cst-bars{ gap:10px; }
+  .cst-bar-row{
+    grid-template-columns:1fr auto;
+    grid-template-areas:'k v' 'track track';
+    gap:3px 8px;
+  }
+  .cst-bar-k{ grid-area:k;white-space:normal;overflow:visible; }
+  .cst-bar-v{ grid-area:v; }
+  .cst-bar-track{ grid-area:track; }
+
+  .ch-vnote{ width:150px;height:150px; }
+  .ch-postrail{ max-width:100%; }
+}
+
+/* RTL: the only asymmetric marks are the story-viewer arrows, and they are
+   already written with logical properties. The chart bars grow from the inline
+   start, so they flip for free. Nothing to mirror by hand. */
+
+@media(prefers-reduced-motion:reduce){
+  .cs-poll-fill,.ch-poll-fill,.cst-col-bar{ transition:none; }
+  .cs-halo,.cs-add-mark,.chl-cover{ transition:none; }
+  .cs-ring:hover .cs-halo,.cs-tray-item:hover .cs-halo,
+  .cs-add:hover .cs-add-mark,.chl-cover:hover{ transform:none; }
+}
+
+/* =========================================================
+   11 · /channels — the container pass
+   ---------------------------------------------------------
+   Loaded after ika-messages-theme's §6–8, so this is the final
+   word on the page's shells: the "Your channels" rail card, the
+   browse box (search · audience filters · DB-fed category row),
+   and small card-clutter fixes. Geometry only — the navy hero
+   plate and the tint spine stay exactly as the theme set them.
+   ========================================================= */
+
+/* ---- rail cards: tint spine + quieter secondary line ---- */
+.cn-mine{
+  border-inline-start:3px solid var(--t,var(--line));
+  padding:12px 14px;
+}
+.cn-mine-sub{ color:var(--muted); }
+.cn-mine:hover .cn-mine-nm{ color:var(--navy); }
+
+/* ---- the browse box: one container for search + filters + categories ---- */
+.cn-browse{
+  display:flex;flex-direction:column;gap:11px;
+  margin:0 0 20px;padding:12px 14px;
+  border:1px solid var(--line);border-radius:var(--r-lg);
+  background:var(--card);
+  box-shadow:var(--shadow-sm);
+}
+.cn-browse .cn-toolbar{ margin:0; }
+/* the search pill sits IN a card now — soften it to a wash so it reads as a
+   slot, not a second card */
+.cn-browse .cn-search{ background:var(--card-2); }
+.cn-browse .cn-cats{
+  margin:0;padding-top:11px;
+  border-top:1px dashed var(--line-soft);
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.cn-cats-label{
+  display:inline-flex;align-items:center;gap:4px;
+  margin-inline-end:4px;
+  font:700 10.5px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);
+}
+.cn-cats-label .ico{ width:11px;height:11px;color:var(--gold-deep); }
+/* category chips run a size down from the audience filters — two rows of
+   identical pills read as one confused control */
+.cn-chip.sm{
+  height:32px;padding:0 13px;
+  font-size:12.5px;background:var(--card-2);
+}
+.cn-chip.sm.on{ background:var(--navy);color:#f7f3ea; }
+
+/* ---- discovery cards: unclutter the cover's corner ---- */
+/* the ornament mark must never collide with the state flag — smaller, dimmer,
+   and tucked further out of the corner the flag owns */
+.cn-card-mark{
+  inset-block-start:auto;inset-block-end:-14px;inset-inline-end:-12px;
+  width:58px;height:58px;color:rgba(255,255,255,.14);
+}
+
+/* ---- phones ---- */
+@media (max-width:720px){
+  .cn-browse{ padding:10px 11px;gap:9px; }
+  .cn-browse .cn-cats{ flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px; }
+  .cn-browse .cn-cats::-webkit-scrollbar{ display:none; }
+  .cn-cats-label{ flex:0 0 auto; }
+  .cn-chip.sm{ flex:0 0 auto; }
+}
+
+/* =========================================================
+   12 · Console pass 2 — rhythm, motion, row normalization
+   ---------------------------------------------------------
+   Audit-driven (2026-07-25). One spacing scale across all
+   seven panes, micro-motion where surfaces swap or reveal,
+   and the collapsed ≤720px pill rail with its failure modes
+   actually fixed (44px targets, snap, active pill in view).
+   ========================================================= */
+
+/* ---- one rhythm: list gaps 12, pane sections 16 ---- */
+.ca{ gap:12px; }
+.cil{ gap:12px; }
+.ca-row{ padding:10px 12px; }
+.cil-row{ padding:10px 12px; }
+/* every row-leading icon sits on the 17px .sm step — a bare <Icon> in a
+   .ca-row otherwise renders at the 20px base beside 17px siblings */
+.ca-row > .ico{ width:17px;height:17px; }
+.ca-bar{ display:flex;justify-content:flex-end; }
+
+/* ---- Settings: labelled plates instead of an undifferentiated stack ---- */
+.cm-group{
+  border:1px solid var(--line-soft);border-radius:var(--r);
+  background:var(--card);overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.cm-group .ci-row{ border:0;border-radius:0;margin:0; }
+.cm-group .ci-row + .ci-row{ border-top:1px solid var(--line-soft); }
+
+/* ---- console-scale chips: the 42px toolbar pill is a full-page control;
+   inside the console presets and filters run a size down ---- */
+.cm-modal .cn-filters{ gap:6px;flex-wrap:wrap; }
+.cm-modal .cn-filters .cn-chip{ height:32px;padding:0 13px;font-size:12.5px; }
+
+/* ---- switches: 44px hit area without moving a pixel ---- */
+.cm-modal .ci-switch{ position:relative; }
+.cm-modal .ci-switch::before{ content:"";position:absolute;inset:-11px; }
+
+/* ---- destructive affordance visible at rest, not only on hover ---- */
+.icon-btn.danger{ color:var(--danger);opacity:.72;border-color:rgba(160,62,54,.25); }
+.icon-btn.danger:hover{ opacity:1;background:#f6e4e2;color:var(--danger); }
+
+/* ---- invites: the creation box must not outweigh the links it produces ---- */
+.cil-make{ border-color:var(--line-soft); }
+@media (min-width:721px){
+  .cil-opts{ grid-template-columns:1fr 1fr; }
+}
+
+/* ---- stats: tooltip motion, series-true hover, honest heading order ---- */
+.cst-col-tip{
+  display:block;opacity:0;visibility:hidden;
+  transform:translate(-50%,3px);
+  transition:opacity .15s ease,transform .15s ease,visibility .15s;
+}
+.cst-col:hover .cst-col-tip,
+.cst-col:focus-within .cst-col-tip{
+  opacity:1;visibility:visible;transform:translate(-50%,0);
+}
+/* hover deepens the series hue — never a third colour on a single-series chart */
+.cst-col:hover .cst-col-bar{ background:var(--navy-deep); }
+.cst-col.peak:hover .cst-col-bar{ background:var(--gold-deep); }
+/* the section head outranks its child list head, not the other way round */
+.cst-soft-h{
+  font-family:var(--serif);font-size:15px;font-weight:600;
+  letter-spacing:0;text-transform:none;color:var(--navy-deep);gap:8px;
+}
+.cst-soft-h .ico{ color:var(--gold-deep); }
+.cst-soft-h::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,var(--line),var(--line-soft) 70%,transparent);
+}
+[dir="rtl"] .cst-soft-h::after{
+  background:linear-gradient(-90deg,var(--line),var(--line-soft) 70%,transparent);
+}
+.cst-top-h{
+  font-size:11.5px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+}
+
+/* ---- ≤720px: the shell is a bottom sheet (chat.css §9) — release the fixed
+   height, collapse the rail to horizontal pills, and fix that rail's old
+   failure modes: 44px targets, snap, a fade wide enough to never eat a
+   legible pill (the active one is scrolled into view from the JSX) ---- */
+@media (max-width:720px){
+  .cm-modal{ height:auto;max-width:none; }
+  .cm-split{ flex-direction:column; }
+  .cm-tabs{
+    flex:0 0 auto;flex-direction:row;gap:6px;
+    padding:10px 14px;
+    overflow-x:auto;overflow-y:hidden;
+    border-inline-end:0;border-bottom:1px solid var(--line);
+    scroll-snap-type:x proximity;scroll-padding-inline:24px;
+    -webkit-mask-image:linear-gradient(to right,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+    mask-image:linear-gradient(to right,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+  }
+  .cm-tab-btn{ width:auto;min-height:44px;padding:0 15px;scroll-snap-align:start; }
+  .cm-body{ padding:16px 16px 0; }
+  .cm-save{ margin-inline:-16px;padding-inline:16px; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .cm-pane{ animation:none; }
+  .cst-col-tip{ transition:none; }
+}

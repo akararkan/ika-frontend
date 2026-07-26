@@ -164,10 +164,21 @@ a.pa-fact:hover{color:var(--navy)}
 .sw.on{background:var(--navy)}
 .sw.on::after{left:21px}
 
-/* ===================== AUTH — split layout ===================== */
+/* ===================== AUTH — split layout (enhanced) ===================== */
+@keyframes auth-drift{from{background-position:0 0}to{background-position:96px 192px}}
+@keyframes auth-shake{0%,100%{transform:none}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+@keyframes auth-spin{to{transform:rotate(360deg)}}
+
 .auth-left{
   background:linear-gradient(165deg,#16283f,#1d3a5f 55%,#274b78);
   color:#f3ecdd;
+}
+/* faint gold star lattice, drifting very slowly under the light scrims */
+.auth-left::before{
+  content:"";position:absolute;inset:-96px;pointer-events:none;opacity:.055;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23d9b96c' stroke-width='1.2'%3E%3Crect x='31' y='31' width='34' height='34'/%3E%3Crect x='31' y='31' width='34' height='34' transform='rotate(45 48 48)'/%3E%3Crect x='-5' y='-5' width='10' height='10' transform='rotate(45 0 0)'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:96px 96px;
+  animation:auth-drift 90s linear infinite;
 }
 /* replace the old red radial scrims with faint gold/blue light */
 .auth-left::after{
@@ -175,34 +186,133 @@ a.pa-fact:hover{color:var(--navy)}
     radial-gradient(720px 420px at 85% 0%,rgba(217,185,108,.10),transparent 60%),
     radial-gradient(640px 480px at 0% 100%,rgba(45,95,151,.22),transparent 60%);
 }
+/* staggered entrance: brand → hero → sub → bullets → footer */
+.auth-left>*{position:relative;z-index:2;animation:wc-rise .55s cubic-bezier(.22,1,.36,1) backwards}
+.auth-left>:nth-child(1){animation-delay:.04s}
+.auth-left>:nth-child(2){animation-delay:.14s}
+.auth-left>:nth-child(3){animation-delay:.24s}
+.auth-left>:nth-child(4){animation-delay:.34s}
+.auth-left>:nth-child(5){animation-delay:.44s}
 .auth-mark{background:rgba(217,185,108,.10);border:1px solid #3a557a}
 .auth-name{color:#f3ecdd}
 .auth-name b{color:#d9b96c}
 .auth-tag{color:rgba(243,236,221,.6)}
+/* gold flourish above the headline */
+.auth-hero::before{
+  content:"";display:block;width:64px;height:3px;border-radius:99px;margin-bottom:20px;
+  background:linear-gradient(90deg,#d9b96c,rgba(217,185,108,0));
+}
 .auth-hero em{color:#d9b96c}
 .auth-sub{color:rgba(243,236,221,.78)}
-.auth-bullets li{color:rgba(243,236,221,.88)}
+.auth-bullets li{color:rgba(243,236,221,.88);transition:transform .18s ease}
+.auth-bullets li:hover{transform:translateX(4px)}
+[dir="rtl"] .auth-bullets li:hover{transform:translateX(-4px)}
 .auth-bullets li span{
   background:rgba(217,185,108,.08);
   border:1px solid #3a557a;color:#d9b96c;border-radius:9px;
+  transition:background .18s ease,border-color .18s ease;
 }
+.auth-bullets li:hover span{background:rgba(217,185,108,.18);border-color:#d9b96c}
 .auth-left .muted{color:rgba(243,236,221,.55)}
 
-/* right: 400px soft card */
+/* right: soft card with a navy→gold top rule */
 .auth-card{
-  max-width:400px;
+  max-width:420px;position:relative;overflow:hidden;
   background:var(--card);border:1px solid var(--line);
   border-radius:var(--r-xl);
-  box-shadow:0 20px 60px rgba(34,30,23,.08);
-  padding:26px 24px 24px;
+  box-shadow:0 1px 2px rgba(34,30,23,.05),0 24px 70px -18px rgba(22,40,63,.28);
+  padding:26px 26px 24px;
+  animation:wc-rise .5s cubic-bezier(.22,1,.36,1) .12s backwards;
 }
-/* segmented Sign in / Create tabs on a #f0ebdf track */
-.auth-tabs{background:#f0ebdf;border-radius:11px;padding:4px;gap:4px;margin-bottom:20px}
+.auth-card::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#1d3a5f,#d9b96c 50%,#1d3a5f);
+}
+.auth-title{font-family:var(--serif);font-size:23px;font-weight:600;letter-spacing:-.3px;color:var(--ink)}
+.auth-lede{font-size:13.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+
+/* segmented Sign in / Create tabs — sliding card thumb on a #f0ebdf track */
+.auth-tabs{position:relative;background:#f0ebdf;border-radius:12px;padding:4px;gap:4px;margin-bottom:20px}
+.auth-thumb{
+  position:absolute;top:4px;bottom:4px;inset-inline-start:4px;width:calc(50% - 6px);
+  background:var(--card);border-radius:9px;box-shadow:0 1px 3px rgba(34,30,23,.14);
+  transition:transform .28s cubic-bezier(.22,1,.36,1);
+}
+.auth-thumb.alt{transform:translateX(calc(100% + 4px))}
+[dir="rtl"] .auth-thumb.alt{transform:translateX(calc(-100% - 4px))}
 .auth-tab{
-  border-radius:8px;font-size:14px;color:var(--ink-soft);
-  transition:background .15s ease,color .15s ease,box-shadow .15s ease;
+  position:relative;z-index:1;border-radius:8px;font-size:14px;color:var(--ink-soft);
+  transition:color .2s ease;
 }
-.auth-tab.on{background:var(--card);color:var(--navy);box-shadow:0 1px 3px rgba(34,30,23,.12)}
+.auth-tab:hover{color:var(--ink)}
+.auth-tab.on{background:transparent;box-shadow:none;color:var(--navy)}
+
+/* form pane — soft rise when the mode flips (keyed remount) */
+.af-pane{animation:wc-rise .35s cubic-bezier(.22,1,.36,1)}
+
+/* fields with a leading icon + optional trailing eye */
+.af{margin-top:14px}
+.af-wrap{position:relative}
+.af-wrap .field{padding-inline-start:40px}
+.af-ico{
+  position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);
+  color:#a89e88;pointer-events:none;transition:color .15s ease;
+}
+.af-wrap:focus-within .af-ico{color:var(--blue)}
+.af-wrap:has(.af-eye) .field{padding-inline-end:44px}
+.af-eye{
+  position:absolute;inset-inline-end:7px;top:50%;transform:translateY(-50%);
+  width:32px;height:32px;border-radius:8px;display:grid;place-items:center;
+  color:#a89e88;transition:color .15s ease,background .15s ease;
+}
+.af-eye:hover{color:var(--ink);background:var(--card-2)}
+.af-hint{display:block;margin-top:6px;font-size:12px;line-height:1.45;color:var(--muted)}
+.af-err{
+  display:block;margin-top:6px;font-size:12px;line-height:1.45;font-weight:600;color:#b0453a;
+  animation:wc-rise .25s ease backwards;
+}
+.af.bad .field{border-color:#cf8177;background:#fdf6f4}
+.af.bad .field:focus{border-color:#c96f64;box-shadow:0 0 0 3px rgba(190,80,70,.12)}
+.af.bad .af-ico{color:#c96f64}
+.af-caps{display:block;margin-top:8px;font-size:12px;font-weight:600;color:#a3702a}
+
+/* password strength — 4 segments, coloured by score */
+.pw-meter{display:flex;align-items:center;gap:10px;margin-top:9px}
+.pw-bars{display:flex;gap:4px;flex:1}
+.pw-bars i{height:4px;flex:1;border-radius:99px;background:#e9e1cd;transition:background .25s ease}
+.pw-meter small{font-size:11.5px;font-weight:700;min-width:58px;text-align:end;color:var(--muted)}
+.pw-meter.s1 .pw-bars i.on{background:#c96f64}   .pw-meter.s1 small{color:#b0453a}
+.pw-meter.s2 .pw-bars i.on{background:#c98a2e}   .pw-meter.s2 small{color:#a3702a}
+.pw-meter.s3 .pw-bars i.on{background:var(--blue)}    .pw-meter.s3 small{color:var(--blue)}
+.pw-meter.s4 .pw-bars i.on{background:var(--emerald)} .pw-meter.s4 small{color:var(--emerald)}
+
+/* quiet session note (sign-in) + terms row (sign-up) */
+.auth-note{
+  display:flex;align-items:flex-start;gap:8px;margin-top:14px;
+  font-size:12.5px;line-height:1.5;color:var(--muted);
+}
+.auth-note .ico{flex:none;margin-top:1px;color:#a89e88}
+.auth-agree{display:flex;align-items:flex-start;gap:9px;margin-top:14px;font-size:12.5px;line-height:1.5;color:var(--muted);cursor:pointer}
+.auth-agree input{margin-top:2px;accent-color:var(--navy)}
+.auth-agree a{color:var(--emerald);font-weight:600}
+.auth-agree.bad{color:#b0453a}
+
+/* server error banner */
+.auth-alert{
+  display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:11px 13px;
+  border-radius:10px;background:#f9e9e6;border:1px solid #ecc8c1;
+  color:#8c3a30;font-size:13.5px;font-weight:600;line-height:1.45;
+  animation:auth-shake .4s ease;
+}
+.auth-alert .ico{flex:none;margin-top:2px}
+
+/* submit spinner */
+.auth-spin{
+  display:inline-block;width:15px;height:15px;vertical-align:-2px;margin-inline-end:9px;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;
+  animation:auth-spin .7s linear infinite;
+}
+
 .auth-card .btn-primary{border-radius:10px}
 .auth-switch a{color:var(--blue)}
 .auth-switch a:hover{color:var(--navy)}

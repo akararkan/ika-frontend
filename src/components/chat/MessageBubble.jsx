@@ -31,6 +31,8 @@ import { systemNoticeOf } from './systemEvents.js'
 import { VoiceNote } from './VoiceNote.jsx'
 import { durationOf } from './mediaPrefs.js'
 import { gteId } from '../../api/ids.js'
+import { PollCard, LocationCard, ContactCard, PostRail, CommentsBar, VideoNote } from './PostExtras.jsx'
+import { nfmt } from '../channels/channelArt.js'
 
 /* Reaction strip offered on hover — mirrors the platform's reaction set. */
 const QUICK = ['👍', '❤️', '😂', '😮', '😢', '🤲']
@@ -152,9 +154,14 @@ function VideoTile({ m, onOpen, label }) {
 }
 
 function MediaBlock({ media, messageId, mine, senderName, onOpenMedia }) {
-  const visuals = media.filter(m => m.kind === 'IMAGE' || m.kind === 'VIDEO')
-  const voices = media.filter(m => m.kind === 'VOICE')
-  const files = media.filter(m => m.kind !== 'IMAGE' && m.kind !== 'VIDEO' && m.kind !== 'VOICE')
+  /* VIDEO_NOTE is a video on the wire but never in the album grid — it is the
+     round one, and dropping it into the grid would square it off. It is pulled
+     out FIRST so the three filters below stay mutually exclusive. */
+  const notes = media.filter(m => m.kind === 'VIDEO_NOTE')
+  const rest = media.filter(m => m.kind !== 'VIDEO_NOTE')
+  const visuals = rest.filter(m => m.kind === 'IMAGE' || m.kind === 'VIDEO')
+  const voices = rest.filter(m => m.kind === 'VOICE')
+  const files = rest.filter(m => m.kind !== 'IMAGE' && m.kind !== 'VIDEO' && m.kind !== 'VOICE')
 
   // At most 4 tiles; the 4th carries a "+n" veil rather than growing the grid.
   const shown = visuals.slice(0, 4)
@@ -162,6 +169,8 @@ function MediaBlock({ media, messageId, mine, senderName, onOpenMedia }) {
 
   return (
     <>
+      {notes.map((m, i) => <VideoNote key={m.storageKey || i} media={m}/>)}
+
       {!!shown.length && (
         <div className={`ch-media n-${shown.length}`}>
           {shown.map((m, i) => (
@@ -258,6 +267,16 @@ export function MessageBubble({
   onJumpTo,
   onOpenMedia,
   onOpenProfile,
+  onPoll,
+  onTag,
+  onComments,
+  /* Channel policy, resolved by ChatPage from `ChannelSettings`. Both are
+     ABSENCES rather than disabled states: a control that can only ever answer
+     403 is worse than no control, and both of these are the channel's policy
+     rather than a role the reader could be granted. */
+  reactionsOff = false,
+  allowedReactions = null,   // non-empty → only these emoji are accepted
+  protectedContent = false,  // forwarding refused channel-wide
 }) {
   const { enrichAuthor, watchUsers, myId } = useChat()
   const [menuOpen, setMenuOpen] = React.useState(false)
@@ -283,6 +302,17 @@ export function MessageBubble({
 
   const sender = enrichAuthor(msg.sender, msg.senderId)
   const senderName = sender?.full || sender?.handle || 'Unknown'
+
+  /* The quick strip, narrowed to what this channel actually accepts. An emoji
+     outside a non-empty `allowedReactions` is refused server-side, so offering
+     it would be offering a 403. If the whitelist and the house set don't
+     overlap at all, the channel's own list wins — it is the authoritative
+     answer to "what can I react with here". */
+  const quick = React.useMemo(() => {
+    if (!allowedReactions?.length) return QUICK
+    const kept = QUICK.filter(e => allowedReactions.includes(e))
+    return kept.length ? kept : allowedReactions.slice(0, 6)
+  }, [allowedReactions])
 
   const closeAll = React.useCallback(() => { setMenuOpen(false); setReactOpen(false) }, [])
 
@@ -421,7 +451,12 @@ export function MessageBubble({
   const menuItems = []
   if (!msg.deleted && !msg.pending) {
     menuItems.push({ key: 'reply', label: 'Reply', icon: 'reply', run: () => onReply?.(msg) })
-    if (hasText) {
+    /* `protectedContent` asks clients to disable copy and save alongside the
+       forward the server actually enforces. Honoured here — the server cannot
+       stop a clipboard write, so the only place this promise can be kept is
+       the client, and quietly ignoring it would make the channel's setting a
+       lie to the admin who switched it on. */
+    if (hasText && !protectedContent) {
       menuItems.push({
         key: 'copy',
         label: 'Copy text',
@@ -432,7 +467,11 @@ export function MessageBubble({
         },
       })
     }
-    menuItems.push({ key: 'forward', label: 'Forward', icon: 'forward', run: () => onForward?.(msg) })
+    // `protectedContent` refuses every forward out of this channel (403), so
+    // the row is absent rather than present-and-failing.
+    if (!protectedContent) {
+      menuItems.push({ key: 'forward', label: 'Forward', icon: 'forward', run: () => onForward?.(msg) })
+    }
     // A star is PRIVATE — nobody else can see it, so it is offered on every
     // readable message, mine or not.
     menuItems.push(msg.starred
@@ -468,6 +507,10 @@ export function MessageBubble({
       className={
         'ch-row' +
         (mine ? ' mine' : '') +
+        /* A broadcast POST, not a chat message. Its reactions are a public
+           tally rather than a private aside between two people, so they are
+           given real weight — see `.ch-row.is-post .ch-react`. */
+        (msg.isPost ? ' is-post' : '') +
         (runStart ? ' run-start' : '') +
         (runEnd ? ' run-end' : '')
       }
@@ -559,6 +602,15 @@ export function MessageBubble({
                   senderName={senderName} onOpenMedia={onOpenMedia}/>
               )}
 
+              {/* Typed payloads. Each is keyed on its OWN field rather than on
+                  `msg.type`, so a row whose type and payload disagree renders
+                  what it actually has instead of an empty card. */}
+              {msg.poll && (
+                <PollCard msg={msg} poll={msg.poll} canClose={canModerate || mine} onPoll={onPoll}/>
+              )}
+              {msg.location && <LocationCard location={msg.location}/>}
+              {msg.contact && <ContactCard contact={msg.contact} onOpenProfile={onOpenProfile}/>}
+
               {hasText && (
                 <span className="ch-text" dir="auto">{renderText(msg.body)}</span>
               )}
@@ -566,6 +618,17 @@ export function MessageBubble({
           )}
 
           <span className="ch-meta">
+            {/* A broadcast post's view count belongs BESIDE the clock, the way
+                every channel reader already expects to find it — not in a
+                separate counter row. `!= null`, so a post with zero views
+                still shows its counter. */}
+            {msg.views != null && !msg.deleted && (
+              <span className="ch-meta-views" title={`${msg.views} unique viewers`}>
+                <Icon name="eye" aria-hidden="true"/>
+                {nfmt(msg.views)}
+                <span className="sr-only"> views</span>
+              </span>
+            )}
             {msg.starred && !msg.deleted && (
               <span className="ch-meta-star" title="Starred">
                 <Icon name="star" aria-hidden="true"/>
@@ -579,6 +642,12 @@ export function MessageBubble({
             {receipt}
           </span>
         </div>
+
+        {/* Tags, signature and the view/forward counters. Outside the bubble,
+            because on a broadcast post they belong to the POST rather than to
+            the utterance — and because the bubble's meta line already floats
+            inside the text flow. */}
+        {!msg.deleted && <PostRail msg={msg} onTag={onTag}/>}
 
         {msg.failed && (
           <button type="button" className="ch-retry" onClick={() => onRetry?.(msg)}>
@@ -608,12 +677,26 @@ export function MessageBubble({
             ))}
           </div>
         )}
+
+        {/* The comments bar closes the post, BELOW the reactions — reacting is
+            a one-tap response to what you just read, commenting is leaving the
+            post for a thread, so they run in that order. It is a full-width
+            row rather than a chip in the counter rail: on a broadcast channel
+            it is the reader's only way to reply, so it gets a button's weight.
+            `!= null` is the test — a post with zero comments still offers the
+            affordance; a post in a channel with no discussion group linked
+            has none at all. */}
+        {!msg.deleted && msg.comments != null && (
+          <CommentsBar msg={msg} channelId={msg.conversationId} onOpen={onComments}/>
+        )}
       </div>
 
       {/* hover rail — hidden on touch by CSS, replaced by long-press */}
       {!msg.deleted && !msg.pending && (
         <div className={'ch-tools' + (menuOpen || reactOpen ? ' open' : '')}>
-          <div className="ch-tool-wrap">
+          {/* Reacting is refused channel-wide (403 REACTIONS_DISABLED) when the
+              admins turn it off — so the opener goes, not just the strip. */}
+          <div className="ch-tool-wrap" hidden={reactionsOff}>
             <button
               type="button"
               ref={reactBtnRef}
@@ -634,7 +717,7 @@ export function MessageBubble({
               align={mine ? 'end' : 'start'}
               prefer="top"
             >
-              {QUICK.map(e => (
+              {quick.map(e => (
                 <button
                   key={e}
                   type="button"
@@ -712,8 +795,10 @@ export function MessageBubble({
             ref={sheetRef}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="ch-sheet-reacts">
-              {QUICK.map(e => (
+            {/* Same gate as the hover rail — the touch path must not offer
+                what the pointer path correctly hides. */}
+            <div className="ch-sheet-reacts" hidden={reactionsOff}>
+              {quick.map(e => (
                 <button
                   key={e}
                   type="button"

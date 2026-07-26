@@ -42,7 +42,13 @@ function TrendingCard({ navigate }) {
   React.useEffect(() => {
     let alive = true
     const load = () => api.tags.trending({ scope: 'ALL', limit: 20 })
-      .then(rows => { if (alive) setTags((rows || []).filter(t => t.tag)) })
+      .then(rows => {
+        if (!alive) return
+        // Dedupe by tag: the endpoint can return the same tag twice (seen on
+        // live data), and `key={t.tag}` below needs one row per tag.
+        const seen = new Set()
+        setTags((rows || []).filter(t => t.tag && !seen.has(t.tag) && seen.add(t.tag)))
+      })
       .catch(() => {})
     load()
     const refetch = setInterval(load, 180000)   // 3 min
@@ -58,7 +64,12 @@ function TrendingCard({ navigate }) {
   if (!tags.length) return null
   const start = page * TREND_PAGE
   let shown = tags.slice(start, start + TREND_PAGE)
-  if (shown.length < TREND_PAGE) shown = [...shown, ...tags.slice(0, TREND_PAGE - shown.length)]   // wrap the tail
+  // Wrap the tail with rows from the head — but only when there are MORE tags
+  // than one page, or the pad would re-list this page's own rows (duplicate
+  // keys, doubled entries) whenever fewer than TREND_PAGE tags exist at all.
+  if (shown.length < TREND_PAGE && tags.length > TREND_PAGE) {
+    shown = [...shown, ...tags.slice(0, TREND_PAGE - shown.length)]
+  }
   return (
     <div className="card card-pad">
       <h3 className="title"><Icon name="trending" className="sm"/> Trending topics</h3>

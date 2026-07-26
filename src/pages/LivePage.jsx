@@ -27,6 +27,7 @@ import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon, Avatar, showToast } from '../components/ui.jsx'
 import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
+import { openShare } from '../components/ShareSheet.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
@@ -122,10 +123,15 @@ function StreamRoom({ streamId, onExit }) {
   const [draft, setDraft] = React.useState('')
   const [showIngest, setShowIngest] = React.useState(false)
   const [sending, setSending] = React.useState(false)
-  // Whether this engine can play the manifest natively. Resolved in the attach
-  // effect and held in state: probing the <video> during render would read a
-  // ref before it is attached and give the wrong answer on the first paint.
-  const [nativeHls, setNativeHls] = React.useState(true)
+  /* How the manifest is being played. Resolved in the attach effect and held
+     in state (probing the <video> during render would read a ref before it is
+     attached):
+       probing     → still deciding / hls.js chunk loading
+       native      → Safari's built-in HLS (or a non-HLS source)
+       mse         → hls.js over MediaSource (Chrome/Firefox/Edge)
+       unsupported → no engine can play it here
+       failed      → an engine exists but the stream can't be reached */
+  const [playback, setPlayback] = React.useState('probing')
   // Registered-viewer flag. The host is implicitly allowed and never joins.
   const [joined, setJoined] = React.useState(false)
   const videoRef = React.useRef(null)
@@ -193,18 +199,53 @@ function StreamRoom({ streamId, onExit }) {
     }
   }, [streamId])
 
-  /* Attach playback. HLS through a bare <video> only works on Safari; the rest
-     get an honest "open in a player" affordance instead of a black rectangle. */
+  /* Attach playback. Safari plays HLS natively; every other engine gets
+     hls.js over MediaSource — imported on demand, so no route that never
+     watches a stream pays for the chunk. Failure stays HONEST: a fatal,
+     unrecoverable error surfaces the open-in-a-player link rather than a
+     silent black rectangle. */
   React.useEffect(() => {
     const el = videoRef.current
     const url = stream?.playbackUrl
-    if (!el || !url) return
-    const native = canPlayHls(el)
-    setNativeHls(native)
-    if (native || !/\.m3u8($|\?)/i.test(url)) {
+    if (!el || !url) return undefined
+
+    if (!/\.m3u8($|\?)/i.test(url) || canPlayHls(el)) {
+      setPlayback('native')
       el.src = url
       el.play?.().catch(() => { /* autoplay policy — the controls are there */ })
+      return undefined
     }
+
+    let dead = false
+    let hls = null
+    let netRetries = 0
+    setPlayback('probing')
+    import('hls.js')
+      .then(({ default: Hls }) => {
+        if (dead) return
+        if (!Hls.isSupported()) { setPlayback('unsupported'); return }
+        hls = new Hls({ enableWorker: true, lowLatencyMode: true })
+        hls.on(Hls.Events.ERROR, (_evt, data) => {
+          if (dead || !data?.fatal) return
+          /* Media errors are usually a decoder hiccup — recoverable in place.
+             Network errors get a few retries (a live edge can 404 for a beat
+             as segments rotate) before we give up honestly. */
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hls?.recoverMediaError(); return }
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && netRetries < 3) {
+            netRetries += 1
+            setTimeout(() => { if (!dead) hls?.startLoad() }, 1500 * netRetries)
+            return
+          }
+          hls?.destroy(); hls = null
+          setPlayback('failed')
+        })
+        hls.loadSource(url)
+        hls.attachMedia(el)
+        setPlayback('mse')
+        el.play?.().catch(() => { /* autoplay policy */ })
+      })
+      .catch(() => { if (!dead) setPlayback('unsupported') })
+    return () => { dead = true; hls?.destroy() }
   }, [stream?.playbackUrl])
 
   React.useEffect(() => subscribe((evt) => {
@@ -285,9 +326,11 @@ function StreamRoom({ streamId, onExit }) {
     return <ErrorState message="This stream could not be opened." onRetry={onExit}/>
   }
 
-  const needsExternalPlayer = !!stream.playbackUrl
+  // Only the truly-stuck states get the banner — 'probing' and 'mse' are
+  // healthy, and 'failed' words it differently from 'unsupported'.
+  const playbackStuck = !!stream.playbackUrl
     && /\.m3u8($|\?)/i.test(stream.playbackUrl)
-    && !nativeHls
+    && (playback === 'unsupported' || playback === 'failed')
 
   return (
     <div className="lv-room">
@@ -296,11 +339,13 @@ function StreamRoom({ streamId, onExit }) {
           {stream.isLive ? (
             <>
               <video ref={videoRef} className="lv-video" controls playsInline autoPlay/>
-              {needsExternalPlayer && (
+              {playbackStuck && (
                 <div className="lv-hls">
                   <Icon name="info"/>
                   <p>
-                    This browser can’t play HLS directly.{' '}
+                    {playback === 'failed'
+                      ? 'The stream can’t be reached right now — the media server may be down or not configured.'
+                      : 'This browser can’t play HLS directly.'}{' '}
                     <a href={stream.playbackUrl} target="_blank" rel="noopener noreferrer">
                       Open the stream in a player
                     </a>.
@@ -329,6 +374,13 @@ function StreamRoom({ streamId, onExit }) {
           </div>
           <div className="lv-meta-acts">
             <button className="btn" onClick={onExit}><Icon name="chevleft" className="xs"/>All streams</button>
+            {stream.shareUrl && (
+              /* The key-safe watch link ({base}/live/{id}) — carries no
+                 stream key, safe for anyone; the route joins on arrival. */
+              <button className="btn" onClick={() => openShare({ kind: 'stream', url: stream.shareUrl, title: stream.title })}>
+                <Icon name="share" className="xs"/>Share
+              </button>
+            )}
             {isHost && stream.isLive && (
               <button className="btn btn-danger" onClick={endStream}>End stream</button>
             )}

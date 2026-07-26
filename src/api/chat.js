@@ -25,6 +25,10 @@ import { http, parseJson } from './http.js'
 import { API_BASE, assetUrl, session } from './config.js'
 import { authorFrom, handleOf, timeAgo } from './adapters.js'
 import { mid } from './ids.js'
+/* Circular by design — ./channels.js imports the hoisted adapters below back
+   out of this module. Nothing on either side reads the other's `const` at
+   module scope, which is what keeps the cycle safe. */
+import { channels } from './channels.js'
 
 /* ---------- small shared helpers ---------- */
 
@@ -66,6 +70,61 @@ function mediaFrom(m) {
     waveform: m?.waveform || null,              // VOICE: sampled amplitudes for the scrubber
     fileName: m?.fileName || '',
     altText: m?.altText || '',
+  }
+}
+
+/** PollResponse → view poll (the in-POST poll; story A/B polls are separate).
+ *  Quiz `correctOptionIndex`/`explanation` are withheld by the server until the
+ *  viewer votes or the poll closes, so `null` there means "not yet revealed",
+ *  never "no correct answer" — `revealed` says which it is. */
+export function pollFrom(dto) {
+  if (!dto) return null
+  const options = (dto.options || []).map((o, i) => ({
+    index: o?.index ?? i,
+    text: o?.text || '',
+    voterCount: o?.voterCount ?? 0,
+  }))
+  const total = dto.totalVoters ?? 0
+  const myVotes = (dto.myVotes || []).map(Number)
+  return {
+    question: dto.question || '',
+    options: options.map(o => ({
+      ...o,
+      // Share of voters, not of votes — with multi-answer polls those differ.
+      pct: total > 0 ? Math.round((o.voterCount / total) * 100) : 0,
+      mine: myVotes.includes(o.index),
+    })),
+    allowsMultipleAnswers: !!dto.allowsMultipleAnswers,
+    anonymous: dto.anonymous !== false,
+    quiz: !!dto.quiz,
+    correctOptionIndex: dto.correctOptionIndex ?? null,
+    explanation: dto.explanation || '',
+    closed: !!dto.closed,
+    totalVoters: total,
+    myVotes,
+    voted: myVotes.length > 0,
+    revealed: !!dto.closed || myVotes.length > 0,
+  }
+}
+
+/** LocationDto — round-tripped verbatim by the server. */
+function locationFrom(l) {
+  if (!l) return null
+  return {
+    latitude: l.latitude, longitude: l.longitude,
+    name: l.name || '', address: l.address || '',
+    live: !!l.live, livePeriodSeconds: l.livePeriodSeconds ?? null,
+  }
+}
+
+/** ContactDto — `userId` is set when the contact is a platform user. */
+function contactFrom(c) {
+  if (!c) return null
+  const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim()
+  return {
+    phone: c.phone || '', firstName: c.firstName || '', lastName: c.lastName || '',
+    userId: c.userId || null,
+    fullName: fullName || c.phone || 'Contact',
   }
 }
 
@@ -115,6 +174,28 @@ export function msgFrom(dto) {
     createdAt: dto.createdAt || null,
     isSystem: type === 'SYSTEM' || !!dto.systemEvent,
     time: timeAgo(dto.createdAt),               // convenience label; bubbles may format their own
+
+    /* ---- typed payloads (present only for their own `type`) ---- */
+    poll: pollFrom(dto.poll),
+    location: locationFrom(dto.location),
+    contact: contactFrom(dto.contact),
+
+    /* ---- channel-post extras ----
+       `tags` are re-extracted server-side on every edit, so they are read from
+       the row rather than parsed out of the body here — the two would drift the
+       moment the backend's extractor changed.
+
+       views / forwards / comments are `null` OUTSIDE a channel, and that null
+       is meaningful: it means "this counter does not exist here", not "zero".
+       `comments` is additionally null when no discussion group is linked. The
+       renderer must therefore test `!= null`, never truthiness, or every
+       zero-view post would silently lose its counter row. */
+    tags: dto.tags || [],
+    authorSignature: dto.authorSignature || null,
+    views: dto.views ?? null,
+    forwards: dto.forwards ?? null,
+    comments: dto.comments ?? null,
+    isPost: dto.views != null || dto.forwards != null,
   }
 }
 
@@ -152,6 +233,13 @@ export function convoFrom(dto) {
     // 0 = off. Anything above is the per-message Cassandra TTL applied to
     // messages sent AFTER the timer was set (existing rows are untouched).
     disappearingSeconds: dto.disappearingSeconds ?? 0,
+    /* Slow mode throttles NON-ADMIN members to one message per window; the
+       owner and admins are exempt, so this number alone never tells the
+       composer whether to count down — pair it with `myRole`. 0 = off. */
+    slowModeSeconds: dto.groupSettings?.slowModeSeconds ?? 0,
+    // Present on a CHANNEL that has a discussion group linked; comments are
+    // disabled (400 on POST …/comments) while it is null.
+    linkedGroupId: dto.linkedGroupId || null,
     myRole: dto.myRole || 'MEMBER',
     myStatus: dto.myStatus || 'ACTIVE',
     lastReadMessageId: mid(dto.lastReadMessageId),
@@ -265,18 +353,86 @@ export function scheduledFrom(dto) {
   }
 }
 
+/** DraftResponse → view draft. Conversation-wide, not channel-only. */
+export function draftFrom(dto) {
+  if (!dto) return null
+  return {
+    conversationId: dto.conversationId || null,
+    body: dto.body || '',
+    media: (dto.media || []).map(mediaFrom),
+    replyToId: mid(dto.replyToId),
+    updatedAt: dto.updatedAt || null,
+    empty: !dto.body && !(dto.media || []).length,
+  }
+}
+
+/** ChannelSettings — one JSONB blob, replaced WHOLE by PATCH. `@JsonInclude
+ *  (NON_NULL)` means unset string knobs are simply absent from the response, so
+ *  every read is defaulted here and `settingsTo` sends the complete object back
+ *  — a partial `settings` on a PATCH would silently reset the omitted knobs. */
+export function channelSettingsFrom(s) {
+  const st = s || {}
+  return {
+    language: st.language || '',
+    country: st.country || '',
+    region: st.region || '',
+    accentColor: st.accentColor || '',
+    emojiStatus: st.emojiStatus || '',
+    wallpaper: st.wallpaper || '',
+    reactionsEnabled: st.reactionsEnabled !== false,
+    allowedReactions: st.allowedReactions || null,     // null = every emoji allowed
+    protectedContent: !!st.protectedContent,
+    hiddenSubscribers: !!st.hiddenSubscribers,
+    signMessages: !!st.signMessages,
+    joinByRequest: !!st.joinByRequest,
+  }
+}
+
+/** View settings → the wire blob. Empty strings are dropped (NON_NULL). */
+export function channelSettingsTo(s = {}) {
+  const out = {
+    reactionsEnabled: s.reactionsEnabled !== false,
+    protectedContent: !!s.protectedContent,
+    hiddenSubscribers: !!s.hiddenSubscribers,
+    signMessages: !!s.signMessages,
+    joinByRequest: !!s.joinByRequest,
+  }
+  for (const k of ['language', 'country', 'region', 'accentColor', 'emojiStatus', 'wallpaper']) {
+    if (s[k]) out[k] = s[k]
+  }
+  if (s.allowedReactions?.length) out.allowedReactions = s.allowedReactions
+  return out
+}
+
 /** ChannelResponse → view channel (a CHANNEL-typed conversation + its counts). */
 export function channelFrom(dto) {
   if (!dto) return null
+  const myRole = dto.myRole || null
   return {
     id: dto.id,                                 // ALSO the conversationId — post/read use it
     handle: dto.handle ? String(dto.handle).replace(/^@/, '') : '',
     title: dto.title || 'Channel',
     description: dto.description || '',
+    category: dto.category || '',
     publicChannel: dto.publicChannel !== false,
+    verified: !!dto.verified,                   // platform-granted, not owner-settable
     subscriberCount: dto.subscriberCount ?? 0,
+    postCount: dto.postCount ?? 0,
     ownerId: dto.ownerId || null,
     subscribed: !!dto.subscribed,
+    /* A viewer who subscribed to a `joinByRequest` channel is NOT subscribed —
+       they are waiting. Three states, not two, and the card has to say which. */
+    pendingJoinRequest: !!dto.pendingJoinRequest,
+    myRole,                                     // OWNER | ADMIN | MEMBER | null (not a member)
+    isOwner: myRole === 'OWNER',
+    isAdmin: myRole === 'OWNER' || myRole === 'ADMIN',
+    avatarUrl: assetUrl(dto.avatarUrl || null),
+    coverUrl: assetUrl(dto.coverUrl || null),
+    settings: channelSettingsFrom(dto.settings),
+    linkedGroupId: dto.linkedGroupId || null,   // the discussion group; null = comments off
+    /* Ready-to-share {irc.base-url}/c/{handle} — null for PRIVATE channels
+       (nothing publicly resolvable; share those via an invite link). */
+    shareUrl: dto.shareUrl || null,
     createdAt: dto.createdAt || null,
     time: timeAgo(dto.createdAt),
   }
@@ -334,6 +490,7 @@ export function liveStreamFrom(dto) {
     isLive: status === 'LIVE',
     playbackUrl: dto.playbackUrl || null,       // HLS/WebRTC out — an external media origin
     ingestUrl: dto.ingestUrl || null,           // null for viewers
+    shareUrl: dto.shareUrl || null,             // key-safe watch link ({base}/live/{id})
     viewerCount: dto.viewerCount ?? 0,
     startedAt: dto.startedAt || null,
     endedAt: dto.endedAt || null,
@@ -374,6 +531,13 @@ const EVENT_HANDLER = {
   'conversation.updated': 'onConversation',
   'member.changed':       'onMember',
   'request.new':          'onRequest',
+  /* Channel-scoped frames ride this same per-user stream — there is no channel
+     socket. `poll.updated` is viewer-NEUTRAL (no myVotes), `message.comment`
+     carries the POST id (not the comment's), and `channel.join_request` only
+     reaches admins of the channel in question. */
+  'poll.updated':         'onPoll',
+  'channel.join_request': 'onJoinRequest',
+  'message.comment':      'onComment',
   /* Calls and live streams are MULTIPLEXED onto this same per-user stream —
      there is no second socket. Every call.*/ /* name maps to one handler key
      (`onCall`) and every stream.* to `onStream`; consumers switch on
@@ -442,6 +606,26 @@ function adaptEvent(type, d = {}) {
       return { type, conversationId: d.conversationId, userId: d.userId, memberChange: d.memberChange || null, role: d.role || null }
     case 'request.new':
       return { type, conversationId: d.conversationId, request: requestFrom(d.request) }
+
+    /* ---- channels ---- */
+    case 'poll.updated':
+      /* The aggregate is viewer-neutral: `myVotes` is absent, so merging this
+         wholesale over a local poll would wipe the viewer's own selection.
+         Consumers must keep their `myVotes` and take only the counts. */
+      return { type, messageId: mid(d.messageId), poll: pollFrom(d.poll), conversationId: d.conversationId || null }
+    case 'channel.join_request': {
+      const jr = d.joinRequest || d.request || null
+      return {
+        type,
+        conversationId: jr?.conversationId || d.conversationId || null,
+        joinRequest: jr,                        // raw — channels.js owns the view shape
+        userId: jr?.userId || d.userId || null,
+      }
+    }
+    case 'message.comment':
+      // `messageId` is the POST's id, not the comment's — apply ±1 to that
+      // post's `comments` counter (delta model, same as every other counter).
+      return { type, messageId: mid(d.messageId), added: !!d.added, conversationId: d.conversationId || null }
 
     /* ---- calls (voice / video) ---- */
     case 'call.incoming':
@@ -607,10 +791,21 @@ export const chat = {
       return (rows || []).map(msgFrom)
     },
     /** `clientNonce` makes the send idempotent AND lets the sender reconcile its
-     *  own optimistic bubble when the echo arrives on the stream. */
-    async send(convId, { clientNonce, type = 'TEXT', body, replyToId, media } = {}) {
+     *  own optimistic bubble when the echo arrives on the stream.
+     *
+     *  The typed payload must MATCH `type` — a `location` on a TEXT, or a
+     *  LOCATION with no `location`, is a 400. Each one is therefore attached
+     *  only under its own type rather than "whatever the caller passed", so a
+     *  composer that forgets to clear stale state cannot poison the send. */
+    async send(convId, { clientNonce, type = 'TEXT', body, replyToId, media, silent, poll, location, contact } = {}) {
       return msgFrom(await http.post(`/api/v1/conversations/${convId}/messages`, {
-        clientNonce, type, body, replyToId: replyToId ?? undefined, media: media || undefined,
+        clientNonce, type, body,
+        replyToId: replyToId ?? undefined,
+        media: media || undefined,
+        silent: silent ? true : undefined,          // delivered normally, no push
+        poll:     type === 'POLL'     ? poll     : undefined,
+        location: type === 'LOCATION' ? location : undefined,
+        contact:  type === 'CONTACT'  ? contact  : undefined,
       }))
     },
     /** Multipart send. `replyToId` is sent best-effort: the documented parts
@@ -665,6 +860,64 @@ export const chat = {
       const rows = await http.get(`/api/v1/messages/${messageId}/seen-by`)
       return (rows || []).map(participantFrom).filter(Boolean)
     },
+
+    /* ---- shared-media gallery ----
+       Backed by the `media_by_conversation` index (one row per attachment,
+       plus LINK rows for bodies containing a URL) — NOT a timeline scan, so it
+       stays cheap on a channel with fifty thousand posts. An album comes back
+       once, as its single message. */
+    async media(convId, { kind, before, limit = 40 } = {}) {
+      const rows = await http.get(`/api/v1/conversations/${convId}/media`, {
+        kind: kind || undefined, before: before || undefined, limit: clampLimit(limit),
+      })
+      return (rows || []).map(msgFrom).filter(Boolean)
+    },
+
+    /** EXACT tag match (ES `tags` keyword field) — `#ml` and `#machinelearning`
+     *  are different tags, so this is a lookup, not a search. */
+    async byTag(convId, tag) {
+      const rows = await http.get(`/api/v1/conversations/${convId}/messages/by-tag`, {
+        tag: String(tag || '').replace(/^#/, ''),
+      })
+      return (rows || []).map(msgFrom).filter(Boolean)
+    },
+
+    /* ---- in-post polls ----
+       Every write broadcasts `poll.updated` with the viewer-NEUTRAL aggregate,
+       so the caller keeps its own `myVotes` and takes only the counts. Quiz
+       answers are final: `retractVote` 400s on a quiz by design. */
+    async vote(messageId, optionIndexes) {
+      const idx = (Array.isArray(optionIndexes) ? optionIndexes : [optionIndexes]).map(Number)
+      return pollFrom(await http.post(`/api/v1/messages/${messageId}/poll/votes`, { optionIndexes: idx }))
+    },
+    async retractVote(messageId) {
+      return pollFrom(await http.del(`/api/v1/messages/${messageId}/poll/votes`))
+    },
+    /** Author, or an admin holding `canEditMessages`. */
+    async closePoll(messageId) {
+      return pollFrom(await http.post(`/api/v1/messages/${messageId}/poll/close`, {}))
+    },
+  },
+
+  /* ---------- drafts (per conversation, PER USER, server-side) ----------
+     A half-written message follows the account across devices. One row per
+     (conversation, user) — `save` overwrites rather than appends. Sending into
+     the conversation clears it server-side, so the client must not re-save a
+     draft it has just sent or the cleared row comes straight back. */
+  drafts: {
+    async get(convId) {
+      // 404 is the documented answer for "no draft", not a failure.
+      try { return draftFrom(await http.get(`/api/v1/conversations/${convId}/draft`)) }
+      catch (e) { if (e?.status === 404) return null; throw e }
+    },
+    async save(convId, { body, media, replyToId } = {}) {
+      return draftFrom(await http.put(`/api/v1/conversations/${convId}/draft`, {
+        body: body || '',
+        media: media?.length ? media : undefined,
+        replyToId: replyToId ?? undefined,
+      }))
+    },
+    discard(convId) { return http.del(`/api/v1/conversations/${convId}/draft`) },    // 204, idempotent
   },
 
   /* ---------- scheduled (send-later) messages ----------
@@ -700,29 +953,12 @@ export const chat = {
   /* ---------- channels (Telegram-style broadcast) ----------
      A channel IS a conversation (`id` is the conversationId) with an
      admins-only send mode, so posting and reading go through the normal
-     conversation/message endpoints. Only creation, discovery and the
-     subscribe toggle live here. */
-  channels: {
-    async create({ title, description, handle, publicChannel = true } = {}) {
-      return channelFrom(await http.post('/api/v1/channels', {
-        title,
-        description: description || undefined,
-        handle: handle ? String(handle).replace(/^@/, '') : undefined,
-        publicChannel: !!publicChannel,
-      }))
-    },
-    /** Public channels matching `q` (or all), most-subscribed first. */
-    async discover(q, opts) {
-      const rows = await http.get('/api/v1/channels/discover', { q: q || undefined }, opts)
-      return (rows || []).map(channelFrom).filter(Boolean)
-    },
-    async byHandle(handle) {
-      const h = String(handle || '').replace(/^@/, '')
-      return channelFrom(await http.get(`/api/v1/channels/by-handle/${encodeURIComponent(h)}`))
-    },
-    async subscribe(id)   { return channelFrom(await http.post(`/api/v1/channels/${id}/subscribe`, {})) },  // idempotent
-    unsubscribe(id)       { return http.del(`/api/v1/channels/${id}/subscribe`) },                          // 204
-  },
+     conversation/message endpoints above. Everything a conversation has no
+     concept of — identity, admin rights, invite links, join requests, stats,
+     the linked discussion group, stories and highlights — lives in
+     ./channels.js and is hung here under the name every call site already
+     uses. `api.channels` is the same object. */
+  channels,
 
   /* ---------- calls (voice / video) ----------
      The server owns the lifecycle (ring → answer → end) and is a BLIND RELAY

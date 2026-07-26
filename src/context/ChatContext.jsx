@@ -470,8 +470,8 @@ export function ChatProvider({ children }) {
           // INSIDE the updater: reading convosRef first and writing an absolute
           // value made a burst of joins collapse to a single +1, because every
           // handler in the burst read the same pre-flush snapshot.
-          const delta = evt.memberChange === 'ADDED' ? 1
-            : (evt.memberChange === 'REMOVED' || evt.memberChange === 'LEFT') ? -1 : 0
+          const delta = (evt.memberChange === 'ADDED' || evt.memberChange === 'SUBSCRIBED') ? 1
+            : (evt.memberChange === 'REMOVED' || evt.memberChange === 'LEFT' || evt.memberChange === 'UNSUBSCRIBED') ? -1 : 0
           if (delta) {
             const bump = (list) => list.map(c => (
               c.id === evt.conversationId

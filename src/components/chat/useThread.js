@@ -203,6 +203,18 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
     })
   }, [])
 
+  /* postId → { added, until }. `message.comment` carries no actor, so this is
+     how my own echo is recognised and dropped. See the SSE case below. */
+  const commentEchoRef = React.useRef(new Map())
+
+  /** Move a post's comment counter now, and swallow the echo that follows. */
+  const bumpComments = React.useCallback((postId, delta) => {
+    const m = msgMapRef.current.get(postId)
+    if (!m) return
+    commentEchoRef.current.set(postId, { added: delta > 0, until: Date.now() + 10000 })
+    patchMsg(postId, { comments: Math.max(0, (m.comments ?? 0) + delta) })
+  }, [patchMsg])
+
   /* ---------------- loaders ---------------- */
 
   const reload = React.useCallback(async () => {
@@ -309,19 +321,24 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
 
   /* ---------------- send ---------------- */
 
-  const sendText = React.useCallback(async ({ body, replyToId } = {}) => {
+  const sendText = React.useCallback(async ({ body, replyToId, silent } = {}) => {
     const text = (body || '').trim()
     if (!text || !conversationId) return
     const nonce = api.chat.newNonce()
     const optimistic = buildOptimistic(nonce, { type: 'TEXT', body: text, replyToId })
-    outboxRef.current.set(nonce, { kind: 'text', body: text, replyToId })
+    outboxRef.current.set(nonce, { kind: 'text', body: text, replyToId, silent })
     setMsgMap(prev => new Map(prev).set(optimistic.id, optimistic))
     try {
-      const real = await api.chat.messages.send(conversationId, { clientNonce: nonce, type: 'TEXT', body: text, replyToId })
+      const real = await api.chat.messages.send(conversationId, { clientNonce: nonce, type: 'TEXT', body: text, replyToId, silent })
       reconcile(nonce, real)
     } catch (e) {
       markFailed(nonce)
       if (!isThrottle(e)) showToast(chatError(e, 'Message failed to send'))
+      /* A throttle is RE-THROWN, uniquely among send failures: it is the only
+         one the composer can act on (arm the slow-mode countdown from the
+         server's own Retry-After). http.js has already shown the toast, and
+         the awaiting caller catches it — nothing escapes. */
+      else throw e
     }
   }, [conversationId, buildOptimistic, reconcile, markFailed])
 
@@ -366,7 +383,9 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
         ? await api.chat.messages.sendFiles(conversationId, {
             clientNonce: nonce, body: entry.body, files: entry.files, replyToId: entry.replyToId,
           })
-        : await api.chat.messages.send(conversationId, { clientNonce: nonce, type: 'TEXT', body: entry.body, replyToId: entry.replyToId })
+        // `silent` is replayed from the outbox: a retry must not wake the
+        // subscribers that the original send deliberately did not.
+        : await api.chat.messages.send(conversationId, { clientNonce: nonce, type: 'TEXT', body: entry.body, replyToId: entry.replyToId, silent: entry.silent })
       reconcile(nonce, real)
     } catch (e) {
       markFailed(nonce)
@@ -685,6 +704,62 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
           if (evt.conversationId !== conversationId) return
           if (evt.memberChange === 'PINNED' || evt.memberChange === 'UNPINNED') reloadPinned()
           break
+
+        case 'poll.updated': {
+          /* The broadcast aggregate is viewer-NEUTRAL — it carries no
+             `myVotes`, because one payload fans out to everybody. Merging it
+             wholesale would therefore erase the viewer's own selection the
+             instant anyone else voted. Take the counts, keep mine, and
+             recompute the two flags that are derived from both. */
+          const m = msgMapRef.current.get(evt.messageId)
+          if (!m?.poll || !evt.poll) break
+          const mine = m.poll.myVotes || []
+          const total = evt.poll.totalVoters
+          patchMsg(evt.messageId, {
+            poll: {
+              ...evt.poll,
+              myVotes: mine,
+              voted: mine.length > 0,
+              revealed: evt.poll.closed || mine.length > 0,
+              options: evt.poll.options.map(o => ({
+                ...o,
+                pct: total > 0 ? Math.round((o.voterCount / total) * 100) : 0,
+                mine: mine.includes(o.index),
+              })),
+            },
+          })
+          break
+        }
+
+        case 'message.comment': {
+          /* `messageId` is the POST's id, not the comment's, and the payload
+             carries a direction rather than a count — the same delta model as
+             every other counter on this stream.
+
+             Unlike `message.reaction` this frame carries NO actor, so the
+             usual "skip my own echo" test is impossible. Instead the local
+             write arms a one-shot suppression (see `bumpComments`) and the
+             matching echo consumes it — which is what stops my own comment
+             counting twice. An echo that never arrives simply leaves an
+             expired token behind; the count is already correct. */
+          const pending = commentEchoRef.current.get(evt.messageId)
+          if (pending && pending.added === !!evt.added && Date.now() < pending.until) {
+            commentEchoRef.current.delete(evt.messageId)
+            break
+          }
+          const m = msgMapRef.current.get(evt.messageId)
+          if (!m) break
+          patchMsg(evt.messageId, {
+            comments: Math.max(0, (m.comments ?? 0) + (evt.added ? 1 : -1)),
+            /* NOT "unread comments" — there is no per-post comment read state
+               on the wire and inventing one would be a lie the moment the page
+               reloaded. This flag means only what it can honestly mean: the
+               count moved while you were looking at the post. Cleared by
+               opening the thread (`seeComments`). */
+            ...(evt.added ? { commentsUnseen: true } : null),
+          })
+          break
+        }
         default:
           break
       }
@@ -712,6 +787,15 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
   return {
     messages, loading, loadingOlder, hasMore, error,
     loadOlder, reload,
+    /* A poll write answers with the VIEWER-SPECIFIC aggregate (it carries my
+       `myVotes`), unlike the `poll.updated` broadcast — so the response is
+       applied whole. The broadcast arrives moments later and is merged
+       count-only in the SSE switch above. */
+    applyPoll: React.useCallback((id, poll) => patchMsg(id, { poll }), [patchMsg]),
+    bumpComments,
+    /** The reader opened this post's thread — the "moved under you" dot has
+     *  served its purpose and comes down. */
+    seeComments: React.useCallback((id) => patchMsg(id, { commentsUnseen: false }), [patchMsg]),
     sendText, sendFiles,
     editMessage, deleteMessage,
     toggleReaction, refreshReactions,

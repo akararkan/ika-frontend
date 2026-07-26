@@ -64,19 +64,82 @@
   color:var(--navy-deep); font:700 9px/1 var(--sans);
 }
 
-.ch-schedpop{ min-width:250px; padding:8px; }
+/* The send-later popover — a real card (it carries its OWN skin: the .ch-pop
+   wrapper is only placement, and without a background this floated as bare
+   text over the thread). Gold-kicker header, preset rows with the concrete
+   time in a chip, then the custom picker under a labelled rule. */
+.ch-schedpop{
+  min-width:268px; max-width:304px; padding:10px;
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  box-shadow:var(--shadow-lg);
+  animation:chPop .15s cubic-bezier(.22,.8,.24,1);
+}
+.ch-schedpop-head{
+  display:flex; align-items:center; gap:7px;
+  margin:2px 4px 8px;
+  font:700 11px/1 var(--sans); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--gold-deep);
+}
+.ch-schedpop-head .ico{ color:var(--gold-deep); width:14px; height:14px; }
+.ch-schedpop-queue{
+  margin-inline-start:auto; cursor:pointer;
+  border:1px solid var(--brass-soft); border-radius:999px;
+  background:var(--gold-wash); color:var(--gold-deep);
+  padding:3px 9px; font:700 10.5px/1.4 var(--sans); letter-spacing:.02em;
+  text-transform:none;
+  transition:background .14s ease, color .14s ease;
+}
+.ch-schedpop-queue:hover{ background:var(--gold); color:#fffdf8; border-color:var(--gold); }
 .ch-schedpop-hint{
-  margin:0 6px 6px; color:var(--muted); font-size:12px; line-height:1.45;
+  margin:0 4px 8px; padding:8px 10px;
+  border-radius:9px; background:var(--gold-wash);
+  color:var(--gold-deep); font-size:12px; line-height:1.45;
 }
-.ch-schedpop-custom{
-  display:block; padding:8px 6px 4px;
+.ch-schedpop-list{ display:flex; flex-direction:column; gap:1px; }
+.ch-schedpop-row{
+  display:flex; align-items:center; gap:9px; width:100%;
+  padding:9px 10px; border:0; border-radius:9px;
+  background:transparent; cursor:pointer;
+  font:500 13.5px/1 var(--sans); color:var(--ink);
+  transition:background .13s ease;
 }
-.ch-schedpop-custom > span{
-  display:block; margin-bottom:5px;
-  color:var(--ink-soft); font:600 12px/1 var(--sans);
+.ch-schedpop-row .ico{ color:var(--muted); width:13px; height:13px; flex:0 0 auto; }
+.ch-schedpop-row:hover:not(:disabled){ background:var(--blue-wash); }
+.ch-schedpop-row:hover:not(:disabled) .ico{ color:var(--navy); }
+.ch-schedpop-row:disabled{ opacity:.45; cursor:default; }
+.ch-schedpop-lbl{ flex:1; min-width:0; text-align:start; }
+.ch-schedpop-at{
+  flex:0 0 auto;
+  padding:3px 7px; border-radius:7px;
+  border:1px solid rgba(179,135,62,.25); background:var(--gold-wash);
+  color:var(--gold-deep); font:600 11.5px/1.3 var(--mono);
+  font-variant-numeric:tabular-nums;
 }
-.ch-schedpop-custom .field{ width:100%; }
-.ch-schedpop-go{ width:calc(100% - 12px); margin:6px; }
+.ch-schedpop-sep{
+  display:flex; align-items:center; gap:8px;
+  margin:9px 4px 8px;
+  color:var(--muted); font:600 10.5px/1 var(--sans);
+  letter-spacing:.07em; text-transform:uppercase;
+}
+.ch-schedpop-sep::before,
+.ch-schedpop-sep::after{ content:""; flex:1; height:1px; background:var(--line-soft); }
+.ch-schedpop-custom{ display:flex; flex-direction:column; gap:8px; padding:0 2px 2px; }
+.ch-schedpop-custom .field{
+  width:100%; height:40px;
+  font-variant-numeric:tabular-nums; font-size:13.5px;
+}
+.ch-schedpop-go{
+  width:100%; margin:0;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+}
+.ch-schedpop-go .ico{ width:13px; height:13px; }
+
+/* the native picker glyph, tinted into the theme instead of stock black */
+input.field[type="datetime-local"]{ font-variant-numeric:tabular-nums; }
+input.field[type="datetime-local"]::-webkit-calendar-picker-indicator{
+  opacity:.5; cursor:pointer;
+}
+input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opacity:.85; }
 
 /* Sent-from-here messages expire; the ones above do not. The note belongs to
    the composer for exactly that reason, so it reads as a property of what you
@@ -95,9 +158,20 @@
    3 · Header additions — call buttons, channel + TTL chips
    ========================================================= */
 
+/* The "Channel" marker in a thread header. Overrides the base .pill wash into
+   a clearer gold broadcast badge with a leading dot, so a channel reads as a
+   broadcast the moment it is opened — matching the /channels surface. */
 .ch-hd-kind{
   flex:0 0 auto;
-  font-size:10px; letter-spacing:.04em; text-transform:uppercase;
+  display:inline-flex; align-items:center; gap:5px;
+  padding-block:2px; padding-inline:8px 9px; border-radius:999px;
+  border:1px solid rgba(179,135,62,.35);
+  background:var(--gold-wash); color:var(--gold-deep);
+  font:700 10px/1.5 var(--sans); letter-spacing:.06em; text-transform:uppercase;
+}
+.ch-hd-kind::before{
+  content:""; width:6px; height:6px; border-radius:50%; flex:0 0 auto;
+  background:var(--gold); box-shadow:0 0 0 3px rgba(179,135,62,.18);
 }
 .ch-hd-ttl{
   display:inline-flex; align-items:center; gap:3px;
@@ -153,15 +227,21 @@
   color:var(--muted); font-size:12px; line-height:1.6;
 }
 
+/* Queue rows as quiet cards: gold time line, two-line body, cancel on the
+   trailing edge — the rail equivalent of the popover's design. */
 .ch-schedrow{
   display:flex; align-items:flex-start; gap:10px;
-  padding:10px 4px;
-  border-block-end:1px solid var(--line-soft);
+  padding:11px 12px; margin-block-end:8px;
+  border:1px solid var(--line-soft); border-radius:12px;
+  background:var(--card);
+  transition:border-color .15s ease, box-shadow .15s ease;
 }
+.ch-schedrow:hover{ border-color:var(--brass-soft); box-shadow:var(--shadow-sm); }
 .ch-schedrow-main{ flex:1 1 auto; min-width:0; }
 .ch-schedrow-when{
   display:flex; align-items:center; gap:5px; flex-wrap:wrap;
   color:var(--gold-deep); font:700 12px/1.5 var(--sans);
+  font-variant-numeric:tabular-nums;
 }
 .ch-schedrow-body{
   margin-block-start:3px; color:var(--ink-soft); font-size:13px; line-height:1.5;
@@ -1370,3 +1450,637 @@
    call type; ringing has to win over both, so it is restated last. A voice
    call that is still ringing is a card, not a stage. */
 .cl-overlay.ringing .cl-frame{ width:min(440px,100%); }
+
+/* =========================================================
+   20 · Channels (/channels) — the cn-* vocabulary
+   ---------------------------------------------------------
+   ChannelsPage renders a full cn-* class tree (hero, my-rail,
+   discovery grid, cards, create modal) that had no rules — the
+   page rendered as raw markup. This section is that missing
+   surface, drawn entirely from the warm token layer so it reads
+   as one system with the rest of the app.
+
+   A channel has no avatar on the wire, so its identity is
+   DERIVED: `tintOf(id)` picks one of six spine colours and
+   `crestOf` a crest letter, both deterministic. The `.tint-N`
+   classes below expose that colour to the whole card through two
+   local custom properties — `--t` (the ink) and `--tw` (its
+   wash) — so the cover, the crest and the subscribed ring all
+   agree without a single hard-coded hex per card.
+   ========================================================= */
+
+/* ---- the six-colour spine (discipline tokens, one wash each) ---- */
+.tint-0{ --t:var(--d-tafsir);  --tw:#e8eef5; }   /* navy   */
+.tint-1{ --t:var(--d-hadith);  --tw:#f4e9ed; }   /* plum   */
+.tint-2{ --t:var(--d-aqidah);  --tw:#eee9f3; }   /* violet */
+.tint-3{ --t:var(--d-fiqh);    --tw:#f2ece1; }   /* umber  */
+.tint-4{ --t:var(--d-science); --tw:#e4efef; }   /* teal   */
+.tint-5{ --t:var(--d-history); --tw:#e9f0ea; }   /* sage   */
+
+/* ---- page shell ---- */
+.cn-page .col-main{ max-width:1120px; padding-block:22px 72px; }
+
+/* =========================================================
+   20.1 · Masthead — a broadcast plate
+   The medallion emits two expanding rings; the eyebrow, serif
+   title and lede sit on a warm plate with a faint gold corner
+   glow. The CTA anchors to the end edge and drops full-width on
+   a phone.
+   ========================================================= */
+.cn-hero{
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:24px;
+  margin-bottom:28px; padding:26px 28px;
+  border:1px solid var(--line); border-radius:var(--r-xl);
+  background:
+    radial-gradient(130% 150% at 100% 0%, var(--gold-wash) 0%, rgba(246,236,216,0) 52%),
+    linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%);
+  box-shadow:var(--shadow-sm);
+}
+/* The CTA anchors to the logical end edge (margin-inline-start:auto) and so
+   mirrors in RTL; the gold glow is pinned to a physical corner and does not.
+   Flip it to the start corner so the decoration keeps warming the CTA corner. */
+[dir="rtl"] .cn-hero{
+  background:
+    radial-gradient(130% 150% at 0% 0%, var(--gold-wash) 0%, rgba(246,236,216,0) 52%),
+    linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%);
+}
+.cn-hero-art{
+  position:relative; flex:0 0 auto;
+  width:74px; height:74px; border-radius:50%;
+  display:grid; place-items:center;
+  color:var(--navy);
+  background:radial-gradient(circle at 50% 40%, #fff 0%, var(--card) 66%);
+  border:1px solid var(--brass-soft);
+  box-shadow:inset 0 1px 3px rgba(255,255,255,.9), var(--shadow-sm);
+}
+.cn-hero-art .ico{ width:32px; height:32px; }
+.cn-hero-art::before,
+.cn-hero-art::after{
+  content:""; position:absolute; inset:-1px; border-radius:50%;
+  border:1.5px solid rgba(179,135,62,.5);
+  animation:cnPulse 3.2s ease-out infinite;
+}
+.cn-hero-art::after{ animation-delay:1.6s; }
+@keyframes cnPulse{
+  0%{ transform:scale(1); opacity:.6 }
+  70%{ opacity:0 }
+  100%{ transform:scale(1.85); opacity:0 }
+}
+.cn-hero-main{ flex:1 1 auto; min-width:0; }
+.cn-eyebrow{
+  display:block;
+  font:700 11px/1 var(--sans); letter-spacing:.15em; text-transform:uppercase;
+  color:var(--gold-deep);
+}
+.cn-title{
+  margin:8px 0 0;
+  font-family:var(--serif); font-weight:600; font-size:clamp(28px,3.4vw,40px);
+  line-height:1.04; color:var(--navy-deep); letter-spacing:-.01em;
+}
+.cn-title em{ font-style:italic; color:var(--gold); }
+.cn-sub{
+  margin:11px 0 0; max-width:66ch;
+  font-size:14.5px; line-height:1.6; color:var(--ink-soft);
+}
+.cn-hero-stats{
+  margin-top:15px; display:flex; align-items:center; gap:11px;
+  font-size:13px; color:var(--muted);
+}
+.cn-hero-stats b{ color:var(--navy); font-weight:700; }
+.cn-hero-sep{ color:var(--brass-soft); }
+.cn-hero-cta{ flex:0 0 auto; margin-inline-start:auto; align-self:flex-start; }
+.cn-hero-cta .btn .ico{ margin-inline-end:2px; }
+
+/* =========================================================
+   20.2 · "Your channels" section + the return rail
+   A horizontal strip of the channels you already belong to —
+   the only surface that knows private channels and unread
+   state. Snap-scrolls; keeps the discovery grid above the fold.
+   ========================================================= */
+.cn-section{ margin:0 0 26px; }
+.cn-section-head{ display:flex; align-items:center; gap:9px; margin-bottom:13px; }
+.cn-section-t{
+  margin:0; font-family:var(--serif); font-weight:600; font-size:17px;
+  color:var(--navy-deep);
+}
+.cn-section-n{
+  display:grid; place-items:center; min-width:22px; height:22px; padding:0 7px;
+  border-radius:999px; border:1px solid var(--line);
+  background:var(--card-2); color:var(--ink-soft); font:700 12px/1 var(--sans);
+}
+.cn-rail{
+  display:flex; gap:12px; overflow-x:auto;
+  padding:2px 2px 12px; margin:0 -2px;
+  scroll-snap-type:x proximity; scrollbar-width:thin;
+  -webkit-overflow-scrolling:touch;
+}
+.cn-mine{
+  position:relative; scroll-snap-align:start;
+  flex:0 0 auto; width:min(268px,74vw);
+  display:flex; align-items:center; gap:12px;
+  padding:11px 13px; border-radius:var(--r);
+  border:1px solid var(--line); background:var(--card);
+  cursor:pointer; text-align:start;
+  transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.cn-mine:hover{ border-color:var(--gold); box-shadow:var(--shadow-sm); transform:translateY(-2px); }
+.cn-mine:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+.cn-mine-crest{
+  flex:0 0 auto; width:44px; height:44px; border-radius:13px;
+  display:grid; place-items:center;
+  background:linear-gradient(180deg, #fff, var(--tw));
+  border:1px solid var(--line); color:var(--t);
+  font-family:var(--serif); font-weight:600; font-size:20px; line-height:1;
+}
+.cn-mine-body{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.cn-mine-nm{
+  font:600 14px/1.3 var(--sans); color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cn-mine-sub{
+  margin-top:1px; font-size:12px; color:var(--ink-soft);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cn-mine-dot{
+  flex:0 0 auto; min-width:18px; height:18px; padding:0 5px;
+  display:grid; place-items:center; border-radius:999px;
+  background:var(--gold); color:var(--navy-deep); font:700 10px/1 var(--sans);
+}
+
+/* =========================================================
+   20.3 · Discovery toolbar — search + filter pills
+   ========================================================= */
+.cn-toolbar{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  margin:0 0 18px;
+}
+.cn-search{ flex:1 1 340px; height:42px; }
+.cn-search .field{ font-size:14px; }
+.cn-filters{ display:inline-flex; gap:8px; flex:0 0 auto; }
+.cn-chip{
+  height:42px; padding:0 17px; border-radius:999px;
+  border:1px solid var(--line); background:var(--card);
+  font:600 13.5px/1 var(--sans); color:var(--ink-soft);
+  cursor:pointer;
+  transition:background .14s ease, border-color .14s ease, color .14s ease;
+}
+.cn-chip:hover{ border-color:var(--blue); color:var(--navy); }
+.cn-chip.on{ background:var(--navy); border-color:var(--navy); color:#f7f3ea; }
+.cn-chip:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+
+/* =========================================================
+   20.4 · The discovery grid + the channel card
+   Cover banner (tint gradient with a broadcast-wave motif) +
+   an overlapping crest medallion straddling the seam + body +
+   a footer that carries the subscriber count and the actions.
+   ========================================================= */
+.cn-grid{
+  display:grid; gap:18px;
+  grid-template-columns:repeat(auto-fill, minmax(288px, 1fr));
+}
+
+.cn-card{
+  position:relative; display:flex; flex-direction:column;
+  border:1px solid var(--line); border-radius:var(--r-lg);
+  background:var(--card); overflow:hidden;
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.cn-card:hover{ transform:translateY(-3px); border-color:var(--gold); box-shadow:var(--shadow); }
+/* Subscribed cards carry a tint ring so the state reads at the card level, not
+   only on the flag chip — the cover, the crest and the ring now agree. .on is
+   (0,2,0), so its hover twin must restate the lift or the ring would kill it. */
+.cn-card.on{ border-color:var(--t); box-shadow:inset 0 0 0 1px var(--t); }
+.cn-card.on:hover{ transform:translateY(-3px); box-shadow:var(--shadow), inset 0 0 0 1px var(--t); }
+
+/* cover */
+.cn-card-cover{
+  position:relative; height:78px; overflow:hidden;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.16), rgba(0,0,0,.16)),
+    var(--t, var(--navy));
+}
+/* concentric broadcast rings behind where the crest sits */
+.cn-card-cover::before{
+  content:""; position:absolute; inset-block-end:-46px; inset-inline-start:8px;
+  width:128px; height:128px; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle,
+    transparent 29%, rgba(255,255,255,.13) 30%, transparent 33%,
+    transparent 45%, rgba(255,255,255,.10) 46%, transparent 49%,
+    transparent 61%, rgba(255,255,255,.07) 62%, transparent 65%);
+}
+.cn-card-mark{
+  position:absolute; inset-block-start:-10px; inset-inline-end:-8px;
+  width:66px; height:66px; color:rgba(255,255,255,.18);
+}
+.cn-card-flag{
+  position:absolute; inset-block-start:11px; inset-inline-end:11px;
+  display:inline-flex; align-items:center; gap:4px;
+  padding-block:3px; padding-inline:7px 9px; border-radius:999px;
+  background:rgba(255,253,248,.94); color:var(--good);
+  font:700 11px/1 var(--sans);
+  box-shadow:0 2px 6px rgba(20,17,12,.16);
+}
+
+/* crest — straddles the cover/body seam like a profile avatar */
+.cn-card-crest{
+  position:absolute; inset-block-start:44px; inset-inline-start:18px; z-index:2;
+  width:56px; height:56px; border-radius:16px;
+  display:grid; place-items:center;
+  background:linear-gradient(180deg, #fff, var(--tw));
+  border:3px solid var(--card); color:var(--t);
+  box-shadow:var(--shadow-sm);
+  font-family:var(--serif); font-weight:600; font-size:26px; line-height:1;
+}
+
+.cn-card-body{ flex:1; padding:34px 18px 6px; min-width:0; }
+.cn-card-title{
+  display:flex; align-items:center; flex-wrap:wrap; gap:6px;
+  margin:0; font-family:var(--serif); font-weight:600; font-size:17px;
+  line-height:1.28; color:var(--navy-deep);
+}
+.cn-tag{
+  display:inline-flex; align-items:center; gap:3px;
+  padding:2px 8px; border-radius:999px;
+  border:1px solid var(--line); background:var(--card-2); color:var(--ink-soft);
+  font:600 10.5px/1.5 var(--sans);
+}
+.cn-tag .ico{ width:11px; height:11px; }
+.cn-tag.gold{
+  border-color:rgba(179,135,62,.35); background:var(--gold-wash); color:var(--gold-deep);
+}
+.cn-card-handle{
+  margin-top:4px; font:600 12.5px/1.3 var(--mono); color:var(--blue);
+  unicode-bidi:plaintext; overflow-wrap:anywhere;
+}
+.cn-card-handle.muted{ color:var(--muted); font-family:var(--sans); font-style:italic; }
+.cn-card-desc{
+  margin:9px 0 0; font-size:13.5px; line-height:1.55; color:var(--ink-soft);
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.cn-card-desc.empty{ color:var(--muted); font-style:italic; }
+
+/* footer */
+.cn-card-foot{
+  display:flex; align-items:center; gap:10px;
+  margin-top:auto; padding:13px 16px 14px; border-top:1px solid var(--line-soft);
+}
+.cn-card-meta{
+  display:inline-flex; align-items:center; gap:5px;
+  font:600 12.5px/1 var(--sans); color:var(--ink-soft);
+}
+.cn-card-meta .ico{ width:14px; height:14px; }
+.cn-card-metaw{ font-weight:500; }
+.cn-card-acts{ margin-inline-start:auto; display:inline-flex; gap:8px; }
+
+/* action buttons — Open (ghost) · Subscribe (navy) · Subscribed (swaps to
+   Unsubscribe, in danger tint, on hover so the label can never lie). */
+.cn-btn{
+  height:34px; padding:0 14px; border-radius:9px;
+  border:1px solid var(--line); background:var(--card);
+  font:600 13px/1 var(--sans); color:var(--ink-2); white-space:nowrap;
+  cursor:pointer;
+  transition:background .14s ease, border-color .14s ease, color .14s ease;
+}
+.cn-btn:hover{ border-color:var(--navy); color:var(--navy); background:var(--card-2); }
+.cn-btn:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+.cn-btn:disabled{ opacity:.55; cursor:progress; }
+.cn-btn.primary{
+  border-color:var(--navy); background:var(--navy); color:#f7f3ea;
+  box-shadow:0 6px 14px -8px rgba(29,58,95,.55);
+}
+.cn-btn.primary:hover{ background:var(--navy-deep); border-color:var(--navy-deep); color:#fff; }
+.cn-btn.on{
+  border-color:rgba(61,107,79,.4); background:var(--good-wash); color:var(--good);
+}
+.cn-btn-a,
+.cn-btn-b{ display:inline-flex; align-items:center; gap:5px; }
+.cn-btn-b{ display:none; }
+.cn-btn.on:hover,
+.cn-btn.on:focus-visible{ border-color:rgba(160,62,54,.45); background:#faeeec; color:var(--danger); }
+.cn-btn.on:hover .cn-btn-a,
+.cn-btn.on:focus-visible .cn-btn-a{ display:none; }
+.cn-btn.on:hover .cn-btn-b,
+.cn-btn.on:focus-visible .cn-btn-b{ display:inline-flex; }
+
+/* preview card (inside the create modal) — a still life, not a control */
+.cn-card.preview{ box-shadow:var(--shadow-sm); }
+.cn-card.preview:hover{ transform:none; border-color:var(--line); box-shadow:var(--shadow-sm); }
+
+/* entrance — a light rise, staggered across the first row */
+@keyframes cnRise{ from{ opacity:0; transform:translateY(9px) } to{ opacity:1; transform:none } }
+.cn-grid > .cn-card:not(.cn-skel){ animation:cnRise .34s ease both; }
+.cn-grid > .cn-card:nth-child(2){ animation-delay:.04s }
+.cn-grid > .cn-card:nth-child(3){ animation-delay:.08s }
+.cn-grid > .cn-card:nth-child(4){ animation-delay:.12s }
+.cn-grid > .cn-card:nth-child(5){ animation-delay:.16s }
+.cn-grid > .cn-card:nth-child(6){ animation-delay:.20s }
+.cn-grid > .cn-card:nth-child(7){ animation-delay:.24s }
+.cn-grid > .cn-card:nth-child(8){ animation-delay:.28s }
+
+/* =========================================================
+   20.5 · Loading skeletons — same geometry so nothing resettles
+   ========================================================= */
+.cn-skel{ pointer-events:none; }
+.cn-skel .cn-card-cover{ background:var(--card-2); }
+.cn-skel .cn-card-crest{
+  background:var(--line-soft); color:transparent; box-shadow:none;
+}
+.cn-skel .cn-card-body{ padding:34px 18px 16px; }
+.cn-skel .cn-card-foot{ border-top:1px solid var(--line-soft); }
+.cn-skel-line{
+  height:11px; border-radius:6px; margin-top:11px;
+  background:linear-gradient(90deg, var(--line-soft) 25%, var(--card-2) 37%, var(--line-soft) 63%);
+  background-size:220% 100%; animation:chShimmer 1.5s ease-in-out infinite;
+}
+.cn-skel-line.w30{ width:30% } .cn-skel-line.w40{ width:40% }
+.cn-skel-line.w60{ width:60% } .cn-skel-line.w75{ width:75% }
+.cn-skel-line.w90{ width:90% }
+
+/* =========================================================
+   20.6 · Create-channel modal — form beside a live preview
+   Widens the shared .ch-modal shell and lays the body out as
+   two columns; the preview is the only place a channel's crest
+   and handle are seen together before it exists.
+   ========================================================= */
+.cn-modal{ max-width:680px; }
+.ch-modal-body.cn-modal-body{
+  display:grid; grid-template-columns:minmax(0,1fr) 268px; gap:24px;
+  padding:20px 18px;
+}
+.cn-form{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.cn-field{ display:flex; flex-direction:column; gap:6px; }
+.cn-field > span{ font:600 13px/1 var(--sans); color:var(--ink-2); }
+.cn-field > span small{
+  margin-inline-start:6px; font-weight:500; font-size:11.5px; color:var(--muted);
+}
+.cn-field textarea.field{ resize:vertical; min-height:74px; line-height:1.5; }
+
+/* visibility row — refines the shared .ci-row into a bordered card */
+.cn-visrow{
+  align-items:flex-start; gap:11px; padding:12px 13px;
+  border:1px solid var(--line); border-radius:var(--r-sm); background:var(--card-2);
+}
+.cn-visrow > .ico{ margin-top:2px; color:var(--gold-deep); }
+
+/* @handle input with availability states. A @handle is a Latin identifier, so
+   the whole group (sigil · input · check) is forced LTR as one atomic unit —
+   direction on the container, not just the field, or in RTL the flex axis
+   reverses and the @ detaches to the far edge. */
+.cn-handle{
+  display:flex; align-items:center; direction:ltr;
+  border:1px solid #ddd4c0; border-radius:10px; background:#fcfaf4;
+  padding-inline-start:12px; overflow:hidden;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.cn-handle:focus-within{ border-color:var(--blue); box-shadow:0 0 0 3px rgba(45,95,151,.12); }
+.cn-handle > span[aria-hidden]{ color:var(--muted); font:600 14.5px/1 var(--mono); }
+.cn-handle .field{
+  flex:1; min-width:0; direction:ltr;
+  border:0; background:transparent; box-shadow:none;
+  padding-inline:6px 10px; font-family:var(--mono); font-size:14px;
+}
+.cn-handle .field:focus{ border:0; box-shadow:none; }
+.cn-handle.ok{ border-color:var(--good); }
+.cn-handle.ok:focus-within{ box-shadow:0 0 0 3px rgba(61,107,79,.14); }
+.cn-handle.bad{ border-color:var(--danger); }
+.cn-handle.bad:focus-within{ box-shadow:0 0 0 3px rgba(160,62,54,.14); }
+.cn-handle-spin{
+  flex:0 0 auto; width:14px; height:14px; margin-inline-end:10px;
+  border-radius:50%;
+  border:2px solid rgba(45,95,151,.25); border-top-color:var(--blue);
+  animation:cnSpin .7s linear infinite;
+}
+@keyframes cnSpin{ to{ transform:rotate(360deg) } }
+.cn-handle-ok{ margin-inline-end:10px; color:var(--good); flex:0 0 auto; }
+.cn-hint{ font-size:12px; line-height:1.4; color:var(--ink-soft); }
+.cn-hint.ok{ color:var(--good); }
+.cn-hint.bad{ color:var(--danger); }
+
+/* preview column */
+.cn-preview{ display:flex; flex-direction:column; gap:9px; min-width:0; }
+.cn-preview-label{
+  font:700 10.5px/1 var(--sans); letter-spacing:.13em; text-transform:uppercase;
+  color:var(--muted);
+}
+
+/* =========================================================
+   20.7 · Responsive
+   ========================================================= */
+@media (max-width:900px){
+  .ch-modal-body.cn-modal-body{ grid-template-columns:1fr; gap:18px; }
+  .cn-preview{ order:-1; }                 /* show the card first on a phone */
+}
+@media (max-width:720px){
+  /* the shared shell becomes a full-bleed bottom sheet here (chat.css §9);
+     the desktop 680px cap loads later, so it must be released explicitly. */
+  .cn-modal{ max-width:none; }
+  .cn-hero{ flex-direction:column; align-items:flex-start; gap:16px; padding:22px; }
+  .cn-hero-cta{ margin-inline-start:0; width:100%; }
+  .cn-hero-cta .btn{ width:100%; justify-content:center; }
+  .cn-toolbar{ gap:10px; }
+  .cn-search{ flex:1 1 100%; }
+  .cn-filters{ width:100%; overflow-x:auto; scrollbar-width:none; }
+  .cn-filters::-webkit-scrollbar{ display:none; }
+  .cn-chip{ flex:0 0 auto; }
+  .cn-grid{ grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); }
+}
+@media (max-width:560px){
+  .cn-page .col-main{ padding-block:14px 64px; }
+  .cn-grid{ grid-template-columns:1fr; }
+}
+
+/* =========================================================
+   20.8 · Reduced motion — kill lift, pulse, shimmer, spinner
+   ========================================================= */
+@media (prefers-reduced-motion:reduce){
+  .cn-card, .cn-mine{ transition:none; }
+  .cn-card:hover, .cn-mine:hover{ transform:none; }
+  .cn-grid > .cn-card:not(.cn-skel){ animation:none; }
+  .cn-hero-art::before, .cn-hero-art::after{ animation:none; opacity:0; }
+  .cn-skel-line{ animation:none; background:var(--line-soft); }
+  .cn-handle-spin{ animation:none; }
+}
+
+/* =========================================================
+   21 · Chat surface polish — reactions · replies · media · voice
+   ---------------------------------------------------------
+   Elevates the four richest message surfaces. Loads after
+   chat.css §5/§6/§12, so equal-specificity rules here win on
+   source order (the same mechanism §12 already uses for voice).
+   Every invariant those sections document is preserved:
+     · the .ch-meta float shape (untouched)
+     · media INTRINSIC sizing — only composited transforms are
+       added, never width/height, so MessageList's prepend
+       scroll-anchoring still measures a stable scrollHeight
+     · the --p waveform mechanism and its RTL clip-path twin
+     · the z-index ladder (menu 100 · sheet 140 · lightbox 150)
+     · RTL logical properties throughout
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   21.1 · Bubbles — a whisper of depth on my own side
+   A vertical navy gradient (tokens only) gives the sent bubble
+   a light source without touching layout, contrast or the tail.
+   .failed / .deleted keep their higher-specificity overrides.
+   --------------------------------------------------------- */
+.ch-row.mine .ch-bubble{
+  background:linear-gradient(180deg, var(--navy), var(--navy-deep));
+}
+
+/* ---------------------------------------------------------
+   21.2 · Reactions — chips that float, pop in, and lift
+   --------------------------------------------------------- */
+.ch-reacts{ gap:5px; }
+.ch-react{
+  padding:2px 9px; font-size:13px;
+  box-shadow:0 2px 8px -4px rgba(34,30,23,.24);
+  transition:transform .14s cubic-bezier(.34,1.4,.5,1),
+             box-shadow .14s ease, border-color .14s ease, background .14s ease;
+  /* NO fill-mode: a held `both`/`forwards` final keyframe (scale(1)) sits above
+     normal author rules in the cascade and would permanently suppress the
+     :hover/:active transforms below. The end state equals the resting state and
+     there is no delay, so dropping the fill causes no flash. */
+  animation:chReactPop .34s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes chReactPop{ 0%{ transform:scale(0) } 60%{ transform:scale(1.16) } 100%{ transform:scale(1) } }
+.ch-react:hover{
+  transform:translateY(-2px);
+  border-color:var(--blue);
+  box-shadow:0 7px 16px -5px rgba(34,30,23,.3);
+}
+.ch-react:active{ transform:scale(.9); }
+.ch-react.mine{
+  border-color:var(--navy);
+  box-shadow:0 2px 10px -4px rgba(29,58,95,.38);
+}
+.ch-react.mine:hover{ box-shadow:0 8px 18px -6px rgba(29,58,95,.42); }
+
+/* quick-react strip — larger glyphs, a gold hover swell, cascade-in */
+.ch-quickreact{ gap:3px; padding:5px 7px; }
+.ch-qr{
+  width:34px; height:34px; font-size:20px;
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1), background .14s ease;
+}
+.ch-qr:hover{ background:var(--gold-wash); transform:scale(1.3) translateY(-2px); }
+.ch-qr:active{ transform:scale(1.06); }
+/* `backwards` (not `both`): the per-child delays need the `from` state held
+   BEFORE each glyph starts (no pre-start flash), but the final keyframe must
+   NOT persist afterwards or it would outrank :hover/:active in the cascade. */
+.ch-quickreact .ch-qr{ animation:chQrIn .26s cubic-bezier(.34,1.56,.64,1) backwards; }
+.ch-quickreact .ch-qr:nth-child(1){ animation-delay:.01s }
+.ch-quickreact .ch-qr:nth-child(2){ animation-delay:.04s }
+.ch-quickreact .ch-qr:nth-child(3){ animation-delay:.07s }
+.ch-quickreact .ch-qr:nth-child(4){ animation-delay:.10s }
+.ch-quickreact .ch-qr:nth-child(5){ animation-delay:.13s }
+.ch-quickreact .ch-qr:nth-child(6){ animation-delay:.16s }
+@keyframes chQrIn{ from{ opacity:0; transform:scale(.4) translateY(5px) } to{ opacity:1; transform:none } }
+/* touch sheet: a firm tactile swell on press */
+.ch-sheet .ch-qr:active{ background:var(--gold-wash); transform:scale(1.12); }
+
+/* ---------------------------------------------------------
+   21.3 · Reply quote + composer reply banner
+   The in-bubble quote reads as a nested card; the composer
+   context strip slides down as it appears.
+   --------------------------------------------------------- */
+.ch-quote{
+  border-radius:9px; padding:6px 11px; margin-bottom:6px;
+  background:linear-gradient(180deg, var(--card-2), var(--card));
+}
+.ch-quote-who{ display:flex; align-items:center; gap:4px; margin-bottom:1px; letter-spacing:.01em; }
+.ch-quote-txt{ line-height:1.4; }
+
+.ch-ctx{ border-radius:11px; animation:chCtxIn .2s ease-out; }
+@keyframes chCtxIn{ from{ opacity:0; transform:translateY(6px) } to{ opacity:1; transform:none } }
+.ch-ctx-x{ transition:background .13s ease, color .13s ease, transform .1s ease; }
+.ch-ctx-x:active{ transform:scale(.9); }
+
+/* ---------------------------------------------------------
+   21.4 · Media — hover-zoom tiles, frosted overlays, glass play
+   Only transform/filter change on hover — never geometry — so
+   the intrinsic-size contract in §chat-extras 11 is untouched.
+   --------------------------------------------------------- */
+.ch-media{ border-radius:14px; }
+.ch-asset img, .ch-asset video{ transition:transform .34s cubic-bezier(.2,.7,.3,1); }
+.ch-asset:hover img{ transform:scale(1.05); }
+.ch-asset:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; border-radius:6px; }
+/* the video tile scales too, but its play glyph still fades for the preview */
+.ch-asset-video:hover video{ transform:scale(1.04); }
+
+.ch-asset-play{
+  background:radial-gradient(circle at 50% 40%, rgba(22,40,63,.74), rgba(22,40,63,.5));
+  box-shadow:0 8px 22px -8px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.2);
+}
+.ch-asset-more{
+  background:linear-gradient(180deg, rgba(22,40,63,.34), rgba(22,40,63,.68));
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  font-size:22px; letter-spacing:.02em;
+}
+
+/* file rows lift on hover */
+.ch-file{ transition:border-color .14s ease, transform .14s ease, box-shadow .14s ease, background .14s ease; }
+.ch-file:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); }
+.ch-file-ico{ background:linear-gradient(180deg, var(--blue-wash), var(--card-2)); }
+
+/* lightbox — a deep, frosted stage with tactile chrome */
+.ch-lightbox{
+  background:rgba(16,14,11,.82);
+  backdrop-filter:blur(12px) saturate(118%); -webkit-backdrop-filter:blur(12px) saturate(118%);
+}
+.ch-lightbox-x, .ch-lightbox-dl, .ch-lightbox-nav{
+  border:1px solid rgba(255,253,248,.16);
+  transition:background .16s ease, transform .16s ease, border-color .16s ease;
+}
+.ch-lightbox-x:hover, .ch-lightbox-nav:hover{ transform:scale(1.08); border-color:rgba(255,253,248,.3); }
+.ch-lightbox-x:active, .ch-lightbox-nav:active{ transform:scale(.94); }
+.ch-lightbox-dl:hover{ transform:translateY(-1px); }
+
+/* ---------------------------------------------------------
+   21.5 · Hover action rail — one grouped floating toolbar
+   Individual bordered squares become a single card pill that
+   rises into place. Desktop only (the rail is display:none
+   under 720px; touch uses the long-press sheet).
+   --------------------------------------------------------- */
+.ch-tools{
+  gap:2px; padding:3px;
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  box-shadow:var(--shadow);
+  transform:translateY(4px);
+  transition:opacity .14s ease, transform .17s cubic-bezier(.22,.8,.24,1);
+}
+.ch-row:hover .ch-tools,
+.ch-row:focus-within .ch-tools,
+.ch-tools.open{ transform:none; }
+.ch-tool{
+  width:30px; height:30px; border-radius:8px;
+  border:1px solid transparent; background:transparent; box-shadow:none;
+}
+.ch-tool:hover{ background:var(--card-2); color:var(--navy); border-color:transparent; }
+
+/* ---------------------------------------------------------
+   21.6 · Voice — a glossier play button (mechanism untouched)
+   --------------------------------------------------------- */
+.ch-voice-play{
+  background:linear-gradient(180deg, var(--blue), var(--navy));
+  box-shadow:0 5px 14px -6px rgba(29,58,95,.6);
+}
+.ch-voice-play:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+.ch-row.mine .ch-voice-play{ box-shadow:0 5px 14px -7px rgba(0,0,0,.35); }
+
+/* ---------------------------------------------------------
+   21.7 · Reduced motion — strip every transform/entrance added above
+   --------------------------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  .ch-react{ animation:none; }
+  .ch-react, .ch-qr, .ch-ctx-x, .ch-file, .ch-asset img, .ch-asset video{ transition:none; }
+  .ch-react:hover, .ch-react:active,
+  .ch-qr:hover, .ch-qr:active, .ch-sheet .ch-qr:active, .ch-ctx-x:active,
+  .ch-file:hover, .ch-asset:hover img, .ch-asset-video:hover video,
+  .ch-lightbox-x:hover, .ch-lightbox-nav:hover,
+  .ch-lightbox-x:active, .ch-lightbox-nav:active,
+  .ch-lightbox-dl:hover{ transform:none; }
+  .ch-quickreact .ch-qr{ animation:none; }
+  .ch-ctx{ animation:none; }
+  .ch-tools{ transform:none; transition:opacity .14s ease; }
+}

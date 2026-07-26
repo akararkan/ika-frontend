@@ -10,7 +10,46 @@ export default defineConfig(({ mode }) => {
   // leave VITE_API_BASE_URL empty so the client uses relative URLs.
   const proxyTarget = env.VITE_DEV_PROXY
   const proxy = proxyTarget
-    ? { '/api': { target: proxyTarget, changeOrigin: true, ws: true } }
+    ? {
+        '/api': {
+          target: proxyTarget,
+          changeOrigin: true,
+          ws: true,
+          /* A down backend is a NORMAL state of this dev loop (every IntelliJ
+             restart takes :8080 away for ~30s), and the default behaviour was
+             the worst of both worlds: a full AggregateError STACK TRACE per
+             failed request — and the app retries constantly (SSE reconnect,
+             token refresh), so a restart printed dozens of them — while the
+             browser saw only a hung socket.
+
+             Instead: one throttled, human line per outage window, and a real
+             `503 { errorCode: BACKEND_DOWN }` to the browser so the app's own
+             error states render instead of requests dangling. The envelope
+             matches the backend's, so http.js parses it like any other error. */
+          configure(proxyServer) {
+            let lastLog = 0
+            proxyServer.on('error', (err, req, res) => {
+              const now = Date.now()
+              if (now - lastLog > 5000) {
+                lastLog = now
+                console.warn(
+                  `[api-proxy] backend unreachable at ${proxyTarget} (${err.code}) — ` +
+                  'is the Spring app running? Requests get a 503 until it is back.',
+                )
+              }
+              // WebSocket upgrades hand over a bare socket, not a response.
+              if (!res || typeof res.writeHead !== 'function') { req?.socket?.destroy?.(); return }
+              if (!res.headersSent) {
+                res.writeHead(503, { 'Content-Type': 'application/json' })
+              }
+              res.end(JSON.stringify({
+                errorCode: 'BACKEND_DOWN',
+                message: 'The backend is not running (dev proxy could not connect).',
+              }))
+            })
+          },
+        },
+      }
     : undefined
 
   return {

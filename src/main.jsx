@@ -27,6 +27,17 @@ import './styles/warm/chat.css'
    chat.css (several rules re-skin its classes at equal specificity and win on
    source order) and still before responsive.css. */
 import './styles/warm/chat-extras.css'
+/* Handoff #3 redesign layer for Messages · Channels · Live. Must sit AFTER
+   chat.css + chat-extras.css (it refines their shared .cv-/.ch-/.cn-/.lv-
+   classes and wins on source order) and BEFORE responsive.css so the mobile
+   one-pane collapse still has the final say. Style-only; no markup changes. */
+import './styles/warm/ika-messages-theme.css'
+/* The channel build-out: profile page, management console, stories,
+   highlights, statistics, and the typed message payloads (poll / location /
+   contact / video note). Sits AFTER the theme layer because a handful of its
+   rules extend shared `.cn-`/`.ch-` classes and must win on source order —
+   and still BEFORE responsive.css, which keeps the last word on layout. */
+import './styles/warm/channels-pro.css'
 import './styles/warm/responsive.css'
 
 import App from './App.jsx'

@@ -432,7 +432,9 @@ export function ConversationInfo({
 
   const copyInvite = async () => {
     if (!invite?.token) return
-    const url = `${window.location.origin}/chat/join/${invite.token}`
+    // The server now mints a ready-to-share {base-url}/join/{token} — prefer
+    // it (it survives base-url changes); fall back to the local route.
+    const url = invite.shareUrl || `${window.location.origin}/join/${invite.token}`
     try { await navigator.clipboard.writeText(url); showToast('Invite link copied') }
     catch { showToast('Could not copy the link') }
   }
@@ -759,14 +761,17 @@ export function ConversationInfo({
           </div>
         )}
 
-        {/* ----- invite link ----- */}
-        {isGroup && can('CREATE_INVITE', myRole, settings) && (
+        {/* ----- invite link -----
+            Groups AND channels: a PRIVATE channel has no public @handle URL,
+            so an invite link is the only way to share it (the backend now
+            accepts CHANNEL-typed conversations on the invite endpoints). */}
+        {(isGroup || convo.isChannel) && can('CREATE_INVITE', myRole, settings) && (
           <div className="ci-section">
             <div className="ci-label">Invite link</div>
             <div className="ci-invite">
               {invite?.token ? (
                 <>
-                  <div className="ci-invite-token">{`${window.location.origin}/chat/join/${invite.token}`}</div>
+                  <div className="ci-invite-token">{invite.shareUrl || `${window.location.origin}/join/${invite.token}`}</div>
                   <div className="ci-row-sub" style={{ marginBottom: 8 }}>
                     Shown once — copy it now. Creating a new link revokes this one.
                   </div>
@@ -779,7 +784,7 @@ export function ConversationInfo({
               ) : (
                 <>
                   <div className="ci-row-sub" style={{ marginBottom: 9 }}>
-                    Create a link anyone can use to join this group. It expires in 7 days.
+                    Create a link anyone can use to join this {convo.isChannel ? 'channel' : 'group'}. It expires in 7 days.
                   </div>
                   <div className="ci-invite-actions">
                     <button type="button" className="rq-btn primary" onClick={makeInvite}>Create link</button>

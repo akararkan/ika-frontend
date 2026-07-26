@@ -246,6 +246,25 @@ export function VideoPlayer({
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [])
 
+  /* React has NO synthetic picture-in-picture events — passing
+     onEnterPictureInPicture/onLeavePictureInPicture as JSX props is silently
+     ignored (console warning), so the `pip` flag never updated and the PiP
+     button's pressed state was dead. Native listeners are the only way to
+     observe entry/exit — including an exit made from the browser's own PiP
+     window chrome, which never goes through togglePip. */
+  React.useEffect(() => {
+    const v = videoRef.current
+    if (!v) return undefined
+    const onEnter = () => setPip(true)
+    const onLeave = () => setPip(false)
+    v.addEventListener('enterpictureinpicture', onEnter)
+    v.addEventListener('leavepictureinpicture', onLeave)
+    return () => {
+      v.removeEventListener('enterpictureinpicture', onEnter)
+      v.removeEventListener('leavepictureinpicture', onLeave)
+    }
+  }, [])
+
   const togglePip = React.useCallback(async () => {
     const v = videoRef.current
     if (!v || !document.pictureInPictureEnabled) return
@@ -335,8 +354,6 @@ export function VideoPlayer({
           }
           setBuffered(Math.min(1, end / total))
         }}
-        onEnterPictureInPicture={() => setPip(true)}
-        onLeavePictureInPicture={() => setPip(false)}
         onTimeUpdate={() => { if (!playing) paint() }}
       />
 

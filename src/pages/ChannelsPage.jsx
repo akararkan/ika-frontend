@@ -14,9 +14,11 @@
 
    Subscription state comes back on every ChannelResponse, and
    both writes are idempotent, so the toggle is safe to
-   double-fire. A public channel's full history is visible to a
-   brand-new subscriber, which is why "Open" is offered before
-   "Subscribe" rather than after.
+   double-fire. The backend floors every conversation read at
+   MEMBERSHIP — a public channel 403s (NOT_A_MEMBER) until you
+   subscribe — so "Open" on a channel you're not in silently
+   subscribes first (idempotent) and then navigates; the full
+   history is visible from the moment you're a subscriber.
 
    Two sources, one page — and they are not interchangeable:
      · DISCOVERY (`/channels/discover`) returns PUBLIC channels
@@ -30,11 +32,14 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Icon, showToast } from '../components/ui.jsx'
+import { Icon, showToast, Verify } from '../components/ui.jsx'
 import { EmptyState, ErrorState } from '../components/states.jsx'
+import { openShare } from '../components/ShareSheet.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
 import { chatError } from '../components/chat/chatErrors.js'
+import { tintOf, crestOf, nfmt } from '../components/channels/channelArt.js'
+import { ChannelStoryTray } from '../components/channels/ChannelStories.jsx'
 
 const HANDLE_RE = /^[a-z0-9_]{3,32}$/
 
@@ -44,29 +49,11 @@ const FILTERS = [
   ['mine', 'Yours'],
 ]
 
-/* A channel has no avatar on the wire, so its art is DERIVED — deterministic
-   from the id, which means the same channel wears the same colour on every
-   device and every reload. The six tints are the discipline spine colours
-   already in the token layer, so nothing new enters the palette. */
-function tintOf(id) {
-  const s = String(id || '')
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 997
-  return h % 6
-}
-
-/** First letter of the title, for the crest. Falls back to the handle. */
-function crestOf(ch) {
-  const src = (ch.title || ch.handle || '#').trim()
-  return [...src][0]?.toUpperCase() || '#'
-}
-
-function nfmt(n) {
-  const v = Number(n) || 0
-  if (v < 1000) return String(v)
-  if (v < 1000000) return `${(v / 1000).toFixed(v < 10000 ? 1 : 0).replace('.0', '')}k`
-  return `${(v / 1000000).toFixed(1).replace('.0', '')}M`
-}
+/* The directory slugs the backend's `category=` filter understands. They are
+   free-form on the wire (any ≤48-char slug), so this list is a set of
+   SHORTCUTS, not a closed vocabulary — a channel in an unlisted category is
+   still found by the text query. */
+const CATEGORIES = ['science', 'history', 'language', 'law', 'literature', 'technology']
 
 /* ---------------------------------------------------------
    Create — with a live preview of the card it will become.
@@ -74,13 +61,25 @@ function nfmt(n) {
    handle and its crest, and both are decided in this form with
    no other chance to see them together before it exists.
    --------------------------------------------------------- */
-function CreateChannel({ onClose, onCreated }) {
+function CreateChannel({ onClose, onCreated, cats = [] }) {
   const [title, setTitle] = React.useState('')
   const [handle, setHandle] = React.useState('')
   const [description, setDescription] = React.useState('')
+  const [category, setCategory] = React.useState('')
   const [isPublic, setIsPublic] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
   const [taken, setTaken] = React.useState(null)     // null | 'checking' | true | false
+
+  /* Art picked BEFORE the channel exists. The create endpoint is JSON-only, so
+     the files are held locally (object-URL previews) and uploaded through the
+     ordinary photo/cover endpoints right after create — one flow to the user. */
+  const [photoFile, setPhotoFile] = React.useState(null)
+  const [coverFile, setCoverFile] = React.useState(null)
+  const photoUrl = React.useMemo(() => (photoFile ? URL.createObjectURL(photoFile) : null), [photoFile])
+  const coverUrl = React.useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : null), [coverFile])
+  React.useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl) }, [photoUrl])
+  React.useEffect(() => () => { if (coverUrl) URL.revokeObjectURL(coverUrl) }, [coverUrl])
+  const pickFile = (set) => (e) => { set(e.target.files?.[0] || null); e.target.value = '' }
 
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -103,7 +102,7 @@ function CreateChannel({ onClose, onCreated }) {
     let alive = true
     setTaken('checking')
     const t = setTimeout(async () => {
-      const found = await api.chat.channels.byHandle(cleanHandle).catch(() => null)
+      const found = await api.channels.byHandle(cleanHandle).catch(() => null)
       if (alive) setTaken(!!found)
     }, 420)
     return () => { alive = false; clearTimeout(t) }
@@ -113,14 +112,26 @@ function CreateChannel({ onClose, onCreated }) {
     if (!canSubmit) return
     setBusy(true)
     try {
-      const ch = await api.chat.channels.create({
+      const ch = await api.channels.create({
         title: title.trim(),
         description: description.trim() || undefined,
         handle: isPublic ? cleanHandle : undefined,
         publicChannel: isPublic,
+        category: category.trim() || undefined,
       })
+      /* Art is best-effort: the channel exists either way, and a failed image
+         is re-uploadable from Manage — never roll a created channel back. */
+      let final = ch
+      if (photoFile) {
+        try { final = await api.channels.photo(ch.id, photoFile) }
+        catch { showToast('The photo could not be uploaded — add it later from Manage') }
+      }
+      if (coverFile) {
+        try { final = await api.channels.cover(ch.id, coverFile) }
+        catch { showToast('The cover could not be uploaded — add it later from Manage') }
+      }
       showToast('Channel created')
-      onCreated?.(ch)
+      onCreated?.(final)
     } catch (e) {
       showToast(chatError(e, 'Could not create the channel'))
     } finally {
@@ -135,6 +146,8 @@ function CreateChannel({ onClose, onCreated }) {
     description: description.trim(),
     publicChannel: isPublic,
     subscriberCount: 1,
+    coverUrl,
+    avatarUrl: photoUrl,
   }
 
   return (
@@ -150,6 +163,47 @@ function CreateChannel({ onClose, onCreated }) {
 
         <div className="ch-modal-body cn-modal-body">
           <div className="cn-form">
+            {/* Identity banner — cover and photo are pickable from the start,
+                previewed live with the same art the card will wear. */}
+            <div className={'cm-art cn-create-art tint-' + tintOf(cleanHandle || title)}>
+              <div className={'cm-art-cover' + (coverUrl ? ' has-img' : '')}
+                style={coverUrl ? { '--cover': `url("${coverUrl}")` } : undefined}>
+                <div className="cm-art-acts">
+                  <label className="cm-art-btn">
+                    <Icon name="image" className="xs"/>
+                    {coverUrl ? 'Replace cover' : 'Add cover'}
+                    <input type="file" accept="image/*" hidden onChange={pickFile(setCoverFile)}/>
+                  </label>
+                  {coverUrl && (
+                    <button type="button" className="cm-art-btn" onClick={() => setCoverFile(null)}
+                      aria-label="Remove the cover" title="Remove the cover">
+                      <Icon name="trash" className="xs"/>
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="cm-art-id">
+                <div className="cm-art-photo">
+                  {photoUrl
+                    ? <img src={photoUrl} alt=""/>
+                    : <span className="cm-art-crest" aria-hidden="true">{crestOf({ title })}</span>}
+                  <label className="cm-art-cam" title={photoUrl ? 'Replace the photo' : 'Add a photo'}>
+                    <Icon name="image" className="xs"/>
+                    <input type="file" accept="image/*" hidden onChange={pickFile(setPhotoFile)}/>
+                  </label>
+                </div>
+                <div className="cm-art-meta">
+                  <div className="cm-art-name" dir="auto">{title.trim() || 'Your channel'}</div>
+                  <div className="cm-art-sub">
+                    {isPublic ? (cleanHandle ? '@' + cleanHandle : 'public channel') : 'private channel'}
+                  </div>
+                </div>
+                {photoUrl && (
+                  <button type="button" className="cn-btn cm-art-clear" onClick={() => setPhotoFile(null)}>Remove</button>
+                )}
+              </div>
+            </div>
+
             <label className="cn-field">
               <span>Name</span>
               <input className="field" value={title} autoFocus maxLength={120}
@@ -161,6 +215,15 @@ function CreateChannel({ onClose, onCreated }) {
               <textarea className="field" rows={3} maxLength={500} value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="What this channel publishes…"/>
+            </label>
+
+            <label className="cn-field">
+              <span>Category <small>optional — where it sits in the directory</small></span>
+              <input className="field" value={category} maxLength={48} list="cn-cat-list"
+                onChange={e => setCategory(e.target.value)} placeholder="science"/>
+              <datalist id="cn-cat-list">
+                {(cats.length ? cats : CATEGORIES).map(c => <option key={c} value={c}/>)}
+              </datalist>
             </label>
 
             <div className="ci-row cn-visrow">
@@ -221,35 +284,50 @@ function CreateChannel({ onClose, onCreated }) {
 /* ---------------------------------------------------------
    One discovery card.
    --------------------------------------------------------- */
-function ChannelCard({ ch, onOpen, onToggle, busy, mine, preview }) {
+function ChannelCard({ ch, onOpen, onToggle, onProfile, busy, mine, preview }) {
   /* Two cases where there is no subscribe toggle to offer:
        · the OWNER — the API refuses to let them unsubscribe from their own
          channel, so a control that can only 403 is worse than none;
        · a PRIVATE channel — self-subscribe is rejected; you get in through a
          group invite link. Discovery only returns public channels, so this
-         arm is reachable only via a direct @handle lookup. */
+         arm is reachable only via a direct @handle lookup.
+     A third state now sits between subscribed and not: a `joinByRequest`
+     channel where I am WAITING. There is nothing to toggle there either — a
+     second subscribe would only re-file the request I already have. */
   const isOwner = !!mine && String(ch.ownerId) === String(mine)
-  const canToggle = !isOwner && (ch.publicChannel || ch.subscribed)
+  const canToggle = !isOwner && !ch.pendingJoinRequest && (ch.publicChannel || ch.subscribed)
 
   return (
     <article className={'cn-card tint-' + tintOf(ch.id) + (ch.subscribed ? ' on' : '') + (preview ? ' preview' : '')}>
-      <div className="cn-card-cover" aria-hidden="true">
-        <Icon name="broadcast" className="cn-card-mark"/>
+      {/* `--cover`, not `background-image` — the sheet layers it over the
+          card's tint so a broken cover falls back to the derived art. */}
+      <div className={'cn-card-cover' + (ch.coverUrl ? ' has-img' : '')}
+        style={ch.coverUrl ? { '--cover': `url("${encodeURI(ch.coverUrl)}")` } : undefined}
+        aria-hidden="true">
+        {!ch.coverUrl && <Icon name="broadcast" className="cn-card-mark"/>}
         {ch.subscribed && !preview && (
           <span className="cn-card-flag"><Icon name="check" className="xs"/>Subscribed</span>
         )}
+        {ch.pendingJoinRequest && !preview && (
+          <span className="cn-card-flag wait"><Icon name="hourglass" className="xs"/>Waiting</span>
+        )}
       </div>
 
-      <div className="cn-card-crest" aria-hidden="true">{crestOf(ch)}</div>
+      {/* The uploaded photo when there is one; the derived crest underneath it
+          always, so a channel that clears its photo does not change colour. */}
+      <div className="cn-card-crest" aria-hidden="true">
+        {ch.avatarUrl ? <img src={ch.avatarUrl} alt="" loading="lazy"/> : crestOf(ch)}
+      </div>
 
       <div className="cn-card-body">
         <h3 className="cn-card-title" dir="auto">
           {ch.title}
+          {ch.verified && <Verify/>}
           {!ch.publicChannel && <span className="cn-tag"><Icon name="lock" className="xs"/>Private</span>}
           {isOwner && <span className="cn-tag gold"><Icon name="crown" className="xs"/>Yours</span>}
         </h3>
         {ch.handle
-          ? <div className="cn-card-handle">@{ch.handle}</div>
+          ? <div className="cn-card-handle">@{ch.handle}{ch.category && <span className="cn-card-cat">{ch.category}</span>}</div>
           : <div className="cn-card-handle muted">invite only</div>}
         {ch.description
           ? <p className="cn-card-desc" dir="auto">{ch.description}</p>
@@ -262,9 +340,24 @@ function ChannelCard({ ch, onOpen, onToggle, busy, mine, preview }) {
           {nfmt(ch.subscriberCount)}<span className="cn-card-metaw">
             &nbsp;subscriber{ch.subscriberCount === 1 ? '' : 's'}
           </span>
+          {ch.postCount > 0 && (
+            <><span className="cn-card-sep">·</span>{nfmt(ch.postCount)}<span className="cn-card-metaw">&nbsp;posts</span></>
+          )}
         </span>
         {!preview && (
           <div className="cn-card-acts">
+            {ch.shareUrl && (
+              /* Public channels carry a ready /c/{handle} link on the wire —
+                 no share-link fetch, no counter to record. */
+              <button className="cn-btn" onClick={() => openShare({ kind: 'channel', url: ch.shareUrl, title: ch.title })}
+                aria-label={`Share ${ch.title}`} title="Share">
+                <Icon name="share" className="xs"/>
+              </button>
+            )}
+            {/* "About" is the profile — cover, stories, highlights, admin
+                console. "Open" is the posts. They are different places and the
+                card offers both rather than making one of them a mystery. */}
+            <button className="cn-btn" onClick={() => onProfile?.(ch)}>About</button>
             <button className="cn-btn" onClick={() => onOpen?.(ch)}>Open</button>
             {canToggle && (
               /* The subscribed state deliberately swaps its label on hover:
@@ -282,7 +375,8 @@ function ChannelCard({ ch, onOpen, onToggle, busy, mine, preview }) {
                   : 'Subscribe'}
               </button>
             )}
-            {!canToggle && !isOwner && <span className="cn-card-note">Invite only</span>}
+            {ch.pendingJoinRequest && <span className="cn-card-note">Awaiting approval</span>}
+            {!canToggle && !isOwner && !ch.pendingJoinRequest && <span className="cn-card-note">Invite only</span>}
           </div>
         )}
       </footer>
@@ -313,15 +407,21 @@ function CardSkeleton() {
 export function ChannelsPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const { upsertConvo, conversations, myId } = useChat()
+  const { upsertConvo, conversations, myId, subscribe } = useChat()
 
   const [q, setQ] = React.useState(params.get('q') || '')
+  const [category, setCategory] = React.useState(params.get('category') || '')
   const [filter, setFilter] = React.useState('all')
   const [rows, setRows] = React.useState([])
   const [state, setState] = React.useState('loading')     // loading | ready | error
   const [creating, setCreating] = React.useState(false)
   const [busyId, setBusyId] = React.useState(null)
   const [retry, setRetry] = React.useState(0)
+  /* The category chips are the categories that actually EXIST in the
+     directory, harvested from every discovery answer (union — a filtered
+     answer can only add, never shrink the row). The hardcoded list is just
+     the create-form's suggestion floor. */
+  const [cats, setCats] = React.useState([])
 
   /* Debounced discovery. The AbortController is what stops a slow earlier
      query from landing after a newer one and repainting stale results.
@@ -341,35 +441,89 @@ export function ChannelsPage() {
     setState(s => (s === 'ready' ? s : 'loading'))
     const t = setTimeout(async () => {
       try {
-        let res = await api.chat.channels.discover(needle, { signal: ctl.signal })
-        if (!res.length && handleShaped) {
+        let res = await api.channels.discover(needle, { category }, { signal: ctl.signal })
+        /* The @handle fallback is deliberately NOT applied while a category is
+           selected: an exact address lookup ignores the category, so it would
+           surface a channel the filter had just excluded. */
+        if (!res.length && handleShaped && !category) {
           // 404 here just means "no channel at that address" — not an error.
-          const exact = await api.chat.channels.byHandle(handle).catch(() => null)
+          const exact = await api.channels.byHandle(handle).catch(() => null)
           if (exact) res = [exact]
         }
-        if (!ctl.signal.aborted) { setRows(res); setState('ready') }
+        if (!ctl.signal.aborted) {
+          setRows(res)
+          setState('ready')
+          setCats(prev => {
+            const s = new Set(prev)
+            res.forEach(r => { const c = (r.category || '').trim(); if (c) s.add(c) })
+            return s.size === prev.length ? prev : [...s].sort((a, b) => a.localeCompare(b))
+          })
+        }
       } catch (e) {
         if (!ctl.signal.aborted && e?.name !== 'AbortError') setState('error')
       }
     }, needle ? 320 : 0)
     return () => { clearTimeout(t); ctl.abort() }
-  }, [q, retry])
+  }, [q, category, retry])
 
-  // Keep the query in the URL so a channel search is shareable and survives a
-  // reload, matching how /explore behaves.
+  /* Realtime subscriber counts — the platform's delta model: every
+     subscribe/unsubscribe fans out as member.changed SUBSCRIBED/UNSUBSCRIBED
+     (no counter on the wire; apply ±1 locally). My own toggles are already
+     applied optimistically in `toggle`/`openChannel`, so my own echo is
+     skipped or the count would move twice. */
+  React.useEffect(() => subscribe((evt) => {
+    if (evt?.type !== 'member.changed') return
+    if (evt.memberChange !== 'SUBSCRIBED' && evt.memberChange !== 'UNSUBSCRIBED') return
+    if (String(evt.userId) === String(myId)) return
+    const d = evt.memberChange === 'SUBSCRIBED' ? 1 : -1
+    setRows(prev => prev.map(r => (String(r.id) === String(evt.conversationId)
+      ? { ...r, subscriberCount: Math.max(0, r.subscriberCount + d) }
+      : r)))
+  }), [subscribe, myId])
+
+  // Keep the query AND the category in the URL so a channel search is
+  // shareable and survives a reload, matching how /explore behaves.
   React.useEffect(() => {
     const next = q.trim()
-    const cur = params.get('q') || ''
-    if (next === cur) return
+    if (next === (params.get('q') || '') && category === (params.get('category') || '')) return
     const p = new URLSearchParams(params)
     if (next) p.set('q', next); else p.delete('q')
+    if (category) p.set('category', category); else p.delete('category')
     setParams(p, { replace: true })
-  }, [q, params, setParams])
+  }, [q, category, params, setParams])
 
-  const openChannel = React.useCallback((ch) => {
-    // The channel id IS the conversation id — no lookup, no second fetch.
+  const openChannel = React.useCallback(async (ch) => {
+    /* The channel id IS the conversation id — but the backend floors ALL
+       conversation reads at membership (GET /conversations/{id} and its
+       /messages return 403 NOT_A_MEMBER even for a PUBLIC channel; verified
+       against the live server). So "Open" on a channel I'm not in must
+       join first — subscribe is idempotent and free, and a brand-new
+       subscriber still sees the full history once inside. */
+    const isMember = ch.subscribed || String(ch.ownerId) === String(myId)
+    if (!isMember) {
+      if (!ch.publicChannel) { showToast('This channel is invite-only'); return }
+      if (ch.pendingJoinRequest) { showToast('Your request is still waiting for an admin'); return }
+      setBusyId(ch.id)
+      try {
+        const next = await api.channels.subscribe(ch.id)
+        setRows(prev => prev.map(r => (r.id === ch.id ? next : r)))
+        /* `joinByRequest` turns subscribe into "file a request" — the caller is
+           NOT a member, so navigating to the thread would land on a 403. */
+        if (next.pendingJoinRequest) {
+          showToast('Request sent — an admin will review it')
+          return
+        }
+        try { const c = await api.chat.conversations.get(ch.id); if (c) upsertConvo(c) }
+        catch { /* it will arrive with the next inbox load */ }
+      } catch (e) {
+        showToast(chatError(e, 'Could not open the channel'))
+        return
+      } finally {
+        setBusyId(null)
+      }
+    }
     navigate(`/chat/${ch.id}`)
-  }, [navigate])
+  }, [navigate, myId, upsertConvo])
 
   const toggle = React.useCallback(async (ch) => {
     setBusyId(ch.id)
@@ -379,15 +533,23 @@ export function ChannelsPage() {
       : r)))
     try {
       if (before) {
-        await api.chat.channels.unsubscribe(ch.id)
+        await api.channels.unsubscribe(ch.id)
         showToast('Unsubscribed')
       } else {
-        await api.chat.channels.subscribe(ch.id)
-        // Subscribing makes it a conversation in my inbox; pull the row so the
-        // rail shows it immediately instead of after the next refresh.
-        try { const c = await api.chat.conversations.get(ch.id); if (c) upsertConvo(c) }
-        catch { /* it will arrive with the next inbox load */ }
-        showToast('Subscribed')
+        const next = await api.channels.subscribe(ch.id)
+        // Three outcomes, not two: a `joinByRequest` channel answers with
+        // `pendingJoinRequest` and NO membership, so the optimistic
+        // "subscribed" above has to be corrected rather than confirmed.
+        setRows(prev => prev.map(r => (r.id === ch.id ? next : r)))
+        if (next.pendingJoinRequest) {
+          showToast('Request sent — an admin will review it')
+        } else {
+          // Subscribing makes it a conversation in my inbox; pull the row so
+          // the rail shows it immediately instead of after the next refresh.
+          try { const c = await api.chat.conversations.get(ch.id); if (c) upsertConvo(c) }
+          catch { /* it will arrive with the next inbox load */ }
+          showToast('Subscribed')
+        }
       }
     } catch (e) {
       setRows(prev => prev.map(r => (r.id === ch.id
@@ -405,10 +567,28 @@ export function ChannelsPage() {
     () => conversations.filter(c => c.isChannel),
     [conversations],
   )
-  const ownedCount = React.useMemo(
-    () => mine.filter(c => String(c.ownerId) === String(myId)).length,
-    [mine, myId],
-  )
+
+  /* Hero stats — the truth is split across two sources: the inbox knows
+     PRIVATE channels (and unread), while discovery already sits on this page
+     and knows public subscribed/owner state. Union them by id so the numbers
+     are right even while the inbox fetch is still in flight — with inbox-only
+     counts, "0 joined · 0 yours" flashed at the owner of a channel. */
+  const joinedCount = React.useMemo(() => {
+    const ids = new Set(mine.map(c => String(c.id)))
+    for (const r of rows) {
+      if (r.subscribed || String(r.ownerId) === String(myId)) ids.add(String(r.id))
+    }
+    return ids.size
+  }, [mine, rows, myId])
+  const ownedCount = React.useMemo(() => {
+    const ids = new Set(
+      mine.filter(c => String(c.ownerId) === String(myId)).map(c => String(c.id)),
+    )
+    for (const r of rows) {
+      if (String(r.ownerId) === String(myId)) ids.add(String(r.id))
+    }
+    return ids.size
+  }, [mine, rows, myId])
 
   const shown = React.useMemo(() => {
     if (filter === 'subscribed') return rows.filter(r => r.subscribed)
@@ -445,7 +625,7 @@ export function ChannelsPage() {
               media all work exactly as they do in a chat.
             </p>
             <div className="cn-hero-stats">
-              <span><b>{mine.length}</b> joined</span>
+              <span><b>{joinedCount}</b> joined</span>
               <span className="cn-hero-sep">·</span>
               <span><b>{ownedCount}</b> yours</span>
             </div>
@@ -456,6 +636,9 @@ export function ChannelsPage() {
             </button>
           </div>
         </header>
+
+        {/* ---- live channel stories, ahead of everything else ---- */}
+        <ChannelStoryTray onOpen={(c) => navigate(`/channels/${c.channelId}`)}/>
 
         {/* ---- my channels: the only place a private one shows up ---- */}
         {!!mine.length && (
@@ -491,25 +674,50 @@ export function ChannelsPage() {
         )}
 
         {/* ---- discovery ---- */}
-        <div className="cn-toolbar">
-          <div className="ch-list-search cn-search">
-            <Icon name="search" className="sm"/>
-            <input className="field" value={q} onChange={e => setQ(e.target.value)}
-              placeholder="Search channels, or paste an @handle…" aria-label="Search channels"/>
-            {q && (
-              <button className="icon-btn" onClick={() => setQ('')} aria-label="Clear" title="Clear">
-                <Icon name="close" className="xs"/>
-              </button>
-            )}
+        <div className="cn-section-head">
+          <h2 className="cn-section-t">Discover</h2>
+          {state === 'ready' && <span className="cn-section-n">{shown.length}</span>}
+        </div>
+
+        {/* One browse container: search + audience filters, and beneath them
+            the categories that actually exist in the directory. */}
+        <div className="cn-browse">
+          <div className="cn-toolbar">
+            <div className="ch-list-search cn-search">
+              <Icon name="search" className="sm"/>
+              <input className="field" value={q} onChange={e => setQ(e.target.value)}
+                placeholder="Search channels, or paste an @handle…" aria-label="Search channels"/>
+              {q && (
+                <button className="icon-btn" onClick={() => setQ('')} aria-label="Clear" title="Clear">
+                  <Icon name="close" className="xs"/>
+                </button>
+              )}
+            </div>
+            <div className="cn-filters" role="group" aria-label="Filter channels">
+              {FILTERS.map(([key, label]) => (
+                <button key={key} className={'cn-chip' + (filter === key ? ' on' : '')}
+                  aria-pressed={filter === key} onClick={() => setFilter(key)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="cn-filters" role="group" aria-label="Filter channels">
-            {FILTERS.map(([key, label]) => (
-              <button key={key} className={'cn-chip' + (filter === key ? ' on' : '')}
-                aria-pressed={filter === key} onClick={() => setFilter(key)}>
-                {label}
-              </button>
-            ))}
-          </div>
+
+          {/* Real directory categories (harvested from discovery), never an
+              invented vocabulary — the row only exists once the DB has one. */}
+          {(cats.length > 0 || category) && (
+            <div className="cn-cats" role="group" aria-label="Browse by category">
+              <span className="cn-cats-label" aria-hidden="true"><Icon name="hash" className="xs"/>Category</span>
+              <button className={'cn-chip sm' + (category ? '' : ' on')} aria-pressed={!category}
+                onClick={() => setCategory('')}>Everything</button>
+              {(cats.includes(category) || !category ? cats : [category, ...cats]).map(c => (
+                <button key={c} className={'cn-chip sm' + (category === c ? ' on' : '')} dir="auto"
+                  aria-pressed={category === c} onClick={() => setCategory(category === c ? '' : c)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {state === 'error' && (
@@ -531,7 +739,8 @@ export function ChannelsPage() {
           <div className="cn-grid">
             {shown.map(ch => (
               <ChannelCard key={ch.id} ch={ch} busy={busyId === ch.id} mine={myId}
-                onOpen={openChannel} onToggle={toggle}/>
+                onOpen={openChannel} onToggle={toggle}
+                onProfile={(c) => navigate(`/channels/${c.id}`)}/>
             ))}
           </div>
         )}
@@ -539,6 +748,7 @@ export function ChannelsPage() {
 
       {creating && (
         <CreateChannel
+          cats={cats}
           onClose={() => setCreating(false)}
           onCreated={(ch) => { setCreating(false); if (ch?.id) navigate(`/chat/${ch.id}`) }}
         />

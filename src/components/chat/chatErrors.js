@@ -46,6 +46,18 @@ const COPY = {
   ACCESS_FORBIDDEN:
     'You don’t have permission to do that.',
 
+  /* ---- channel settings that refuse an action ----
+     None of these are a permission the reader lacks — they are a policy the
+     channel has set, and the copy says so. "You don't have permission to
+     forward this" would send someone hunting for a role they can't be given;
+     "this channel doesn't allow forwarding" is the truth and ends the search. */
+  PROTECTED_CONTENT:
+    'This channel doesn’t allow its posts to be forwarded.',
+  REACTIONS_DISABLED:
+    'Reactions are turned off in this channel.',
+  SUBSCRIBERS_HIDDEN:
+    'This channel keeps its subscriber list private.',
+
   /* ---- the stranger-contact cap ----
      Three messages before the recipient answers, then refused —
      and the same code comes back once a request is DECLINED,

@@ -6,7 +6,7 @@
 import React from 'react'
 import { Icon, Avatar, showToast } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
-import { EmptyState } from '../components/states.jsx'
+import { EmptyState, Loader } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -344,8 +344,14 @@ function SecurityPanel() {
 
 export function SettingsPage() {
   const { user } = useAuth()
-  const me = user || { full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)', bio:'', field:'' }
+  // Hook-phase placeholder only — the render below is guarded on `user`.
+  const me = user || { initials:'', avc:'' }
   const [tab, setTab] = React.useState('PROFILE')
+
+  // No invented "@you" identity on the corrupt-cache race — loader instead.
+  if (!user) {
+    return <div className="main center"><div className="col-main"><Loader label="Loading settings…"/></div></div>
+  }
 
   return (
     <div className="main center">
