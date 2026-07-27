@@ -282,8 +282,11 @@
    ========================================================= */
 
 /* The console shell: fixed height so switching between a short pane and a
-   tall one never resizes the modal or shifts the rail under the pointer. */
-.cm-modal{
+   tall one never resizes the modal or shifts the rail under the pointer.
+   Every `.cm-modal`/`.cm-tabs` rule here is scoped under `.ch-modal` — the
+   post composer (ComposeModal) owns those bare class names in warm/feed.css,
+   and an unscoped rule turns its type tabs into this console's side rail. */
+.ch-modal.cm-modal{
   max-width:min(880px,calc(100vw - 32px));
   height:min(720px,calc(100dvh - 96px));
 }
@@ -322,7 +325,7 @@
    start-edge indicator bar, which is an underline turned 90°): ghost at rest,
    gold wash on hover, the house navy fill when current. Logical properties
    throughout, so a ckb/ar UI mirrors for free. */
-.cm-tabs{
+.ch-modal .cm-tabs{
   flex:0 0 200px;
   display:flex;flex-direction:column;gap:4px;
   padding:16px 12px;
@@ -332,7 +335,7 @@
   scrollbar-width:none;
   -webkit-mask-image:none;mask-image:none;
 }
-.cm-tabs::-webkit-scrollbar{ display:none; }
+.ch-modal .cm-tabs::-webkit-scrollbar{ display:none; }
 .cm-tab-btn{
   display:inline-flex;align-items:center;gap:9px;
   width:100%;justify-content:flex-start;
@@ -1411,7 +1414,7 @@
 
 @media(max-width:900px){
   .cst-bar-row{ grid-template-columns:96px 1fr 42px; }
-  .cm-modal{ max-width:none; }
+  .ch-modal.cm-modal{ max-width:none; }
 }
 
 @media(max-width:720px){
@@ -1619,9 +1622,9 @@
    failure modes: 44px targets, snap, a fade wide enough to never eat a
    legible pill (the active one is scrolled into view from the JSX) ---- */
 @media (max-width:720px){
-  .cm-modal{ height:auto;max-width:none; }
+  .ch-modal.cm-modal{ height:auto;max-width:none; }
   .cm-split{ flex-direction:column; }
-  .cm-tabs{
+  .ch-modal .cm-tabs{
     flex:0 0 auto;flex-direction:row;gap:6px;
     padding:10px 14px;
     overflow-x:auto;overflow-y:hidden;

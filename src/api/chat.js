@@ -21,7 +21,7 @@
    SSE payloads — consumers apply +1/-1 deltas locally, exactly like
    the posts/research realtime model in realtime.js.
    ========================================================= */
-import { http, parseJson } from './http.js'
+import { http, parseJson, saveBlob } from './http.js'
 import { API_BASE, assetUrl, session } from './config.js'
 import { authorFrom, handleOf, timeAgo } from './adapters.js'
 import { mid } from './ids.js'
@@ -484,17 +484,53 @@ export function liveStreamFrom(dto) {
   return {
     id: dto.id,
     hostId: dto.hostId || null,
+    hostUsername: dto.hostUsername || null,       // raw handle, e.g. "alice"
+    hostHandle: handleOf(dto.hostUsername),       // BARE handle — render it as `@{hostHandle}`
+    hostDisplayName: dto.hostDisplayName || null, // host first + last
+    /* Avatar ring on the live row / watch page. NULLABLE — always keep an
+       initials fallback. assetUrl because backend media paths are RELATIVE:
+       without it the row resolves `/uploads/…` against the app origin, not the
+       API, and every host avatar silently 404s. */
+    hostAvatarUrl: assetUrl(dto.hostAvatarUrl || null),
     title: dto.title || 'Live',
     description: dto.description || '',
     status,
     isLive: status === 'LIVE',
-    playbackUrl: dto.playbackUrl || null,       // HLS/WebRTC out — an external media origin
-    ingestUrl: dto.ingestUrl || null,           // null for viewers
+    playbackUrl: dto.playbackUrl || null,       // HLS out — universal, higher latency
+    whepUrl: dto.whepUrl || null,               // WebRTC/WHEP out — sub-second latency (public)
+    whipUrl: dto.whipUrl || null,               // WebRTC/WHIP in — browser camera publish (host-only, null for viewers)
+    ingestUrl: dto.ingestUrl || null,           // RTMP in — OBS/desktop (host-only, null for viewers)
     shareUrl: dto.shareUrl || null,             // key-safe watch link ({base}/live/{id})
     viewerCount: dto.viewerCount ?? 0,
     startedAt: dto.startedAt || null,
     endedAt: dto.endedAt || null,
     time: timeAgo(dto.startedAt),
+    // recording (owner-facing). recordingDownloadUrl is an AUTHED API path — fetch
+    // it via the http client (Bearer), don't use it as a plain <a href>.
+    recordingStatus: dto.recordingStatus || null,          // DISABLED|RECORDING|AVAILABLE|EMPTY|DELETED
+    recordingAvailable: !!dto.recordingAvailable,           // finished + downloadable
+    recordingDownloadUrl: dto.recordingDownloadUrl || null, // null unless available
+  }
+}
+
+/** RecordingInfo → view manifest (`GET /streams/{id}/recording`, owner-only).
+ *  A long segment window keeps a typical broadcast in ONE part, so multi-part
+ *  is the exception to handle, not the shape to design around. */
+export function recordingInfoFrom(dto) {
+  if (!dto) return null
+  const parts = (dto.parts || []).map(p => ({
+    file: p?.file || '',
+    sizeBytes: p?.sizeBytes ?? 0,
+    modifiedAt: p?.modifiedAt || null,
+    downloadUrl: p?.downloadUrl || null,   // an AUTHED path — fetch it, never <a href> it
+  }))
+  return {
+    streamId: dto.streamId || null,
+    status: dto.status || null,            // DISABLED|RECORDING|AVAILABLE|EMPTY|DELETED
+    available: !!dto.available,
+    partCount: dto.partCount ?? parts.length,
+    totalBytes: dto.totalBytes ?? 0,
+    parts,
   }
 }
 
@@ -552,6 +588,7 @@ const EVENT_HANDLER = {
   'stream.started':       'onStream',
   'stream.viewer':        'onStream',
   'stream.chat':          'onStream',
+  'stream.updated':       'onStream',
   'stream.ended':         'onStream',
 }
 
@@ -641,9 +678,16 @@ function adaptEvent(type, d = {}) {
       return { type, signal, callId: signal?.callId || null, userId: signal?.fromUserId || null }
     }
 
-    /* ---- live streaming ---- */
+    /* ---- live streaming ----
+       The host identity (`hostUsername`/`hostDisplayName`/`hostAvatarUrl`) rides
+       `stream.started` but is OMITTED from `.viewer` / `.updated` / `.ended` —
+       the client already has it from the fetch or the join. `liveStreamFrom`
+       fills an omitted field with `null`, so consumers MUST fold these frames
+       with `patchStream` (lib/liveRows.js) instead of assigning them over a
+       card, or the avatar and handle vanish on the first viewer who arrives. */
     case 'stream.started':
     case 'stream.viewer':
+    case 'stream.updated':
     case 'stream.ended': {
       const stream_ = liveStreamFrom(d.stream)
       return { type, stream: stream_, streamId: stream_?.id || d.streamId || null, userId: d.userId || null, memberChange: d.memberChange || null }
@@ -987,12 +1031,23 @@ export const chat = {
      (RTMP/WebRTC in, HLS/WebRTC out) addressed by the per-stream secret in
      `ingestUrl` — which is host-only and null for viewers. */
   streams: {
-    async start({ title, description } = {}) {
-      return liveStreamFrom(await http.post('/api/v1/streams', { title, description: description || undefined }))
+    /** Go live. `record: true` writes the broadcast to disk so you can download
+     *  it after ending (owner-only). Defaults to the server's opt-in default. */
+    async start({ title, description, record } = {}) {
+      return liveStreamFrom(await http.post('/api/v1/streams', {
+        title, description: description || undefined,
+        record: typeof record === 'boolean' ? record : undefined,
+      }))
     },
     /** Currently-live streams, most-watched first. */
     async live(opts) {
       const rows = await http.get('/api/v1/streams/live', undefined, opts)
+      return (rows || []).map(liveStreamFrom).filter(Boolean)
+    },
+    /** The "following is live" row — people you follow who are live now,
+     *  newest-live-first. Each card carries the host avatar + handle. */
+    async followingLive(opts) {
+      const rows = await http.get('/api/v1/streams/live/following', undefined, opts)
       return (rows || []).map(liveStreamFrom).filter(Boolean)
     },
     async get(id)          { return liveStreamFrom(await http.get(`/api/v1/streams/${id}`)) },
@@ -1008,6 +1063,83 @@ export const chat = {
     /** Ephemeral — broadcast only, never persisted, so late joiners see none
      *  of it. Rate-limited to 20 / 10s; you must join (or host) first. */
     chat(id, text)         { return http.post(`/api/v1/streams/${id}/chat`, { text }) },
+
+    /* ---- management (owner-only) ---- */
+    /** My streams (LIVE + ENDED), newest-first — the ONLY route that can reach
+     *  an ended stream, and so the only way back to a finished recording.
+     *  Normalised through `pageOf` like every other paged read in this module
+     *  ({ items, total, hasMore, page }), not left as a raw Spring page. */
+    async mine({ page = 0, size = 20 } = {}, opts) {
+      return pageOf(await http.get('/api/v1/streams/mine', { page, size }, opts), liveStreamFrom)
+    },
+    /** Edit title/description (owner). While LIVE, viewers get `stream.updated`. */
+    async update(id, { title, description } = {}) {
+      return liveStreamFrom(await http.patch(`/api/v1/streams/${id}`, { title, description }))
+    },
+    /** Delete a stream + its recording (ends it first if still live). 204. */
+    remove(id)             { return http.del(`/api/v1/streams/${id}`) },
+
+    /* ---- recording (owner-only) ---- */
+    /** Recording manifest — status + the downloadable parts. */
+    async recording(id, opts) {
+      return recordingInfoFrom(await http.get(`/api/v1/streams/${id}/recording`, undefined, opts))
+    },
+    /** Delete only the recording, keeping the stream record. 204. */
+    removeRecording(id)    { return http.del(`/api/v1/streams/${id}/recording`) },
+    /**
+     * Download the recording as `{ blob, filename, type }`. `part` is optional
+     * when there is a single file.
+     *
+     * Goes through `http.download` rather than a bare `fetch` on purpose. The
+     * route is Bearer-authed, so it cannot be an <a href> — but hand-rolling
+     * the fetch also skipped the 401 → refresh → retry recovery in http.js,
+     * which is exactly what a page left open past the ~hourly token rotation
+     * needs, and it turned the backend's JSON error envelope (a missing
+     * recording answers 404 with JSON, not bytes) into a bare Error that
+     * `chatError` could say nothing useful about.
+     */
+    downloadRecording(id, { part } = {}) {
+      return http.download(`/api/v1/streams/${id}/recording/download`, part ? { part } : undefined)
+    },
+    /** Download ONE file (the whole recording, or a named part) and hand it to
+     *  the browser's downloader. Prefer `saveWholeRecording` — see why there. */
+    async saveRecording(id, opts) {
+      /* The object URL is revoked on a timer inside `saveBlob`, NOT straight
+         after .click(): revoking synchronously cancels the download outright in
+         Safari, which is the browser most likely to be watching this. */
+      saveBlob(await chat.streams.downloadRecording(id, opts), `recording-${id}.mp4`)
+    },
+
+    /**
+     * Save the ENTIRE recording, whatever shape it landed in on disk.
+     *
+     * The part-less download route answers **400** when there is more than one
+     * part ("This recording has N parts — pass ?part="), and multi-part is not
+     * the exotic case the API docs imply: MediaMTX restarts its recorder
+     * whenever the published track set CHANGES, and a browser broadcast changes
+     * it routinely — audio registers first, video a beat later. The log shows it
+     * plainly, one session, two segments:
+     *     [recorder] recording 2 tracks (Opus, H264)
+     *     [recorder] recording 2 tracks (Opus, H264)   ← restarted
+     * The first part is then the audio-only prelude and the second is the one
+     * with the picture. So grabbing "the recording" without walking the parts
+     * either 400s outright or hands the owner a black file — which is exactly
+     * how this was reported.
+     *
+     * Returns the number of files saved.
+     */
+    async saveWholeRecording(id) {
+      const info = await chat.streams.recording(id)
+      const parts = info?.parts || []
+      if (parts.length > 1) {
+        // Sequentially, not in parallel: browsers throttle (and Safari drops)
+        // a burst of simultaneous programmatic downloads.
+        for (const p of parts) await chat.streams.saveRecording(id, { part: p.file })
+        return parts.length
+      }
+      await chat.streams.saveRecording(id)
+      return 1
+    },
   },
 
   /* ---------- group membership ---------- */

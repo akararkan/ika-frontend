@@ -18,8 +18,12 @@ export function notifFrom(dto) {
     aggregateCount: dto.aggregateCount || 1,
     resourceId: dto.resourceId,
     resourceType: dto.resourceType,
-    // TRENDING_DIGEST has no backend deepLink yet — resolve to our trending landing page (NOTIFICATIONS_API §11.6)
-    deepLink: dto.deepLink || (dto.type === 'TRENDING_DIGEST' ? '/explore' : null),
+    // Prefer a backend-supplied deepLink; otherwise derive one so the row is
+    // clickable. "X is live" (resourceType LiveStream) opens the stream;
+    // TRENDING_DIGEST has no backend deepLink yet → the trending landing page.
+    deepLink: dto.deepLink
+      || (dto.resourceType === 'LiveStream' && dto.resourceId ? `/live/${dto.resourceId}` : null)
+      || (dto.type === 'TRENDING_DIGEST' ? '/explore' : null),
     unread: dto.isRead === false,
     time: timeAgo(dto.createdAt),
     createdAt: dto.createdAt,            // raw ISO — used for date grouping in the inbox

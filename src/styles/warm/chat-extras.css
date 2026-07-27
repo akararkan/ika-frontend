@@ -517,6 +517,176 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   animation:clPulse 1.6s ease-in-out infinite;
 }
 
+/* the host under a directory card's title — the same person, plate and
+   handle, that the rail below shows in its ring */
+.lv-card-host{
+  margin-block-start:7px; min-width:0;
+  display:flex; align-items:center; gap:7px;
+}
+.lv-card-host .avatar{ flex:0 0 auto; }
+.lv-card-host span{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font:600 12.5px/1.3 var(--sans); color:var(--ink);
+}
+.lv-card-host small{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--muted); font-size:11.5px;
+}
+
+/* ---- the "following is live" rail ----
+   The people you follow who are live right now: avatar ring, @handle,
+   viewers. Geometry only — the theme layer (ika-messages-theme §9.5)
+   gives the ring its ember identity and makes it breathe. */
+.lv-rail{ margin-block:2px 20px; }
+.lv-rail-head,
+.lv-sec{
+  display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
+  margin-block:0 11px;
+}
+.lv-sec{ margin-block-start:22px; }
+.lv-rail-head h2,
+.lv-sec h2{ margin:0; font:600 14px/1 var(--sans); color:var(--ink); }
+.lv-rail-head span,
+.lv-sec span{ color:var(--muted); font-size:12px; }
+
+.lv-row{
+  display:flex; gap:14px; overflow-x:auto;
+  padding:2px 2px 10px; margin:0 -2px;
+  scroll-snap-type:x proximity; scrollbar-width:thin;
+  -webkit-overflow-scrolling:touch;
+}
+.lv-row-item{ flex:0 0 auto; scroll-snap-align:start; }
+
+.lv-cell{
+  width:84px; padding:0; border:0; background:none; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  text-align:center; color:inherit;
+}
+/* a gradient annulus: the ring is the whole "live" signal, so the plate
+   inset is what makes it read as a ring rather than a coloured border */
+.lv-cell-ring{
+  position:relative; width:74px; height:74px; border-radius:50%;
+  display:grid; place-items:center;
+  background:conic-gradient(from 210deg,var(--live),#d98a3c,var(--gold),var(--live));
+}
+.lv-cell-plate{
+  display:grid; place-items:center;
+  width:66px; height:66px; border-radius:50%;
+  background:var(--paper);
+}
+.lv-cell-tag{
+  /* centred with inset-inline + auto margins, NOT a translate: a transform
+     does not flip with the writing direction and the chip would hang off
+     the ring in RTL. */
+  position:absolute; inset-block-end:-6px; inset-inline:0;
+  width:fit-content; margin-inline:auto;
+  padding:2px 7px; border-radius:5px;
+  border:2px solid var(--paper);
+  background:var(--live); color:#fff;
+  font:700 9px/1.5 var(--sans); letter-spacing:.08em;
+}
+.lv-cell-nm{
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font:600 12px/1.3 var(--sans); color:var(--ink);
+}
+.lv-cell-meta{
+  display:inline-flex; align-items:center; gap:4px;
+  color:var(--muted); font-size:11px; line-height:1.2;
+}
+.lv-cell-meta .ico{ opacity:.75; }
+.lv-cell-age::before{ content:'·'; margin-inline-end:4px; }
+
+/* ---- recording + owner management (.lv-rec* / .lv-mine* / .lv-check) ---- */
+
+/* the go-live opt-in: a checkbox that has to explain itself, because
+   "this is being written to disk" is not a detail */
+.lv-check{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:11px 13px; border-radius:var(--r);
+  border:1px solid var(--line); background:var(--paper-2);
+  cursor:pointer;
+}
+.lv-check input{ margin-block-start:2px; flex:0 0 auto; accent-color:var(--live); }
+.lv-check span{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.lv-check b{ font:600 13.5px/1.3 var(--sans); color:var(--ink); }
+.lv-check small{ color:var(--ink-soft); font-size:12px; line-height:1.5; }
+
+.lv-rec{
+  margin-block-start:14px; padding:12px 14px;
+  border:1px solid var(--line); border-radius:var(--r-lg);
+  background:var(--card);
+}
+/* the promise-broken plate: recording was asked for and did not start */
+.lv-rec.warn{ border-color:var(--live); background:var(--live-soft); }
+.lv-rec-warn{
+  margin:9px 0 0; color:var(--ink); font-size:12.5px; line-height:1.6;
+}
+.lv-rec-chip.failed{ background:var(--live); color:#fff; }
+.lv-rec-chip.failed .ico{ width:12px; height:12px; }
+
+.lv-rec-t{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.lv-rec-hint{ color:var(--muted); font-size:12px; }
+.lv-rec-chip{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 10px; border-radius:999px;
+  font:700 11px/1.5 var(--sans); letter-spacing:.03em;
+  background:var(--card-2); color:var(--ink-soft);
+}
+.lv-rec-chip.sm{ padding:2px 8px; font-size:10px; }
+.lv-rec-chip.recording{ background:var(--live-soft); color:var(--live); }
+.lv-rec-chip.recording .lv-dot{ background:var(--live); width:6px; height:6px; }
+.lv-rec-chip.available{ background:var(--gold-wash); color:var(--gold-deep); }
+.lv-rec-chip.deleted,
+.lv-rec-chip.empty,
+.lv-rec-chip.disabled{ background:var(--card-2); color:var(--muted); }
+
+.lv-rec-row{
+  margin-block-start:10px; display:flex; align-items:center; gap:10px;
+  flex-wrap:wrap; justify-content:space-between;
+}
+.lv-rec-size{ color:var(--muted); font-size:12px; }
+.lv-rec-acts{ display:flex; gap:8px; flex:0 0 auto; }
+.lv-rec-parts{ margin:10px 0 0; padding:0; list-style:none; display:grid; gap:6px; }
+.lv-rec-parts li{
+  display:flex; align-items:center; gap:10px;
+  padding:7px 9px; border-radius:var(--r-sm); background:var(--paper-2);
+}
+.lv-rec-file{
+  flex:1 1 auto; min-width:0; font-size:12px; color:var(--ink-soft);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* the owner's catalogue — the only route back to an ended stream */
+.lv-mine{ width:min(620px,94vw); }
+.lv-mine-row{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:11px 12px; border-radius:var(--r);
+  border:1px solid var(--line); background:var(--card);
+}
+.lv-mine-row + .lv-mine-row{ margin-block-start:8px; }
+.lv-mine-main{ flex:1 1 240px; min-width:0; }
+.lv-mine-t{ display:flex; align-items:center; gap:8px; min-width:0; }
+.lv-mine-t b{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font:600 14px/1.35 var(--serif); color:var(--ink);
+}
+.lv-mine-state{
+  flex:0 0 auto; display:inline-flex; align-items:center; gap:5px;
+  padding:2px 8px; border-radius:6px;
+  font:700 10px/1.6 var(--sans); letter-spacing:.06em;
+  background:var(--card-2); color:var(--muted);
+}
+.lv-mine-state.live{ background:var(--live); color:#fff; }
+.lv-mine-sub{
+  margin-block-start:5px; display:flex; align-items:center; gap:10px;
+  flex-wrap:wrap; color:var(--muted); font-size:12px;
+}
+.lv-mine-sub span{ display:inline-flex; align-items:center; gap:4px; }
+.lv-mine-acts{ display:flex; gap:6px; flex-wrap:wrap; flex:0 0 auto; }
+.lv-mine-more{ margin:12px 2px 0; color:var(--muted); font-size:12px; text-align:center; }
+
+.lv-head-acts{ display:flex; gap:8px; flex:0 0 auto; flex-wrap:wrap; }
+
 /* ---- the room ---- */
 .lv-room{
   display:grid; gap:16px;
@@ -622,6 +792,18 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 @media (max-width:900px){
   .lv-room{ grid-template-columns:minmax(0,1fr); }
   .lv-chat{ height:min(56vh,460px); }
+}
+@media (max-width:600px){
+  /* One size down so five cells still fit a phone width.
+     NO edge-bleed here. A negative inline margin on a rail whose container
+     is already flush with the phone's padding widens the PAGE — measured at
+     390px it took documentElement.scrollWidth to 394 and the whole app
+     scrolled sideways. The rail keeps the container's gutter, exactly like
+     .cn-rail (§20.2) does. */
+  .lv-cell{ width:74px; gap:7px; }
+  .lv-cell-ring{ width:66px; height:66px; }
+  .lv-cell-plate{ width:58px; height:58px; }
+  .lv-cell-plate .avatar{ width:54px !important; height:54px !important; }
 }
 
 /* =========================================================

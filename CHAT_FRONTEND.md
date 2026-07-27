@@ -369,7 +369,7 @@ Four more families live in [chat-extras.css](src/styles/warm/chat-extras.css), n
 | --- | --- | --- |
 | `cl-` | calls | `.cl-overlay` (`.ringing`), `.cl-frame`, `.cl-head*`, `.cl-stage.n-1…n-4`, `.cl-tile` (`.audio-only`, `.speaking`), `.cl-video` (`.mirrored`), `.cl-self`, `.cl-await*`, `.cl-bar`, `.cl-ctl` (`.off`), `.cl-btn` (`.accept`/`.decline`/`.wide`), `.cl-pill*` |
 | `cn-` | channels | `.cn-page`, `.cn-head`, `.cn-title`, `.cn-sub`, `.cn-section*`, `.cn-chip*`, `.cn-search`, `.cn-grid`, `.cn-card*`, `.cn-field`, `.cn-handle`, `.cn-hint` (`.bad`) |
-| `lv-` | live streaming | `.lv-page`, `.lv-grid`, `.lv-card*`, `.lv-badge` (`.sm`), `.lv-dot`, `.lv-room`, `.lv-main`, `.lv-stage`, `.lv-video`, `.lv-hls`, `.lv-ended`, `.lv-meta*`, `.lv-ingest*`, `.lv-note`, `.lv-chat*`, `.lv-line*` |
+| `lv-` | live streaming | `.lv-page`, `.lv-grid`, `.lv-card*` (incl. `.lv-card-host`), `.lv-badge` (`.sm`), `.lv-dot`, `.lv-room`, `.lv-main`, `.lv-stage`, `.lv-video`, `.lv-hls`, `.lv-ended`, `.lv-meta*`, `.lv-ingest*`, `.lv-note`, `.lv-chat*`, `.lv-line*`; the following rail adds `.lv-rail*`, `.lv-sec`, `.lv-row`, `.lv-row-item`, `.lv-cell` (`-ring`/`-plate`/`-tag`/`-nm`/`-meta`/`-age`); recording + ownership add `.lv-check`, `.lv-head-acts`, `.lv-rec*` (`-chip` with a status modifier, `-parts`), `.lv-mine*` |
 | `botnav-` | the mobile Messages tab badge | `.botnav-ico`, `.botnav-dot` — global by necessity: `.botnav` lives outside `<main>`, so no page-scoped selector can reach it |
 
 Newer `ch-*` / `ci-*` members, all in chat-extras.css: the voice player (`.ch-voice-foot`, `.ch-voice-rate`, `.ch-voice-new`, `.ch-voice-spin`, `.ch-wave-layer` (`.played`), `.ch-wave-head`), the tombstone (`.ch-deleted-note`, `.ch-deleted-ico`), the video-tile duration chip (`.ch-asset-dur`), the timeline call card (`.ch-callcard*`), the connection banner (`.ch-netbar` with `.off`/`.wait`/`.ok`) and the info panel's call history (`.ci-callstats`, `.ci-stat`, `.ci-callsplit`, `.ci-calllist`, `.ci-callrow*`).
@@ -563,6 +563,11 @@ Everything goes through [src/api/http.js](src/api/http.js) (`http.get(path, quer
 | `calls.start` / `.accept` / `.decline` / `.end` / `.signal` | `/conversations/{id}/calls`, `/calls/{id}…` | `call` | [CallContext.jsx](src/context/CallContext.jsx) |
 | `calls.get` | `GET /calls/{callId}` | `call` | **UNUSED** — every state transition arrives on the stream as a `call.*` frame carrying the full `CallResponse`, so there is nothing to poll for. It is the natural backing for a "rejoin after a reload" flow, which does not exist yet |
 | `streams.start` / `.live` / `.get` / `.join` / `.leave` / `.end` / `.chat` | `/streams…` | `stream` | [LivePage.jsx](src/pages/LivePage.jsx) |
+| `streams.followingLive` | `GET /streams/live/following` | `stream[]` | [LiveRow.jsx](src/components/LiveRow.jsx) — the "following is live" rail. Same card shape as `.live()`, so one cell renders both rows; ordered newest-live-first rather than most-watched-first |
+| `streams.mine` | `GET /streams/mine` | `{ items, total, hasMore, page }` | the `MyStreams` catalogue in [LivePage.jsx](src/pages/LivePage.jsx). The **only** route that reaches an ENDED stream — it leaves `/streams/live` the instant it stops — and therefore the only way back to a finished recording |
+| `streams.update` / `.remove` | `PATCH`/`DELETE /streams/{id}` | `stream` / 204 | owner-only. A live `PATCH` fans `stream.updated` to that stream's viewers; `DELETE` takes the recording with it |
+| `streams.recording` / `.removeRecording` | `GET`/`DELETE /streams/{id}/recording` | `recordingInfo` / 204 | owner-only manifest + delete-just-the-video |
+| `streams.downloadRecording` / `.saveRecording` | `GET /streams/{id}/recording/download` | `{ blob, filename, type }` | **authed binary.** Goes through `http.download` (`as: 'blob'`), never an `<a href>` — see below |
 
 ### Exact per-viewer reads: `messages.reactions` (wired) and `messages.get` (still not)
 
@@ -677,7 +682,7 @@ Every dispatched event goes to its named handler *and* to `onAny`, which the pro
 | `member.changed` | `onMember` | mine: `REMOVED`/`LEFT` → drop convo, `PROMOTED`/`DEMOTED` → patch `myRole`, `RESTRICTED`/`UNRESTRICTED` → patch `myStatus`, `ADDED` → refetch (role, status, settings and the history floor are all new). Others: ±1 `memberCount`, computed **inside** the state updater so a burst of joins doesn't collapse to a single +1 | — |
 | `request.new` | `onRequest` | `requestCount + 1`; prepend to the list if it has been loaded | — |
 | `call.incoming` · `.accepted` · `.declined` · `.participant` · `.ended` · `.signal` | `onCall` | **none supplied** | [CallContext.jsx](src/context/CallContext.jsx) — the entire call lifecycle and the WebRTC relay |
-| `stream.started` · `.viewer` · `.chat` · `.ended` | `onStream` | **none supplied** | [LivePage.jsx](src/pages/LivePage.jsx) — the directory and the room both subscribe |
+| `stream.started` · `.viewer` · `.chat` · `.updated` · `.ended` | `onStream` | **none supplied** | [LivePage.jsx](src/pages/LivePage.jsx) — the directory and the room both subscribe — and [LiveRow.jsx](src/components/LiveRow.jsx). List surfaces fold through the one reducer in [liveRows.js](src/lib/liveRows.js) |
 | `heartbeat` | — | not in `EVENT_HANDLER`; the dedicated `heartbeat`/`HEARTBEAT` listeners touch `lastBeat` only, and `dispatch` early-returns on the name. Never broadcast | — |
 
 Calls and live streams are **multiplexed onto the same per-user socket** — there is no second `EventSource` for either. All six `call.*` names map to one handler key (`onCall`) and all four `stream.*` to `onStream`; consumers switch on `evt.type`. They are listed individually in `EVENT_HANDLER` anyway because that map is what `stream()` derives its `addEventListener` calls from — a name missing from it reaches nothing, not even `onAny`.
@@ -1155,6 +1160,144 @@ same log as the chat, so arrivals read in sequence with what is being said.
 Own-userId is skipped — "you joined" is not news to you — and the lines share
 the chat log's 200-entry tail so a long stream cannot grow the DOM without
 limit.
+
+#### The "following is live" rail
+
+[LiveRow.jsx](src/components/LiveRow.jsx) is the TikTok/Instagram-style rail of
+people you follow who are live now: avatar ring, `@handle`, viewers, tap →
+`/live/{id}`. Everything a cell renders arrives in the **one** list response —
+`followingLive()` carries `hostAvatarUrl` / `hostHandle` / `hostDisplayName` —
+so it never fans out a user fetch per cell and never touches `watchUsers`.
+`followingLive()` and `live()` return the identical shape, so `source` selects
+the row and the same cell renders both.
+
+**A frame PATCHES, it does not replace** — the rule the shared reducer in
+[liveRows.js](src/lib/liveRows.js) exists to enforce. `liveStreamFrom` returns
+*every* key, filling what the payload omits with `null`, so assigning
+`evt.stream` wholesale over a card is not a merge but an erase. In the room this
+was a live bug: a `stream.viewer` frame arriving without the URLs (they are
+minted on `join`, and `whipUrl`/`ingestUrl` are host-only) blanked
+`playbackUrl`/`whepUrl`, which are attach-effect *dependencies* — so the video
+tore down and re-dialled every time somebody else walked in. The second rule:
+`stream.viewer` **never inserts**. A viewer arriving on a stream we are not
+showing must not conjure a card, or the ordering contract of both rows breaks.
+
+**Measured fanout, and why a reconcile exists anyway** (against the real backend,
+2026-07-27 — captured by reading the raw SSE frames as a follower):
+
+| frame | reaches a follower who never joined? |
+| --- | --- |
+| `stream.started` | **yes** — fanned to the host's followers, so the rail gains a card the instant they go live |
+| `stream.ended` | **no** |
+| `stream.viewer` | **no** |
+
+Both absent frames are fanned to a *stream's participants*, not to the host's
+followers. Pushed alone the rail therefore only ever **grows**: dead streams sit
+in it until a reload and tapping one opens an ended room. So the push path stays
+the update path, and a 60s reconcile — skipped while the tab is hidden, caught up
+on `visibilitychange` — is the net under it. The discovery grid carries the same
+net for the same reason. **Delete both the day the backend fans `stream.ended` to
+followers**; the reducer already handles the frame.
+
+`hostAvatarUrl` needed `assetUrl()` in `liveStreamFrom` like every other avatar
+in this file — without it a relative `/uploads/…` resolves against the app
+origin instead of the API and every host avatar 404s. It is **nullable** in any
+case (the backend does not currently send the field at all), so the initials
+plate is the normal rendering, not the fallback path.
+
+#### Recording, and the owner's catalogue
+
+Recording is **opt-in at go-live** (`POST /streams` with `record: true`) and the
+checkbox starts unticked — "this is being written to disk" is an answer that has
+to be chosen, never one that happens quietly. `record` is omitted rather than
+sent as `false` when unticked, so the server's own default still governs.
+
+**Opt-in is enforced at the source, and that makes it fallible.** MediaMTX records
+nothing by default; on an opted-in go-live the backend calls the MediaMTX control
+API to enable recording for that one path, so a stream the host didn't opt into
+never touches disk at all (verified: the opted-out stream's path returns **404**
+from `/v3/config/paths/get/{id}`). That call is **best-effort** — if it fails the
+stream still goes live, just unrecorded.
+
+So `recordingStatus` alone cannot distinguish *"the host didn't want a recording"*
+from *"the host wanted one and the media server refused"*, and those need
+different words. `DISABLED` copy therefore never claims the host's intent — it
+says "This broadcast isn't being saved", which is all we can honestly assert. The
+host's actual intent rides the go-live navigation as router state
+(`recordRequested`, **not** a query param — intent is not part of the stream's
+address, and a reload should not keep re-asserting something only known at
+go-live). When intent and status disagree, `RecordingPanel` replaces the neutral
+chip with a plain statement that recording could not be turned on and the
+broadcast will produce no file — said *while it is still cheap to act on*, plus a
+toast at the moment of going live. A host must not discover this an hour later
+when they go looking for the video.
+
+`recordingStatus` rides *every* `LiveStreamResponse` (it comes off the record
+with no disk I/O): `DISABLED` → `RECORDING` while live → `AVAILABLE` or `EMPTY`
+on end → `DELETED` once removed. `EMPTY` is what a browser-driven test always
+produces — headless Chrome publishes no camera, so nothing is ever written. To
+exercise the real path, publish a synthetic broadcast to `ingestUrl` over RTMP
+with ffmpeg (`-f lavfi -i testsrc … -f flv "<ingestUrl>"`); that yields a genuine
+`AVAILABLE` recording and is the only way to test the download with real bytes.
+
+**Why a browser broadcast recorded as a black video** (found 2026-07-27, from a
+report that the downloaded file had no picture). Two independent causes, both
+confirmed against the running stack:
+
+1. **MediaMTX's `webrtcTrackGatherTimeout` (default `2s`) vs Chrome's encoder
+   startup.** MediaMTX waits that long after the peer connection is established
+   and takes whatever has produced data as the session's track list —
+   permanently. `getUserMedia` resolves when the *device* opens, but the first
+   *encoded* H264 frame lands later, and on the first broadcast of a browser
+   session later than 2s. Lose that race and the session registers as **audio
+   only**: live viewers get sound with no picture, and the recording is written
+   with no video stream at all. Straight from the MediaMTX log, same build, same
+   machine — `[recorder] recording 1 track (Opus)` on a loss,
+   `recording 2 tracks (Opus, H264)` on a win.
+   *Frontend mitigation:* `firstVideoFrame` in [liveWebrtc.js](src/lib/liveWebrtc.js)
+   pulls a real decoded frame through a detached `<video>` **before** the SDP
+   offer, and `onLocalStream` attaches the host's preview at capture time rather
+   than after the handshake, keeping the pipeline awake. That wins the race on a
+   warm camera and narrows it on a cold one — it cannot close it, because the
+   encoder start is not under JS control. *The deterministic fix is server-side:*
+   set `webrtcTrackGatherTimeout: 10s` in `mediamtx.yml`. Measured with it
+   raised, the previously-failing cold-camera run recorded h264 1280x720.
+
+2. **Multi-part recordings, which are the norm here rather than the exception.**
+   MediaMTX restarts its recorder when the published track set *changes*, and a
+   browser broadcast changes it routinely — audio registers, video joins a beat
+   later, recorder restarts. The result is two parts where the **first is the
+   audio-only prelude and the second holds the picture**. The part-less download
+   route answers **400** (`"This recording has 2 parts — pass ?part="`), so
+   "Download" failed outright on exactly those recordings, and grabbing only the
+   first part would have handed back a black file either way. `saveWholeRecording`
+   walks the manifest and saves every part (sequentially — browsers throttle a
+   burst of programmatic downloads); the part-less route is now only ever called
+   when `partCount === 1`.
+
+**The download can never be a link.** `recordingDownloadUrl` is an API *path*,
+not an href: the route is Bearer-authed and answers **403 with no token**
+(measured), so `<a href>` and `<a download>` are both dead ends. It goes through
+`http.download` → `as: 'blob'` in [http.js](src/api/http.js), which keeps the
+whole client pipeline — most importantly the 401 → refresh → retry recovery a
+page left open past the hourly token rotation depends on, and the JSON error
+envelope (a missing recording answers **404 with JSON**, not with bytes). A
+hand-rolled `fetch` had neither. `saveBlob` then hands it to the browser and
+revokes the object URL **on a timer**: revoking synchronously after `.click()`
+cancels the download outright in Safari.
+
+**Ending a stream no longer exits the room.** End is the exact moment
+`recordingStatus` resolves, so bouncing the host back to the directory sent them
+to hunt for a file that had just appeared on the page they were thrown off. The
+room re-fetches in place and renders its own ended state.
+
+`GET /streams/mine` is the owner's catalogue and the **only** route that can
+reach an ENDED stream — it is gone from `/streams/live` the moment it stops. It
+lives behind a "Your streams" button rather than pinned to the page: for most
+people it is empty, and `/live` is for discovery. Note `stream.updated` is fanned
+to *a stream's current viewers*, not to everyone browsing the directory, so the
+grid learns about a mid-broadcast rename on the same 60s reconcile as everything
+else.
 
 ### Privacy switches are symmetric, and the UI has to say so twice
 
@@ -1700,4 +1843,3 @@ what makes mentions clickable today. The id set would allow reliably
 highlighting a mention *of you* even when the display text does not match the
 handle — but nothing maps those UUIDs back to positions in the body, so it would
 need either server-side offsets or a directory round trip per message.
-

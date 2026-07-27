@@ -454,6 +454,12 @@
   color:var(--gold-deep); background:var(--gold-wash);
 }
 
+/* The header's actions are a wrapper div now (Your streams + Go live), and
+   `.cn-head > div` above hands every direct div the TITLE block's
+   `flex:1 1 320px` — which would let the buttons claim half the header. The
+   class selector outranks it (0,2,0 beats 0,1,1) whatever the source order. */
+.cn-head > .lv-head-acts{ flex:0 0 auto; }
+
 /* the LIVE chip squares off — broadcast grammar, not a pill */
 .lv-badge{
   border-radius:7px; padding:4px 11px;
@@ -461,6 +467,41 @@
   box-shadow:0 4px 12px -4px rgba(194,72,61,.6);
 }
 .lv-badge.sm{ border-radius:6px; padding:3px 8px; font-size:10px; }
+
+/* =========================================================
+   9.5 · Live — the "following is live" rail
+   The ring carries the whole signal, so it is the only thing
+   here that moves: an ember glow that breathes on a slow beat,
+   the way the .lv-dot does inside the badge. Geometry stays in
+   chat-extras §10 — this layer only gives it the identity.
+   ========================================================= */
+.lv-rail-head h2,
+.lv-sec h2{ font-family:var(--serif); font-size:15px; color:var(--navy-deep); }
+
+.lv-cell-ring{
+  box-shadow:0 6px 18px -10px rgba(194,72,61,.75);
+  animation:lvRing 2.6s var(--mx-ease) infinite;
+  transition:transform .16s var(--mx-ease);
+}
+@keyframes lvRing{
+  0%,100%{ box-shadow:0 6px 18px -10px rgba(194,72,61,.7) }
+  50%    { box-shadow:0 7px 24px -8px  rgba(194,72,61,1) }
+}
+.lv-cell:hover .lv-cell-ring{ transform:scale(1.05); }
+.lv-cell:active .lv-cell-ring{ transform:scale(.99); }
+.lv-cell:hover .lv-cell-nm{ color:var(--navy-deep); }
+/* the ring IS the control's shape — outline the circle, not the column */
+.lv-cell:focus-visible{ outline:none; }
+.lv-cell:focus-visible .lv-cell-ring{ outline:2px solid var(--blue); outline-offset:3px; }
+
+.lv-cell-tag{
+  box-shadow:0 3px 9px -3px rgba(194,72,61,.7);
+  /* the chip sits ON the paper the page is made of, so the notch it cuts
+     out of the ring has to be that same paper — restated here because the
+     rail also rides the card surface inside a channel page */
+  border-color:var(--paper);
+}
+.lv-card-host small{ color:var(--muted); }
 
 /* =========================================================
    10 · Live — the room
@@ -643,7 +684,15 @@
 }
 @media (max-width:720px){
   .cn-head{ align-items:stretch; flex-direction:column; }
+  /* `flex:1 1 320px` above is a WIDTH basis for the row layout — the moment
+     the header turns into a column that same basis becomes a HEIGHT, and the
+     title block was being inflated to 320px. Measured on /live at 390px: a
+     376px-tall header holding 73px of text, with the "Go live" button pushed
+     most of a screen below the subtitle. */
+  .cn-head > div{ flex:0 0 auto; }
   .cn-head .btn{ width:100%; justify-content:center; }
+  /* the two header actions stack rather than fighting over one row */
+  .cn-head > .lv-head-acts{ flex-direction:column; align-items:stretch; }
   .cn-hero{
     box-shadow:0 14px 34px -20px rgba(22,40,63,.5);
     /* restate chat-extras §20.7's phone metrics — this file loads
@@ -679,6 +728,10 @@
   .lv-grid > .lv-card,.cn-rail > .cn-mine{ animation:none; }
   .lv-card,.lv-chat-log .lv-line{ transition:none; }
   .lv-card:hover{ transform:none; }
+  /* the rail's ember pulse — the ring's colour still says LIVE without it */
+  .lv-cell-ring{ animation:none; transition:none; }
+  .lv-cell:hover .lv-cell-ring,
+  .lv-cell:active .lv-cell-ring{ transform:none; }
   .ch-send:not(:disabled):hover,
   .ch-send:not(:disabled):active{ transform:none; }
 }

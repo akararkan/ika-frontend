@@ -147,10 +147,28 @@ function endSession() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('ika:auth-expired'))   // AuthProvider → setUser(null) → RequireAuth redirects
 }
 
-export async function request(method, path, opts = {}) {
-  const { body, query, headers = {}, multipart = false, signal, keepalive = false, _retried = false } = opts
+/** `attachment; filename="2026-07-27_09-15-03.mp4"` → the bare filename.
+ *  RFC 5987's `filename*=UTF-8''…` wins when present (it is the one that can
+ *  carry non-ASCII). Returns '' when the header says nothing useful. */
+function filenameFrom(disposition) {
+  const d = String(disposition || '')
+  const ext = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(d)
+  if (ext) { try { return decodeURIComponent(ext[1].trim().replace(/^"|"$/g, '')) } catch { /* fall through */ } }
+  const plain = /filename="?([^";]+)"?/i.exec(d)
+  return plain ? plain[1].trim() : ''
+}
 
-  const finalHeaders = { Accept: 'application/json', ...headers }
+export async function request(method, path, opts = {}) {
+  const { body, query, headers = {}, multipart = false, signal, keepalive = false, as = 'json', _retried = false } = opts
+
+  /* `as: 'blob'` is for authed BINARY downloads (the live-stream recording).
+     It must go through this function rather than an <a href> or a bare fetch:
+     the download is Bearer-authed, so a plain link sends no token, and going
+     around `request` would also skip the 401→refresh→retry recovery — which is
+     exactly what a long-open page hitting a rotated token needs. Note the
+     failure path is unchanged: a non-ok response is still parsed as an error
+     envelope (a missing recording answers 404 with JSON, not with bytes). */
+  const finalHeaders = { Accept: as === 'blob' ? '*/*' : 'application/json', ...headers }
   const token = session.getToken()
   if (token) finalHeaders.Authorization = `Bearer ${token}`
 
@@ -179,6 +197,13 @@ export async function request(method, path, opts = {}) {
 
   if (res.ok) {
     if (res.status === 204) return null
+    if (as === 'blob') {
+      return {
+        blob: await res.blob(),
+        filename: filenameFrom(res.headers.get('content-disposition')),
+        type: res.headers.get('content-type') || '',
+      }
+    }
     const text = await res.text()
     if (!text) return null
     try { return parseJson(text) } catch { return text }   // some endpoints return plain string
@@ -213,4 +238,24 @@ export const http = {
   put:   (path, body, opts)         => request('PUT', path, { body, ...opts }),
   del:   (path, opts)               => request('DELETE', path, opts),
   upload:(path, formData, opts)     => request('POST', path, { body: formData, multipart: true, ...opts }),
+  /** Authed binary GET → `{ blob, filename, type }`. See the `as: 'blob'` note
+   *  in `request`; use `saveBlob` below to actually put it on disk. */
+  download:(path, query, opts)      => request('GET', path, { query, as: 'blob', ...opts }),
+}
+
+/** Hand a fetched blob to the browser's downloader.
+ *  Kept next to `http.download` because the two are only ever used together:
+ *  the object URL MUST be revoked or the blob is pinned in memory for the life
+ *  of the document, and a whole recording is not a small leak. */
+export function saveBlob({ blob, filename } = {}, fallbackName = 'download') {
+  if (!blob || typeof document === 'undefined') return
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || fallbackName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Safari needs the URL alive until the click is actually processed.
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
 }

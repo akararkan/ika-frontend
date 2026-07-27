@@ -220,13 +220,19 @@ export function Badges({ items, max }) {
 export function Avatar({ initials, color, size = 38, square, className = '', src }) {
   const bg = color || 'linear-gradient(135deg,#2d5f97,#16283f)'
   const fontSize = Math.max(11, Math.round(size * 0.36))
+  /* A dead image URL used to leave an EMPTY plate: the old handler hid the
+     <img>, but the initials were never in the tree to fall back to. Reset on
+     `src` change so a different user in a re-used cell (the live rail swaps
+     cards in place) is not poisoned by the previous one's failure. */
+  const [broken, setBroken] = React.useState(false)
+  React.useEffect(() => { setBroken(false) }, [src])
   return (
     <span
       className={'avatar ' + (square ? 'sq ' : '') + className}
       style={{ width: size, height: size, background: bg, fontSize }}
     >
-      {src
-        ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }}/>
+      {src && !broken
+        ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setBroken(true)}/>
         : initials}
     </span>
   )

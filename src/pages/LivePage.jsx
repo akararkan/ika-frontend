@@ -24,7 +24,7 @@
    empty state says it rather than looking broken.
    ========================================================= */
 import React from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Icon, Avatar, showToast } from '../components/ui.jsx'
 import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
@@ -32,7 +32,11 @@ import { uiConfirm } from '../components/Dialog.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
+import { authorFrom } from '../api/adapters.js'
 import { chatError } from '../components/chat/chatErrors.js'
+import { publishCamera, playWhep } from '../lib/liveWebrtc.js'
+import { applyStreamEvent, patchStream } from '../lib/liveRows.js'
+import { LiveRow } from '../components/LiveRow.jsx'
 
 /** Native HLS is Safari-only; everywhere else a bare <video> can't play .m3u8. */
 function canPlayHls(el) {
@@ -45,11 +49,38 @@ const clockOf = (iso) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
-/* ---------- go live ---------- */
+/* Recording lifecycle → what the owner is actually told. `null` is "the backend
+   didn't say" (an older deploy), which renders as nothing rather than a guess.
 
-function GoLive({ onClose, onStarted }) {
-  const [title, setTitle] = React.useState('')
-  const [description, setDescription] = React.useState('')
+   DISABLED deliberately does NOT say "you chose not to save this one". Enabling
+   a recording is a best-effort call from the backend out to the MediaMTX
+   control API, and when it fails the stream still goes live — just unrecorded.
+   So DISABLED means "this is not being saved", which is all we can honestly
+   claim; it does not mean the host asked for that. `RecordingPanel` takes the
+   host's actual intent separately and says the true thing when the two differ. */
+const RECORDING_LABEL = {
+  RECORDING: ['Recording', 'Being saved while you’re live.'],
+  AVAILABLE: ['Recording ready', 'Download it, or delete it to free the space.'],
+  EMPTY:     ['Nothing recorded', 'The stream ended without anything being published.'],
+  DISABLED:  ['Not recorded', 'This broadcast isn’t being saved.'],
+  DELETED:   ['Recording deleted', 'The video is gone; the stream stays in your list.'],
+}
+
+/** 48210432 → "46.0 MB". Recordings are big enough that bytes are noise. */
+function sizeOf(bytes) {
+  const n = Number(bytes) || 0
+  if (n < 1024) return `${n} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let v = n / 1024, i = 0
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i += 1 }
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`
+}
+
+/* ---------- edit a stream's metadata (owner) ---------- */
+
+function EditStream({ stream, onClose, onSaved }) {
+  const [title, setTitle] = React.useState(stream?.title || '')
+  const [description, setDescription] = React.useState(stream?.description || '')
   const [busy, setBusy] = React.useState(false)
 
   React.useEffect(() => {
@@ -62,8 +93,217 @@ function GoLive({ onClose, onStarted }) {
     if (!title.trim() || busy) return
     setBusy(true)
     try {
-      const s = await api.chat.streams.start({ title: title.trim(), description: description.trim() || undefined })
-      onStarted?.(s)
+      const s = await api.chat.streams.update(stream.id, {
+        title: title.trim(),
+        description: description.trim(),
+      })
+      onSaved?.(s)
+    } catch (e) {
+      showToast(chatError(e, 'Could not save the changes'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="ch-modal-overlay" role="dialog" aria-modal="true" aria-label="Edit stream"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
+      <div className="ch-modal">
+        <div className="ch-modal-head">
+          <h3>Edit stream</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" title="Close">
+            <Icon name="close" className="sm"/>
+          </button>
+        </div>
+        <div className="ch-modal-body">
+          <label className="cn-field">
+            <span>Title</span>
+            <input className="field" autoFocus value={title} maxLength={140}
+              onChange={e => setTitle(e.target.value)}/>
+          </label>
+          <label className="cn-field">
+            <span>Description <small>optional</small></span>
+            <textarea className="field" rows={3} value={description} maxLength={500}
+              onChange={e => setDescription(e.target.value)}/>
+          </label>
+          {stream?.isLive && (
+            <p className="lv-note">
+              <Icon name="info" className="xs"/>
+              You’re live — everyone watching sees the new title straight away.
+            </p>
+          )}
+        </div>
+        <div className="ch-modal-foot">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={!title.trim() || busy} onClick={submit}>
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- the recording panel (owner-only) ---------- */
+
+function RecordingPanel({ stream, requested, onChanged }) {
+  const [info, setInfo] = React.useState(null)
+  const [busy, setBusy] = React.useState('')
+  const status = stream?.recordingStatus || null
+
+  /* The manifest is only worth fetching once there could be parts to list.
+     While RECORDING it is always empty (nothing is flushed until the end), and
+     DISABLED/DELETED have nothing to say. */
+  const wants = status === 'AVAILABLE' || status === 'EMPTY'
+  React.useEffect(() => {
+    if (!wants || !stream?.id) { setInfo(null); return undefined }
+    let alive = true
+    api.chat.streams.recording(stream.id)
+      .then(r => { if (alive) setInfo(r) })
+      .catch(() => { if (alive) setInfo(null) })
+    return () => { alive = false }
+  }, [wants, stream?.id])
+
+  /* EVERY early return lives below the hooks — rules of hooks. */
+  if (!status) return null
+
+  /* The host ticked "Record this stream" and it is not recording. Turning
+     recording on is a best-effort call from the backend out to the MediaMTX
+     control API; when that call fails the stream still goes live, silently
+     unrecorded. Saying nothing means the host broadcasts for an hour believing
+     it is being saved and finds out only when they go looking for the file —
+     the worst possible moment. `requested` carries the host's actual intent
+     across the go-live navigation, so this lands while it is still cheap to act
+     on: end and start again. */
+  if (requested && status !== 'RECORDING' && status !== 'AVAILABLE') {
+    return (
+      <section className="lv-rec warn">
+        <div className="lv-rec-t">
+          <span className="lv-rec-chip failed"><Icon name="info" className="xs"/>Not being recorded</span>
+        </div>
+        <p className="lv-rec-warn">
+          You asked for this stream to be saved, but recording couldn’t be turned
+          on — the media server didn’t take the request. The broadcast itself is
+          live and fine; there just won’t be a file at the end. End and start
+          again to retry.
+        </p>
+      </section>
+    )
+  }
+
+  const [label, hint] = RECORDING_LABEL[status] || ['Recording', '']
+
+  /* `part` given → that one file. `part` omitted → the WHOLE recording, which
+     walks the parts when there is more than one; the part-less route 400s on a
+     multi-part recording, and multi-part is routine here (see
+     saveWholeRecording). */
+  const save = async (part) => {
+    setBusy('save')
+    try {
+      if (part) await api.chat.streams.saveRecording(stream.id, { part })
+      else {
+        const n = await api.chat.streams.saveWholeRecording(stream.id)
+        if (n > 1) showToast(`Saved ${n} files — the broadcast is split into parts`)
+      }
+    } catch (e) {
+      showToast(chatError(e, 'Could not download the recording'))
+    } finally { setBusy('') }
+  }
+
+  const drop = async () => {
+    const ok = await uiConfirm({
+      title: 'Delete this recording?',
+      message: 'The video file is removed for good. The stream itself stays in your list.',
+      danger: true,
+      confirmLabel: 'Delete recording',
+    })
+    if (!ok) return
+    setBusy('drop')
+    try {
+      await api.chat.streams.removeRecording(stream.id)
+      showToast('Recording deleted')
+      onChanged?.({ recordingStatus: 'DELETED', recordingAvailable: false, recordingDownloadUrl: null })
+    } catch (e) {
+      showToast(chatError(e, 'Could not delete the recording'))
+    } finally { setBusy('') }
+  }
+
+  const multi = (info?.parts?.length || 0) > 1
+
+  return (
+    <section className="lv-rec">
+      <div className="lv-rec-t">
+        <span className={'lv-rec-chip ' + status.toLowerCase()}>
+          {status === 'RECORDING' && <span className="lv-dot" aria-hidden="true"/>}
+          {label}
+        </span>
+        <span className="lv-rec-hint">{hint}</span>
+      </div>
+
+      {info?.available && (
+        <div className="lv-rec-row">
+          <span className="lv-rec-size">
+            {info.partCount} {info.partCount === 1 ? 'file' : 'files'} · {sizeOf(info.totalBytes)}
+          </span>
+          <span className="lv-rec-acts">
+            {/* No <a download> anywhere here: the route is Bearer-authed, so a
+                plain link answers 401. It is fetched as a Blob and handed to
+                the browser's downloader. */}
+            <button className="rq-btn primary" disabled={!!busy} onClick={() => save(null)}>
+              {busy === 'save' ? 'Preparing…' : multi ? `Download all (${info.parts.length})` : 'Download'}
+            </button>
+            <button className="rq-btn" disabled={!!busy} onClick={drop}>
+              {busy === 'drop' ? 'Deleting…' : 'Delete'}
+            </button>
+          </span>
+        </div>
+      )}
+
+      {multi && (
+        <ul className="lv-rec-parts">
+          {info.parts.map(p => (
+            <li key={p.file}>
+              <span className="lv-rec-file" dir="auto">{p.file}</span>
+              <span className="lv-rec-size">{sizeOf(p.sizeBytes)}</span>
+              <button className="rq-btn" disabled={!!busy} onClick={() => save(p.file)}>Download</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/* ---------- go live ---------- */
+
+function GoLive({ onClose, onStarted }) {
+  const [title, setTitle] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  /* Recording is OPT-IN and the default is the server's (`record` omitted, not
+     `false`) — the box starts unticked because "this is being written to disk"
+     is the answer that has to be chosen, never the one that happens quietly. */
+  const [record, setRecord] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const submit = async () => {
+    if (!title.trim() || busy) return
+    setBusy(true)
+    try {
+      const s = await api.chat.streams.start({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        record,
+      })
+      /* The request is echoed back with the result: `recordingStatus` alone
+         cannot tell "the host didn't want a recording" from "the host wanted one
+         and the media server refused", and those need different words. */
+      onStarted?.(s, record)
     } catch (e) {
       showToast(chatError(e, 'Could not start the stream'))
     } finally {
@@ -92,10 +332,20 @@ function GoLive({ onClose, onStarted }) {
             <textarea className="field" rows={3} value={description} maxLength={500}
               onChange={e => setDescription(e.target.value)} placeholder="What you'll cover…"/>
           </label>
+          <label className="lv-check">
+            <input type="checkbox" checked={record} onChange={e => setRecord(e.target.checked)}/>
+            <span>
+              <b>Record this stream</b>
+              <small>
+                Saves the broadcast so you can download it after you end — only you
+                can reach it. Leave this off and nothing is written to disk.
+              </small>
+            </span>
+          </label>
           <p className="lv-note">
             <Icon name="info" className="xs"/>
-            Starting a stream gives you a private ingest URL. Point your
-            broadcasting software at it — the video never passes through IKA.
+            Next you’ll go live straight from your camera — just allow access when
+            asked. Prefer OBS or other software? A private ingest URL is there too.
           </p>
         </div>
         <div className="ch-modal-foot">
@@ -111,7 +361,7 @@ function GoLive({ onClose, onStarted }) {
 
 /* ---------- the watch / host view ---------- */
 
-function StreamRoom({ streamId, onExit }) {
+function StreamRoom({ streamId, recordRequested, onExit }) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { subscribe, watchUsers, userOf } = useChat()
@@ -122,6 +372,7 @@ function StreamRoom({ streamId, onExit }) {
   const [lines, setLines] = React.useState([])
   const [draft, setDraft] = React.useState('')
   const [showIngest, setShowIngest] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
   const [sending, setSending] = React.useState(false)
   /* How the manifest is being played. Resolved in the attach effect and held
      in state (probing the <video> during render would read a ref before it is
@@ -132,11 +383,19 @@ function StreamRoom({ streamId, onExit }) {
        unsupported → no engine can play it here
        failed      → an engine exists but the stream can't be reached */
   const [playback, setPlayback] = React.useState('probing')
+  /* Host broadcast (camera → WebRTC/WHIP): idle → connecting → live | error.
+     Only the host ever leaves 'idle'; viewers never publish. */
+  const [cast, setCast] = React.useState('idle')
+  const [castErr, setCastErr] = React.useState('')
+  const [micOn, setMicOn] = React.useState(true)
+  const [camOn, setCamOn] = React.useState(true)
   // Registered-viewer flag. The host is implicitly allowed and never joins.
   const [joined, setJoined] = React.useState(false)
   const videoRef = React.useRef(null)
   const logRef = React.useRef(null)
   const joinedRef = React.useRef(false)
+  const castRef = React.useRef(null)   // { pc, media, stop } while broadcasting
+  const whepRef = React.useRef(null)   // { pc, stop } while WHEP-watching
 
   const isHost = !!stream && String(stream.hostId) === String(myId)
 
@@ -199,61 +458,149 @@ function StreamRoom({ streamId, onExit }) {
     }
   }, [streamId])
 
-  /* Attach playback. Safari plays HLS natively; every other engine gets
-     hls.js over MediaSource — imported on demand, so no route that never
-     watches a stream pays for the chunk. Failure stays HONEST: a fatal,
-     unrecoverable error surfaces the open-in-a-player link rather than a
-     silent black rectangle. */
-  React.useEffect(() => {
-    const el = videoRef.current
-    const url = stream?.playbackUrl
-    if (!el || !url) return undefined
+  /* ---- HOST: broadcast the camera over WebRTC/WHIP ----
+     Browsers can't publish RTMP, so this is the in-app "go live". Publishing
+     is gated behind an explicit button press (a user gesture keeps the
+     camera-permission prompt reliable and never surprises the host). */
+  const stopCast = React.useCallback(() => {
+    castRef.current?.stop?.()
+    castRef.current = null
+  }, [])
 
-    if (!/\.m3u8($|\?)/i.test(url) || canPlayHls(el)) {
-      setPlayback('native')
-      el.src = url
-      el.play?.().catch(() => { /* autoplay policy — the controls are there */ })
-      return undefined
+  const startCast = React.useCallback(async () => {
+    if (!stream?.whipUrl || castRef.current) return
+    setCast('connecting'); setCastErr('')
+    try {
+      const handle = await publishCamera(stream.whipUrl, {
+        /* Attach the preview at CAPTURE time, not after the handshake. The host
+           sees themselves immediately, and a preview that is already painting
+           keeps the capture pipeline awake through the SDP exchange — which is
+           the race `firstVideoFrame` exists to win (lose it and MediaMTX
+           registers the session as audio-only and the recording has no video). */
+        onLocalStream: (media) => {
+          const el = videoRef.current
+          if (el) { el.srcObject = media; el.muted = true; el.play?.().catch(() => {}) }
+        },
+        onState: (st) => {
+          if (st === 'connected') setCast('live')
+          else if (st === 'failed') { setCast('error'); setCastErr('The connection to the media server dropped. Try again.') }
+        },
+      })
+      castRef.current = handle
+      const el = videoRef.current
+      if (el && el.srcObject !== handle.media) { el.srcObject = handle.media; el.muted = true; el.play?.().catch(() => {}) }
+      setMicOn(true); setCamOn(true)
+      // Some engines never emit 'connected' — the SDP answer already means we're up.
+      setCast(c => (c === 'connecting' ? 'live' : c))
+    } catch (e) {
+      setCast('error')
+      setCastErr(e?.name === 'NotAllowedError'
+        ? 'Camera / microphone access was blocked. Allow it in your browser and try again.'
+        : (e?.message || 'Could not start the camera.'))
     }
+  }, [stream])
+
+  const toggleMic = () => {
+    const t = castRef.current?.media?.getAudioTracks?.()[0]
+    if (t) { t.enabled = !t.enabled; setMicOn(t.enabled) }
+  }
+  const toggleCam = () => {
+    const t = castRef.current?.media?.getVideoTracks?.()[0]
+    if (t) { t.enabled = !t.enabled; setCamOn(t.enabled) }
+  }
+
+  // Always release the camera + peer connection when leaving the room.
+  React.useEffect(() => () => stopCast(), [stopCast])
+
+  /* ---- VIEWER: play the stream. WHEP first (sub-second latency, the "live"
+     feel); fall back to HLS — Safari plays it natively, every other engine
+     gets hls.js over MediaSource, imported on demand. Failure stays HONEST:
+     a fatal error surfaces the open-in-a-player link, not a black rectangle.
+     The host never runs this — they see their own camera preview instead. */
+  React.useEffect(() => {
+    if (isHost) return undefined
+    const el = videoRef.current
+    if (!el || !stream?.isLive) return undefined
 
     let dead = false
     let hls = null
     let netRetries = 0
-    setPlayback('probing')
-    import('hls.js')
-      .then(({ default: Hls }) => {
-        if (dead) return
-        if (!Hls.isSupported()) { setPlayback('unsupported'); return }
-        hls = new Hls({ enableWorker: true, lowLatencyMode: true })
-        hls.on(Hls.Events.ERROR, (_evt, data) => {
-          if (dead || !data?.fatal) return
-          /* Media errors are usually a decoder hiccup — recoverable in place.
-             Network errors get a few retries (a live edge can 404 for a beat
-             as segments rotate) before we give up honestly. */
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hls?.recoverMediaError(); return }
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && netRetries < 3) {
-            netRetries += 1
-            setTimeout(() => { if (!dead) hls?.startLoad() }, 1500 * netRetries)
-            return
-          }
-          hls?.destroy(); hls = null
-          setPlayback('failed')
+    const stopWhep = () => { whepRef.current?.stop?.(); whepRef.current = null }
+
+    const attachHls = () => {
+      const url = stream.playbackUrl
+      if (!url) { setPlayback('failed'); return }
+      if (!/\.m3u8($|\?)/i.test(url) || canPlayHls(el)) {
+        setPlayback('native'); el.src = url
+        el.play?.().catch(() => { /* autoplay policy — the controls are there */ })
+        return
+      }
+      import('hls.js')
+        .then(({ default: Hls }) => {
+          if (dead) return
+          if (!Hls.isSupported()) { setPlayback('unsupported'); return }
+          hls = new Hls({ enableWorker: true, lowLatencyMode: true })
+          hls.on(Hls.Events.ERROR, (_evt, data) => {
+            if (dead || !data?.fatal) return
+            /* Media errors are usually a decoder hiccup — recoverable in place.
+               Network errors get a few retries (a live edge can 404 for a beat
+               as segments rotate) before we give up honestly. */
+            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hls?.recoverMediaError(); return }
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR && netRetries < 3) {
+              netRetries += 1
+              setTimeout(() => { if (!dead) hls?.startLoad() }, 1500 * netRetries)
+              return
+            }
+            hls?.destroy(); hls = null
+            setPlayback('failed')
+          })
+          hls.loadSource(url)
+          hls.attachMedia(el)
+          setPlayback('mse')
+          el.play?.().catch(() => { /* autoplay policy */ })
         })
-        hls.loadSource(url)
-        hls.attachMedia(el)
-        setPlayback('mse')
-        el.play?.().catch(() => { /* autoplay policy */ })
-      })
-      .catch(() => { if (!dead) setPlayback('unsupported') })
-    return () => { dead = true; hls?.destroy() }
-  }, [stream?.playbackUrl])
+        .catch(() => { if (!dead) setPlayback('unsupported') })
+    }
+
+    async function go() {
+      setPlayback('probing')
+      // 1) WHEP — pure WebRTC, sub-second latency.
+      if (stream.whepUrl) {
+        try {
+          const handle = await playWhep(stream.whepUrl, el, {
+            onState: (st) => {
+              if (dead) return
+              if (st === 'connected') setPlayback('webrtc')
+              // If the WebRTC path drops, fall back to HLS mid-stream.
+              if ((st === 'failed' || st === 'disconnected') && whepRef.current) {
+                stopWhep(); if (!dead) attachHls()
+              }
+            },
+          })
+          if (dead) { handle.stop(); return }
+          whepRef.current = handle
+          el.play?.().catch(() => {})
+          return
+        } catch { /* WHEP unavailable (no publisher yet, or blocked) — try HLS */ }
+      }
+      attachHls()
+    }
+    go()
+    return () => { dead = true; stopWhep(); hls?.destroy() }
+  }, [isHost, stream?.whepUrl, stream?.playbackUrl, stream?.isLive])
 
   React.useEffect(() => subscribe((evt) => {
     if (!evt?.type?.startsWith('stream.')) return
     if (evt.streamId && String(evt.streamId) !== String(streamId)) return
 
     if (evt.type === 'stream.viewer') {
-      if (evt.stream) setStream(evt.stream)
+      /* PATCH, never replace. `liveStreamFrom` fills everything the payload
+         omits with `null`, and the URLs are not on a viewer frame — they are
+         minted on `join`, and `whipUrl` is host-only besides. Assigning the
+         frame wholesale blanked `playbackUrl`/`whepUrl`, which are attach-
+         effect dependencies: the video tore down and re-dialled every single
+         time somebody else walked into the room. */
+      if (evt.stream) setStream(prev => patchStream(prev, evt.stream))
       /* The event names WHO joined or left, not just the new total — that is
          the audience feedback a live room runs on, and it was being thrown
          away in favour of a bare number. Fold it into the same log as the
@@ -269,8 +616,19 @@ function StreamRoom({ streamId, onExit }) {
       }
     }
 
+    /* The host edited the title/description mid-broadcast. Same patch rule —
+       the frame omits the host identity, so replacing would blank it. */
+    if (evt.type === 'stream.updated' && evt.stream) {
+      setStream(prev => patchStream(prev, evt.stream))
+    }
+
     if (evt.type === 'stream.ended') {
-      if (evt.stream) setStream(evt.stream)
+      /* The EVENT NAME is the truth here, not the payload: `liveStreamFrom`
+         defaults a missing `status` to LIVE, so a thin frame would have left
+         the room insisting the stream was still running. */
+      setStream(prev => (prev || evt.stream
+        ? { ...patchStream(prev, evt.stream), status: 'ENDED', isLive: false }
+        : prev))
       joinedRef.current = false
       setJoined(false)
       showToast('The stream has ended')
@@ -312,13 +670,41 @@ function StreamRoom({ streamId, onExit }) {
   const endStream = async () => {
     const ok = await uiConfirm({
       title: 'End the stream?',
-      message: 'Viewers will be disconnected and the stream closes for everyone.',
+      message: stream?.recordingStatus === 'RECORDING'
+        ? 'Viewers will be disconnected and the stream closes for everyone. Your recording is saved and you can download it here afterwards.'
+        : 'Viewers will be disconnected and the stream closes for everyone.',
       danger: true,
       confirmLabel: 'End stream',
     })
     if (!ok) return
-    try { await api.chat.streams.end(streamId); showToast('Stream ended'); onExit?.() }
-    catch (e) { showToast(chatError(e, 'Could not end the stream')) }
+    try {
+      await api.chat.streams.end(streamId)
+      stopCast()
+      showToast('Stream ended')
+      /* Deliberately NOT exiting to the directory any more. Ending is the exact
+         moment `recordingStatus` resolves (RECORDING → AVAILABLE or EMPTY), so
+         bouncing the host out was sending them to hunt for a file that had just
+         appeared on the page they were thrown off. Re-fetch in place instead —
+         the room already renders its own ended state. */
+      const fresh = await api.chat.streams.get(streamId).catch(() => null)
+      setStream(prev => (fresh ? patchStream(prev, fresh) : { ...prev, status: 'ENDED', isLive: false }))
+    } catch (e) {
+      showToast(chatError(e, 'Could not end the stream'))
+    }
+  }
+
+  const deleteStream = async () => {
+    const ok = await uiConfirm({
+      title: 'Delete this stream?',
+      message: stream?.recordingAvailable
+        ? 'The stream and its recording are both deleted for good. Download the recording first if you want to keep it.'
+        : 'The stream is removed from your list for good.',
+      danger: true,
+      confirmLabel: 'Delete stream',
+    })
+    if (!ok) return
+    try { await api.chat.streams.remove(streamId); showToast('Stream deleted'); onExit?.() }
+    catch (e) { showToast(chatError(e, 'Could not delete the stream')) }
   }
 
   if (state === 'loading') return <Loader label="Opening the stream…"/>
@@ -338,8 +724,30 @@ function StreamRoom({ streamId, onExit }) {
         <div className="lv-stage">
           {stream.isLive ? (
             <>
-              <video ref={videoRef} className="lv-video" controls playsInline autoPlay/>
-              {playbackStuck && (
+              <video ref={videoRef} className="lv-video" controls={!isHost} playsInline autoPlay muted={isHost}/>
+
+              {/* Host: broadcast from the browser camera (WebRTC/WHIP). */}
+              {isHost && cast !== 'live' && (
+                <div className="lv-hls" style={{ textAlign: 'center' }}>
+                  {cast === 'connecting' ? (
+                    <Loader label="Starting your camera…"/>
+                  ) : cast === 'error' ? (
+                    <p>
+                      <Icon name="info"/> {castErr}{' '}
+                      <button className="rq-btn primary" onClick={startCast}>Try again</button>
+                    </p>
+                  ) : (
+                    <p>
+                      <Icon name="broadcast"/> You’re set to go live. Start your camera to
+                      broadcast — viewers watch instantly.{' '}
+                      <button className="rq-btn primary" onClick={startCast}>Start camera</button>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Viewer: playback couldn’t start on this engine. */}
+              {!isHost && playbackStuck && (
                 <div className="lv-hls">
                   <Icon name="info"/>
                   <p>
@@ -352,6 +760,7 @@ function StreamRoom({ streamId, onExit }) {
                   </p>
                 </div>
               )}
+
               <span className="lv-badge"><span className="lv-dot" aria-hidden="true"/>LIVE</span>
             </>
           ) : (
@@ -362,6 +771,19 @@ function StreamRoom({ streamId, onExit }) {
             </div>
           )}
         </div>
+
+        {/* Host broadcast controls — only while actually publishing the camera. */}
+        {isHost && stream.isLive && cast === 'live' && (
+          <div className="lv-cast-bar" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '10px 0', flexWrap: 'wrap' }}>
+            <span className="lv-badge"><span className="lv-dot" aria-hidden="true"/>You’re live</span>
+            <button className="btn" onClick={toggleMic}>
+              <Icon name={micOn ? 'mic' : 'micoff'} className="xs"/>{micOn ? 'Mute' : 'Unmute'}
+            </button>
+            <button className="btn" onClick={toggleCam}>
+              <Icon name={camOn ? 'camera' : 'videooff'} className="xs"/>{camOn ? 'Camera off' : 'Camera on'}
+            </button>
+          </div>
+        )}
 
         <header className="lv-meta">
           <div className="lv-meta-main">
@@ -381,18 +803,35 @@ function StreamRoom({ streamId, onExit }) {
                 <Icon name="share" className="xs"/>Share
               </button>
             )}
+            {isHost && (
+              <button className="btn" onClick={() => setEditing(true)}>
+                <Icon name="edit" className="xs"/>Edit
+              </button>
+            )}
             {isHost && stream.isLive && (
               <button className="btn btn-danger" onClick={endStream}>End stream</button>
             )}
+            {isHost && !stream.isLive && (
+              <button className="btn btn-danger" onClick={deleteStream}>Delete</button>
+            )}
           </div>
         </header>
+
+        {/* Owner-only, and only once the backend has said something about it. */}
+        {isHost && (
+          <RecordingPanel
+            stream={stream}
+            requested={recordRequested}
+            onChanged={(patch) => setStream(prev => ({ ...prev, ...patch }))}
+          />
+        )}
 
         {isHost && stream.ingestUrl && (
           <section className="lv-ingest">
             <div className="lv-ingest-t">
               <Icon name="lock" className="sm"/>
-              <b>Your ingest URL</b>
-              <span className="lv-ingest-warn">Never share this — it carries your stream key.</span>
+              <b>Advanced — broadcast with OBS / software</b>
+              <span className="lv-ingest-warn">Optional. Never share this — it carries your stream key.</span>
             </div>
             <div className="lv-ingest-row">
               <code>{showIngest ? stream.ingestUrl : '••••••••••••••••••••••••••••'}</code>
@@ -459,6 +898,152 @@ function StreamRoom({ streamId, onExit }) {
           </div>
         )}
       </aside>
+
+      {editing && (
+        <EditStream
+          stream={stream}
+          onClose={() => setEditing(false)}
+          onSaved={(s) => {
+            setEditing(false)
+            /* The PATCH response is the full record, but fold it rather than
+               assign it — the host's own copy holds `whipUrl`/`ingestUrl`, and
+               a response that omitted either would take the broadcast down. */
+            setStream(prev => patchStream(prev, s))
+            showToast('Stream updated')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ---------- your streams (owner catalogue) ----------
+   `GET /streams/mine` is the only place an ENDED stream is reachable — it is
+   gone from `/streams/live` the moment it stops, so without this the host can
+   never get back to a recording. Kept behind a button rather than pinned to
+   the page: for most people it is empty, and discovery is what /live is for. */
+
+function MyStreams({ onClose, onOpen }) {
+  const [page, setPage] = React.useState(null)     // the Spring page, mapped
+  const [state, setState] = React.useState('loading')
+  const [editing, setEditing] = React.useState(null)
+
+  const load = React.useCallback(() => {
+    setState(s => (s === 'ready' ? s : 'loading'))
+    api.chat.streams.mine({ page: 0, size: 30 })
+      .then(pg => { setPage(pg); setState('ready') })
+      .catch(() => setState('error'))
+  }, [])
+
+  React.useEffect(() => { load() }, [load])
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !editing) onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, editing])
+
+  const rows = page?.items || []
+
+  const patchRow = (id, patch) => setPage(pg => (pg ? {
+    ...pg,
+    items: pg.items.map(r => (String(r.id) === String(id) ? { ...r, ...patch } : r)),
+  } : pg))
+
+  const dropStream = async (s) => {
+    const ok = await uiConfirm({
+      title: 'Delete this stream?',
+      message: s.recordingAvailable
+        ? 'The stream and its recording are both deleted for good.'
+        : 'The stream is removed from your list for good.',
+      danger: true,
+      confirmLabel: 'Delete',
+    })
+    if (!ok) return
+    try {
+      await api.chat.streams.remove(s.id)
+      setPage(pg => (pg ? { ...pg, items: pg.items.filter(r => String(r.id) !== String(s.id)) } : pg))
+      showToast('Stream deleted')
+    } catch (e) { showToast(chatError(e, 'Could not delete the stream')) }
+  }
+
+  const download = async (s) => {
+    // saveWholeRecording, not saveRecording: the part-less route 400s on a
+    // multi-part recording, which a browser broadcast produces routinely.
+    try {
+      const n = await api.chat.streams.saveWholeRecording(s.id)
+      if (n > 1) showToast(`Saved ${n} files — the broadcast is split into parts`)
+    } catch (e) { showToast(chatError(e, 'Could not download the recording')) }
+  }
+
+  return (
+    <div className="ch-modal-overlay" role="dialog" aria-modal="true" aria-label="Your streams"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
+      <div className="ch-modal lv-mine">
+        <div className="ch-modal-head">
+          <h3>Your streams</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" title="Close">
+            <Icon name="close" className="sm"/>
+          </button>
+        </div>
+
+        <div className="ch-modal-body">
+          {state === 'loading' && <Loader label="Loading your streams…"/>}
+          {state === 'error' && <ErrorState message="Could not load your streams." onRetry={load}/>}
+          {state === 'ready' && rows.length === 0 && (
+            <EmptyState icon="broadcast" title="You haven’t streamed yet"
+              sub="Your past broadcasts and their recordings will live here."/>
+          )}
+
+          {rows.map(s => {
+            const [recLabel] = RECORDING_LABEL[s.recordingStatus] || []
+            return (
+              <div className="lv-mine-row" key={s.id}>
+                <div className="lv-mine-main">
+                  <div className="lv-mine-t">
+                    <span className={'lv-mine-state ' + (s.isLive ? 'live' : 'ended')}>
+                      {s.isLive && <span className="lv-dot" aria-hidden="true"/>}
+                      {s.isLive ? 'LIVE' : 'Ended'}
+                    </span>
+                    <b dir="auto">{s.title}</b>
+                  </div>
+                  <div className="lv-mine-sub">
+                    {s.startedAt && <span>{new Date(s.startedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                    <span><Icon name="eye" className="xs"/>{(Number(s.viewerCount) || 0).toLocaleString()}</span>
+                    {recLabel && <span className={'lv-rec-chip sm ' + String(s.recordingStatus).toLowerCase()}>{recLabel}</span>}
+                  </div>
+                </div>
+                <div className="lv-mine-acts">
+                  {s.isLive && <button className="rq-btn primary" onClick={() => onOpen?.(s)}>Open</button>}
+                  {s.recordingAvailable && (
+                    <button className="rq-btn" onClick={() => download(s)}>Download</button>
+                  )}
+                  <button className="rq-btn" onClick={() => setEditing(s)}>Edit</button>
+                  <button className="rq-btn" onClick={() => dropStream(s)}>Delete</button>
+                </div>
+              </div>
+            )
+          })}
+
+          {page?.hasMore && (
+            <p className="lv-mine-more">
+              Showing your {rows.length} most recent streams.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {editing && (
+        <EditStream
+          stream={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(s) => {
+            patchRow(editing.id, { title: s.title, description: s.description })
+            setEditing(null)
+            showToast('Stream updated')
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -467,6 +1052,7 @@ function StreamRoom({ streamId, onExit }) {
 
 export function LivePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const { user } = useAuth()
   const { subscribe } = useChat()
@@ -474,6 +1060,10 @@ export function LivePage() {
   const [rows, setRows] = React.useState([])
   const [state, setState] = React.useState('loading')
   const [going, setGoing] = React.useState(false)
+  const [mine, setMine] = React.useState(false)
+  // How many followed hosts the rail is showing — the "Discover" heading only
+  // earns its place once there is a row above it to be distinguished from.
+  const [followCount, setFollowCount] = React.useState(0)
 
   const load = React.useCallback(() => {
     setState(s => (s === 'ready' ? s : 'loading'))
@@ -484,22 +1074,31 @@ export function LivePage() {
 
   React.useEffect(() => { if (!id) load() }, [id, load])
 
-  /* Keep the directory honest without polling: a stream ending or gaining a
-     viewer already arrives on the socket. */
+  /* The same reconcile the rail carries, and for the same measured reason:
+     `stream.ended` is fanned to a stream's participants, NOT to everyone
+     watching the directory, so a pushed-only grid never loses a card. `load`
+     keeps `state` at 'ready', so this never flashes the loader. */
+  React.useEffect(() => {
+    if (id) return undefined
+    const tick = () => { if (!document.hidden) load() }
+    const t = setInterval(tick, 60000)
+    document.addEventListener('visibilitychange', tick)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
+  }, [id, load])
+
+  /* Keep the directory honest without polling: a stream starting, ending or
+     gaining a viewer already arrives on the socket. The fold is shared with
+     the rail (lib/liveRows.js) — the discovery grid passes no `skipHostId`,
+     because your own stream belongs in "everyone live" and is what the "You"
+     pill on the card is for. */
   React.useEffect(() => subscribe((evt) => {
     if (!evt?.type?.startsWith('stream.') || id) return
-    if (evt.type === 'stream.ended') setRows(prev => prev.filter(s => String(s.id) !== String(evt.streamId)))
-    if (evt.type === 'stream.viewer' && evt.stream) {
-      setRows(prev => prev.map(s => (String(s.id) === String(evt.stream.id) ? evt.stream : s)))
-    }
-    if (evt.type === 'stream.started' && evt.stream) {
-      setRows(prev => [evt.stream, ...prev.filter(s => String(s.id) !== String(evt.stream.id))])
-    }
+    setRows(prev => applyStreamEvent(prev, evt))
   }), [subscribe, id])
 
   if (id) return (
     <div className="main wide lv-page">
-      <StreamRoom streamId={id} onExit={() => navigate('/live')}/>
+      <StreamRoom streamId={id} recordRequested={!!location.state?.recordRequested} onExit={() => navigate('/live')}/>
     </div>
   )
 
@@ -513,10 +1112,25 @@ export function LivePage() {
               Streams happening right now. Chat is live-only — nothing is recorded.
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => setGoing(true)}>
-            <Icon name="broadcast" className="xs"/>Go live
-          </button>
+          <div className="lv-head-acts">
+            <button className="btn" onClick={() => setMine(true)}>
+              <Icon name="feed" className="xs"/>Your streams
+            </button>
+            <button className="btn btn-primary" onClick={() => setGoing(true)}>
+              <Icon name="broadcast" className="xs"/>Go live
+            </button>
+          </div>
         </header>
+
+        {/* The people you follow, newest-live-first. Renders nothing at all
+            when none of them is live — an empty rail is a state, not an
+            error, and the directory below is the whole page either way. */}
+        <LiveRow
+          source="following"
+          title="Following"
+          sub="live right now"
+          onCount={setFollowCount}
+        />
 
         {state === 'loading' && <Loader label="Looking for live streams…"/>}
         {state === 'error' && <ErrorState message="Live streams are unavailable right now." onRetry={load}/>}
@@ -524,31 +1138,68 @@ export function LivePage() {
           <EmptyState icon="broadcast" title="Nobody is live" sub="Be the first — start a stream above."/>
         )}
 
+        {followCount > 0 && rows.length > 0 && (
+          <header className="lv-sec"><h2>Discover</h2><span>everyone live, most-watched first</span></header>
+        )}
+
         <div className="lv-grid">
-          {rows.map(s => (
-            <button key={s.id} className="lv-card" onClick={() => navigate(`/live/${s.id}`)}>
-              <div className="lv-card-thumb">
-                <Icon name="broadcast"/>
-                <span className="lv-badge sm"><span className="lv-dot" aria-hidden="true"/>LIVE</span>
-              </div>
-              <div className="lv-card-body">
-                <h3 dir="auto">{s.title}</h3>
-                {s.description && <p dir="auto">{s.description}</p>}
-                <div className="lv-card-meta">
-                  <Icon name="eye" className="xs"/>
-                  {s.viewerCount.toLocaleString()} watching
-                  {String(s.hostId) === String(user?.id) && <span className="pill">You</span>}
+          {rows.map(s => {
+            /* Same host fields the rail uses, same derivation — one identity
+               for a person, whichever surface they appear on. */
+            const u = authorFrom({
+              id: s.hostId, username: s.hostUsername,
+              fullName: s.hostDisplayName, profileImage: s.hostAvatarUrl,
+            }, s.hostId)
+            return (
+              <button key={s.id} className="lv-card" onClick={() => navigate(`/live/${s.id}`)}>
+                <div className="lv-card-thumb">
+                  <Icon name="broadcast"/>
+                  <span className="lv-badge sm"><span className="lv-dot" aria-hidden="true"/>LIVE</span>
                 </div>
-              </div>
-            </button>
-          ))}
+                <div className="lv-card-body">
+                  <h3 dir="auto">{s.title}</h3>
+                  <div className="lv-card-host">
+                    <Avatar size={22} src={u.profileImage || null} initials={u.initials} color={u.avc}/>
+                    <span dir="auto">{u.full}</span>
+                    <small dir="auto">@{s.hostHandle || u.handle}</small>
+                  </div>
+                  {s.description && <p dir="auto">{s.description}</p>}
+                  <div className="lv-card-meta">
+                    <Icon name="eye" className="xs"/>
+                    {(Number(s.viewerCount) || 0).toLocaleString()} watching
+                    {String(s.hostId) === String(user?.id) && <span className="pill">You</span>}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {going && (
         <GoLive
           onClose={() => setGoing(false)}
-          onStarted={(s) => { setGoing(false); if (s?.id) navigate(`/live/${s.id}`) }}
+          onStarted={(s, record) => {
+            setGoing(false)
+            if (!s?.id) return
+            /* Router state, not a query param: the host's INTENT is not part of
+               the stream's address, and a reload should not keep re-asserting
+               something we only knew at go-live. */
+            /* Said once, immediately, as well as shown persistently in the room:
+               "I asked for a recording and did not get one" is the kind of thing
+               a host must not learn an hour late. */
+            if (record && s.recordingStatus && s.recordingStatus !== 'RECORDING') {
+              showToast('Going live — but recording could not be turned on')
+            }
+            navigate(`/live/${s.id}`, { state: { recordRequested: !!record } })
+          }}
+        />
+      )}
+
+      {mine && (
+        <MyStreams
+          onClose={() => { setMine(false); load() }}
+          onOpen={(s) => { setMine(false); navigate(`/live/${s.id}`) }}
         />
       )}
     </div>

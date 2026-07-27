@@ -8,7 +8,7 @@ export { openStream, applyPostDelta, applyResearchDelta } from './realtime.js'
 export {
   convoFrom, msgFrom, memberFrom, requestFrom, participantFrom,
   settingsFrom, scheduledFrom, channelFrom, callFrom, callSignalFrom,
-  liveStreamFrom, liveChatFrom, pollFrom, draftFrom,
+  liveStreamFrom, liveChatFrom, recordingInfoFrom, pollFrom, draftFrom,
   channelSettingsFrom, channelSettingsTo,
 } from './chat.js'
 export {
