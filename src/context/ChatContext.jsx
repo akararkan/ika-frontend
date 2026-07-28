@@ -95,6 +95,7 @@ export function ChatProvider({ children }) {
   const activeIdRef = React.useRef(null)
   const seenRef = React.useRef(new Set())            // recently-seen messageIds (badge dedupe)
   const subscribersRef = React.useRef(new Set())     // firehose subscribers
+  const stageInvitesRef = React.useRef(new Map())    // streamId -> { member, at } — pending stage invites
   const typingRef = React.useRef({})                 // { convId: { userId: { until, activity } } }
   const typingSentRef = React.useRef(new Map())      // { convId: { at, activity } } — send throttle
   /* Mirror of `chatSettings`, so the stable-identity callbacks (sendTyping)
@@ -490,11 +491,16 @@ export function ChatProvider({ children }) {
         },
         /* A stage invite can land while the user is anywhere in the app — the
            full Accept/Decline banner lives in the live room, so away from it
-           say what happened and where to go. The room's own banner covers the
-           in-room case; suppress the toast there to avoid saying it twice. */
+           say what happened and where to go. The frame fires ONCE, and the
+           roster never lists INVITED members, so the invite is also STASHED —
+           LivePage takes it on mount and shows the banner; without the stash a
+           user who walks to the stream after the toast would find nothing to
+           accept. The room's own banner covers the in-room case; suppress the
+           toast there to avoid saying it twice. */
         onStream: (evt) => {
-          if (evt.type !== 'stream.stage.invite' || !evt.stageMember) return
-          if (evt.streamId && window.location.pathname.includes(`/live/${evt.streamId}`)) return
+          if (evt.type !== 'stream.stage.invite' || !evt.stageMember || !evt.streamId) return
+          stageInvitesRef.current.set(String(evt.streamId), { member: evt.stageMember, at: Date.now() })
+          if (window.location.pathname.includes(`/live/${evt.streamId}`)) return
           const who = evt.stageMember.displayName
             || (evt.stageMember.handle ? '@' + evt.stageMember.handle : 'The host')
           showToast(`${who} invited you up on their live stage — open their stream to accept`)
@@ -860,6 +866,18 @@ export function ChatProvider({ children }) {
 
   React.useEffect(() => () => clearTimeout(usersTimerRef.current), [])
 
+  /** One-shot pickup of a stage invite that arrived while the user was away
+   *  from that live page. Consumed on read; stale invites (>10 min) are dead —
+   *  the host has almost certainly moved on, and offering a seat that will
+   *  403 is worse than offering nothing. */
+  const takeStageInvite = React.useCallback((streamId) => {
+    const key = String(streamId || '')
+    const entry = stageInvitesRef.current.get(key)
+    if (!entry) return null
+    stageInvitesRef.current.delete(key)
+    return Date.now() - entry.at < 10 * 60 * 1000 ? entry.member : null
+  }, [])
+
   const subscribe = React.useCallback((handler) => {
     subscribersRef.current.add(handler)
     return () => subscribersRef.current.delete(handler)
@@ -882,6 +900,7 @@ export function ChatProvider({ children }) {
     sendTyping, typingIn, presenceOf, watchPresence,
     watchUsers, userOf, enrichAuthor,
     subscribe, setActiveConversation,
+    takeStageInvite,
   }
   return <ChatCtx.Provider value={value}>{children}</ChatCtx.Provider>
 }

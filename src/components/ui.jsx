@@ -45,7 +45,8 @@ export const ICON_PATHS = {
   upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
   download:'<path d="M12 3v12M8 11l4 4 4-4M4 21h16"/>',
   eye:    '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
-  eyeoff: '<path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6 0 10 7 10 7a17.8 17.8 0 0 1-3.1 3.7M6.5 6.5C3.9 8.3 2 12 2 12s4 7 10 7c1.7 0 3.2-.4 4.5-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/>',
+  /* (a refined `eyeoff` lives further down the map — a duplicate key here was
+     silently shadowed and tripped no-dupe-keys) */
   mail:   '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7.5l9 6 9-6"/>',
   alert:  '<circle cx="12" cy="12" r="9"/><path d="M12 8v4.5"/><path d="M12 16h.01"/>',
   lock:   '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
@@ -168,13 +169,19 @@ export const ICON_PATHS = {
   refresh:   '<path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.5V10H15"/>',
 }
 
-export function Icon({ name, className = '', style }) {
+/* An `aria-label` makes the icon a named image; without one it is decoration
+   and explicitly hidden from AT (which is right — nearly every Icon sits next
+   to its own text or inside an aria-labelled button). Before this, a label
+   passed in was silently DROPPED — a role-less <svg> that screen readers
+   skip — so state carried only by an icon (a guest's muted badge) vanished. */
+export function Icon({ name, className = '', style, 'aria-label': ariaLabel }) {
   const path = ICON_PATHS[name] || ''
   return (
     <svg
       className={'ico ' + className}
       viewBox="0 0 24 24"
       style={style}
+      {...(ariaLabel ? { role: 'img', 'aria-label': ariaLabel } : { 'aria-hidden': true })}
       dangerouslySetInnerHTML={{ __html: path }}
     />
   )

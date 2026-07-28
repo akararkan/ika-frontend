@@ -2288,68 +2288,163 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 }
 
 /* =========================================================
-   §23 — Multi-guest stage, reactions & gifts (LivePage)
+   §23 — The TikTok-style live stage (LivePage)
    ---------------------------------------------------------
-   The "go live together" layer: a rail of guest tiles under
-   the main stage, drifting reactions over it, one-at-a-time
-   gift moments in the center, the host's request queue, and
-   the supporters board in the chat aside.
+   Split-screen multi-guest grid, camera-off profile plates,
+   the LIVE top bar, drifting reactions, gift moments, the
+   host's request queue, the supporters board — and on phones
+   the comments float over the picture with the composer
+   pinned, exactly the TikTok live layout.
    ========================================================= */
 
-/* ---- the guest-tile rail ---- */
-.lv-tiles{
-  display:grid; gap:10px; margin-block-start:10px;
-  grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));
+/* ---- the split-screen grid ---- */
+.lv-grid{
+  position:absolute; inset:0;
+  display:grid; gap:2px; background:#0b1220;
 }
-.lv-tile{
-  position:relative; margin:0; aspect-ratio:4/3;
-  border-radius:var(--r-lg); overflow:hidden;
-  background:#0b1220; border:1px solid var(--line);
+.lv-grid[data-n="1"]{ grid-template-columns:1fr; }
+.lv-grid[data-n="2"],
+.lv-grid[data-n="3"],
+.lv-grid[data-n="4"]{ grid-template-columns:1fr 1fr; }
+.lv-grid[data-n="5"], .lv-grid[data-n="6"],
+.lv-grid[data-n="7"], .lv-grid[data-n="8"], .lv-grid[data-n="9"]{
+  grid-template-columns:repeat(3, 1fr);
 }
-.lv-tile.me{ border-color:var(--gold); }
-.lv-tile video,
-.lv-tile-media, .lv-tile-media video{
-  width:100%; height:100%; object-fit:cover; display:block; background:#000;
+/* Three up: two on top, the third across the bottom — no dead quarter. */
+.lv-grid[data-n="3"] .lv-cell:last-child{ grid-column:1 / -1; }
+
+.lv-cell{
+  position:relative; margin:0; overflow:hidden;
+  min-width:0; min-height:0; background:#0b1220;
 }
-.lv-tile-media{ position:absolute; inset:0; }
-.lv-tile-bar{
-  position:absolute; inset-block-end:0; inset-inline:0;
+.lv-cell video,
+.lv-cell-media, .lv-cell-media video{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; background:#000; display:block;
+}
+/* Alone on the stage, the host keeps the classic letterboxed frame; the
+   moment the screen splits, every cell fills like TikTok. */
+.lv-grid[data-n="1"] .lv-video{ object-fit:contain; }
+
+.lv-cell-bar{
+  position:absolute; inset-block-end:0; inset-inline:0; z-index:2;
   display:flex; align-items:center; justify-content:space-between; gap:6px;
-  padding:5px 8px; background:linear-gradient(transparent, rgba(11,18,32,.85));
+  padding:14px 8px 5px; background:linear-gradient(transparent, rgba(11,18,32,.82));
   color:#f5f1e8; font:600 11.5px/1.4 var(--sans);
 }
-.lv-tile-name{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
-.lv-tile-name bdi{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.lv-tile-acts{ display:inline-flex; gap:4px; flex:0 0 auto; }
-.lv-tile-act{
-  display:inline-flex; align-items:center; gap:4px;
-  padding:3px 7px; border:0; border-radius:999px; cursor:pointer;
-  background:rgba(247,243,234,.16); color:#f5f1e8;
-  font:600 11px/1.4 var(--sans);
+.lv-cell-name{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.lv-cell-name bdi{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lv-cell-chip{
+  padding:1px 7px; border-radius:999px; flex:0 0 auto;
+  background:var(--live); color:#fff; font:700 9.5px/1.5 var(--sans);
+  letter-spacing:.03em; text-transform:uppercase;
 }
-.lv-tile-act:hover{ background:rgba(247,243,234,.3); }
-.lv-tile-act.bad:hover{ background:var(--live); }
-.lv-tile-act:disabled{ opacity:.5; cursor:default; }
+.lv-cell-acts{ display:inline-flex; gap:4px; flex:0 0 auto; }
+.lv-cell-act{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border:0; border-radius:50%; cursor:pointer;
+  background:rgba(247,243,234,.16); color:#f5f1e8;
+}
+.lv-cell-act:hover{ background:rgba(247,243,234,.3); }
+.lv-cell-act.bad:hover{ background:var(--live); }
+.lv-cell-act:disabled{ opacity:.5; cursor:default; }
 
-/* ---- floating reactions ---- */
-.lv-floats{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+/* ---- camera-off / joining: the profile plate ---- */
+.lv-plate{
+  position:absolute; inset:0; z-index:1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
+  background:radial-gradient(120% 120% at 50% 30%, #1d2a44 0%, #0b1220 78%);
+  color:#f5f1e8; text-align:center; padding:10px;
+}
+.lv-plate-bg{
+  position:absolute; inset:-12%;
+  background-position:center; background-size:cover;
+  filter:blur(26px) saturate(1.1) brightness(.45);
+  transform:scale(1.15);
+}
+.lv-plate > *{ position:relative; }
+.lv-plate-name{ font:700 13px/1.4 var(--sans); max-width:92%; }
+.lv-plate-name bdi{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lv-plate-note{ color:rgba(247,243,234,.75); font:500 11px/1.4 var(--sans); }
+
+/* ---- the LIVE top bar ---- */
+.lv-topbar{
+  position:absolute; inset-block-start:0; inset-inline:0; z-index:4;
+  display:flex; align-items:center; gap:8px; padding:8px 10px 16px;
+  background:linear-gradient(rgba(11,18,32,.6), transparent);
+  pointer-events:none;
+}
+.lv-topbar > *{ pointer-events:auto; }
+.lv-topbar-sp{ flex:1; pointer-events:none; }
+.lv-live-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 10px; border-radius:999px;
+  background:var(--live); color:#fff;
+  font:800 11px/1.6 var(--sans); letter-spacing:.06em;
+}
+.lv-live-pill .lv-dot{ position:static; width:6px; height:6px; background:#fff; }
+.lv-count{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 9px; border-radius:999px;
+  background:rgba(11,18,32,.55); color:#f5f1e8;
+  font:700 11.5px/1.6 var(--sans);
+}
+.lv-ctl{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; border:0; border-radius:50%; cursor:pointer;
+  background:rgba(11,18,32,.55); color:#f5f1e8;
+}
+.lv-ctl:hover{ background:rgba(11,18,32,.85); }
+
+.lv-sound-pill{
+  position:absolute; inset-block-end:18%; inset-inline-start:50%; z-index:4;
+  transform:translateX(-50%);
+  display:inline-flex; align-items:center; gap:6px;
+  padding:7px 16px; border:0; border-radius:999px; cursor:pointer;
+  background:rgba(11,18,32,.72); color:#f5f1e8;
+  font:700 13px/1.5 var(--sans); backdrop-filter:blur(4px);
+}
+.lv-sound-pill:hover{ background:rgba(11,18,32,.9); }
+[dir="rtl"] .lv-sound-pill{ transform:translateX(50%); }
+
+/* ---- floating reactions (the heart burst) ---- */
+/* container-type makes cqh mean THIS BOX's height — without it the unit falls
+   back to the viewport and the hearts fly off at triple speed. */
+.lv-floats{
+  position:absolute; inset:0; z-index:3;
+  overflow:hidden; pointer-events:none;
+  container-type:size;
+}
 .lv-float{
-  position:absolute; inset-block-end:-36px;
-  font-size:26px; line-height:1;
-  animation:lv-float-up 2.5s ease-out forwards;
+  position:absolute; inset-block-end:-40px;
+  line-height:1;
+  animation:lv-float-up 2.6s cubic-bezier(.2,.5,.6,1) forwards;
   will-change:transform, opacity;
 }
+.lv-float-sway{
+  display:inline-block;
+  animation:lv-float-sway .9s ease-in-out infinite alternate;
+}
 @keyframes lv-float-up{
-  0%   { transform:translateY(0) scale(.7); opacity:0; }
-  12%  { opacity:1; }
-  100% { transform:translateY(-72cqh) translateY(-160px) scale(1.15); opacity:0; }
+  0%   { transform:translateY(0) scale(.5); opacity:0; }
+  8%   { transform:translateY(-6cqh) scale(1.12); opacity:1; }
+  14%  { transform:translateY(-11cqh) scale(1); }
+  78%  { opacity:.95; }
+  100% { transform:translateY(-86cqh) scale(1.05); opacity:0; }
+}
+@keyframes lv-float-sway{
+  from{ transform:translateX(calc(var(--amp, 10px) * -1)) rotate(-6deg); }
+  to  { transform:translateX(var(--amp, 10px)) rotate(6deg); }
 }
 
 /* ---- the tap rail (hearts + gift) ---- */
 .lv-react-rail{
   position:absolute; inset-inline-end:10px; inset-block-end:12px;
-  display:flex; flex-direction:column; gap:6px; z-index:3;
+  display:flex; flex-direction:column; gap:6px; z-index:5;
 }
+/* Split screen: the rightmost cell's name bar lives where the rail's tail
+   would sit — lift the rail clear of it. */
+.lv-grid:not([data-n="1"]) ~ .lv-react-rail{ inset-block-end:52px; }
 .lv-react-btn{
   width:38px; height:38px; border:0; border-radius:50%; cursor:pointer;
   background:rgba(11,18,32,.55); backdrop-filter:blur(4px);
@@ -2361,9 +2456,57 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .lv-react-btn.gift{ background:var(--gold-wash); }
 .lv-react-btn.gift:hover{ background:var(--gold); }
 
+/* ---- overlay comments + composer (the TikTok phone layout) ---- */
+.lv-ovl{
+  display:none;
+  position:absolute; z-index:4;
+  inset-inline-start:10px; inset-block-end:60px;
+  width:min(76%, 340px);
+  flex-direction:column; gap:4px;
+  pointer-events:none;
+  mask-image:linear-gradient(transparent, #000 18%);
+  -webkit-mask-image:linear-gradient(transparent, #000 18%);
+}
+.lv-ovl-line{
+  display:flex; align-items:center; gap:6px;
+  max-width:100%; width:fit-content;
+  padding:4px 10px 4px 5px; border-radius:999px;
+  background:rgba(11,18,32,.55); color:#f5f1e8;
+  font:500 12px/1.45 var(--sans);
+}
+.lv-ovl-line.sys{ padding-inline-start:10px; color:rgba(247,243,234,.8); font-size:11px; }
+.lv-ovl-line.gift{ padding-inline-start:10px; color:#f0cf7a; font-weight:700; }
+.lv-ovl-body{
+  min-width:0; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+}
+.lv-ovl-body b{ margin-inline-end:5px; color:#f0cf7a; font-weight:700; }
+.lv-ovl-send{
+  display:none;
+  position:absolute; z-index:5;
+  inset-block-end:10px; inset-inline-start:10px;
+  width:calc(100% - 68px);            /* leaves the rail's corner free */
+  align-items:center; gap:6px;
+}
+.lv-ovl-input{
+  flex:1; min-width:0; height:38px;
+  border:1px solid rgba(247,243,234,.25); border-radius:999px;
+  padding:0 14px; background:rgba(11,18,32,.6); color:#f5f1e8;
+  font:500 13px/1.5 var(--sans); backdrop-filter:blur(4px);
+}
+.lv-ovl-input::placeholder{ color:rgba(247,243,234,.55); }
+.lv-ovl-input:focus{ outline:none; border-color:var(--gold); }
+.lv-ovl-go{
+  width:38px; height:38px; flex:0 0 auto;
+  border:0; border-radius:50%; cursor:pointer;
+  display:grid; place-items:center;
+  background:var(--gold); color:var(--navy);
+}
+.lv-ovl-go:disabled{ opacity:.5; cursor:default; }
+
 /* ---- gift picker sheet ---- */
 .lv-gift-sheet{
-  position:absolute; inset:0; z-index:5;
+  position:absolute; inset:0; z-index:8;
   display:flex; align-items:flex-end; justify-content:center;
   background:rgba(11,18,32,.45); backdrop-filter:blur(2px);
 }
@@ -2371,6 +2514,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   width:min(420px, 94%); margin-block-end:10px;
   background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
   padding:10px 12px 12px; box-shadow:0 18px 40px rgba(11,18,32,.35);
+  outline:none;
 }
 .lv-gift-head{
   display:flex; align-items:center; justify-content:space-between;
@@ -2392,7 +2536,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 
 /* ---- the center-stage gift moment ---- */
 .lv-gift-splash{
-  position:absolute; inset:0; z-index:4; pointer-events:none;
+  position:absolute; inset:0; z-index:6; pointer-events:none;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
   animation:lv-gift-in var(--dur, 2s) ease-out forwards;
 }
@@ -2416,6 +2560,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   border:1px solid var(--gold); border-radius:var(--r-lg);
   background:var(--gold-wash); color:var(--ink);
   font:500 13px/1.5 var(--sans);
+  outline:none;
 }
 .lv-invite-msg{ flex:1 1 240px; min-width:0; }
 .lv-invite-acts{ display:inline-flex; gap:8px; flex:0 0 auto; }
@@ -2478,17 +2623,31 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .lv-line-invite:hover{ background:var(--gold-wash); }
 .lv-line-invite:disabled{ opacity:.5; cursor:default; }
 
-/* ---- mobile ---- */
+/* ---- phones: the full TikTok layout ---- */
 @media (max-width:720px){
-  .lv-tiles{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:8px; }
+  /* A tall stage, not a 16:9 letterbox squeezed to 190px. */
+  .lv-stage{ aspect-ratio:auto; height:min(68svh, 560px); }
+  /* The side panel gives way to the overlay comments + pinned composer. */
+  .lv-chat{ display:none; }
+  .lv-ovl{ display:flex; }
+  .lv-ovl-send{ display:flex; }
+  /* The rail rides above the composer; system banners clear it too. */
+  .lv-react-rail{ inset-block-end:60px; }
   .lv-react-btn{ width:34px; height:34px; font-size:17px; }
+  .lv-hls{ inset-block-end:58px; }
+  .lv-sound-pill{ inset-block-end:26%; }
+  /* The sheet escapes the stage box — a 68svh stage still clips a tall grid. */
+  .lv-gift-sheet{ position:fixed; z-index:90; }
   .lv-gift-glyph{ font-size:56px; }
-  .lv-gift-cells{ grid-template-columns:repeat(4, 1fr); gap:6px; }
+  .lv-gift-cells{ gap:6px; }
+  .lv-cell-bar{ font-size:10.5px; padding-block-start:10px; }
+  .lv-cell-act{ width:24px; height:24px; }
 }
 
 /* Motion is decoration here — a still heart and a fading gift are fine. */
 @media (prefers-reduced-motion:reduce){
   .lv-float{ animation:lv-float-fade 1.6s ease-out forwards; }
+  .lv-float-sway{ animation:none; }
   .lv-gift-splash{ animation:lv-gift-fade var(--dur, 2s) ease-out forwards; }
   .lv-react-btn:hover{ transform:none; }
   .lv-gift-cell:hover{ transform:none; }

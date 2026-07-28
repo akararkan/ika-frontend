@@ -1,20 +1,27 @@
 /* =========================================================
-   liveStage — the multi-guest stage, reactions and gifts UI
+   liveStage — the TikTok-style live stage: split screen,
+   camera-off profile plates, reactions and gifts
    ---------------------------------------------------------
-   The TikTok-style "go live together" layer on top of LivePage.
+   Multi-guest live is SEVERAL publishers sharing one canvas.
+   When the host is alone the stage is their full picture;
+   every guest who comes up SPLITS the screen — 2 side by side,
+   then a 2×2, then a 3-wide grid — exactly the TikTok "go live
+   together" layout. Each cell is one publisher: the host cell
+   is the room's main <video> (host preview, or WHEP/HLS for a
+   viewer), my own cell is my local camera, every other guest is
+   a WHEP subscription.
 
-   The one idea (live-multiguest-frontend.md §1): multi-guest live
-   is SEVERAL publishers. The host publishes as before and stays
-   the big picture; each guest publishes their own camera to their
-   own URL; everyone subscribes to every publisher. So the stage is
-   a rail of guest tiles under the main video — one tile per active
-   guest, each one a WHEP subscription — plus your OWN tile showing
-   your local camera while you are up.
+   A cell whose camera is off shows the person's PROFILE PLATE
+   (avatar on a tinted backdrop) instead of a black rectangle.
+   For my own cells that is local knowledge; for remote ones
+   there is no wire signal — a disabled WebRTC track still sends
+   encoded black frames — so `useVideoPresence` samples each
+   video's luma on a canvas and calls black black.
 
-   State (roster, queue, invites, floaters, the gift board) lives in
-   StreamRoom, which owns the SSE subscription; this file is the
-   rendering and the one genuinely stateful piece, useStageVideos —
-   the hook that keeps WHEP connections in sync with the roster.
+   State lives in StreamRoom (it owns the SSE subscription);
+   this file renders, plus the two genuinely stateful hooks:
+   useStageVideos (WHEP-per-guest, diffed, self-redialling) and
+   useVideoPresence (the camera-off detector).
    ========================================================= */
 import React from 'react'
 import { Icon, Avatar } from './ui.jsx'
@@ -41,64 +48,82 @@ const GIFT_EMOJI = {
 }
 export const emojiOfGift = (iconKey) => GIFT_EMOJI[String(iconKey || '').toLowerCase()] || '🎁'
 
+const connKeyOf = (m) => `${m.userId}|${m.whepUrl}`
+
 /**
  * Keep one WHEP connection per REMOTE guest, in lockstep with the roster.
  *
  * Diff-based on purpose: a `stream.stage` frame replaces the whole roster, and
  * tearing every tile down to re-dial it would blink every guest's video each
- * time anyone joins or leaves. So: open a connection only for a member we don't
- * have, close only the ones whose member left, and on EVERY pass re-apply the
- * mute flag — that last line IS the receive side of host-mute (there is no
- * server-side track mute; every client silencing the guest locally is the
- * mechanism, per live-streaming.md).
+ * time anyone joins or leaves. So: open a connection only for an entry we don't
+ * have, close only the ones that left, and on EVERY pass re-apply the mute
+ * flag — that line IS the receive side of host-mute (there is no server-side
+ * track mute; every client silencing the guest locally is the mechanism).
  *
- * The host member and myself are excluded by the caller: the host's media is
- * the main <video> (a second WHEP to the same path would double their audio),
- * and my own tile is my local camera preview, not a round-trip.
+ * Keyed by userId AND whepUrl: a guest who steps down and comes back up gets a
+ * freshly-minted media path, and a connection keyed by user alone would keep
+ * dialling the dead one forever.
  *
- * Dialing RETRIES while the tile exists: the roster frame routinely beats the
- * guest's first publish, so WHEP 404s for a beat — give up and that guest is
- * a black tile forever.
+ * Dialling retries while the entry exists (the roster frame routinely beats
+ * the guest's first publish, so WHEP 404s for a beat), and a connection that
+ * FAILS after it was up re-dials too — a network blip must not leave a
+ * permanently black cell.
+ *
+ * The host and myself are excluded by the caller: the host's media is the main
+ * video (a second WHEP to the same path would double their audio), and my own
+ * cell is my local camera preview, not a round trip.
  */
 export function useStageVideos(members) {
-  const conns = React.useRef(new Map())          // userId -> { el, handle, dead, muted }
+  const conns = React.useRef(new Map())   // connKey -> { el, handle, dead, timer, userId }
   const [, force] = React.useReducer(x => x + 1, 0)
 
   React.useEffect(() => {
-    const want = new Map((members || [])
-      .filter(m => m.whepUrl)
-      .map(m => [String(m.userId), m]))
+    const want = new Map((members || []).filter(m => m.whepUrl).map(m => [connKeyOf(m), m]))
 
-    // Members who left: stop the dial loop, close the connection, drop the el.
-    for (const [uid, c] of conns.current) {
-      if (!want.has(uid)) {
+    // Entries that left (or re-keyed): stop dialling, close, drop the element.
+    for (const [key, c] of conns.current) {
+      if (!want.has(key)) {
         c.dead = true
+        clearTimeout(c.timer)
         c.handle?.stop?.()
         try { c.el.remove() } catch { /* not mounted */ }
-        conns.current.delete(uid)
+        conns.current.delete(key)
       }
     }
 
     let created = false
-    want.forEach((m, uid) => {
-      let c = conns.current.get(uid)
+    want.forEach((m, key) => {
+      let c = conns.current.get(key)
       if (!c) {
         const el = document.createElement('video')
         el.autoplay = true
         el.playsInline = true
-        c = { el, handle: null, dead: false }
-        conns.current.set(uid, c)
+        c = { el, handle: null, dead: false, timer: null, userId: String(m.userId) }
+        conns.current.set(key, c)
         created = true
+        const redial = (delay) => {
+          if (c.dead) return
+          clearTimeout(c.timer)
+          c.timer = setTimeout(dial, delay)
+        }
         const dial = async () => {
-          while (!c.dead && !c.handle) {
-            try {
-              const h = await playWhep(m.whepUrl, el)
-              if (c.dead) { h.stop(); return }
-              c.handle = h
-              el.play?.().catch(() => { /* autoplay policy — it's muted-managed below */ })
-            } catch {
-              await new Promise(r => setTimeout(r, 1500))
-            }
+          if (c.dead || c.handle) return
+          try {
+            const h = await playWhep(m.whepUrl, el, {
+              onState: (st) => {
+                if (c.dead) return
+                if (st === 'failed' || st === 'disconnected' || st === 'closed') {
+                  c.handle?.stop?.()
+                  c.handle = null
+                  redial(1500)         // the publisher may just be re-negotiating
+                }
+              },
+            })
+            if (c.dead) { h.stop(); return }
+            c.handle = h
+            el.play?.().catch(() => { /* muted playback is managed below */ })
+          } catch {
+            redial(1500)
           }
         }
         dial()
@@ -106,109 +131,243 @@ export function useStageVideos(members) {
       /* Mute enforcement, every pass — the flag rides every roster frame. */
       c.el.muted = !!m.muted
     })
-    if (created) force()   // new els exist → let the tiles mount them
+    if (created) force()   // new els exist → let the cells mount them
   }, [members])
 
   // Unmount: stop everything. The dial loops see `dead` and exit.
   React.useEffect(() => () => {
-    conns.current.forEach(c => { c.dead = true; c.handle?.stop?.() })
+    conns.current.forEach(c => { c.dead = true; clearTimeout(c.timer); c.handle?.stop?.() })
     conns.current.clear()
   }, [])
 
   /* The REF, not its contents: reading `.current` during render is forbidden
-     (and pointless — the map only matters inside the tiles' DOM ref callbacks,
-     which run after render, where reading it is allowed). */
+     (the map only matters inside DOM ref callbacks and hooks, where it is
+     allowed). */
   return conns
 }
 
-/* ---------- the guest-tile rail ---------- */
-
 /**
- * One tile per guest — mine first (local preview), then each remote guest
- * (WHEP). The HOST is deliberately not here: their picture is the main stage.
+ * The camera-off detector. A remote publisher disabling their video track
+ * still SENDS frames — black ones — so "camera off" is invisible on the wire.
+ * Sample each cell's video onto a 12×12 canvas every 1.5s and read the mean
+ * luma; two consecutive black samples → that cell wears the profile plate.
+ * (Two, not one: a dark scene cut or a starting keyframe must not flash the
+ * plate over a live picture.) `readyState < 2` means no frames at all yet —
+ * reported separately so cells can say "joining" instead of "camera off".
+ *
+ * Returns { [userId]: 'connecting' | 'on' | 'off', '@host': … }.
  */
-export function StageTiles({
-  stage, myId, isHost, meOnStage, myTileRef, micOn,
-  connsRef, cardOf, busyId,
-  onMute, onUnmute, onRemove, onStepDown,
-}) {
-  const guests = (stage?.members || []).filter(m => !m.isHost)
-  const remotes = guests.filter(m => String(m.userId) !== String(myId))
-  if (!meOnStage && remotes.length === 0) return null
+export function useVideoPresence({ connsRef, idsKey, mainRef, watchMain }) {
+  const [presence, setPresence] = React.useState({})
+  const prevBlackRef = React.useRef({})   // key -> was the LAST sample black?
 
-  const plate = (m) => {
-    const card = cardOf?.(m.userId)
-    const name = m.displayName || card?.full || (m.handle ? '@' + m.handle : 'Guest')
-    return (
-      <span className="lv-tile-name" dir="auto">
-        <Avatar size={18} src={card?.profileImage || m.avatarUrl || null}
-          initials={card?.initials || (name[0] || '·')} color={card?.avc}/>
-        <bdi>{name}</bdi>
-        {m.muted && <Icon name="micoff" className="xs" aria-label="Muted by the host"/>}
-      </span>
-    )
-  }
+  React.useEffect(() => {
+    if (!idsKey && !watchMain) {
+      setPresence(p => (Object.keys(p).length ? {} : p))
+      return undefined
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = 12; canvas.height = 12
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
 
+    const sample = (el, key) => {
+      if (!el || el.readyState < 2 || !el.videoWidth) { prevBlackRef.current[key] = false; return 'connecting' }
+      try {
+        ctx.drawImage(el, 0, 0, 12, 12)
+        const d = ctx.getImageData(0, 0, 12, 12).data
+        let sum = 0
+        for (let i = 0; i < d.length; i += 4) sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114
+        const black = (sum / (d.length / 4)) < 16
+        const off = black && prevBlackRef.current[key]   // two consecutive black samples
+        prevBlackRef.current[key] = black
+        return off ? 'off' : 'on'
+      } catch {
+        return 'on'   // sampling failed → assume the picture is fine
+      }
+    }
+
+    const tick = () => {
+      const next = {}
+      connsRef.current.forEach(c => { next[c.userId] = sample(c.el, c.userId) })
+      if (watchMain) next['@host'] = sample(mainRef.current, '@host')
+      setPresence(prev => {
+        const pk = Object.keys(prev), nk = Object.keys(next)
+        if (pk.length === nk.length && nk.every(k => prev[k] === next[k])) return prev
+        return next
+      })
+    }
+    tick()
+    const t = setInterval(tick, 1500)
+    return () => clearInterval(t)
+  }, [connsRef, idsKey, mainRef, watchMain])
+
+  return presence
+}
+
+/* ---------- the split-screen stage grid ---------- */
+
+/** A cell's profile plate — what a camera-off (or still-joining) person looks
+ *  like: their face and name on a soft tinted backdrop, TikTok-style, never a
+ *  black rectangle. */
+function CellPlate({ name, card, avatarUrl, note }) {
   return (
-    <div className="lv-tiles" role="group" aria-label="On stage">
-      {meOnStage && (
-        <figure className="lv-tile me">
-          {/* My local camera — attached by goUp's onLocalStream. Muted ALWAYS:
-              hearing your own mic back half a second late is unusable. */}
-          <video ref={myTileRef} autoPlay playsInline muted/>
-          <figcaption className="lv-tile-bar">
-            <span className="lv-tile-name">
-              <bdi>You</bdi>
-              {(!micOn) && <Icon name="micoff" className="xs" aria-label="Your mic is off"/>}
-            </span>
-            <button className="lv-tile-act" onClick={onStepDown} title="Leave the stage">
-              <Icon name="logout" className="xs"/>Step down
-            </button>
-          </figcaption>
-        </figure>
+    <div className="lv-plate">
+      {(card?.profileImage || avatarUrl) && (
+        <span className="lv-plate-bg" style={{ backgroundImage: `url("${encodeURI(card?.profileImage || avatarUrl)}")` }} aria-hidden="true"/>
       )}
-
-      {remotes.map(m => (
-        <figure className="lv-tile" key={m.userId}>
-          {/* The WHEP <video> lives in the conns map (created before mount so
-              dialing can start immediately); adopt it into the tile. Reading
-              the ref HERE is fine — DOM ref callbacks run after render. */}
-          <div className="lv-tile-media" ref={node => {
-            const c = connsRef.current.get(String(m.userId))
-            if (node && c && c.el.parentNode !== node) node.appendChild(c.el)
-          }}/>
-          <figcaption className="lv-tile-bar">
-            {plate(m)}
-            {isHost && (
-              <span className="lv-tile-acts">
-                <button className="lv-tile-act" disabled={busyId === m.userId}
-                  onClick={() => (m.muted ? onUnmute(m.userId) : onMute(m.userId))}
-                  title={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}>
-                  <Icon name={m.muted ? 'micoff' : 'mic'} className="xs"/>
-                </button>
-                <button className="lv-tile-act bad" disabled={busyId === m.userId}
-                  onClick={() => onRemove(m.userId)} title="Take off the stage">
-                  <Icon name="close" className="xs"/>
-                </button>
-              </span>
-            )}
-          </figcaption>
-        </figure>
-      ))}
+      <Avatar size={52} src={card?.profileImage || avatarUrl || null}
+        initials={card?.initials || (name[0] || '·')} color={card?.avc}/>
+      <span className="lv-plate-name" dir="auto"><bdi>{name}</bdi></span>
+      {note && <span className="lv-plate-note">{note}</span>}
     </div>
   )
 }
 
-/* ---------- floating reactions ---------- */
+/**
+ * The whole stage as an adaptive grid: 1 → the host full-bleed, 2 → split
+ * side by side, 3-4 → 2×2, 5+ → 3-wide. The host cell wraps `hostSlot` — the
+ * room's ONE main <video> element, passed in as JSX so its identity (and the
+ * attach effects pointed at it) survive every layout change.
+ */
+export function StageGrid({
+  hostSlot, stream, stage, myId, isHost,
+  hostCamOff, presence, connsRef, cardOf, busyId,
+  meOnStage, attachMyTile, guestMicOn, guestCamOn, myMuted,
+  onToggleGuestMic, onToggleGuestCam, onStepDown,
+  onMute, onUnmute, onRemove,
+}) {
+  const guests = (stage?.members || []).filter(m => !m.isHost)
+  const remotes = guests.filter(m => String(m.userId) !== String(myId))
+  const n = 1 + (meOnStage ? 1 : 0) + remotes.length
 
-/** The drifting hearts over the stage. Pure render — StreamRoom owns the array
- *  and the expiry timers. `aria-hidden`: decorative, announced nowhere. */
+  const hostCard = cardOf?.(stream?.hostId)
+  const hostName = stream?.hostDisplayName || hostCard?.full
+    || (stream?.hostHandle ? '@' + stream.hostHandle : 'Host')
+
+  const nameOf = (m, card) => m.displayName || card?.full || (m.handle ? '@' + m.handle : 'Guest')
+
+  return (
+    <div className="lv-grid" data-n={Math.min(n, 9)}>
+      {/* ---- the host's cell — the main video lives here ---- */}
+      <figure className="lv-cell host">
+        {hostSlot}
+        {hostCamOff && (
+          <CellPlate name={hostName} card={hostCard} avatarUrl={stream?.hostAvatarUrl}
+            note="Camera is off"/>
+        )}
+        {n > 1 && (
+          <figcaption className="lv-cell-bar">
+            <span className="lv-cell-name">
+              <Icon name="crown" className="xs" aria-label="Host"/>
+              <bdi>{hostName}</bdi>
+            </span>
+          </figcaption>
+        )}
+      </figure>
+
+      {/* ---- my cell — local camera preview, my own controls ---- */}
+      {meOnStage && (
+        <figure className="lv-cell me">
+          {/* Muted ALWAYS: hearing your own mic back half a second late is
+              unusable. attachMyTile also (re)attaches the captured media, so a
+              cell that mounts AFTER capture still gets the picture. */}
+          <video ref={attachMyTile} autoPlay playsInline muted/>
+          {!guestCamOn && (
+            <CellPlate name="You" card={cardOf?.(myId)} note="Your camera is off"/>
+          )}
+          <figcaption className="lv-cell-bar">
+            <span className="lv-cell-name">
+              <bdi>You</bdi>
+              {myMuted && <span className="lv-cell-chip">Muted by host</span>}
+            </span>
+            <span className="lv-cell-acts">
+              <button className="lv-cell-act" onClick={onToggleGuestMic} disabled={myMuted}
+                aria-pressed={guestMicOn && !myMuted}
+                title={myMuted ? 'The host muted you' : guestMicOn ? 'Mute your mic' : 'Unmute your mic'}>
+                <Icon name={guestMicOn && !myMuted ? 'mic' : 'micoff'} className="xs"
+                  aria-label={guestMicOn && !myMuted ? 'Your mic is on' : 'Your mic is off'}/>
+              </button>
+              <button className="lv-cell-act" onClick={onToggleGuestCam}
+                aria-pressed={guestCamOn}
+                title={guestCamOn ? 'Turn your camera off — your profile shows instead' : 'Turn your camera on'}>
+                <Icon name={guestCamOn ? 'camera' : 'videooff'} className="xs"
+                  aria-label={guestCamOn ? 'Your camera is on' : 'Your camera is off'}/>
+              </button>
+              <button className="lv-cell-act bad" onClick={onStepDown} title="Leave the stage">
+                <Icon name="logout" className="xs" aria-label="Leave the stage"/>
+              </button>
+            </span>
+          </figcaption>
+        </figure>
+      )}
+
+      {/* ---- every other guest — a WHEP subscription each ---- */}
+      {remotes.map(m => {
+        const card = cardOf?.(m.userId)
+        const name = nameOf(m, card)
+        const state = presence?.[String(m.userId)] || 'connecting'
+        return (
+          <figure className="lv-cell" key={connKeyOf(m)}>
+            {/* The WHEP <video> lives in the conns map (created before mount so
+                dialling starts immediately); adopt it into the cell. Reading
+                the ref HERE is fine — DOM ref callbacks run after render. */}
+            <div className="lv-cell-media" ref={node => {
+              const c = connsRef.current.get(connKeyOf(m))
+              if (node && c && c.el.parentNode !== node) node.appendChild(c.el)
+            }}/>
+            {state !== 'on' && (
+              <CellPlate name={name} card={card} avatarUrl={m.avatarUrl}
+                note={state === 'connecting' ? 'Joining…' : 'Camera is off'}/>
+            )}
+            <figcaption className="lv-cell-bar">
+              <span className="lv-cell-name">
+                <Avatar size={16} src={card?.profileImage || m.avatarUrl || null}
+                  initials={card?.initials || (name[0] || '·')} color={card?.avc}/>
+                <bdi>{name}</bdi>
+                {m.muted && <Icon name="micoff" className="xs" aria-label="Muted by the host"/>}
+              </span>
+              {isHost && (
+                <span className="lv-cell-acts">
+                  <button className="lv-cell-act" disabled={busyId === m.userId}
+                    onClick={() => (m.muted ? onUnmute(m.userId) : onMute(m.userId))}
+                    title={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}>
+                    <Icon name={m.muted ? 'micoff' : 'mic'} className="xs"
+                      aria-label={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}/>
+                  </button>
+                  <button className="lv-cell-act bad" disabled={busyId === m.userId}
+                    onClick={() => onRemove(m.userId)} title="Take off the stage">
+                    <Icon name="close" className="xs" aria-label="Take off the stage"/>
+                  </button>
+                </span>
+              )}
+            </figcaption>
+          </figure>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ---------- floating reactions (the TikTok heart burst) ---------- */
+
+/** Hearts rise from the corner where thumbs tap, swaying as they climb. Two
+ *  layers per floater: the outer span rises and fades, the inner one sways —
+ *  composed transforms without keyframe math. Pure render; StreamRoom owns
+ *  the array and the expiry timers. Decorative → hidden from AT. */
 export function FloaterLayer({ floaters }) {
   if (!floaters?.length) return null
   return (
     <div className="lv-floats" aria-hidden="true">
       {floaters.map(f => (
-        <span key={f.id} className="lv-float" style={{ insetInlineStart: f.x + '%' }}>{f.emoji}</span>
+        <span key={f.id} className="lv-float"
+          style={{
+            insetInlineStart: f.x + '%',
+            fontSize: f.size + 'px',
+            animationDuration: f.dur + 's',
+            '--amp': f.amp + 'px',
+          }}>
+          <span className="lv-float-sway" style={{ animationDuration: (f.dur / 3) + 's' }}>{f.emoji}</span>
+        </span>
       ))}
     </div>
   )
@@ -217,13 +376,13 @@ export function FloaterLayer({ floaters }) {
 /* ---------- gifts ---------- */
 
 /** Center-stage gift moment. One at a time (StreamRoom queues); bigger gifts
- *  linger longer via the animation-duration custom property. */
+ *  linger longer via the hold stamped on the splash at promote time. */
 export function GiftSplash({ gift, cardOf }) {
   if (!gift) return null
   const card = cardOf?.(gift.senderId)
   const who = card?.full || gift.senderUsername || 'Someone'
   return (
-    <div className="lv-gift-splash" style={{ '--dur': `${1.8 + Math.min((gift.coins || 1) * 0.06, 2.4)}s` }}>
+    <div className="lv-gift-splash" style={{ '--dur': `${(gift._hold || 2000) / 1000}s` }}>
       <span className="lv-gift-glyph" aria-hidden="true">{emojiOfGift(gift.iconKey)}</span>
       <span className="lv-gift-caption" dir="auto">
         <b><bdi>{who}</bdi></b> sent {/^[aeiou]/i.test(gift.giftName) ? 'an' : 'a'} {gift.giftName}
@@ -232,14 +391,26 @@ export function GiftSplash({ gift, cardOf }) {
   )
 }
 
-/** The gift picker — a compact sheet over the stage. Symbolic only: coins are
- *  a leaderboard score, so the coin chip reads as rank weight, not price. */
+/** The gift picker — a bottom sheet (over the stage on desktop, over the
+ *  viewport on phones). Symbolic only: coins are a leaderboard score. */
 export function GiftPicker({ open, catalog, busy, onSend, onClose }) {
+  const boxRef = React.useRef(null)
+
+  // A dialog must answer Escape and take focus — otherwise a keyboard user is
+  // left composing into a page that has a sheet floating over it.
+  React.useEffect(() => {
+    if (!open) return undefined
+    boxRef.current?.focus()
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   if (!open) return null
   return (
-    <div className="lv-gift-sheet" role="dialog" aria-label="Send a gift"
+    <div className="lv-gift-sheet" role="dialog" aria-modal="true" aria-label="Send a gift"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
-      <div className="lv-gift-grid">
+      <div className="lv-gift-grid" ref={boxRef} tabIndex={-1}>
         <div className="lv-gift-head">
           <b>Send a gift</b>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close" className="sm"/></button>
@@ -330,13 +501,18 @@ export function RequestQueue({ requests, stageFull, busyId, cardOf, onApprove, o
 /* ---------- the invite banner (viewer side) ---------- */
 
 /** The host asked YOU up. A banner with the decision, not a toast — a toast
- *  can't carry Accept/Decline, and this is a decision, not a notification. */
+ *  can't carry Accept/Decline. Takes focus when it appears so a keyboard or
+ *  screen-reader user actually learns the question is being asked. */
 export function InviteBanner({ invite, busy, cardOf, onAccept, onDecline }) {
+  const boxRef = React.useRef(null)
+  const has = !!invite
+  React.useEffect(() => { if (has) boxRef.current?.focus() }, [has])
   if (!invite) return null
   const card = cardOf?.(invite.userId)
   const who = invite.displayName || card?.full || (invite.handle ? '@' + invite.handle : 'The host')
   return (
-    <div className="lv-invite" role="alertdialog" aria-label="Invitation to join the stage">
+    <div className="lv-invite" role="alertdialog" aria-label="Invitation to join the stage"
+      ref={boxRef} tabIndex={-1}>
       <Icon name="broadcast" className="sm"/>
       <span className="lv-invite-msg" dir="auto">
         <b><bdi>{who}</bdi></b> invited you up on the stage — your camera and mic go live to everyone.
