@@ -488,6 +488,17 @@ export function ChatProvider({ children }) {
             setRequests(prev => [evt.request, ...prev.filter(r => r.id !== evt.request.id)])
           }
         },
+        /* A stage invite can land while the user is anywhere in the app — the
+           full Accept/Decline banner lives in the live room, so away from it
+           say what happened and where to go. The room's own banner covers the
+           in-room case; suppress the toast there to avoid saying it twice. */
+        onStream: (evt) => {
+          if (evt.type !== 'stream.stage.invite' || !evt.stageMember) return
+          if (evt.streamId && window.location.pathname.includes(`/live/${evt.streamId}`)) return
+          const who = evt.stageMember.displayName
+            || (evt.stageMember.handle ? '@' + evt.stageMember.handle : 'The host')
+          showToast(`${who} invited you up on their live stage — open their stream to accept`)
+        },
         onAny: broadcast,                        // firehose → subscribe() consumers (useThread etc.)
         onError: async (readyState) => {
           setConnected(false)

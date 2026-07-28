@@ -37,6 +37,11 @@ import { chatError } from '../components/chat/chatErrors.js'
 import { publishCamera, playWhep } from '../lib/liveWebrtc.js'
 import { applyStreamEvent, patchStream } from '../lib/liveRows.js'
 import { LiveRow } from '../components/LiveRow.jsx'
+import {
+  REACTIONS, emojiOfReaction, emojiOfGift, useStageVideos,
+  StageTiles, FloaterLayer, GiftSplash, GiftPicker, SupportersPanel,
+  RequestQueue, InviteBanner,
+} from '../components/liveStage.jsx'
 
 /** Native HLS is Safari-only; everywhere else a bare <video> can't play .m3u8. */
 function canPlayHls(el) {
@@ -60,6 +65,8 @@ const clockOf = (iso) => {
    host's actual intent separately and says the true thing when the two differ. */
 const RECORDING_LABEL = {
   RECORDING: ['Recording', 'Being saved while you’re live.'],
+  PAUSED:    ['Recording paused', 'You’re still live — nothing is being saved right now.'],
+  PROCESSING:['Preparing your video', 'Your takes are being joined into one file. The parts below still work.'],
   AVAILABLE: ['Recording ready', 'Download it, or delete it to free the space.'],
   EMPTY:     ['Nothing recorded', 'The stream ended without anything being published.'],
   DISABLED:  ['Not recorded', 'This broadcast isn’t being saved.'],
@@ -152,17 +159,33 @@ function RecordingPanel({ stream, requested, onChanged }) {
   const status = stream?.recordingStatus || null
 
   /* The manifest is only worth fetching once there could be parts to list.
-     While RECORDING it is always empty (nothing is flushed until the end), and
-     DISABLED/DELETED have nothing to say. */
-  const wants = status === 'AVAILABLE' || status === 'EMPTY'
+     While RECORDING/PAUSED it is always empty (nothing is flushed until the
+     end), and DISABLED/DELETED have nothing to say. PROCESSING is included
+     because the individual takes ARE downloadable while the join runs — a host
+     in a hurry should not have to wait for the re-encode. */
+  const wants = status === 'AVAILABLE' || status === 'EMPTY' || status === 'PROCESSING'
   React.useEffect(() => {
     if (!wants || !stream?.id) { setInfo(null); return undefined }
     let alive = true
-    api.chat.streams.recording(stream.id)
+    const load = () => api.chat.streams.recording(stream.id)
       .then(r => { if (alive) setInfo(r) })
       .catch(() => { if (alive) setInfo(null) })
-    return () => { alive = false }
-  }, [wants, stream?.id])
+    load()
+    /* The join finishes on the server with nothing to announce it — there is no
+       SSE event for "your file is ready" — so poll, but only while it is
+       actually running. */
+    if (status !== 'PROCESSING') return () => { alive = false }
+    const t = setInterval(async () => {
+      if (!alive) return
+      try {
+        const fresh = await api.chat.streams.get(stream.id)
+        if (!alive) return
+        if (fresh?.recordingStatus && fresh.recordingStatus !== 'PROCESSING') onChanged?.(fresh)
+        else load()
+      } catch { /* transient — the next tick tries again */ }
+    }, 5000)
+    return () => { alive = false; clearInterval(t) }
+  }, [wants, status, stream?.id, onChanged])
 
   /* EVERY early return lives below the hooks — rules of hooks. */
   if (!status) return null
@@ -175,7 +198,10 @@ function RecordingPanel({ stream, requested, onChanged }) {
      the worst possible moment. `requested` carries the host's actual intent
      across the go-live navigation, so this lands while it is still cheap to act
      on: end and start again. */
-  if (requested && status !== 'RECORDING' && status !== 'AVAILABLE') {
+  /* PAUSED and PROCESSING are deliberate states, not failures — the host paused
+     the recording themselves, or the server is joining their takes. Warning
+     "recording couldn't be turned on" in either case would be a lie. */
+  if (requested && !['RECORDING', 'PAUSED', 'PROCESSING', 'AVAILABLE'].includes(status)) {
     return (
       <section className="lv-rec warn">
         <div className="lv-rec-t">
@@ -389,6 +415,11 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
   const [castErr, setCastErr] = React.useState('')
   const [micOn, setMicOn] = React.useState(true)
   const [camOn, setCamOn] = React.useState(true)
+  /* The PICTURE's health, which is not the same thing as `cast`. A broadcast
+     can stay `live` — connection up, audio flowing, viewers counted — while the
+     camera has quietly stopped producing frames. Left unsaid, the host finds
+     out afterwards, from a recording that freezes halfway. */
+  const [camHealth, setCamHealth] = React.useState({ state: 'ok', detail: '' })
   // Registered-viewer flag. The host is implicitly allowed and never joins.
   const [joined, setJoined] = React.useState(false)
   const videoRef = React.useRef(null)
@@ -397,7 +428,39 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
   const castRef = React.useRef(null)   // { pc, media, stop } while broadcasting
   const whepRef = React.useRef(null)   // { pc, stop } while WHEP-watching
 
+  /* ---- multi-guest stage / reactions / gifts state ----
+     The roster (`stage`) is server-truth, replaced wholesale by every
+     `stream.stage` frame. Everything else is what the wire cannot know:
+     my pending hand-raise, the invite awaiting my answer, the animation
+     queues, and the host's request list. */
+  const [stage, setStage] = React.useState(null)          // StageState | null
+  const [requests, setRequests] = React.useState([])      // host's hand-raise queue
+  const [invite, setInvite] = React.useState(null)        // the HOST member who invited me
+  const [handRaised, setHandRaised] = React.useState(false)
+  const [stageBusy, setStageBusy] = React.useState(false) // my own up/down transitions
+  const [stageBusyId, setStageBusyId] = React.useState(null) // host acting on ONE guest
+  const [floaters, setFloaters] = React.useState([])      // drifting reaction emojis
+  const [giftSplash, setGiftSplash] = React.useState(null) // the one showing now
+  const [giftQueue, setGiftQueue] = React.useState([])     // the ones waiting
+  const [giftsOpen, setGiftsOpen] = React.useState(false)
+  const [catalog, setCatalog] = React.useState(null)      // null = not fetched yet
+  const [giftBusy, setGiftBusy] = React.useState(false)
+  const [board, setBoard] = React.useState([])            // top supporters
+  const guestCastRef = React.useRef(null)  // { pc, media, stop } while I'm ON the stage
+  const myTileRef = React.useRef(null)     // my guest tile's <video>
+  const lastTapRef = React.useRef(0)       // reaction send throttle
+
   const isHost = !!stream && String(stream.hostId) === String(myId)
+  const myStageMember = stage?.members?.find(m => String(m.userId) === String(myId)) || null
+  const meOnStage = !!myStageMember && !myStageMember.isHost && myStageMember.status === 'ACTIVE'
+  const stageFull = !!stage?.isFull
+  /* Remote guests only: my tile is my local camera, and the HOST's media is the
+     main <video> — a second WHEP to the host's path would double their audio. */
+  const remoteGuests = React.useMemo(
+    () => (stream?.isLive && stage ? stage.members.filter(m => !m.isHost && String(m.userId) !== String(myId)) : []),
+    [stage, myId, stream?.isLive],
+  )
+  const connsRef = useStageVideos(remoteGuests)
 
   /* Join registers presence (it is what drives `viewerCount`) and is what
      returns `playbackUrl`. The host must NOT join — they are already counted,
@@ -469,7 +532,7 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
 
   const startCast = React.useCallback(async () => {
     if (!stream?.whipUrl || castRef.current) return
-    setCast('connecting'); setCastErr('')
+    setCast('connecting'); setCastErr(''); setCamHealth({ state: 'ok', detail: '' })
     try {
       const handle = await publishCamera(stream.whipUrl, {
         /* Attach the preview at CAPTURE time, not after the handshake. The host
@@ -479,12 +542,20 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
            registers the session as audio-only and the recording has no video). */
         onLocalStream: (media) => {
           const el = videoRef.current
-          if (el) { el.srcObject = media; el.muted = true; el.play?.().catch(() => {}) }
+          if (!el) return
+          /* Detach first: this fires again after a camera repair swaps the video
+             track, and re-assigning the SAME MediaStream is a no-op in some
+             engines — the preview would keep showing the dead frame. */
+          el.srcObject = null
+          el.srcObject = media
+          el.muted = true
+          el.play?.().catch(() => {})
         },
         onState: (st) => {
           if (st === 'connected') setCast('live')
           else if (st === 'failed') { setCast('error'); setCastErr('The connection to the media server dropped. Try again.') }
         },
+        onHealth: (state, detail) => setCamHealth({ state, detail: detail || '' }),
       })
       castRef.current = handle
       const el = videoRef.current
@@ -509,8 +580,260 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
     if (t) { t.enabled = !t.enabled; setCamOn(t.enabled) }
   }
 
+  /* Recording is the host's to start and stop as often as they like while live.
+     Each take is a separate file on the server and they are joined into one
+     video when the stream ends, so this is a plain toggle — there is no "take
+     1 of 4" for the host to keep track of. */
+  const [recBusy, setRecBusy] = React.useState(false)
+  const recording = stream?.recordingStatus === 'RECORDING'
+  const toggleRecord = async () => {
+    if (recBusy || !stream?.id) return
+    setRecBusy(true)
+    try {
+      const next = recording
+        ? await api.chat.streams.stopRecording(stream.id)
+        : await api.chat.streams.startRecording(stream.id)
+      setStream(s => ({ ...s, ...next }))
+      showToast(recording ? 'Recording paused — you’re still live' : 'Recording')
+    } catch (e) {
+      showToast(chatError(e, recording ? 'Could not pause the recording' : 'Could not start recording'))
+    } finally { setRecBusy(false) }
+  }
+
+  /* ---- GUEST: publish my camera to MY OWN stage path ----
+     The same publishCamera the host uses — warm-up, sender tuning, the
+     picture-health watchdog, the wake lock — pointed at the whipUrl the server
+     handed ME privately (grant frame or the accept response). Viewers never see
+     it; other guests never see mine. */
+  const stopGuestCast = React.useCallback(() => {
+    guestCastRef.current?.stop?.()
+    guestCastRef.current = null
+  }, [])
+
+  const goUp = React.useCallback(async (member) => {
+    if (!member?.whipUrl || guestCastRef.current) return
+    try {
+      const handle = await publishCamera(member.whipUrl, {
+        onLocalStream: (media) => {
+          const el = myTileRef.current
+          if (!el) return
+          el.srcObject = null      // re-fires after a camera repair — see startCast
+          el.srcObject = media
+          el.muted = true
+          el.play?.().catch(() => {})
+        },
+        onHealth: (st) => {
+          if (st === 'lost') showToast('Your stage camera stopped and can’t be reopened — step down and come back up to retry.')
+        },
+      })
+      guestCastRef.current = handle
+      showToast('You’re on the stage — everyone can see and hear you')
+    } catch (e) {
+      /* The seat is mine but the camera isn't — an ACTIVE guest with no media
+         is a black tile for everyone. Free the seat rather than squat on it. */
+      api.chat.streams.stage.leave(streamId).catch(() => {})
+      showToast(e?.name === 'NotAllowedError'
+        ? 'Camera / microphone access was blocked. Allow it in your browser and raise your hand again.'
+        : chatError(e, 'Could not start your camera'))
+    }
+  }, [streamId])
+
+  const stepDown = React.useCallback(async (silent) => {
+    stopGuestCast()
+    try { await api.chat.streams.stage.leave(streamId) } catch { /* seat frees on end anyway */ }
+    if (!silent) showToast('You stepped down from the stage')
+  }, [streamId, stopGuestCast])
+
+  /* Honor MY OWN host-mute at the source. The tiles silence me on every other
+     client; killing the actual mic track means not even a client that ignores
+     the flag can hear me — and it is the honest thing to do to the speaker. */
+  React.useEffect(() => {
+    const t = guestCastRef.current?.media?.getAudioTracks?.()[0]
+    if (t) t.enabled = !(myStageMember?.muted) && micOn
+  }, [myStageMember?.muted, micOn, meOnStage])
+
+  /* ---- viewer: raise a hand · answer an invite ---- */
+  const raiseHand = async () => {
+    if (stageBusy) return
+    setStageBusy(true)
+    try {
+      await api.chat.streams.stage.requestUp(streamId)
+      setHandRaised(true)
+      showToast('Hand raised — the host decides who comes up')
+    } catch (e) {
+      showToast(chatError(e, 'Could not raise your hand'))
+    } finally { setStageBusy(false) }
+  }
+
+  const acceptInvite = async () => {
+    if (stageBusy) return
+    setStageBusy(true)
+    try {
+      const me = await api.chat.streams.stage.accept(streamId)   // carries MY creds
+      setInvite(null)
+      await goUp(me)
+    } catch (e) {
+      showToast(chatError(e, 'Could not join the stage'))
+    } finally { setStageBusy(false) }
+  }
+
+  const declineInvite = () => {
+    api.chat.streams.stage.decline(streamId).catch(() => {})
+    setInvite(null)
+  }
+
+  /* ---- host: the queue and the per-guest controls ----
+     No local roster surgery after a mutation — the `stream.stage` broadcast is
+     the acknowledgement, and it arrives for everyone at once. Only the queue
+     is patched locally (its removal event doesn't exist). */
+  const hostStageAct = async (userId, act, fallbackMsg) => {
+    if (stageBusyId) return
+    setStageBusyId(userId)
+    try { await act() }
+    catch (e) { showToast(chatError(e, fallbackMsg)) }
+    finally { setStageBusyId(null) }
+  }
+  const approveReq = (userId) => hostStageAct(userId, async () => {
+    await api.chat.streams.stage.approve(streamId, userId)
+    setRequests(prev => prev.filter(r => String(r.userId) !== String(userId)))
+  }, 'Could not bring them up')
+  const denyReq = (userId) => hostStageAct(userId, async () => {
+    await api.chat.streams.stage.deny(streamId, userId)
+    setRequests(prev => prev.filter(r => String(r.userId) !== String(userId)))
+  }, 'Could not decline the request')
+  const inviteUp = (userId) => hostStageAct(userId, async () => {
+    await api.chat.streams.stage.invite(streamId, userId)
+    showToast('Invitation sent')
+  }, 'Could not send the invite')
+  const muteGuest   = (userId) => hostStageAct(userId, () => api.chat.streams.stage.mute(streamId, userId), 'Could not mute them')
+  const unmuteGuest = (userId) => hostStageAct(userId, () => api.chat.streams.stage.unmute(streamId, userId), 'Could not unmute them')
+  const removeGuest = async (userId) => {
+    const ok = await uiConfirm({
+      title: 'Take them off the stage?',
+      message: 'Their camera and mic stop for everyone. They can raise their hand again.',
+      confirmLabel: 'Take down', danger: true, icon: 'block',
+    })
+    if (!ok) return
+    hostStageAct(userId, () => api.chat.streams.stage.remove(streamId, userId), 'Could not take them down')
+  }
+
+  /* ---- reactions: tap → float; throttle the wire, never the animation ----
+     The server caps 30/10s; a rapid tapper still sees every one of their own
+     hearts (the point of tapping), we just don't send each to the wire. */
+  const spawnFloater = React.useCallback((type) => {
+    const id = Math.random().toString(36).slice(2)
+    setFloaters(prev => [...prev.slice(-40), { id, emoji: emojiOfReaction(type), x: 6 + Math.random() * 78 }])
+    setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== id)), 2600)
+  }, [])
+
+  const tapReaction = React.useCallback((type = 'LIKE') => {
+    spawnFloater(type)                                 // optimistic — mine shows instantly
+    const now = Date.now()
+    if (now - lastTapRef.current < 180) return
+    lastTapRef.current = now
+    api.chat.streams.react(streamId, type).catch(() => { /* rate-limited or dropped — the float already played */ })
+  }, [spawnFloater, streamId])
+
+  /* ---- gifts: one splash at a time, board kept live off the frames ----
+     A plain state queue, drained by effects: when nothing is showing and
+     something is waiting, promote the head; every splash hides itself after a
+     hold that grows with the gift's coins. Two effects on purpose — a single
+     one re-armed by queue growth would cancel the hide timer of whatever is
+     mid-splash. */
+  const enqueueGift = React.useCallback((g) => setGiftQueue(q => [...q, g]), [])
+
+  React.useEffect(() => {
+    if (giftSplash || giftQueue.length === 0) return
+    setGiftSplash(giftQueue[0])
+    setGiftQueue(q => q.slice(1))
+  }, [giftSplash, giftQueue])
+
+  React.useEffect(() => {
+    if (!giftSplash) return undefined
+    const holdMs = 1800 + Math.min((giftSplash.coins || 1) * 60, 2400)   // bigger gift, longer moment
+    const t = setTimeout(() => setGiftSplash(null), holdMs)
+    return () => clearTimeout(t)
+  }, [giftSplash])
+
+  const upsertSupporter = (prev, g) => {
+    const before = prev.find(r => String(r.userId) === String(g.senderId))
+    const rows = prev.filter(r => String(r.userId) !== String(g.senderId))
+    rows.push({
+      userId: g.senderId,
+      username: g.senderUsername,
+      handle: g.senderHandle,
+      displayName: before?.displayName || '',
+      avatarUrl: before?.avatarUrl || g.senderAvatarUrl || null,
+      coins: g.senderTotalCoins,               // the authoritative running total
+      giftCount: (before?.giftCount || 0) + 1,
+    })
+    return rows.sort((a, b) => b.coins - a.coins).slice(0, 10)
+  }
+
+  const openGifts = async () => {
+    setGiftsOpen(true)
+    if (catalog === null) {
+      try { setCatalog(await api.chat.streams.gifts.catalog()) }
+      catch { setCatalog([]) }
+    }
+  }
+
+  const sendGift = async (giftId) => {
+    if (giftBusy) return
+    setGiftBusy(true)
+    try {
+      await api.chat.streams.gifts.send(streamId, giftId)
+      setGiftsOpen(false)
+      // No local splash: the `stream.gift` broadcast echoes to the sender too
+      // (measured), so animating here would play it twice.
+    } catch (e) {
+      showToast(chatError(e, 'Could not send the gift'))
+    } finally { setGiftBusy(false) }
+  }
+
+  /* Seed the roster + supporters board; the host also seeds the request queue.
+     After the seed everything arrives by broadcast. */
+  React.useEffect(() => {
+    if (!streamId || !stream?.isLive) return undefined
+    let alive = true
+    api.chat.streams.stage.get(streamId).then(s => { if (alive && s) setStage(s) }).catch(() => {})
+    api.chat.streams.gifts.top(streamId, 10).then(b => { if (alive && b?.length) setBoard(b) }).catch(() => {})
+    return () => { alive = false }
+  }, [streamId, stream?.isLive])
+
+  React.useEffect(() => {
+    if (!streamId || !isHost || !stream?.isLive) return undefined
+    let alive = true
+    api.chat.streams.stage.requests(streamId).then(rs => { if (alive && rs) setRequests(rs) }).catch(() => {})
+    return () => { alive = false }
+  }, [streamId, isHost, stream?.isLive])
+
+  /* A guest closing the tab must free their seat — same pagehide/beacon
+     reasoning as the viewer `leave` above. */
+  React.useEffect(() => {
+    if (!streamId) return undefined
+    const onHide = () => {
+      if (guestCastRef.current) api.chat.streams.stage.leave(streamId, { beacon: true }).catch(() => {})
+    }
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      window.removeEventListener('pagehide', onHide)
+      if (guestCastRef.current) {
+        stopGuestCast()
+        api.chat.streams.stage.leave(streamId).catch(() => {})
+      }
+    }
+  }, [streamId, stopGuestCast])
+
   // Always release the camera + peer connection when leaving the room.
   React.useEffect(() => () => stopCast(), [stopCast])
+
+  // "Your picture is back" is a confirmation, not a state — let it fade.
+  React.useEffect(() => {
+    if (camHealth.state !== 'recovered') return undefined
+    const t = setTimeout(() => setCamHealth({ state: 'ok', detail: '' }), 4000)
+    return () => clearTimeout(t)
+  }, [camHealth.state])
 
   /* ---- VIEWER: play the stream. WHEP first (sub-second latency, the "live"
      feel); fall back to HLS — Safari plays it natively, every other engine
@@ -631,6 +954,14 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
         : prev))
       joinedRef.current = false
       setJoined(false)
+      /* The whole stage dies with the stream — there is no separate "stage
+         cleared" frame. Stop my publisher, drop the roster (which closes every
+         WHEP tile via useStageVideos), clear anything awaiting an answer. */
+      stopGuestCast()
+      setStage(null)
+      setInvite(null)
+      setRequests([])
+      setHandRaised(false)
       showToast('The stream has ended')
     }
     if (evt.type === 'stream.chat' && evt.streamChat) {
@@ -638,12 +969,74 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
       // can't grow the DOM without limit.
       setLines(prev => [...prev, { kind: 'chat', ...evt.streamChat }].slice(-200))
     }
-  }), [subscribe, streamId, myId])
+
+    /* ---- multi-guest stage ---- */
+    if (evt.type === 'stream.stage' && evt.stage) {
+      // The whole panel — REPLACE local state, and reconcile what it implies:
+      setStage(evt.stage)
+      // a queued requester who is now ACTIVE was approved (maybe on another device)
+      setRequests(prev => prev.filter(r => !evt.stage.members.some(m => String(m.userId) === String(r.userId))))
+      // my own hand-raise resolves the moment the roster carries me
+      if (evt.stage.members.some(m => String(m.userId) === String(myId))) setHandRaised(false)
+    }
+    if (evt.type === 'stream.stage.request' && evt.stageMember) {
+      // Host only — a viewer raised their hand. Replace-by-user, then append.
+      setRequests(prev => [...prev.filter(r => String(r.userId) !== String(evt.stageMember.userId)), evt.stageMember])
+    }
+    if (evt.type === 'stream.stage.invite' && evt.stageMember) {
+      // Invitee only — the member is the HOST (so the banner can say who asked).
+      setInvite(evt.stageMember)
+    }
+    if (evt.type === 'stream.stage.grant' && evt.stageMember) {
+      /* Addressed to ONE guest, but check anyway — trusting the address alone
+         would let a mis-fanned frame start someone else's camera. */
+      const m = evt.stageMember
+      if (String(m.userId) === String(myId)) {
+        if (m.status === 'REMOVED') {
+          stopGuestCast()
+          showToast('The host took you off the stage')
+        } else if (m.whipUrl) {
+          setHandRaised(false)
+          goUp(m)          // the host approved my hand-raise — my creds are here
+        }
+      }
+    }
+
+    /* ---- reactions & gifts ---- */
+    if (evt.type === 'stream.reaction' && evt.streamReaction) {
+      // Mine already floated at tap time — the echo would double it.
+      if (String(evt.streamReaction.userId) !== String(myId)) spawnFloater(evt.streamReaction.type)
+    }
+    if (evt.type === 'stream.gift' && evt.streamGift) {
+      const g = evt.streamGift
+      /* Everyone animates from the frame — including the sender (their send
+         deliberately doesn't splash locally, so this is their one). */
+      enqueueGift(g)
+      setBoard(prev => upsertSupporter(prev, g))
+      // A gift is a live-room moment — it belongs in the log next to the chat.
+      setLines(prev => [...prev, {
+        kind: 'gift', userId: g.senderId, username: g.senderUsername, gift: g, sentAt: g.sentAt,
+      }].slice(-200))
+    }
+  }), [subscribe, streamId, myId, goUp, stopGuestCast, spawnFloater, enqueueGift])
 
   React.useEffect(() => {
     const ids = lines.map(l => l.userId).filter(Boolean)   // chat AND presence lines
     if (ids.length) watchUsers(ids.slice(-30))
   }, [lines, watchUsers])
+
+  /* The stage/queue/board people too: their frames carry no avatar (measured —
+     the same backend gap as hostAvatarUrl), so the chat user-card cache is the
+     only place a face can come from. */
+  React.useEffect(() => {
+    const ids = [
+      ...(stage?.members || []).map(m => m.userId),
+      ...requests.map(r => r.userId),
+      ...board.map(s => s.userId),
+      invite?.userId,
+    ].filter(Boolean)
+    if (ids.length) watchUsers(ids.slice(0, 30))
+  }, [stage, requests, board, invite, watchUsers])
 
   // Pin the log to the newest line as it grows.
   React.useEffect(() => {
@@ -762,6 +1155,31 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
               )}
 
               <span className="lv-badge"><span className="lv-dot" aria-hidden="true"/>LIVE</span>
+
+              {/* Reactions drift up over the picture; a gift takes the center.
+                  Both are broadcast moments — everyone sees the same thing. */}
+              <FloaterLayer floaters={floaters}/>
+              <GiftSplash gift={giftSplash} cardOf={userOf}/>
+
+              {/* Tap rail — hearts and the gift box. Joined viewers and the
+                  host only: the server rejects outsiders, so don't offer it. */}
+              {(isHost || joined) && (
+                <div className="lv-react-rail" role="group" aria-label="Reactions">
+                  {REACTIONS.map(r => (
+                    <button key={r.type} className="lv-react-btn" onClick={() => tapReaction(r.type)}
+                      aria-label={`React ${r.label}`} title={r.label}>
+                      <span aria-hidden="true">{r.emoji}</span>
+                    </button>
+                  ))}
+                  <button className="lv-react-btn gift" onClick={openGifts}
+                    aria-label="Send a gift" title="Send a gift">
+                    <span aria-hidden="true">🎁</span>
+                  </button>
+                </div>
+              )}
+
+              <GiftPicker open={giftsOpen} catalog={catalog} busy={giftBusy}
+                onSend={sendGift} onClose={() => setGiftsOpen(false)}/>
             </>
           ) : (
             <div className="lv-ended">
@@ -771,6 +1189,23 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
             </div>
           )}
         </div>
+
+        {/* The host asked me up — a decision, so it sits where it can't be missed. */}
+        {stream.isLive && !meOnStage && (
+          <InviteBanner invite={invite} busy={stageBusy} cardOf={userOf}
+            onAccept={acceptInvite} onDecline={declineInvite}/>
+        )}
+
+        {/* The stage rail — my tile (local camera) + every other guest (WHEP). */}
+        {stream.isLive && (
+          <StageTiles
+            stage={stage} myId={myId} isHost={isHost} meOnStage={meOnStage}
+            myTileRef={myTileRef} micOn={micOn} connsRef={connsRef} cardOf={userOf}
+            busyId={stageBusyId}
+            onMute={muteGuest} onUnmute={unmuteGuest} onRemove={removeGuest}
+            onStepDown={() => stepDown(false)}
+          />
+        )}
 
         {/* Host broadcast controls — only while actually publishing the camera. */}
         {isHost && stream.isLive && cast === 'live' && (
@@ -782,7 +1217,44 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
             <button className="btn" onClick={toggleCam}>
               <Icon name={camOn ? 'camera' : 'videooff'} className="xs"/>{camOn ? 'Camera off' : 'Camera on'}
             </button>
+            <button className={'btn' + (recording ? ' rec-on' : '')} onClick={toggleRecord} disabled={recBusy}
+              aria-pressed={recording}
+              title={recording ? 'Stop saving — the broadcast continues' : 'Start saving this broadcast'}>
+              {recording
+                ? <><span className="lv-dot" aria-hidden="true"/>Stop recording</>
+                : <><Icon name="broadcast" className="xs"/>Record</>}
+            </button>
+
+            {/* The picture died while the connection stayed up. Said plainly and
+                at the moment it happens, because the alternative is the host
+                discovering it in the recording, when nothing can be done. */}
+            {camHealth.state === 'recovered' && (
+              <span className="lv-cast-warn ok">
+                <Icon name="camera" className="xs"/>Your picture is back.
+              </span>
+            )}
+            {camHealth.state === 'stalled' && (
+              <span className="lv-cast-warn">
+                <Icon name="info" className="xs"/>
+                Your picture stopped{camHealth.detail ? ` — ${camHealth.detail}` : ''}. Restoring the camera…
+              </span>
+            )}
+            {camHealth.state === 'lost' && (
+              <span className="lv-cast-warn bad">
+                <Icon name="info" className="xs"/>
+                Your camera can’t be reopened{camHealth.detail ? ` (${camHealth.detail})` : ''} — viewers and the
+                recording have sound but no picture. Close anything else using the camera, then{' '}
+                <button className="rq-btn" onClick={() => { stopCast(); startCast() }}>restart the camera</button>.
+              </span>
+            )}
           </div>
+        )}
+
+        {/* Host: viewers asking to come up. Broadcast keeps it fresh; approval
+            grants THEM creds via their private stream.stage.grant. */}
+        {isHost && stream.isLive && (
+          <RequestQueue requests={requests} stageFull={stageFull} busyId={stageBusyId}
+            cardOf={userOf} onApprove={approveReq} onDeny={denyReq}/>
         )}
 
         <header className="lv-meta">
@@ -796,6 +1268,16 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
           </div>
           <div className="lv-meta-acts">
             <button className="btn" onClick={onExit}><Icon name="chevleft" className="xs"/>All streams</button>
+            {/* Ask to come up beside the host. Joined viewers only (the server
+                requires membership), and honest about a full stage. */}
+            {!isHost && stream.isLive && joined && !meOnStage && (
+              <button className="btn" onClick={raiseHand}
+                disabled={stageBusy || handRaised || stageFull}
+                title={stageFull ? `The stage is full (${stage?.maxGuests ?? 6})` : 'Ask to join the host on stage'}>
+                <Icon name="mic" className="xs"/>
+                {stageFull ? 'Stage full' : handRaised ? 'Hand raised' : 'Join stage'}
+              </button>
+            )}
             {stream.shareUrl && (
               /* The key-safe watch link ({base}/live/{id}) — carries no
                  stream key, safe for anyone; the route joins on arrival. */
@@ -853,6 +1335,8 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
           <span className="lv-chat-n">{stream.viewerCount.toLocaleString()}</span>
         </div>
 
+        <SupportersPanel board={board} cardOf={userOf}/>
+
         <div className="lv-chat-log" ref={logRef}>
           {lines.length === 0 ? (
             <p className="lv-chat-empty">
@@ -862,11 +1346,31 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
           ) : lines.map((l, i) => {
             const card = userOf(l.userId)
             const who = card?.full || l.username || 'Someone'
+            /* The host can pull anyone in the room up on stage straight from
+               their line — presence and chat rows both carry the userId. */
+            const onStageIds = new Set((stage?.members || []).map(m => String(m.userId)))
+            const canInvite = isHost && stream.isLive && l.userId
+              && !stageFull && !onStageIds.has(String(l.userId))
+            const inviteBtn = canInvite ? (
+              <button className="lv-line-invite" onClick={() => inviteUp(l.userId)}
+                disabled={stageBusyId === l.userId} title={`Invite ${who} up on the stage`}>
+                <Icon name="mic" className="xs"/>Invite up
+              </button>
+            ) : null
             if (l.kind === 'presence') {
               return (
                 <div className="lv-line lv-line-presence" key={`p-${l.userId}-${i}`}>
                   <Icon name={l.left ? 'logout' : 'follow'} className="xs"/>
                   <span dir="auto">{who} {l.left ? 'left' : 'joined'}</span>
+                  {!l.left && inviteBtn}
+                </div>
+              )
+            }
+            if (l.kind === 'gift') {
+              return (
+                <div className="lv-line lv-line-gift" key={`g-${l.sentAt}-${i}`}>
+                  <span className="lv-line-gift-ico" aria-hidden="true">{emojiOfGift(l.gift?.iconKey)}</span>
+                  <span dir="auto"><b>{who}</b> sent {/^[aeiou]/i.test(l.gift?.giftName || '') ? 'an' : 'a'} {l.gift?.giftName}</span>
                 </div>
               )
             }
@@ -880,6 +1384,7 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
                   <b dir="auto">{who}</b>
                   <span dir="auto">{l.text}</span>
                 </span>
+                {inviteBtn}
               </div>
             )
           })}

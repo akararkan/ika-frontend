@@ -101,6 +101,213 @@ async function firstVideoFrame(media, timeoutMs = 4000) {
   }
 }
 
+/**
+ * Tune the video sender so degradation can never take the picture to zero.
+ *
+ * Chrome's default `degradationPreference` for a camera is "balanced": under CPU
+ * or uplink pressure it sheds BOTH resolution and framerate, and the framerate
+ * floor is low enough to look like a freeze. `maintain-framerate` sheds pixels
+ * instead, which is what a talking-head broadcast wants. The bitrate cap is the
+ * other half — an uncapped sender on a weak uplink drives itself into loss, and
+ * lost H264 packets are unrecoverable until the next keyframe (see watchVideo).
+ */
+function tuneVideoSender(pc, track) {
+  try { if (track) track.contentHint = 'motion' } catch { /* not supported */ }
+  const sender = pc.getSenders().find((s) => s.track?.kind === 'video')
+  if (!sender?.getParameters) return
+  try {
+    const params = sender.getParameters()
+    params.degradationPreference = 'maintain-framerate'
+    params.encodings = params.encodings?.length ? params.encodings : [{}]
+    params.encodings[0].maxBitrate = 2_500_000
+    params.encodings[0].maxFramerate = 30
+    sender.setParameters(params).catch(() => { /* best-effort */ })
+  } catch { /* best-effort — never let tuning break publishing */ }
+}
+
+/**
+ * Outbound video encoder progress + downstream loss, gathered in one getStats
+ * pass. Null before the first frame.
+ *
+ * `framesEncoded` only proves the LOCAL encoder is still running — it keeps
+ * climbing even when every packet is lost in transit. `fractionLost` comes from
+ * the RECEIVER's (MediaMTX's) RTCP reports via the remote-inbound entry, so it
+ * reflects what actually arrived. That distinction is the whole point of the
+ * loss check in watchVideo: an advancing encoder with a frozen picture.
+ */
+async function videoOutbound(pc) {
+  try {
+    const stats = await pc.getStats()
+    let out = null
+    let fractionLost = null
+    stats.forEach((r) => {
+      if (r.type === 'outbound-rtp' && (r.kind || r.mediaType) === 'video') out = r
+      if (r.type === 'remote-inbound-rtp' && (r.kind || r.mediaType) === 'video'
+          && typeof r.fractionLost === 'number') fractionLost = r.fractionLost
+    })
+    if (!out) return null
+    return { framesEncoded: out.framesEncoded, fractionLost }
+  } catch { return null }
+}
+
+/**
+ * Keep the PICTURE alive for the whole broadcast — the fix for "the recording
+ * freezes partway through but the sound keeps playing".
+ *
+ * A WebRTC video track can stop feeding the encoder mid-broadcast without the
+ * peer connection ever leaving `connected`: the OS suspends the camera when the
+ * display sleeps, another app grabs the device, a USB camera re-enumerates, or
+ * a burst of loss leaves the H264 chain undecodable with no IDR coming (Chrome
+ * only emits keyframes on request, so nothing ever repairs it). Audio is Opus —
+ * every packet stands alone — so sound sails on regardless.
+ *
+ * Downstream that is silent and permanent: MediaMTX simply has no more video
+ * samples to write, so the recording holds one frame to the end of the file
+ * while the audio runs out the full duration.
+ *
+ * So: poll `framesEncoded`. If it stops advancing while the camera is meant to
+ * be on, re-acquire the camera and `replaceTrack`. A brand-new encoder always
+ * opens with a keyframe, which repairs both the live picture and everything
+ * written from that point on. The transceiver is reused, so the published track
+ * SET never changes — which matters, because a changed track set is exactly
+ * what makes MediaMTX restart its recorder and split the file into parts
+ * (BACKEND_LIVE_FINDINGS.md, P1).
+ */
+function watchVideo(pc, media, constraints, opts) {
+  const POLL_MS = 2000
+  const STALL_POLLS = 3          // ~6s of no encoded frames before we act
+  const GRACE_MS = 6000          // the encoder is allowed to be slow to start
+  const LOSS_FRACTION = 0.12     // >12% of an interval lost = the chain is breaking
+  const LOSS_POLLS = 3           // sustained ~6s, so a one-off blip is ignored
+  const LOSS_COOLDOWN_MS = 20000 // force at most one keyframe re-acquire / 20s
+
+  let dead = false
+  let last = -1
+  let stalls = 0
+  let lossy = 0
+  let lastForcedKeyframeAt = 0
+  let healing = false
+  let startedAt = null
+
+  const report = (state, detail) => { try { opts.onHealth?.(state, detail) } catch { /* host callback */ } }
+
+  /* Swap in a fresh camera track. The old one is stopped FIRST: a device that
+     was yanked or is held by another app will refuse a second concurrent open,
+     and we would rather re-take the one we had than fail. */
+  const heal = async (why) => {
+    if (dead || healing) return
+    healing = true
+    report('stalled', why)
+    try {
+      const old = media.getVideoTracks()[0]
+      try { old?.stop() } catch { /* already gone */ }
+      const fresh = await navigator.mediaDevices.getUserMedia({ video: constraints.video, audio: false })
+      const track = fresh.getVideoTracks()[0]
+      if (!track) throw new Error('no video track')
+      if (dead) { track.stop(); return }
+
+      const sender = pc.getSenders().find((s) => s.track?.kind === 'video')
+      if (!sender) throw new Error('no video sender')
+      await sender.replaceTrack(track)
+
+      if (old) media.removeTrack(old)
+      media.addTrack(track)
+      /* Inherit the host's Camera-off state — healing must not silently switch
+         their camera back on behind them. */
+      if (old) track.enabled = old.enabled
+      tuneVideoSender(pc, track)
+      arm(track)
+
+      last = -1; stalls = 0; lossy = 0; startedAt = null
+      opts.onLocalStream?.(media)
+      report('recovered')
+    } catch (e) {
+      report('lost', e?.message || 'the camera could not be reopened')
+    } finally {
+      healing = false
+    }
+  }
+
+  /* `ended` is the device going away for good; `mute` is the browser telling us
+     frames stopped arriving (screen lock, another app took the camera). Both
+     mean the picture is gone right now — no need to wait out the poll. */
+  function arm(track) {
+    if (!track) return
+    track.addEventListener('ended', () => heal('the camera was disconnected'))
+    track.addEventListener('mute', () => heal('the camera stopped sending frames'))
+  }
+  arm(media.getVideoTracks()[0])
+
+  const timer = setInterval(async () => {
+    if (dead || healing) return
+    const track = media.getVideoTracks()[0]
+    // Camera deliberately off: black frames are correct, so don't "repair" them.
+    if (!track || track.enabled === false) { last = -1; stalls = 0; lossy = 0; return }
+    if (pc.connectionState !== 'connected' && pc.connectionState !== 'new') return
+
+    const rtp = await videoOutbound(pc)
+    const frames = rtp?.framesEncoded
+    if (typeof frames !== 'number') return
+
+    if (startedAt === null) startedAt = Date.now()
+    if (Date.now() - startedAt < GRACE_MS) { last = frames; return }
+
+    if (frames > last) {
+      if (stalls) report('ok')
+      last = frames; stalls = 0
+
+      // The encoder is alive, but the PICTURE can still be frozen downstream: a
+      // burst of loss breaks the H264 decode chain and — with no PLI coming back
+      // from the media server — no keyframe ever repairs it, while framesEncoded
+      // keeps climbing so the stall check above never fires. Detect sustained
+      // receiver-reported loss and force a fresh keyframe by re-acquiring (a new
+      // encoder always opens with an IDR). Rate-limited so a weak uplink, where
+      // the re-acquire's keyframe would add to the congestion, can't thrash the
+      // camera.
+      const frac = typeof rtp.fractionLost === 'number' ? rtp.fractionLost : 0
+      if (frac >= LOSS_FRACTION) {
+        lossy += 1
+        if (lossy >= LOSS_POLLS && Date.now() - lastForcedKeyframeAt >= LOSS_COOLDOWN_MS) {
+          lastForcedKeyframeAt = Date.now()
+          lossy = 0
+          heal('packet loss froze the picture')
+        }
+      } else if (lossy) {
+        lossy = 0
+      }
+      return
+    }
+    stalls += 1
+    if (stalls >= STALL_POLLS) heal('the camera stopped producing frames')
+  }, POLL_MS)
+
+  return () => { dead = true; clearInterval(timer) }
+}
+
+/** Hold a screen wake lock while broadcasting. A sleeping display suspends the
+ *  camera on most laptops — the single most common way a live picture dies with
+ *  the tab still open. Re-taken on tab focus, because the lock is dropped
+ *  whenever the page is hidden. */
+function holdWakeLock() {
+  if (!navigator.wakeLock?.request) return () => {}
+  let sentinel = null
+  let dead = false
+  const take = () => {
+    if (dead || document.visibilityState !== 'visible') return
+    navigator.wakeLock.request('screen').then((s) => {
+      if (dead) { s.release().catch(() => {}); return }
+      sentinel = s
+    }).catch(() => { /* denied or unsupported — not fatal */ })
+  }
+  take()
+  document.addEventListener('visibilitychange', take)
+  return () => {
+    dead = true
+    document.removeEventListener('visibilitychange', take)
+    try { sentinel?.release() } catch { /* already released */ }
+  }
+}
+
 /** POST an SDP offer to a WHIP/WHEP endpoint, return the answer SDP text. */
 async function exchangeSdp(url, offerSdp, signal) {
   const res = await fetch(url, {
@@ -124,21 +331,28 @@ async function exchangeSdp(url, offerSdp, signal) {
  * @param {(media:MediaStream)=>void} [opts.onLocalStream]  fires as soon as the
  *        camera is captured, BEFORE the SDP exchange — attach the preview here.
  * @param {MediaStreamConstraints} [opts.constraints]
+ * @param {(state:'stalled'|'recovered'|'lost'|'ok', detail?:string)=>void} [opts.onHealth]
+ *        the PICTURE's health while live, independent of the connection state —
+ *        see watchVideo. `stalled` → repairing, `recovered` → picture is back,
+ *        `lost` → the camera could not be reopened and the host must act.
  * @returns {Promise<{pc:RTCPeerConnection, media:MediaStream, stop:()=>void}>}
  */
 export async function publishCamera(whipUrl, opts = {}) {
   if (!whipUrl) throw new Error('This stream has no publish URL (are you the host?)')
   const constraints = opts.constraints || {
-    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: 'user' },
     audio: { echoCancellation: true, noiseSuppression: true },
   }
 
   const media = await navigator.mediaDevices.getUserMedia(constraints)
   const pc = new RTCPeerConnection({ iceServers: ICE })
   let stopped = false
+  let unwatch = null
+  let unlock = null
   const stop = () => {
     if (stopped) return
     stopped = true
+    unwatch?.(); unlock?.()
     try { pc.close() } catch { /* already closed */ }
     media.getTracks().forEach((t) => t.stop())
   }
@@ -161,6 +375,12 @@ export async function publishCamera(whipUrl, opts = {}) {
     await iceGathered(pc)
     const answer = await exchangeSdp(whipUrl, pc.localDescription.sdp, opts.signal)
     await pc.setRemoteDescription({ type: 'answer', sdp: answer })
+
+    /* Tuning has to wait for the answer: encoding parameters only exist once
+       the transceiver has been negotiated. */
+    tuneVideoSender(pc, media.getVideoTracks()[0])
+    unwatch = watchVideo(pc, media, constraints, opts)
+    unlock = holdWakeLock()
     return { pc, media, stop }
   } catch (e) {
     stop()

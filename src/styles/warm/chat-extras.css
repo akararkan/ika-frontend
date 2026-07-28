@@ -624,6 +624,26 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .lv-rec-chip.failed{ background:var(--live); color:#fff; }
 .lv-rec-chip.failed .ico{ width:12px; height:12px; }
 
+/* Recording is live — the one control in the bar that changes what is kept, so
+   it is the one that gets colour. */
+.lv-cast-bar .btn.rec-on{
+  background:var(--live-soft); color:var(--live); border-color:currentColor;
+}
+.lv-cast-bar .btn.rec-on .lv-dot{ background:var(--live); width:7px; height:7px; }
+
+/* Picture-health notice in the host's broadcast bar. Sits beside the mic/camera
+   buttons rather than over the stage — the host is watching their own preview
+   there, and covering it would hide the very thing being reported on. */
+.lv-cast-warn{
+  display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;
+  padding:5px 11px; border-radius:999px;
+  font:600 12px/1.5 var(--sans);
+  background:var(--gold-wash); color:var(--gold-deep);
+}
+.lv-cast-warn.ok{ background:var(--card-2); color:var(--ink-soft); }
+.lv-cast-warn.bad{ background:var(--live-soft); color:var(--live); }
+.lv-cast-warn .rq-btn{ padding:2px 9px; font-size:12px; }
+
 .lv-rec-t{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .lv-rec-hint{ color:var(--muted); font-size:12px; }
 .lv-rec-chip{
@@ -2266,3 +2286,212 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   .ch-ctx{ animation:none; }
   .ch-tools{ transform:none; transition:opacity .14s ease; }
 }
+
+/* =========================================================
+   §23 — Multi-guest stage, reactions & gifts (LivePage)
+   ---------------------------------------------------------
+   The "go live together" layer: a rail of guest tiles under
+   the main stage, drifting reactions over it, one-at-a-time
+   gift moments in the center, the host's request queue, and
+   the supporters board in the chat aside.
+   ========================================================= */
+
+/* ---- the guest-tile rail ---- */
+.lv-tiles{
+  display:grid; gap:10px; margin-block-start:10px;
+  grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));
+}
+.lv-tile{
+  position:relative; margin:0; aspect-ratio:4/3;
+  border-radius:var(--r-lg); overflow:hidden;
+  background:#0b1220; border:1px solid var(--line);
+}
+.lv-tile.me{ border-color:var(--gold); }
+.lv-tile video,
+.lv-tile-media, .lv-tile-media video{
+  width:100%; height:100%; object-fit:cover; display:block; background:#000;
+}
+.lv-tile-media{ position:absolute; inset:0; }
+.lv-tile-bar{
+  position:absolute; inset-block-end:0; inset-inline:0;
+  display:flex; align-items:center; justify-content:space-between; gap:6px;
+  padding:5px 8px; background:linear-gradient(transparent, rgba(11,18,32,.85));
+  color:#f5f1e8; font:600 11.5px/1.4 var(--sans);
+}
+.lv-tile-name{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.lv-tile-name bdi{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lv-tile-acts{ display:inline-flex; gap:4px; flex:0 0 auto; }
+.lv-tile-act{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 7px; border:0; border-radius:999px; cursor:pointer;
+  background:rgba(247,243,234,.16); color:#f5f1e8;
+  font:600 11px/1.4 var(--sans);
+}
+.lv-tile-act:hover{ background:rgba(247,243,234,.3); }
+.lv-tile-act.bad:hover{ background:var(--live); }
+.lv-tile-act:disabled{ opacity:.5; cursor:default; }
+
+/* ---- floating reactions ---- */
+.lv-floats{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.lv-float{
+  position:absolute; inset-block-end:-36px;
+  font-size:26px; line-height:1;
+  animation:lv-float-up 2.5s ease-out forwards;
+  will-change:transform, opacity;
+}
+@keyframes lv-float-up{
+  0%   { transform:translateY(0) scale(.7); opacity:0; }
+  12%  { opacity:1; }
+  100% { transform:translateY(-72cqh) translateY(-160px) scale(1.15); opacity:0; }
+}
+
+/* ---- the tap rail (hearts + gift) ---- */
+.lv-react-rail{
+  position:absolute; inset-inline-end:10px; inset-block-end:12px;
+  display:flex; flex-direction:column; gap:6px; z-index:3;
+}
+.lv-react-btn{
+  width:38px; height:38px; border:0; border-radius:50%; cursor:pointer;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(4px);
+  font-size:19px; line-height:1; display:grid; place-items:center;
+  transition:transform .12s ease, background .12s ease;
+}
+.lv-react-btn:hover{ transform:scale(1.12); background:rgba(11,18,32,.8); }
+.lv-react-btn:active{ transform:scale(.94); }
+.lv-react-btn.gift{ background:var(--gold-wash); }
+.lv-react-btn.gift:hover{ background:var(--gold); }
+
+/* ---- gift picker sheet ---- */
+.lv-gift-sheet{
+  position:absolute; inset:0; z-index:5;
+  display:flex; align-items:flex-end; justify-content:center;
+  background:rgba(11,18,32,.45); backdrop-filter:blur(2px);
+}
+.lv-gift-grid{
+  width:min(420px, 94%); margin-block-end:10px;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
+  padding:10px 12px 12px; box-shadow:0 18px 40px rgba(11,18,32,.35);
+}
+.lv-gift-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-block-end:8px; color:var(--ink); font:700 13.5px/1.4 var(--sans);
+}
+.lv-gift-cells{ display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+.lv-gift-cell{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:9px 4px 7px; border:1px solid var(--line-soft); border-radius:var(--r-sm);
+  background:var(--card-2); cursor:pointer;
+  transition:transform .12s ease, border-color .12s ease;
+}
+.lv-gift-cell:hover{ transform:translateY(-2px); border-color:var(--gold); }
+.lv-gift-cell:disabled{ opacity:.5; cursor:default; transform:none; }
+.lv-gift-ico{ font-size:24px; line-height:1.2; }
+.lv-gift-nm{ color:var(--ink); font:600 11.5px/1.3 var(--sans); }
+.lv-gift-coins{ color:var(--gold-deep); font:700 10.5px/1.3 var(--sans); }
+.lv-gift-empty{ margin:8px 0; color:var(--muted); font-size:12.5px; text-align:center; }
+
+/* ---- the center-stage gift moment ---- */
+.lv-gift-splash{
+  position:absolute; inset:0; z-index:4; pointer-events:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  animation:lv-gift-in var(--dur, 2s) ease-out forwards;
+}
+.lv-gift-glyph{ font-size:74px; line-height:1; filter:drop-shadow(0 6px 18px rgba(11,18,32,.5)); }
+.lv-gift-caption{
+  padding:4px 12px; border-radius:999px;
+  background:rgba(11,18,32,.72); color:#f5f1e8; font:600 13px/1.5 var(--sans);
+}
+@keyframes lv-gift-in{
+  0%   { transform:scale(.4); opacity:0; }
+  14%  { transform:scale(1.08); opacity:1; }
+  22%  { transform:scale(1); }
+  82%  { transform:scale(1); opacity:1; }
+  100% { transform:scale(.96); opacity:0; }
+}
+
+/* ---- invite banner (the host asked YOU up) ---- */
+.lv-invite{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin-block-start:10px; padding:10px 14px;
+  border:1px solid var(--gold); border-radius:var(--r-lg);
+  background:var(--gold-wash); color:var(--ink);
+  font:500 13px/1.5 var(--sans);
+}
+.lv-invite-msg{ flex:1 1 240px; min-width:0; }
+.lv-invite-acts{ display:inline-flex; gap:8px; flex:0 0 auto; }
+
+/* ---- host request queue ---- */
+.lv-queue{
+  margin-block-start:12px; padding:10px 14px;
+  border:1px solid var(--line); border-radius:var(--r-lg); background:var(--card);
+}
+.lv-queue-t{
+  display:flex; align-items:center; gap:6px;
+  color:var(--ink); font:700 12.5px/1.5 var(--sans); margin-block-end:6px;
+}
+.lv-queue-full{
+  margin-inline-start:auto; padding:2px 8px; border-radius:999px;
+  background:var(--live-soft); color:var(--live); font:700 10.5px/1.5 var(--sans);
+}
+.lv-queue-row{
+  display:flex; align-items:center; gap:9px; padding:5px 0;
+  border-block-start:1px solid var(--line-soft);
+}
+.lv-queue-name{
+  flex:1; min-width:0; color:var(--ink); font:600 13px/1.4 var(--sans);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lv-queue-acts{ display:inline-flex; gap:6px; flex:0 0 auto; }
+
+/* ---- supporters board (chat aside) ---- */
+.lv-supporters{
+  padding:8px 14px; border-block-end:1px solid var(--line-soft);
+}
+.lv-sup-t{
+  display:flex; align-items:center; gap:6px;
+  color:var(--gold-deep); font:700 11.5px/1.5 var(--sans);
+  letter-spacing:.04em; text-transform:uppercase; margin-block-end:4px;
+}
+.lv-sup-list{ margin:0; padding:0; list-style:none; display:grid; gap:3px; }
+.lv-sup-row{ display:flex; align-items:center; gap:7px; font:500 12.5px/1.5 var(--sans); color:var(--ink); }
+.lv-sup-rank{
+  width:16px; height:16px; border-radius:50%; flex:0 0 auto;
+  display:grid; place-items:center;
+  background:var(--card-2); color:var(--muted); font:700 10px/1 var(--sans);
+}
+.lv-sup-rank.r1{ background:var(--gold); color:var(--navy); }
+.lv-sup-rank.r2{ background:var(--gold-wash); color:var(--gold-deep); }
+.lv-sup-rank.r3{ background:var(--gold-wash); color:var(--gold-deep); }
+.lv-sup-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lv-sup-coins{ color:var(--gold-deep); font-weight:700; font-size:11.5px; }
+
+/* ---- log extras: gift lines + the host's invite-up ---- */
+.lv-line-gift{ color:var(--gold-deep); font-weight:600; }
+.lv-line-gift-ico{ font-size:16px; line-height:1; }
+.lv-line-invite{
+  margin-inline-start:auto; flex:0 0 auto;
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border:1px solid var(--gold); border-radius:999px;
+  background:transparent; color:var(--gold-deep);
+  font:600 10.5px/1.5 var(--sans); cursor:pointer;
+}
+.lv-line-invite:hover{ background:var(--gold-wash); }
+.lv-line-invite:disabled{ opacity:.5; cursor:default; }
+
+/* ---- mobile ---- */
+@media (max-width:720px){
+  .lv-tiles{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:8px; }
+  .lv-react-btn{ width:34px; height:34px; font-size:17px; }
+  .lv-gift-glyph{ font-size:56px; }
+  .lv-gift-cells{ grid-template-columns:repeat(4, 1fr); gap:6px; }
+}
+
+/* Motion is decoration here — a still heart and a fading gift are fine. */
+@media (prefers-reduced-motion:reduce){
+  .lv-float{ animation:lv-float-fade 1.6s ease-out forwards; }
+  .lv-gift-splash{ animation:lv-gift-fade var(--dur, 2s) ease-out forwards; }
+  .lv-react-btn:hover{ transform:none; }
+  .lv-gift-cell:hover{ transform:none; }
+}
+@keyframes lv-float-fade{ 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; } }
+@keyframes lv-gift-fade{ 0%{ opacity:0; } 12%{ opacity:1; } 85%{ opacity:1; } 100%{ opacity:0; } }

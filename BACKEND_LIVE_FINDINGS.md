@@ -44,8 +44,10 @@ exact cold-camera case that had been failing:
 | cold (first broadcast of the session) | `["Opus"]` — no video track | `["Opus","H264"]` → **h264 1280x720**, mean luma 71.5 |
 | warm | `["Opus","H264"]` | `["Opus","H264"]` → h264 960x540, mean luma 72.6 |
 
-> The runtime patch is **not persisted** — it reverts to `2s` on the next
-> `docker compose restart`. It needs to go in the file.
+> ~~The runtime patch is **not persisted**~~ — **DONE.** `mediamtx.yml:43` now
+> carries `webrtcTrackGatherTimeout: 10s`, and the running server reports it
+> (`GET /v3/config/global/get`). Re-confirmed 2026-07-28: a fresh browser
+> broadcast registered `2 tracks (Opus, H264)` from the first moment.
 
 **Frontend side, already shipped.** `publishCamera` now pulls a real decoded frame
 through a detached `<video>` before sending the SDP offer, and attaches the host's
@@ -80,13 +82,201 @@ part 2 holds the picture. Logged twice for one session:
 **Worth considering backend-side** (the frontend now walks the manifest and saves
 every part, so this is no longer breaking, just unpleasant):
 
-- Fixing **P0** should make this rarer — with video present from the first moment
-  the track set never changes. **Not verified**, worth confirming.
-- `…/recording/download` with no `part` could concatenate/remux the parts and
-  return one file, which is what a user means by "download the recording". Today
-  the caller has to know the manifest exists.
+- ~~Fixing **P0** should make this rarer~~ — **confirmed 2026-07-28.** With
+  `webrtcTrackGatherTimeout: 10s` in the file, a browser broadcast logged
+  `[recorder] recording 2 tracks (Opus, H264)` **once**, no restart, and the
+  manifest came back `partCount: 1`. The audio-only prelude is gone.
+- ~~`…/recording/download` with no `part` could concatenate/remux the parts~~ —
+  **built**, see the record-in-takes section below. Note it must **re-encode**,
+  not remux: a stream-copy concat propagates the per-part head/tail defects
+  measured in P1b into every seam.
 - Discarding a part that has no video track would avoid handing anyone a black
   file at all.
+
+---
+
+## P1b — Recordings that freeze but keep their sound. What is actually in the file
+
+**Symptom.** Not P0 — the file *has* a video track and plays normally, then the
+picture stops and audio runs on to the end of the duration.
+
+**Measured**, 2026-07-28, on a real 39s WHIP broadcast published by headless
+Chrome with `--use-fake-device-for-media-stream` and `record: true`. Numbers are
+from the delivered file, not from stats.
+
+| | measured |
+|---|---|
+| keyframe interval | **2.00s median** (20 keyframes / 34.1s) |
+| first video packet | 0.80s |
+| first **decodable** frame | **2.00s** — the first keyframe |
+| last video packet | 36.69s |
+| last audio packet | **39.46s** |
+| decoded video gaps > 0.4s | **none** |
+
+Three things follow, and the first one overturns the theory this section used to
+carry.
+
+**1. Packet loss cannot cause a permanent freeze here.** Keyframes arrive every
+two seconds, so a loss-broken H264 chain repairs itself within 2s. The premise
+that "Chrome only emits keyframes on request and nothing ever asks" is false in
+this stack — something (almost certainly MediaMTX's own segmenting) is
+requesting them steadily. Any fix built on the loss theory is guarding a failure
+mode that does not occur, and a repair that re-opens the camera on loss makes a
+weak uplink worse. Confirm with the keyframe cadence before believing otherwise:
+
+```bash
+ffprobe -v quiet -select_streams v -show_entries packet=pts_time,flags -of csv=p=0 rec.mp4 | grep K
+```
+
+**2. The head is undecodable — ~1.2s.** Video packets start at 0.80s but nothing
+decodes until the first keyframe at 2.00s: `sps_id N out of range`,
+`non-existing PPS 0 referenced`, `no frame!`. MediaMTX writes video samples
+before the H264 parameter sets reach the container — its own log says so
+(`[recorder] SPS not received yet`). Every part has this lead-in.
+
+**3. The tail loses ~2.8s of video while keeping the audio.** Video stops at
+36.69s, audio runs to 39.46s. The final fMP4 fragment is not flushed on
+publisher teardown. This is a reproducible instance of the reported symptom, at
+the end of every file.
+
+**Also measured, and good news:**
+
+- `remote-inbound-rtp` **is** present with a numeric `fractionLost` from t+4s, so
+  receiver-reported loss is available to the publisher if it is ever wanted.
+- `replaceTrack` on the same transceiver does **not** restart the recorder —
+  `[recorder] recording 2 tracks` logged once, `partCount: 1`, and no gap in the
+  decoded video across the swap. Repairing a dead camera mid-broadcast is safe
+  and does not split the file.
+
+**Fixed frontend-side, shipped.** `liveWebrtc.watchVideo` polls `framesEncoded`
+and, on a stall or on `ended`/`mute`, re-acquires the camera and `replaceTrack`s
+it — verified above. A screen wake lock is held while broadcasting, since
+display sleep suspending the camera is the most common way a live picture dies
+with the tab still open.
+
+**Worth doing backend-side.** Both #2 and #3 are cured for free by the join step
+in the section below, because re-encoding drops the undecodable lead-in and
+rebuilds the timeline. Fixing them at the source would be better still: hold
+video samples until SPS/PPS are known, and flush the final fragment on
+disconnect.
+
+---
+
+## NEW — Recording in takes, and one file at the end
+
+Built 2026-07-28 (backend `~/Desktop/irc` + frontend). **Exercised end to end**
+against the running stack with a headless fake camera:
+
+```
+recording/start -> 200 RECORDING     take 1
+recording/stop  -> 200 PAUSED        pause — the broadcast survived; take 2 published fine
+recording/start -> 200 RECORDING     take 2
+end             -> status AVAILABLE, partCount 1
+```
+
+The endpoints, the pause-that-does-not-drop-the-broadcast, and the join into a
+single file all work. The seam quality took two iterations to get right — see
+trap 3.
+
+> The **seek-based join is compiled but not yet exercised through the running
+> backend** (it needs a restart). The ffmpeg pipeline itself is verified on real
+> parts; what is unproven is only the Java calling it.
+
+**Shape.** The host records in takes while live — on, off, on again — and every
+take is joined into a single file when the stream ends. Nothing about the seams
+is visible in the finished video, and `download` with no `part` finally means
+what a caller expects, which retires the multi-part 400 in **P1**.
+
+| route | effect |
+|---|---|
+| `POST /streams/{id}/recording/start` | host-only, live-only, idempotent → `RECORDING` |
+| `POST /streams/{id}/recording/stop`  | pauses, broadcast continues → `PAUSED` |
+
+New `RecordingStatus` values: `PAUSED` (live, not saving) and `PROCESSING` (ended,
+takes being joined — the individual parts stay downloadable throughout).
+
+### Three traps, all of which drop the broadcast or corrupt the file
+
+**1. Pause must not delete the path config.** `removeRecordingPath` issues
+`DELETE /v3/config/paths/delete/{id}`, which tears down the path the browser is
+actively publishing to. Using it to pause ends the stream. Pause is
+`PATCH {"record": false}`.
+
+**2. The path config must exist before anyone publishes.** Adding one under a
+live publisher re-creates the path and drops the broadcast — the same bug as #1
+wearing a different coat. `ensurePath(streamId, record)` therefore runs at
+go-live for **every** stream, opted in or not, so every later change is a patch
+of an existing entry. The privacy property is unchanged (`record: false` writes
+nothing to disk; what exists is a config entry, not a recording), but path
+cleanup at end had to become unconditional or an opted-out stream leaks one
+MediaMTX path per broadcast, forever.
+
+**3. The join must trim each part before joining. Re-encoding alone is not
+enough.** This was measured, twice, and the first answer was wrong.
+
+Each part carries both P1b defects: audio starts at 0 but video does not decode
+until 0.45–1.5s in, and audio outlives video by ~2.7s at the end. Concatenating
+leaves a video-shaped hole at every seam.
+
+| join strategy | seam freeze |
+|---|---|
+| one-pass `concat` + re-encode | **2.7s** — a re-encode of a hole is a hole |
+| per-part `-shortest`, then concat | 0.6s — tail cured, lead-in remains |
+| per-part `-ss <first decodable frame>` **+** `-shortest`, then concat | **none** |
+
+So the join is two passes. First normalize each part on its own — seek past the
+undecodable lead-in and cut the audio-only tail:
+
+```bash
+SS=$(ffprobe -v quiet -select_streams v -show_frames -show_entries frame=pts_time \
+     -of csv=p=0 -read_intervals '%+10' part.mp4 | head -1)
+ffmpeg -ss "$SS" -i part.mp4 -map 0:v:0 -map '0:a:0?' \
+       -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac \
+       -shortest -avoid_negative_ts make_zero norm-N.mp4
+```
+
+`-ss` goes **before** `-i` and trims both streams together — shifting video
+alone would desync it by exactly the amount you trimmed. `-show_frames` rather
+than `-show_packets` because only the former decodes, and the undecodable
+lead-in is precisely what must be skipped.
+
+Then join. Every part now shares codec parameters, so this is a stream copy —
+no second generation of loss, and it takes seconds:
+
+```bash
+ffmpeg -f concat -safe 0 -i list.txt -c copy -movflags +faststart out.mp4
+```
+
+**Verified** on a two-take broadcast: 214 decodable frames, 0.02 → 10.69s, **no
+gap greater than 0.4s anywhere**, video and audio ending 0.07s apart.
+
+It runs once per broadcast, off the request path (after commit, single-threaded
+— a re-encode is CPU-hungry and shares the box with the media server), and is
+non-destructive: if ffmpeg is missing, errors or times out, the original parts
+are left exactly as they are and the recording still lands `AVAILABLE`.
+
+### Two operational notes
+
+- **`ffmpeg` must be on the backend host's PATH.** Configurable via
+  `app.streaming.ffmpeg-bin`. Without it the join silently no-ops and recordings
+  stay multi-part — degraded, not broken.
+- **The database CHECK constraint needed widening by hand.** `live_streams_
+  recording_status_check` enumerated the original five statuses; with
+  `ddl-auto: update` and no Flyway/Liquibase, Hibernate will never alter it, so
+  the first pause would have thrown a constraint violation. Applied to the local
+  `irc` database as:
+
+  ```sql
+  ALTER TABLE live_streams DROP CONSTRAINT live_streams_recording_status_check;
+  ALTER TABLE live_streams ADD CONSTRAINT live_streams_recording_status_check
+    CHECK (recording_status::text = ANY (ARRAY['DISABLED','RECORDING','PAUSED',
+      'PROCESSING','AVAILABLE','EMPTY','DELETED']::text[]));
+  ```
+
+  **This lives only in that database.** With no migration tool in the project it
+  is not reproducible anywhere else — any other environment needs the same
+  statement run by hand, and that is a standing hazard for every future enum
+  change, not just this one. Adopting Flyway is the real fix.
 
 ---
 
@@ -198,3 +388,38 @@ black picture rather than a missing track:
 ffmpeg -i recording.mp4 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG \
        -frames:v 15 -an -f null -    # mean YAVG < 20 ≈ black
 ```
+
+### Driving a real WHIP publish (the recipe that produced the P1b numbers)
+
+RTMP ingest does not exercise the WebRTC path, which is where every one of these
+bugs lives. What works:
+
+1. Serve a page that imports the app's **real** `src/lib/liveWebrtc.js` (copy it
+   next to the page; it has no imports) and calls `publishCamera(whipUrl)`.
+   Serve over `http://127.0.0.1` — `file://` is not a secure context, so
+   `getUserMedia` is unavailable.
+2. Drive it with `playwright-core` + `channel: 'chrome'` and
+   `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream
+   --autoplay-policy=no-user-gesture-required`. The fake camera is a rolling
+   test pattern, so a frozen picture is obvious.
+3. Get the `whipUrl` from `POST /api/v1/streams` as a real user — MediaMTX auth
+   is an HTTP hook to the backend, so a stream key issued by the backend is the
+   only way past it.
+
+Then, on the delivered file — the two checks that actually distinguish the
+failure modes:
+
+```bash
+# where does each track stop? video ≪ audio = the picture died
+ffprobe -v quiet -select_streams v -show_entries packet=pts_time -of csv=p=0 rec.mp4 | tail -1
+ffprobe -v quiet -select_streams a -show_entries packet=pts_time -of csv=p=0 rec.mp4 | tail -1
+
+# gaps in DECODED video — the only definition of "frozen" that matters
+ffprobe -v quiet -select_streams v -show_frames -show_entries frame=pts_time \
+        -of csv=p=0 rec.mp4 | awk -F, 'NR>1 && $1-p>0.4 {print p" -> "$1} {p=$1}'
+```
+
+Beware `nb_frames` and `duration` — both report the container's claims, not what
+decodes. A file whose video is entirely undecodable still reports a healthy
+video stream. Only `-show_frames` (which decodes) and the decoder's own stderr
+tell the truth.

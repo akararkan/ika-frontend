@@ -547,6 +547,105 @@ export function liveChatFrom(dto) {
   }
 }
 
+/* ---- multi-guest stage / reactions / gifts (live-streaming.md §multi-guest) ---- */
+
+/**
+ * StageMember → view. The same shape serves two audiences with different
+ * secrets: the roster / request-queue member is PUBLIC (`whepUrl` only), while
+ * the member handed privately to a guest — the `accept` response and their own
+ * `stream.stage.grant` — additionally carries `whipUrl` + `publishKey`, the
+ * credential that lets them publish. Both flow through here; the private
+ * fields are simply null on the public view (the API drops them).
+ */
+export function stageMemberFrom(dto) {
+  if (!dto) return null
+  return {
+    streamId: dto.streamId || null,
+    userId: dto.userId || null,
+    username: dto.username || '',
+    handle: handleOf(dto.username),
+    displayName: dto.displayName || '',
+    /* NULLABLE, and measured absent on every frame today (the same backend gap
+       as `hostAvatarUrl`, P3) — always render with an initials fallback and
+       prefer the chat user-card cache for the picture. */
+    avatarUrl: assetUrl(dto.avatarUrl || null),
+    role: dto.role || 'GUEST',
+    isHost: dto.role === 'HOST',
+    status: dto.status || null,           // REQUESTED|INVITED|ACTIVE|DECLINED|REMOVED
+    muted: !!dto.muted,
+    whepUrl: dto.whepUrl || null,         // public subscribe URL — anyone may watch
+    whipUrl: dto.whipUrl || null,         // SECRET publish URL — only ever on YOUR OWN member
+    publishKey: dto.publishKey || null,   // SECRET — same visibility as whipUrl
+    joinedAt: dto.joinedAt || null,
+  }
+}
+
+/** StageState → view. `members` is host-first; only ACTIVE members ride it. */
+export function stageStateFrom(dto) {
+  if (!dto) return null
+  const members = (dto.members || []).map(stageMemberFrom).filter(Boolean)
+  const guestCount = dto.guestCount ?? members.filter(m => !m.isHost).length
+  const maxGuests = dto.maxGuests ?? 6
+  return {
+    streamId: dto.streamId || null,
+    hostId: dto.hostId || null,
+    members,
+    guestCount,
+    maxGuests,
+    isFull: guestCount >= maxGuests,
+  }
+}
+
+/** StreamReaction → view. Broadcast-only; never stored, never replayed. */
+export function streamReactionFrom(dto) {
+  if (!dto) return null
+  return {
+    streamId: dto.streamId || null,
+    userId: dto.userId || null,
+    type: dto.type || 'LIKE',
+    sentAt: dto.sentAt || null,
+  }
+}
+
+/** StreamGiftEvent → view. `senderTotalCoins` is the sender's new running
+ *  total — fold it into the leaderboard instead of re-fetching. */
+export function streamGiftFrom(dto) {
+  if (!dto) return null
+  return {
+    streamId: dto.streamId || null,
+    senderId: dto.senderId || null,
+    senderUsername: dto.senderUsername || '',
+    senderHandle: handleOf(dto.senderUsername),
+    senderAvatarUrl: assetUrl(dto.senderAvatarUrl || null),   // nullable — initials fallback
+    giftId: dto.giftId || null,
+    giftName: dto.giftName || '',
+    iconKey: dto.iconKey || null,
+    coins: dto.coins ?? 0,
+    senderTotalCoins: dto.senderTotalCoins ?? 0,
+    sentAt: dto.sentAt || null,
+  }
+}
+
+/** GiftCatalogEntry → view (the picker). */
+export function giftEntryFrom(dto) {
+  if (!dto) return null
+  return { id: dto.id || null, name: dto.name || '', iconKey: dto.iconKey || null, coins: dto.coins ?? 0 }
+}
+
+/** GiftSupporter → view (the "top supporters" board). */
+export function giftSupporterFrom(dto) {
+  if (!dto) return null
+  return {
+    userId: dto.userId || null,
+    username: dto.username || '',
+    handle: handleOf(dto.username),
+    displayName: dto.displayName || '',
+    avatarUrl: assetUrl(dto.avatarUrl || null),
+    coins: dto.coins ?? 0,
+    giftCount: dto.giftCount ?? 0,
+  }
+}
+
 /* =========================================================
    SSE — the ONE per-user chat stream, /api/v1/messaging/stream
    ========================================================= */
@@ -590,6 +689,16 @@ const EVENT_HANDLER = {
   'stream.chat':          'onStream',
   'stream.updated':       'onStream',
   'stream.ended':         'onStream',
+  /* Multi-guest stage + reactions + gifts (probed 2026-07-28: the wire sends
+     exactly these dotted names, with the payload under `stage` / `stageMember` /
+     `streamReaction` / `streamGift`). An unlisted name is dropped silently —
+     which is why every one is here even though they share a handler. */
+  'stream.stage':         'onStream',
+  'stream.stage.request': 'onStream',
+  'stream.stage.invite':  'onStream',
+  'stream.stage.grant':   'onStream',
+  'stream.reaction':      'onStream',
+  'stream.gift':          'onStream',
 }
 
 /* An unnamed `message` frame (or a server that switched casing) carries its own
@@ -695,6 +804,27 @@ function adaptEvent(type, d = {}) {
     case 'stream.chat': {
       const chatLine = liveChatFrom(d.streamChat || d.chat)
       return { type, streamChat: chatLine, streamId: chatLine?.streamId || d.streamId || null, userId: chatLine?.userId || null }
+    }
+
+    /* ---- multi-guest stage / reactions / gifts ---- */
+    case 'stream.stage': {
+      // The WHOLE panel — replace local stage state with it, never merge.
+      const stage = stageStateFrom(d.stage)
+      return { type, stage, streamId: stage?.streamId || d.streamId || null }
+    }
+    case 'stream.stage.request':   // host only — a viewer raised their hand
+    case 'stream.stage.invite':    // invitee only — carries the HOST member (who invited)
+    case 'stream.stage.grant': {   // one guest only — creds when going up, REMOVED on revoke
+      const stageMember = stageMemberFrom(d.stageMember)
+      return { type, stageMember, streamId: stageMember?.streamId || d.streamId || null, userId: d.userId || stageMember?.userId || null }
+    }
+    case 'stream.reaction': {
+      const streamReaction = streamReactionFrom(d.streamReaction || d)
+      return { type, streamReaction, streamId: streamReaction?.streamId || d.streamId || null, userId: streamReaction?.userId || d.userId || null }
+    }
+    case 'stream.gift': {
+      const streamGift = streamGiftFrom(d.streamGift || d)
+      return { type, streamGift, streamId: streamGift?.streamId || d.streamId || null, userId: streamGift?.senderId || d.userId || null }
     }
 
     default:
@@ -1080,6 +1210,21 @@ export const chat = {
     remove(id)             { return http.del(`/api/v1/streams/${id}`) },
 
     /* ---- recording (owner-only) ---- */
+    /**
+     * Start / pause recording DURING a live broadcast. The host can record in
+     * takes — on, off, on again — and every take is joined into a single file
+     * when the stream ends, so the finished video never shows the seams.
+     *
+     * Both return the updated stream (`recordingStatus` → RECORDING / PAUSED).
+     * Pausing keeps the broadcast and its viewers untouched; only the writing
+     * to disk stops.
+     */
+    async startRecording(id) {
+      return liveStreamFrom(await http.post(`/api/v1/streams/${id}/recording/start`, {}))
+    },
+    async stopRecording(id) {
+      return liveStreamFrom(await http.post(`/api/v1/streams/${id}/recording/stop`, {}))
+    },
     /** Recording manifest — status + the downloadable parts. */
     async recording(id, opts) {
       return recordingInfoFrom(await http.get(`/api/v1/streams/${id}/recording`, undefined, opts))
@@ -1139,6 +1284,50 @@ export const chat = {
       }
       await chat.streams.saveRecording(id)
       return 1
+    },
+
+    /* ---- multi-guest stage (co-hosts up beside the host) ----
+       The stage is CONTROL-PLANE state: who is up, who asked, who is muted.
+       The media itself is each guest publishing to their own MediaMTX path
+       with their own secret key (never the host's), which arrives ONLY on the
+       `accept` response / that guest's private `stream.stage.grant`. */
+    stage: {
+      /** Current roster (host + active guests). Public. */
+      async get(id)      { return stageStateFrom(await http.get(`/api/v1/streams/${id}/stage`)) },
+      /** Raise your hand to come up — the host gets `stream.stage.request`. */
+      async requestUp(id){ return stageMemberFrom(await http.post(`/api/v1/streams/${id}/stage/requests`, {})) },
+      /** Pending hand-raises, host only (the request queue). */
+      async requests(id) { return (await http.get(`/api/v1/streams/${id}/stage/requests`) || []).map(stageMemberFrom).filter(Boolean) },
+      /** Approve a hand-raise — the guest's creds go to THEM via `stream.stage.grant`;
+       *  this response is only the public member view. */
+      async approve(id, userId) { return stageMemberFrom(await http.post(`/api/v1/streams/${id}/stage/requests/${userId}/approve`, {})) },
+      deny(id, userId)   { return http.post(`/api/v1/streams/${id}/stage/requests/${userId}/deny`, {}) },
+      invite(id, userId) { return http.post(`/api/v1/streams/${id}/stage/invites/${userId}`, {}) },
+      /** Accept an invite. The response is YOUR member WITH `whipUrl`/`publishKey`. */
+      async accept(id)   { return stageMemberFrom(await http.post(`/api/v1/streams/${id}/stage/accept`, {})) },
+      decline(id)        { return http.post(`/api/v1/streams/${id}/stage/decline`, {}) },
+      /** Step down. `beacon` mirrors streams.leave — a guest closing the tab
+       *  must still free their seat, or the stage stays "full" of ghosts. */
+      leave(id, { beacon } = {}) { return http.post(`/api/v1/streams/${id}/stage/leave`, {}, { keepalive: beacon }) },
+      /** Host takes a guest down — revokes creds and kicks their media session. */
+      remove(id, userId) { return http.del(`/api/v1/streams/${id}/stage/${userId}`) },
+      /** Authoritative mute: a flag on every roster broadcast that EVERY client
+       *  applies locally — see the mute note in live-streaming.md. */
+      mute(id, userId)   { return http.post(`/api/v1/streams/${id}/stage/${userId}/mute`, {}) },
+      unmute(id, userId) { return http.post(`/api/v1/streams/${id}/stage/${userId}/unmute`, {}) },
+    },
+
+    /** Tap a floating reaction (host or joined viewer; server caps 30/10s).
+     *  Broadcast only, never stored — the animation IS the payload. */
+    react(id, type)      { return http.post(`/api/v1/streams/${id}/reactions`, type ? { type } : {}) },
+
+    /* ---- symbolic gifts (coins = leaderboard score, never money) ---- */
+    gifts: {
+      async catalog()    { return (await http.get('/api/v1/streams/gifts/catalog') || []).map(giftEntryFrom).filter(Boolean) },
+      /** The `stream.gift` broadcast echoes to the sender too — animate from
+       *  the frame, not from this response, or the sender sees it twice. */
+      async send(id, giftId) { return streamGiftFrom(await http.post(`/api/v1/streams/${id}/gifts`, { giftId })) },
+      async top(id, limit = 10) { return (await http.get(`/api/v1/streams/${id}/gifts/top`, { limit }) || []).map(giftSupporterFrom).filter(Boolean) },
     },
   },
 

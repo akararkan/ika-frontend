@@ -249,6 +249,7 @@ Routes: `chat`, `chat/requests`, `chat/:id` all mount [ChatPage.jsx](src/pages/C
 | `PostComposer` | Sends the types a textarea can't express: POLL (incl. quiz), LOCATION, CONTACT. | [PostComposer.jsx](src/components/chat/PostComposer.jsx) |
 | `ChannelPanels` | `CommentsPanel` (a post's thread in the linked discussion group) and `TagPanel` (exact `#tag` lookup). Both ride the `.ch-search` slide-over rung. | [ChannelPanels.jsx](src/components/chat/ChannelPanels.jsx) |
 | `LivePage` | Go live, watch, and the ephemeral live chat. Media rides an external ingest/playback origin. | [LivePage.jsx](src/pages/LivePage.jsx) |
+| `liveStage` | The multi-guest stage layer: guest-tile rail (`useStageVideos` keeps one WHEP per remote guest, diff-based so tiles never blink), floating reactions, gift picker/splash/supporters, the host's request queue, the invite banner. The host is NEVER a tile — their media is the main video, and a second WHEP to it would double their audio. | [liveStage.jsx](src/components/liveStage.jsx) |
 
 ### (b) Prop contracts that are easy to get wrong
 
@@ -683,6 +684,7 @@ Every dispatched event goes to its named handler *and* to `onAny`, which the pro
 | `request.new` | `onRequest` | `requestCount + 1`; prepend to the list if it has been loaded | — |
 | `call.incoming` · `.accepted` · `.declined` · `.participant` · `.ended` · `.signal` | `onCall` | **none supplied** | [CallContext.jsx](src/context/CallContext.jsx) — the entire call lifecycle and the WebRTC relay |
 | `stream.started` · `.viewer` · `.chat` · `.updated` · `.ended` | `onStream` | **none supplied** | [LivePage.jsx](src/pages/LivePage.jsx) — the directory and the room both subscribe — and [LiveRow.jsx](src/components/LiveRow.jsx). List surfaces fold through the one reducer in [liveRows.js](src/lib/liveRows.js) |
+| `stream.stage` · `.stage.request` · `.stage.invite` · `.stage.grant` · `stream.reaction` · `stream.gift` | `onStream` | ChatContext toasts a `stage.invite` that arrives while NOT on that live page (the in-room banner handles the rest) | [LivePage.jsx](src/pages/LivePage.jsx) — the multi-guest stage (roster replaces wholesale; the queue/invite/grant frames are per-audience), floating reactions (sender skips their own echo) and gifts (everyone, sender included, animates from the frame). UI pieces in [liveStage.jsx](src/components/liveStage.jsx) |
 | `heartbeat` | — | not in `EVENT_HANDLER`; the dedicated `heartbeat`/`HEARTBEAT` listeners touch `lastBeat` only, and `dispatch` early-returns on the name. Never broadcast | — |
 
 Calls and live streams are **multiplexed onto the same per-user socket** — there is no second `EventSource` for either. All six `call.*` names map to one handler key (`onCall`) and all four `stream.*` to `onStream`; consumers switch on `evt.type`. They are listed individually in `EVENT_HANDLER` anyway because that map is what `stream()` derives its `addEventListener` calls from — a name missing from it reaches nothing, not even `onAny`.
