@@ -1410,15 +1410,15 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
 
         {/* Host broadcast controls — only while actually publishing the camera. */}
         {isHost && stream.isLive && cast === 'live' && (
-          <div className="lv-cast-bar" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '10px 0', flexWrap: 'wrap' }}>
-            <span className="lv-badge"><span className="lv-dot" aria-hidden="true"/>You’re live</span>
-            <button className="btn" onClick={toggleMic}>
+          <div className="stg-castbar">
+            <span className="stg-onair"><span className="lv-dot" aria-hidden="true"/>You’re live</span>
+            <button className="stg-cast-btn" onClick={toggleMic} aria-pressed={!micOn}>
               <Icon name={micOn ? 'mic' : 'micoff'} className="xs"/>{micOn ? 'Mute' : 'Unmute'}
             </button>
-            <button className="btn" onClick={toggleCam}>
+            <button className="stg-cast-btn" onClick={toggleCam} aria-pressed={!camOn}>
               <Icon name={camOn ? 'camera' : 'videooff'} className="xs"/>{camOn ? 'Camera off' : 'Camera on'}
             </button>
-            <button className={'btn' + (recording ? ' rec-on' : '')} onClick={toggleRecord} disabled={recBusy}
+            <button className={'stg-cast-btn' + (recording ? ' rec-on' : '')} onClick={toggleRecord} disabled={recBusy}
               aria-pressed={recording}
               title={recording ? 'Stop saving — the broadcast continues' : 'Start saving this broadcast'}>
               {recording

@@ -206,19 +206,25 @@ export function useVideoPresence({ connsRef, idsKey, mainRef, watchMain }) {
 
 /* ---------- the split-screen stage grid ---------- */
 
+/* NAMESPACE NOTE: every class in this file is `stg-*`. The obvious `lv-*`
+   prefix is ALREADY TAKEN twice over — `.lv-grid` is the live DIRECTORY's
+   card grid and `.lv-cell` is the following-rail's 74px avatar cell — and the
+   first version of this file collided with both: rail rules squeezed stage
+   cells into face-slivers, and the stage rules clobbered the directory. */
+
 /** A cell's profile plate — what a camera-off (or still-joining) person looks
  *  like: their face and name on a soft tinted backdrop, TikTok-style, never a
  *  black rectangle. */
 function CellPlate({ name, card, avatarUrl, note }) {
   return (
-    <div className="lv-plate">
+    <div className="stg-plate">
       {(card?.profileImage || avatarUrl) && (
-        <span className="lv-plate-bg" style={{ backgroundImage: `url("${encodeURI(card?.profileImage || avatarUrl)}")` }} aria-hidden="true"/>
+        <span className="stg-plate-bg" style={{ backgroundImage: `url("${encodeURI(card?.profileImage || avatarUrl)}")` }} aria-hidden="true"/>
       )}
       <Avatar size={52} src={card?.profileImage || avatarUrl || null}
         initials={card?.initials || (name[0] || '·')} color={card?.avc}/>
-      <span className="lv-plate-name" dir="auto"><bdi>{name}</bdi></span>
-      {note && <span className="lv-plate-note">{note}</span>}
+      <span className="stg-plate-name" dir="auto"><bdi>{name}</bdi></span>
+      {note && <span className="stg-plate-note">{note}</span>}
     </div>
   )
 }
@@ -246,28 +252,30 @@ export function StageGrid({
 
   const nameOf = (m, card) => m.displayName || card?.full || (m.handle ? '@' + m.handle : 'Guest')
 
+  /* TikTok cell chrome: a compact glass NAME PILL top-left, round glass
+     CONTROLS bottom-right. No full-width bars — the picture is the surface. */
+  const tag = (children) => <span className="stg-tag">{children}</span>
+
   return (
-    <div className="lv-grid" data-n={Math.min(n, 9)}>
+    <div className="stg-grid" data-n={Math.min(n, 9)}>
       {/* ---- the host's cell — the main video lives here ---- */}
-      <figure className="lv-cell host">
+      <figure className="stg-cell host">
         {hostSlot}
         {hostCamOff && (
           <CellPlate name={hostName} card={hostCard} avatarUrl={stream?.hostAvatarUrl}
             note="Camera is off"/>
         )}
-        {n > 1 && (
-          <figcaption className="lv-cell-bar">
-            <span className="lv-cell-name">
-              <Icon name="crown" className="xs" aria-label="Host"/>
-              <bdi>{hostName}</bdi>
-            </span>
-          </figcaption>
+        {n > 1 && tag(
+          <>
+            <Icon name="crown" className="xs" aria-label="Host"/>
+            <bdi>{hostName}</bdi>
+          </>
         )}
       </figure>
 
       {/* ---- my cell — local camera preview, my own controls ---- */}
       {meOnStage && (
-        <figure className="lv-cell me">
+        <figure className="stg-cell me">
           {/* Muted ALWAYS: hearing your own mic back half a second late is
               unusable. attachMyTile also (re)attaches the captured media, so a
               cell that mounts AFTER capture still gets the picture. */}
@@ -275,29 +283,30 @@ export function StageGrid({
           {!guestCamOn && (
             <CellPlate name="You" card={cardOf?.(myId)} note="Your camera is off"/>
           )}
-          <figcaption className="lv-cell-bar">
-            <span className="lv-cell-name">
+          {tag(
+            <>
               <bdi>You</bdi>
-              {myMuted && <span className="lv-cell-chip">Muted by host</span>}
-            </span>
-            <span className="lv-cell-acts">
-              <button className="lv-cell-act" onClick={onToggleGuestMic} disabled={myMuted}
-                aria-pressed={guestMicOn && !myMuted}
-                title={myMuted ? 'The host muted you' : guestMicOn ? 'Mute your mic' : 'Unmute your mic'}>
-                <Icon name={guestMicOn && !myMuted ? 'mic' : 'micoff'} className="xs"
-                  aria-label={guestMicOn && !myMuted ? 'Your mic is on' : 'Your mic is off'}/>
-              </button>
-              <button className="lv-cell-act" onClick={onToggleGuestCam}
-                aria-pressed={guestCamOn}
-                title={guestCamOn ? 'Turn your camera off — your profile shows instead' : 'Turn your camera on'}>
-                <Icon name={guestCamOn ? 'camera' : 'videooff'} className="xs"
-                  aria-label={guestCamOn ? 'Your camera is on' : 'Your camera is off'}/>
-              </button>
-              <button className="lv-cell-act bad" onClick={onStepDown} title="Leave the stage">
-                <Icon name="logout" className="xs" aria-label="Leave the stage"/>
-              </button>
-            </span>
-          </figcaption>
+              {myMuted && <span className="stg-chip">Muted by host</span>}
+              {!myMuted && !guestMicOn && <Icon name="micoff" className="xs" aria-label="Your mic is off"/>}
+            </>
+          )}
+          <span className="stg-ctl">
+            <button className="stg-act" onClick={onToggleGuestMic} disabled={myMuted}
+              aria-pressed={guestMicOn && !myMuted}
+              title={myMuted ? 'The host muted you' : guestMicOn ? 'Mute your mic' : 'Unmute your mic'}>
+              <Icon name={guestMicOn && !myMuted ? 'mic' : 'micoff'} className="xs"
+                aria-label={guestMicOn && !myMuted ? 'Your mic is on' : 'Your mic is off'}/>
+            </button>
+            <button className="stg-act" onClick={onToggleGuestCam}
+              aria-pressed={guestCamOn}
+              title={guestCamOn ? 'Turn your camera off — your profile shows instead' : 'Turn your camera on'}>
+              <Icon name={guestCamOn ? 'camera' : 'videooff'} className="xs"
+                aria-label={guestCamOn ? 'Your camera is on' : 'Your camera is off'}/>
+            </button>
+            <button className="stg-act bad" onClick={onStepDown} title="Leave the stage">
+              <Icon name="logout" className="xs" aria-label="Leave the stage"/>
+            </button>
+          </span>
         </figure>
       )}
 
@@ -307,11 +316,11 @@ export function StageGrid({
         const name = nameOf(m, card)
         const state = presence?.[String(m.userId)] || 'connecting'
         return (
-          <figure className="lv-cell" key={connKeyOf(m)}>
+          <figure className="stg-cell" key={connKeyOf(m)}>
             {/* The WHEP <video> lives in the conns map (created before mount so
                 dialling starts immediately); adopt it into the cell. Reading
                 the ref HERE is fine — DOM ref callbacks run after render. */}
-            <div className="lv-cell-media" ref={node => {
+            <div className="stg-media" ref={node => {
               const c = connsRef.current.get(connKeyOf(m))
               if (node && c && c.el.parentNode !== node) node.appendChild(c.el)
             }}/>
@@ -319,28 +328,28 @@ export function StageGrid({
               <CellPlate name={name} card={card} avatarUrl={m.avatarUrl}
                 note={state === 'connecting' ? 'Joining…' : 'Camera is off'}/>
             )}
-            <figcaption className="lv-cell-bar">
-              <span className="lv-cell-name">
-                <Avatar size={16} src={card?.profileImage || m.avatarUrl || null}
+            {tag(
+              <>
+                <Avatar size={14} src={card?.profileImage || m.avatarUrl || null}
                   initials={card?.initials || (name[0] || '·')} color={card?.avc}/>
                 <bdi>{name}</bdi>
                 {m.muted && <Icon name="micoff" className="xs" aria-label="Muted by the host"/>}
+              </>
+            )}
+            {isHost && (
+              <span className="stg-ctl">
+                <button className="stg-act" disabled={busyId === m.userId}
+                  onClick={() => (m.muted ? onUnmute(m.userId) : onMute(m.userId))}
+                  title={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}>
+                  <Icon name={m.muted ? 'micoff' : 'mic'} className="xs"
+                    aria-label={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}/>
+                </button>
+                <button className="stg-act bad" disabled={busyId === m.userId}
+                  onClick={() => onRemove(m.userId)} title="Take off the stage">
+                  <Icon name="close" className="xs" aria-label="Take off the stage"/>
+                </button>
               </span>
-              {isHost && (
-                <span className="lv-cell-acts">
-                  <button className="lv-cell-act" disabled={busyId === m.userId}
-                    onClick={() => (m.muted ? onUnmute(m.userId) : onMute(m.userId))}
-                    title={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}>
-                    <Icon name={m.muted ? 'micoff' : 'mic'} className="xs"
-                      aria-label={m.muted ? 'Unmute for everyone' : 'Mute for everyone'}/>
-                  </button>
-                  <button className="lv-cell-act bad" disabled={busyId === m.userId}
-                    onClick={() => onRemove(m.userId)} title="Take off the stage">
-                    <Icon name="close" className="xs" aria-label="Take off the stage"/>
-                  </button>
-                </span>
-              )}
-            </figcaption>
+            )}
           </figure>
         )
       })}

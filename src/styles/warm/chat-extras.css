@@ -624,13 +624,6 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .lv-rec-chip.failed{ background:var(--live); color:#fff; }
 .lv-rec-chip.failed .ico{ width:12px; height:12px; }
 
-/* Recording is live — the one control in the bar that changes what is kept, so
-   it is the one that gets colour. */
-.lv-cast-bar .btn.rec-on{
-  background:var(--live-soft); color:var(--live); border-color:currentColor;
-}
-.lv-cast-bar .btn.rec-on .lv-dot{ background:var(--live); width:7px; height:7px; }
-
 /* Picture-health notice in the host's broadcast bar. Sits beside the mic/camera
    buttons rather than over the stage — the host is watching their own preview
    there, and covering it would hide the very thing being reported on. */
@@ -2295,83 +2288,108 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
    host's request queue, the supporters board — and on phones
    the comments float over the picture with the composer
    pinned, exactly the TikTok live layout.
+
+   NAMESPACE: the stage box itself is `stg-*`. The natural
+   `lv-grid` / `lv-cell` names are TAKEN — the live directory's
+   card grid and the following-rail's avatar cells — and the
+   first cut of this section collided with both (rail widths
+   squeezed stage cells into face-slivers). Overlay pieces that
+   proved collision-free keep their `lv-*` names.
    ========================================================= */
 
 /* ---- the split-screen grid ---- */
-.lv-grid{
+.stg-grid{
   position:absolute; inset:0;
-  display:grid; gap:2px; background:#0b1220;
+  display:grid; gap:3px; background:#05070c;
 }
-.lv-grid[data-n="1"]{ grid-template-columns:1fr; }
-.lv-grid[data-n="2"],
-.lv-grid[data-n="3"],
-.lv-grid[data-n="4"]{ grid-template-columns:1fr 1fr; }
-.lv-grid[data-n="5"], .lv-grid[data-n="6"],
-.lv-grid[data-n="7"], .lv-grid[data-n="8"], .lv-grid[data-n="9"]{
+.stg-grid[data-n="1"]{ grid-template-columns:1fr; }
+.stg-grid[data-n="2"],
+.stg-grid[data-n="3"],
+.stg-grid[data-n="4"]{ grid-template-columns:1fr 1fr; }
+.stg-grid[data-n="5"], .stg-grid[data-n="6"],
+.stg-grid[data-n="7"], .stg-grid[data-n="8"], .stg-grid[data-n="9"]{
   grid-template-columns:repeat(3, 1fr);
 }
 /* Three up: two on top, the third across the bottom — no dead quarter. */
-.lv-grid[data-n="3"] .lv-cell:last-child{ grid-column:1 / -1; }
+.stg-grid[data-n="3"] .stg-cell:last-child{ grid-column:1 / -1; }
 
-.lv-cell{
+.stg-cell{
   position:relative; margin:0; overflow:hidden;
   min-width:0; min-height:0; background:#0b1220;
 }
-.lv-cell video,
-.lv-cell-media, .lv-cell-media video{
+.stg-cell video,
+.stg-media, .stg-media video{
   position:absolute; inset:0; width:100%; height:100%;
   object-fit:cover; background:#000; display:block;
 }
+.stg-media{ position:absolute; inset:0; }
 /* Alone on the stage, the host keeps the classic letterboxed frame; the
    moment the screen splits, every cell fills like TikTok. */
-.lv-grid[data-n="1"] .lv-video{ object-fit:contain; }
+.stg-grid[data-n="1"] .lv-video{ object-fit:contain; }
+/* My own cell wears a quiet gold ring — "this one is you". */
+.stg-cell.me::after{
+  content:''; position:absolute; inset:0; z-index:3; pointer-events:none;
+  border:2px solid var(--gold); opacity:.65;
+}
 
-.lv-cell-bar{
-  position:absolute; inset-block-end:0; inset-inline:0; z-index:2;
-  display:flex; align-items:center; justify-content:space-between; gap:6px;
-  padding:14px 8px 5px; background:linear-gradient(transparent, rgba(11,18,32,.82));
-  color:#f5f1e8; font:600 11.5px/1.4 var(--sans);
+/* ---- cell chrome: name pill top-left, controls bottom-right ---- */
+.stg-tag{
+  position:absolute; z-index:2;
+  /* Bottom-left, like TikTok — the top strip belongs to the LIVE bar, and a
+     first-row cell's name would sit exactly underneath it. Width leaves room
+     for the control cluster sharing the bottom edge. */
+  inset-block-end:8px; inset-inline-start:8px;
+  max-width:calc(100% - 118px);
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 9px 3px 5px; border-radius:999px;
+  background:rgba(11,18,32,.6); backdrop-filter:blur(6px);
+  color:#f5f1e8; font:700 11px/1.5 var(--sans);
 }
-.lv-cell-name{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
-.lv-cell-name bdi{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.lv-cell-chip{
+.stg-tag bdi{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stg-tag .ico{ flex:0 0 auto; }
+.stg-chip{
   padding:1px 7px; border-radius:999px; flex:0 0 auto;
-  background:var(--live); color:#fff; font:700 9.5px/1.5 var(--sans);
-  letter-spacing:.03em; text-transform:uppercase;
+  background:var(--live); color:#fff; font:700 9px/1.6 var(--sans);
+  letter-spacing:.04em; text-transform:uppercase;
 }
-.lv-cell-acts{ display:inline-flex; gap:4px; flex:0 0 auto; }
-.lv-cell-act{
+.stg-ctl{
+  position:absolute; z-index:2;
+  inset-block-end:8px; inset-inline-end:8px;
+  display:inline-flex; gap:5px;
+}
+.stg-act{
   display:inline-flex; align-items:center; justify-content:center;
-  width:26px; height:26px; border:0; border-radius:50%; cursor:pointer;
-  background:rgba(247,243,234,.16); color:#f5f1e8;
+  width:30px; height:30px; border:0; border-radius:50%; cursor:pointer;
+  background:rgba(11,18,32,.62); color:#f5f1e8; backdrop-filter:blur(6px);
+  transition:background .12s ease, transform .12s ease;
 }
-.lv-cell-act:hover{ background:rgba(247,243,234,.3); }
-.lv-cell-act.bad:hover{ background:var(--live); }
-.lv-cell-act:disabled{ opacity:.5; cursor:default; }
+.stg-act:hover{ background:rgba(11,18,32,.9); transform:scale(1.08); }
+.stg-act.bad:hover{ background:var(--live); }
+.stg-act:disabled{ opacity:.5; cursor:default; transform:none; }
 
 /* ---- camera-off / joining: the profile plate ---- */
-.lv-plate{
+.stg-plate{
   position:absolute; inset:0; z-index:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
   background:radial-gradient(120% 120% at 50% 30%, #1d2a44 0%, #0b1220 78%);
   color:#f5f1e8; text-align:center; padding:10px;
 }
-.lv-plate-bg{
+.stg-plate-bg{
   position:absolute; inset:-12%;
   background-position:center; background-size:cover;
   filter:blur(26px) saturate(1.1) brightness(.45);
   transform:scale(1.15);
 }
-.lv-plate > *{ position:relative; }
-.lv-plate-name{ font:700 13px/1.4 var(--sans); max-width:92%; }
-.lv-plate-name bdi{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.lv-plate-note{ color:rgba(247,243,234,.75); font:500 11px/1.4 var(--sans); }
+.stg-plate > *{ position:relative; }
+.stg-plate-name{ font:700 13px/1.4 var(--sans); max-width:92%; }
+.stg-plate-name bdi{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stg-plate-note{ color:rgba(247,243,234,.75); font:500 11px/1.4 var(--sans); }
 
 /* ---- the LIVE top bar ---- */
 .lv-topbar{
   position:absolute; inset-block-start:0; inset-inline:0; z-index:4;
   display:flex; align-items:center; gap:8px; padding:8px 10px 16px;
-  background:linear-gradient(rgba(11,18,32,.6), transparent);
+  background:linear-gradient(rgba(11,18,32,.55), transparent);
   pointer-events:none;
 }
 .lv-topbar > *{ pointer-events:auto; }
@@ -2386,13 +2404,14 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .lv-count{
   display:inline-flex; align-items:center; gap:5px;
   padding:3px 9px; border-radius:999px;
-  background:rgba(11,18,32,.55); color:#f5f1e8;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(6px); color:#f5f1e8;
   font:700 11.5px/1.6 var(--sans);
 }
 .lv-ctl{
   display:inline-flex; align-items:center; justify-content:center;
   width:32px; height:32px; border:0; border-radius:50%; cursor:pointer;
-  background:rgba(11,18,32,.55); color:#f5f1e8;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(6px); color:#f5f1e8;
+  transition:background .12s ease;
 }
 .lv-ctl:hover{ background:rgba(11,18,32,.85); }
 
@@ -2406,6 +2425,32 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 }
 .lv-sound-pill:hover{ background:rgba(11,18,32,.9); }
 [dir="rtl"] .lv-sound-pill{ transform:translateX(50%); }
+
+/* ---- the host's on-air control bar (below the stage) ---- */
+.stg-castbar{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin-block-start:10px;
+}
+.stg-onair{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 12px; border-radius:999px;
+  background:var(--live); color:#fff;
+  font:800 11px/1.6 var(--sans); letter-spacing:.05em;
+}
+.stg-onair .lv-dot{ position:static; width:6px; height:6px; background:#fff; }
+.stg-cast-btn{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 14px; border:1px solid var(--line); border-radius:999px;
+  background:var(--card); color:var(--ink); cursor:pointer;
+  font:600 12.5px/1.5 var(--sans);
+  transition:border-color .12s ease, background .12s ease;
+}
+.stg-cast-btn:hover{ border-color:var(--gold); background:var(--gold-wash); }
+.stg-cast-btn:disabled{ opacity:.55; cursor:default; }
+.stg-cast-btn.rec-on{
+  background:var(--live-soft); color:var(--live); border-color:currentColor;
+}
+.stg-cast-btn.rec-on .lv-dot{ position:static; background:var(--live); width:7px; height:7px; }
 
 /* ---- floating reactions (the heart burst) ---- */
 /* container-type makes cqh mean THIS BOX's height — without it the unit falls
@@ -2442,9 +2487,9 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   position:absolute; inset-inline-end:10px; inset-block-end:12px;
   display:flex; flex-direction:column; gap:6px; z-index:5;
 }
-/* Split screen: the rightmost cell's name bar lives where the rail's tail
-   would sit — lift the rail clear of it. */
-.lv-grid:not([data-n="1"]) ~ .lv-react-rail{ inset-block-end:52px; }
+/* Split screen: the rightmost cell's controls live where the rail's tail
+   would sit — lift the rail clear of them. */
+.stg-grid:not([data-n="1"]) ~ .lv-react-rail{ inset-block-end:52px; }
 .lv-react-btn{
   width:38px; height:38px; border:0; border-radius:50%; cursor:pointer;
   background:rgba(11,18,32,.55); backdrop-filter:blur(4px);
@@ -2633,6 +2678,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   .lv-ovl-send{ display:flex; }
   /* The rail rides above the composer; system banners clear it too. */
   .lv-react-rail{ inset-block-end:60px; }
+  .stg-grid:not([data-n="1"]) ~ .lv-react-rail{ inset-block-end:96px; }
   .lv-react-btn{ width:34px; height:34px; font-size:17px; }
   .lv-hls{ inset-block-end:58px; }
   .lv-sound-pill{ inset-block-end:26%; }
@@ -2640,8 +2686,10 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   .lv-gift-sheet{ position:fixed; z-index:90; }
   .lv-gift-glyph{ font-size:56px; }
   .lv-gift-cells{ gap:6px; }
-  .lv-cell-bar{ font-size:10.5px; padding-block-start:10px; }
-  .lv-cell-act{ width:24px; height:24px; }
+  .stg-tag{ font-size:10px; max-width:calc(100% - 46px); }
+  .stg-act{ width:27px; height:27px; }
+  .stg-castbar{ gap:6px; }
+  .stg-cast-btn{ padding:5px 11px; font-size:12px; }
 }
 
 /* Motion is decoration here — a still heart and a fading gift are fine. */
@@ -2651,6 +2699,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   .lv-gift-splash{ animation:lv-gift-fade var(--dur, 2s) ease-out forwards; }
   .lv-react-btn:hover{ transform:none; }
   .lv-gift-cell:hover{ transform:none; }
+  .stg-act:hover{ transform:none; }
 }
 @keyframes lv-float-fade{ 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; } }
 @keyframes lv-gift-fade{ 0%{ opacity:0; } 12%{ opacity:1; } 85%{ opacity:1; } 100%{ opacity:0; } }
