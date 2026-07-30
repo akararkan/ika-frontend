@@ -7,7 +7,7 @@
 import { Icon } from './ui.jsx'
 
 const ICON_MAP  = { URL:'link', BOOK:'book', ARTICLE:'doc', ISBN:'book', MEDIA_FILE:'doc', MANUAL:'cite' }
-const COLOR_MAP = { URL:'#2d5f97', BOOK:'#7a5b3f', ARTICLE:'#1d3a5f', ISBN:'#7a5b3f', MEDIA_FILE:'#6b5b8a', MANUAL:'#8b8371' }
+const COLOR_MAP = { URL:'#2d5f97', BOOK:'#7a5b3f', ARTICLE:'#1d3a5f', ISBN:'#7a5b3f', MEDIA_FILE:'#6b5b8a', MANUAL:'#8a93a3' }
 
 function bytes(n) {
   if (n == null || n < 0) return ''
@@ -19,7 +19,7 @@ function bytes(n) {
 
 export function SourceRow({ s }) {
   const icon = ICON_MAP[s.type] || 'book'
-  const color = COLOR_MAP[s.type] || '#2a251d'
+  const color = COLOR_MAP[s.type] || '#232b3a'
   const isFile = s.type === 'MEDIA_FILE' || !!s.fileUrl
   // The descriptive line: prefer a full citation, then the URL / ISBN / file name.
   const desc = isFile

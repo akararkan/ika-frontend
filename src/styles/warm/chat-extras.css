@@ -89,7 +89,7 @@
   text-transform:none;
   transition:background .14s ease, color .14s ease;
 }
-.ch-schedpop-queue:hover{ background:var(--gold); color:#fffdf8; border-color:var(--gold); }
+.ch-schedpop-queue:hover{ background:var(--gold); color:#ffffff; border-color:var(--gold); }
 .ch-schedpop-hint{
   margin:0 4px 8px; padding:8px 10px;
   border-radius:9px; background:var(--gold-wash);
@@ -408,7 +408,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .cl-ctl:hover{ background:rgba(255,255,255,.18); }
 /* A muted control is inverted, not dimmed: "off" has to be unmistakable at a
    glance mid-call, and a low-opacity icon reads as "disabled" instead. */
-.cl-ctl.off{ background:#f5f1e8; color:var(--navy-deep); border-color:transparent; }
+.cl-ctl.off{ background:#f7f8fa; color:var(--navy-deep); border-color:transparent; }
 
 .cl-btn{
   display:inline-flex; align-items:center; gap:8px;
@@ -930,7 +930,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .ch-voice-play:hover{ transform:scale(1.06); }
 .ch-voice-play:active{ transform:scale(.94); }
 .ch-voice-play:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
-.ch-row.mine .ch-voice-play{ background:rgba(255,253,248,.94); color:var(--navy); }
+.ch-row.mine .ch-voice-play{ background:rgba(255,255,255,.94); color:var(--navy); }
 .ch-voice-play .ico{ width:16px; height:16px; }
 /* Playing state gets a soft breathing halo — the only motion in a bubble, and
    the fastest way to find WHICH note is the one you can hear. */
@@ -981,7 +981,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .ch-wave-layer.played .ch-wave-bar{
   background:linear-gradient(180deg,var(--gold),var(--gold-deep));
 }
-.ch-row.mine .ch-wave-bar{ background:rgba(255,253,248,.34); }
+.ch-row.mine .ch-wave-bar{ background:rgba(255,255,255,.34); }
 .ch-row.mine .ch-wave-layer.played .ch-wave-bar{ background:#f7f3ea; }
 
 /* The playhead. `inset-inline-start` with a percentage resolves against the
@@ -997,7 +997,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .ch-voice.playing .ch-wave-head,
 .ch-wave:hover ~ * .ch-wave-head,
 .ch-wave:hover .ch-wave-head{ opacity:.9; }
-.ch-row.mine .ch-wave-head{ background:#fffdf8; }
+.ch-row.mine .ch-wave-head{ background:#ffffff; }
 
 .ch-voice-foot{
   display:flex; align-items:center; gap:6px;
@@ -1037,7 +1037,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   border-color:transparent; color:var(--navy-deep);
 }
 .ch-row.mine .ch-voice-rate{
-  background:rgba(255,253,248,.16); border-color:rgba(255,253,248,.26); color:#f5f1e8;
+  background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.26); color:#f5f1e8;
 }
 .ch-row.mine .ch-voice-rate.on{
   background:#f7f3ea; border-color:transparent; color:var(--navy-deep);
@@ -1155,7 +1155,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .vp-knob{
   position:absolute; inset-inline-start:calc(var(--p,0) * 100%);
   width:12px; height:12px; margin-inline-start:-6px; border-radius:50%;
-  background:#fffdf8; box-shadow:0 1px 4px rgba(0,0,0,.5);
+  background:#ffffff; box-shadow:0 1px 4px rgba(0,0,0,.5);
   transform:scale(0); transition:transform .14s cubic-bezier(.34,1.56,.64,1);
 }
 .vp-track:hover::before,
@@ -1219,10 +1219,10 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .vp-volrange::-webkit-slider-thumb{
   -webkit-appearance:none; appearance:none;
   width:12px; height:12px; margin-block-start:-4px; border-radius:50%;
-  background:#fffdf8; box-shadow:0 1px 3px rgba(0,0,0,.5);
+  background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,.5);
 }
 .vp-volrange::-moz-range-thumb{
-  width:12px; height:12px; border:0; border-radius:50%; background:#fffdf8;
+  width:12px; height:12px; border:0; border-radius:50%; background:#ffffff;
 }
 
 .vp-time{
@@ -1587,7 +1587,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   transition:background .16s ease;
 }
 .cl-pill-ic:hover{ background:rgba(255,255,255,.22); }
-.cl-pill-ic.off{ background:#f5f1e8; color:var(--navy-deep); }
+.cl-pill-ic.off{ background:#f7f8fa; color:var(--navy-deep); }
 /* The pill's dot doubles as a speaking indicator — the only signal available
    when the surface is collapsed. */
 .cl-pill-dot.live{ background:#5fd08a; animation:clPulse .8s ease-in-out infinite; }
@@ -1872,9 +1872,9 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   position:absolute; inset-block-start:11px; inset-inline-end:11px;
   display:inline-flex; align-items:center; gap:4px;
   padding-block:3px; padding-inline:7px 9px; border-radius:999px;
-  background:rgba(255,253,248,.94); color:var(--good);
+  background:rgba(255,255,255,.94); color:var(--good);
   font:700 11px/1 var(--sans);
-  box-shadow:0 2px 6px rgba(20,17,12,.16);
+  box-shadow:0 2px 6px rgba(15,21,32,.16);
 }
 
 /* crest — straddles the cover/body seam like a profile avatar */
@@ -2025,7 +2025,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
    reverses and the @ detaches to the far edge. */
 .cn-handle{
   display:flex; align-items:center; direction:ltr;
-  border:1px solid #ddd4c0; border-radius:10px; background:#fcfaf4;
+  border:1px solid #d8dee8; border-radius:10px; background:#fcfdfe;
   padding-inline-start:12px; overflow:hidden;
   transition:border-color .15s ease, box-shadow .15s ease;
 }
@@ -2130,7 +2130,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .ch-reacts{ gap:5px; }
 .ch-react{
   padding:2px 9px; font-size:13px;
-  box-shadow:0 2px 8px -4px rgba(34,30,23,.24);
+  box-shadow:0 2px 8px -4px rgba(23,31,45,.24);
   transition:transform .14s cubic-bezier(.34,1.4,.5,1),
              box-shadow .14s ease, border-color .14s ease, background .14s ease;
   /* NO fill-mode: a held `both`/`forwards` final keyframe (scale(1)) sits above
@@ -2143,7 +2143,7 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
 .ch-react:hover{
   transform:translateY(-2px);
   border-color:var(--blue);
-  box-shadow:0 7px 16px -5px rgba(34,30,23,.3);
+  box-shadow:0 7px 16px -5px rgba(23,31,45,.3);
 }
 .ch-react:active{ transform:scale(.9); }
 .ch-react.mine{
@@ -2224,10 +2224,10 @@ input.field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{ opa
   backdrop-filter:blur(12px) saturate(118%); -webkit-backdrop-filter:blur(12px) saturate(118%);
 }
 .ch-lightbox-x, .ch-lightbox-dl, .ch-lightbox-nav{
-  border:1px solid rgba(255,253,248,.16);
+  border:1px solid rgba(255,255,255,.16);
   transition:background .16s ease, transform .16s ease, border-color .16s ease;
 }
-.ch-lightbox-x:hover, .ch-lightbox-nav:hover{ transform:scale(1.08); border-color:rgba(255,253,248,.3); }
+.ch-lightbox-x:hover, .ch-lightbox-nav:hover{ transform:scale(1.08); border-color:rgba(255,255,255,.3); }
 .ch-lightbox-x:active, .ch-lightbox-nav:active{ transform:scale(.94); }
 .ch-lightbox-dl:hover{ transform:translateY(-1px); }
 

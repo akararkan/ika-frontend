@@ -342,7 +342,7 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
     }
   }, [conversationId, buildOptimistic, reconcile, markFailed])
 
-  const sendFiles = React.useCallback(async ({ files, body, replyToId, durationMs } = {}) => {
+  const sendFiles = React.useCallback(async ({ files, body, replyToId, durationMs, waveform } = {}) => {
     const list = Array.from(files || [])
     if (!list.length || !conversationId) return
     const nonce = api.chat.newNonce()
@@ -352,19 +352,24 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
       return {
         kind: kindOfFile(f), url, thumbnailUrl: null,
         mime: f.type || '', bytes: f.size || 0, fileName: f.name || '', altText: '',
-        // Carried for the optimistic bubble only: the multipart endpoint has
-        // no duration part, so the server re-derives it. Without this the
-        // pending voice bubble would render 0:00 until the echo arrives.
+        // On the optimistic bubble these make the pending voice note whole:
+        // a real clock instead of 0:00, the note's real shape instead of the
+        // id-seeded synthetic bars. They are ALSO sent to the server (as
+        // best-effort multipart parts — see api.chat.messages.sendFiles);
+        // verified live that today's backend drops them, so after reconcile
+        // the echo may carry neither. That is the backend's gap to close,
+        // not a reason to strip them here.
         durationMs: durationMs ?? null,
+        waveform: waveform || null,
       }
     })
     pendingUrlsRef.current.set(nonce, urls)
-    outboxRef.current.set(nonce, { kind: 'files', body: body || '', files: list, replyToId, durationMs })
+    outboxRef.current.set(nonce, { kind: 'files', body: body || '', files: list, replyToId, durationMs, waveform })
     const optimistic = buildOptimistic(nonce, { type: media[0]?.kind || 'FILE', body, media, replyToId })
     setMsgMap(prev => new Map(prev).set(optimistic.id, optimistic))
     try {
       const real = await api.chat.messages.sendFiles(conversationId, {
-        clientNonce: nonce, body, files: list, replyToId,
+        clientNonce: nonce, body, files: list, replyToId, durationMs, waveform,
       })
       reconcile(nonce, real)
     } catch (e) {
@@ -382,6 +387,7 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
       const real = entry.kind === 'files'
         ? await api.chat.messages.sendFiles(conversationId, {
             clientNonce: nonce, body: entry.body, files: entry.files, replyToId: entry.replyToId,
+            durationMs: entry.durationMs, waveform: entry.waveform,
           })
         // `silent` is replayed from the outbox: a retry must not wake the
         // subscribers that the original send deliberately did not.

@@ -45,10 +45,10 @@
   --mx-ease:cubic-bezier(.22,.8,.24,1);
   --mx-spring:cubic-bezier(.34,1.56,.64,1);
   /* the handoff's warm-interaction family (paper derivatives) */
-  --mx-hover:#efe9da;        /* row hover        */
-  --mx-active:#eae2cf;       /* row active (tan) */
-  --mx-soft:#f0ebdf;         /* control hover    */
-  --mx-canvas:#f1ece1;       /* thread canvas    */
+  --mx-hover:#f2f5f9;        /* row hover        */
+  --mx-active:#e7edf6;       /* row active (tan) */
+  --mx-soft:#f2f5f9;         /* control hover    */
+  --mx-canvas:#f1f4f8;       /* thread canvas    */
   --mx-online:#3d9a5f;       /* presence green   */
 }
 
@@ -78,7 +78,7 @@
 .cv-row{ padding:9px 11px; }
 .cv-row:hover{ background:var(--mx-hover); }
 .cv-row.active{ background:var(--mx-active); }
-.cv-row.active:hover{ background:#e4dbc4; }
+.cv-row.active:hover{ background:#dfe7f2; }
 /* the active row is bookmarked, like a ribbon in a ledger */
 .cv-row.active::before{
   content:""; position:absolute;
@@ -90,6 +90,9 @@
 .cv-dot{ border-color:var(--paper-2); }
 .cv-dot.on{ background:var(--mx-online); }
 .cv-row.active .cv-dot{ border-color:var(--mx-active); }
+/* the type seal's ring tracks the same surfaces as the presence dot */
+.cv-kind{ border-color:var(--paper-2); }
+.cv-row.active .cv-kind{ border-color:var(--mx-active); }
 .cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--mx-active),0 3px 8px -3px rgba(122,102,47,.55); }
 /* group medallions keep their gold wash but soften to the new radius */
 .cv-medallion{ border-radius:14px; }
@@ -106,7 +109,7 @@
 
 /* skeleton ring + section labels sit on the new paper */
 .cv-skel-av{ border-radius:14px; }
-.chat-group-label{ color:#a39a85; }
+.chat-group-label{ color:#98a1b0; }
 
 /* request rows share the rail's warm hover family — card-2 is
    invisible against the new paper-2 rail */
@@ -128,7 +131,7 @@
 .ch-day span{
   text-transform:none; letter-spacing:0;
   font-size:11.5px; font-weight:600;
-  background:#e5ddc9; border-color:transparent; color:#7a7259;
+  background:#e2e7ee; border-color:transparent; color:#566172;
   padding:4px 14px;
 }
 .ch-unread-rule span{
@@ -175,7 +178,7 @@
   border:0; border-radius:18px;
   padding:9px 13px 8px;
   font-size:15px;
-  box-shadow:0 1px 1.5px rgba(34,30,23,.07), 0 6px 18px -12px rgba(34,30,23,.16);
+  box-shadow:0 1px 1.5px rgba(23,31,45,.07), 0 6px 18px -12px rgba(23,31,45,.16);
 }
 .ch-row.mine .ch-bubble{
   box-shadow:0 2px 4px rgba(22,40,63,.14), 0 10px 26px -14px rgba(22,40,63,.45);
@@ -220,7 +223,7 @@
   background:transparent; box-shadow:none;
   color:var(--muted);
 }
-.ch-tool:hover{ background:#e9e2d0; color:var(--navy); border-color:transparent; }
+.ch-tool:hover{ background:#e7edf6; color:var(--navy); border-color:transparent; }
 
 /* ---- voice notes: the played wave + playhead go blue ----
    (prototype/doc spec — blue is the activity colour; the halo,
@@ -352,10 +355,10 @@
 .cn-hero .cn-hero-sep{ color:rgba(217,185,108,.55); }
 /* the CTA inverts: paper button on navy */
 .cn-hero .btn-primary{
-  background:#fffdf8; color:var(--navy);
+  background:#ffffff; color:var(--navy);
   box-shadow:0 10px 24px -12px rgba(0,0,0,.5);
 }
-.cn-hero .btn-primary:hover{ background:#e8e2d2; color:var(--navy-deep); }
+.cn-hero .btn-primary:hover{ background:#e7edf6; color:var(--navy-deep); }
 .cn-hero .btn-primary .ico{ color:var(--gold-deep); }
 
 /* =========================================================
@@ -366,12 +369,12 @@
 .cn-mine:hover{ border-color:var(--t,var(--gold)); }
 .cn-mine-crest{
   background:var(--t,var(--navy));
-  border:0; color:#fffdf8;
+  border:0; color:#ffffff;
   box-shadow:inset 0 -10px 18px -12px rgba(0,0,0,.45);
 }
 .cn-mine-dot{
   background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
-  color:#fffdf8;
+  color:#ffffff;
   box-shadow:0 0 0 2px var(--card);
 }
 .cn-section-n{ font-variant-numeric:tabular-nums; }
@@ -390,7 +393,7 @@
 .cn-card-mark{ color:rgba(255,255,255,.22); }
 .cn-card-crest{
   background:var(--t,var(--navy));
-  color:#fffdf8;
+  color:#ffffff;
   border:3px solid var(--card);
   box-shadow:inset 0 -12px 20px -14px rgba(0,0,0,.5), var(--shadow-sm);
 }
@@ -734,4 +737,436 @@
   .lv-cell:active .lv-cell-ring{ transform:none; }
   .ch-send:not(:disabled):hover,
   .ch-send:not(:disabled):active{ transform:none; }
+}
+
+/* =========================================================
+   14 · Prototype polish — 2026-07 chat-prototypes handoff
+   Style-only refinements mapped onto the REAL class
+   vocabulary. Placement in THIS file (after chat.css and
+   chat-extras.css) is what lets equal-specificity rules win
+   on source order; the poll/discover refinements live in
+   channels-pro.css instead because THAT file loads after
+   this one.
+   ========================================================= */
+
+/* -- Messages · the typing bubble reads as an incoming bubble -- */
+.ch-typing-bubble{
+  border:0; border-radius:18px; border-end-start-radius:6px;
+  box-shadow:0 1px 1.5px rgba(23,31,45,.07), 0 6px 18px -12px rgba(23,31,45,.16);
+}
+
+/* -- Messages · inline @mention is a tappable blue-wash chip -- */
+.ch-text .tk-mention{
+  padding:1px 5px; margin-inline:1px; border-radius:6px;
+  background:var(--blue-wash); color:var(--navy); font-weight:650;
+}
+.ch-row.mine .ch-text .tk-mention{
+  background:rgba(255,255,255,.16); color:#f5f1e8;
+}
+
+/* -- Messages · a deleted tombstone is a PILL, not speech. (0,3,0) on the
+      base ties chat.css's .ch-row.run-end .ch-bubble tail rule and wins on
+      source order; the mine restatement (0,4,0) out-ranks the mine.run-end
+      pair the same way. -- */
+.ch-row .ch-bubble.deleted{ border-radius:999px; padding:6px 13px; }
+.ch-row.mine .ch-bubble.deleted{ border-radius:999px; }
+/* my tombstone is a LIGHT pill, so the navy-bubble cream meta is illegible
+   on it — restate the quiet slate meta (0,4,0 beats the cream 0,3,0) */
+.ch-row.mine .ch-bubble.deleted .ch-meta{ color:var(--muted); }
+
+/* -- Pinned bar · a gold announcement card with a raised count pill -- */
+.ch-pinbar{
+  margin:8px 12px 0; border:1px solid var(--brass-soft);
+  border-bottom:1px solid var(--brass-soft);
+  border-radius:14px; box-shadow:var(--shadow-sm);
+}
+.ch-pinbar-count{
+  padding:2px 9px; border-radius:999px; background:var(--card);
+  border:1px solid var(--brass-soft); box-shadow:var(--shadow-sm);
+  font-size:10.5px; letter-spacing:.04em;
+}
+
+/* -- Info panel · the hero crest wears the broadcast double ring -- */
+.ci-hero-av::before, .ci-hero-av::after{
+  content:""; position:absolute; inset:-1px; border-radius:27px;
+  border:1.5px solid rgba(179,135,62,.45);
+  animation:mxRing 3.2s ease-out infinite; pointer-events:none;
+}
+.ci-hero-av::after{ animation-delay:1.6s; }
+
+/* -- Channel posts · article column: the card spans the reading width -- */
+.ch-row.is-post{ margin-top:18px; animation-duration:.32s; }
+.ch-row.is-post .ch-stack{ max-width:min(100%,720px); flex:1 1 auto; }
+.ch-row.is-post .ch-bubble{ padding:14px 16px 12px; border-radius:18px; line-height:1.75; }
+.ch-row.is-post .ch-row-av .avatar{ border-radius:10px; }
+
+/* -- File attachment · borderless sunken document tile -- */
+.ch-file{
+  border:0; border-radius:12px; padding:9px 11px;
+  box-shadow:inset 0 0 0 1px transparent; transition:box-shadow .14s ease;
+}
+.ch-file:hover{ box-shadow:inset 0 0 0 1px var(--blue); transform:none; }
+.ch-file-ico{ width:40px; height:48px; border-radius:8px; }
+
+/* -- Live · the following rail is a card plate; the ring notch and LIVE
+      tag re-key to the card surface now behind them -- */
+.lv-rail{
+  padding:14px 14px 4px; border:1px solid var(--line);
+  border-radius:var(--r-xl); background:var(--card); box-shadow:var(--shadow-sm);
+}
+.lv-rail .lv-cell-plate{ background:var(--card); }
+.lv-rail .lv-cell-tag{ border-color:var(--card); }
+.lv-cell-age{ font-family:var(--mono,monospace); font-size:10.5px; letter-spacing:-.01em; }
+
+/* -- Live · Go live is the page's one hot control: red fill + red glow
+      (prototype .golive), not another navy button -- */
+.lv-page .lv-head-acts .btn-primary{
+  background:var(--live); color:#fff;
+  box-shadow:0 6px 18px -6px rgba(194,72,61,.55);
+}
+.lv-page .lv-head-acts .btn-primary:hover{
+  background:#a83a30;
+  box-shadow:0 8px 22px -6px rgba(194,72,61,.7);
+}
+
+/* -- Live · one broadcast chip grammar: stage LIVE + host ON AIR -- */
+.lv-live-pill, .stg-onair{
+  border-radius:7px; letter-spacing:.07em;
+  box-shadow:0 4px 12px -4px rgba(194,72,61,.6);
+}
+
+/* -- Live · chat lines rise in as they land -- */
+.lv-chat-log .lv-line{ animation:mxRise .26s var(--mx-ease) backwards; }
+
+/* -- Live · the stage is the navy broadcast plate -- */
+.lv-stage{
+  background:
+    radial-gradient(120% 150% at 85% -12%, rgba(45,95,151,.42) 0%, rgba(45,95,151,0) 55%),
+    linear-gradient(135deg,#16283f 0%,#1d3a5f 70%,#22456b 100%);
+}
+/* the player-gradient band the stage controls ride on; z 1 stays above
+   the z-auto video and the camera-off plate, and slots under the cell
+   chrome stg-tag/stg-ctl(2), floats(3), overlay/topbar(4), rail(5);
+   pointer-events:none keeps taps on video */
+.lv-stage:has(.stg-grid)::after{
+  content:''; position:absolute; inset-inline:0; inset-block-end:0;
+  height:84px; z-index:1; pointer-events:none;
+  background:linear-gradient(transparent, rgba(11,18,32,.55));
+}
+
+/* -- Live · a toggled-OFF cast control flips to the light inverted fill
+      (prototype hostbtn.is-off) so mute reads at a glance on the dark
+      stage; aria-pressed=true here means the track is OFF -- */
+/* :not(.rec-on) — the Record button also carries aria-pressed, but there
+   pressed means recording ON and it must keep its red .rec-on fill */
+.stg-cast-btn[aria-pressed="true"]:not(.rec-on){
+  background:#f7f8fa; color:var(--navy-deep); border-color:#f7f8fa;
+}
+.stg-cast-btn[aria-pressed="true"]:not(.rec-on):hover{ background:#fff; border-color:#fff; }
+
+/* -- Live · the ended plate leads with a gold seal -- */
+.lv-ended{ gap:10px; }
+.lv-ended .ico.lg{
+  width:58px; height:58px; padding:13px;
+  border:1px solid rgba(217,185,108,.55); border-radius:50%;
+  background:rgba(217,185,108,.08);
+}
+.lv-ended h3{ font-size:22px; }
+
+/* Phone restatements — chat.css §10 loads BEFORE this layer, so every
+   unconditional rule above on a §10-compacted selector needs its own
+   ≤720 value (cascade rule; see the file header). */
+@media (max-width:720px){
+  .ch-row.is-post{ margin-top:14px; }
+  .ch-row.is-post .ch-stack{ max-width:100%; }
+  .ch-row.is-post .ch-bubble{ padding:12px 13px 10px; }
+  .lv-stage:has(.stg-grid)::after{ height:132px; }
+}
+@media (max-width:600px){
+  .lv-rail{ padding:11px 11px 2px; }
+}
+@media (prefers-reduced-motion:reduce){
+  .ci-hero-av::before,.ci-hero-av::after{ animation:none; opacity:0; }
+  .lv-chat-log .lv-line{ animation:none; }
+  .ch-file{ transition:none; }
+}
+
+/* Small phones: six 36px satellites + the coin still starve the input
+   pill at ≤460 (it wrapped to three lines). One more size down for the
+   accessory buttons only — nothing is hidden, the field wins the rest. */
+@media (max-width:460px){
+  .ch-inputrow{ gap:4px; }
+  .ch-cbtn{ width:32px; height:32px; }
+  .ch-cbtn .ico{ width:18px; height:18px; }
+  .ch-send{ width:42px; height:42px; }
+}
+
+/* =========================================================
+   15 · Chat smoothness pass + new-followers rail section
+   (2026-07-30). The thread reads as ONE justified column:
+   the composer strips and the pinned card cap at the same
+   900px the messages already do, so nothing spans wider than
+   the conversation it belongs to. Rhythm evens out; quotes
+   slim down; reaction chips nestle onto their bubble.
+   ========================================================= */
+
+/* the composer joins the reading column */
+.ch-composer .ch-inputrow,
+.ch-composer .ch-tray,
+.ch-composer .ch-ctx,
+.ch-composer .ch-ttlnote{
+  width:100%; max-width:900px; margin-inline:auto;
+}
+/* the pinned card centers on the same column (supersedes §14's margin) */
+.ch-pinbar{ width:min(900px, calc(100% - 24px)); margin:8px auto 0; }
+
+/* vertical rhythm: calmer run separation, tighter day pills, and
+   enough floor padding that the last bubble's reaction chips never
+   kiss the composer edge */
+.ch-scroll{ padding-block:14px 16px; }
+.ch-row.run-start{ margin-top:12px; }
+.ch-day{ margin:13px 0 8px; }
+.ch-sender{ margin-bottom:4px; }
+
+/* reply quotes slim down — a reference, not a second message */
+.ch-quote{ padding:5px 10px 6px; border-radius:9px; }
+.ch-quote-who{ font-size:10.5px; letter-spacing:.02em; }
+.ch-quote-txt{ font-size:12.5px; line-height:1.4; }
+
+/* reaction chips nestle onto the bubble's bottom edge */
+.ch-reacts{ margin-top:-9px; padding-inline:10px; gap:5px; }
+.ch-react{
+  padding:2px 9px; border-color:var(--line-soft);
+  box-shadow:0 2px 6px -2px rgba(23,31,45,.2);
+}
+
+/* ---- new followers — an invitation to talk, answered in place ---- */
+.cv-flw{
+  flex:0 0 auto;
+  margin:6px 10px 4px;
+  padding:9px 8px 6px;
+  border:1px solid var(--brass-soft);
+  border-radius:14px;
+  background:var(--card);
+  box-shadow:var(--shadow-sm);
+}
+.cv-flw-head{
+  display:flex; align-items:center; gap:7px;
+  padding:0 6px 6px; color:var(--gold-deep);
+}
+.cv-flw-eyebrow{
+  font-size:10.5px; font-weight:700;
+  letter-spacing:.09em; text-transform:uppercase;
+}
+.cv-flw-n{
+  min-width:17px; height:17px; padding:0 5px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border-radius:999px; background:var(--gold-wash);
+  border:1px solid var(--brass-soft);
+  font-size:10px; font-weight:700; color:var(--gold-deep);
+}
+.cv-flw-x{
+  margin-inline-start:auto;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:24px; height:24px; border:0; border-radius:8px;
+  background:transparent; color:var(--muted); cursor:pointer;
+}
+.cv-flw-x:hover{ background:var(--mx-soft); color:var(--ink); }
+.cv-flw-row{
+  display:flex; align-items:center; gap:10px;
+  width:100%; padding:7px 8px; border:0; border-radius:10px;
+  background:transparent; text-align:start; cursor:pointer;
+  transition:background .14s ease;
+}
+.cv-flw-row:hover{ background:var(--mx-hover); }
+.cv-flw-row:focus-visible{ outline:2px solid var(--blue); outline-offset:-2px; }
+.cv-flw-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.cv-flw-name{
+  font-size:13.5px; font-weight:650; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cv-flw-sub{
+  font-size:11.5px; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cv-flw-cta{
+  flex:0 0 auto;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:999px;
+  background:var(--navy); color:#f7f3ea;
+  font-size:11.5px; font-weight:650;
+}
+.cv-flw-row:hover .cv-flw-cta{ background:var(--navy-deep); }
+@media (prefers-reduced-motion:reduce){
+  .cv-flw-row{ transition:none; }
+}
+
+/* =========================================================
+   16 · Live viewer room — prototype grammar (2026-07-30)
+   The stage chrome, chat rail, meta block and ingest panel
+   take the chat-prototypes' LiveStreaming design, bound to
+   the REAL StreamRoom classes. Style-only; §23's stacking
+   rungs (ovl 4 · rail 5) and phone behaviour are untouched.
+   ========================================================= */
+
+/* ---- stage chrome: one glass grammar ---- */
+.lv-topbar{ gap:8px; }
+.lv-count{
+  border-radius:7px; padding:4px 10px;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(8px);
+  font:600 12px/1.5 var(--sans); letter-spacing:.01em;
+}
+.lv-ctl{
+  width:36px; height:36px;
+  background:rgba(255,255,255,.14); backdrop-filter:blur(8px);
+  transition:background .14s ease, transform .12s ease;
+}
+.lv-ctl:hover{ background:rgba(255,255,255,.26); transform:translateY(-1px); }
+.lv-sound-pill{
+  border-radius:999px;
+  background:rgba(255,255,255,.14); backdrop-filter:blur(8px); color:#f5f1e8;
+  font-weight:650;
+}
+.lv-sound-pill:hover{ background:rgba(255,255,255,.26); }
+
+/* the tap rail becomes the player's circular glass buttons */
+.lv-react-btn{
+  width:40px; height:40px; border:0; border-radius:50%;
+  background:rgba(255,255,255,.14); backdrop-filter:blur(8px);
+  font-size:18px;
+  transition:background .14s ease, transform .12s ease;
+}
+.lv-react-btn:hover{ background:rgba(255,255,255,.26); transform:translateY(-2px); }
+
+/* ---- meta block: serif masthead over a quiet byline row ---- */
+.lv-meta-main h1{
+  font-family:var(--serif); font-size:clamp(19px,2vw,23px);
+  font-weight:600; letter-spacing:-.3px; line-height:1.3;
+  color:var(--navy-deep); text-wrap:pretty;
+}
+.lv-meta-main p{ font-size:14.5px; line-height:1.7; color:var(--ink-soft); text-wrap:pretty; }
+.lv-meta-row{ gap:14px; font-size:12.5px; color:var(--muted); }
+.lv-meta-row .ico{ color:var(--muted); }
+
+/* ---- chat rail: the prototype chatrail card ---- */
+.lv-chat{ box-shadow:var(--shadow-sm); }
+.lv-chat-head{ gap:9px; padding:13px 15px; }
+.lv-chat-head h2{ font:600 15px/1 var(--serif); color:var(--navy-deep); }
+.lv-chat-n{
+  padding:2px 9px; border-radius:999px;
+  background:var(--card-2); color:var(--ink-soft);
+  font:700 10.5px/1.7 var(--sans); letter-spacing:.02em;
+}
+.lv-chat-log{ padding:12px; gap:6px; }
+.lv-chat-log .lv-line{
+  padding:4px 7px; border-radius:9px;
+  transition:background .14s ease;
+}
+.lv-chat-log .lv-line:hover{ background:var(--mx-soft); }
+.lv-line-body{ font-size:13px; }
+.lv-line-body b{ display:block; font-size:12px; font-weight:700; color:var(--navy); margin-block-end:1px; }
+.lv-line-presence{
+  font-size:11.5px; font-style:normal; color:var(--muted);
+  padding:3px 7px;
+}
+.lv-line-gift{
+  padding:4px 7px; border-radius:9px;
+  background:var(--gold-wash); color:var(--gold-deep);
+}
+.lv-chat-empty{
+  padding:18px 14px; text-align:center;
+  font-size:12.5px; line-height:1.6; color:var(--muted); text-wrap:pretty;
+}
+/* composer: pill field + the send coin */
+.lv-chat-send{ gap:8px; }
+.lv-chat-send .field{ border-radius:999px; padding:0 15px; }
+.lv-chat-send .ch-send{ width:40px; height:40px; flex:0 0 auto; }
+
+/* ---- host ingest: the gold broadcast panel ---- */
+.lv-ingest{
+  border-color:var(--brass-soft);
+  background:var(--gold-wash);
+}
+.lv-ingest-t b{ font-size:13.5px; color:var(--ink); }
+.lv-ingest-row code{
+  padding:8px 12px; border-radius:9px;
+  border:1px solid var(--brass-soft); background:var(--card);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-soft);
+}
+
+@media (prefers-reduced-motion:reduce){
+  .lv-ctl, .lv-react-btn, .lv-chat-log .lv-line{ transition:none; }
+  .lv-ctl:hover, .lv-react-btn:hover{ transform:none; }
+}
+
+/* the host's chat lines carry the prototype's navy HOST tag */
+.lv-line-hosttag{
+  display:inline-block; vertical-align:1px;
+  margin-inline-start:6px; padding:1px 6px;
+  border-radius:5px; background:var(--navy); color:#f7f3ea;
+  font:700 9px/1.5 var(--sans); font-style:normal; letter-spacing:.06em;
+}
+
+/* the host castbar now rides INSIDE .lv-stage on the bottom gradient
+   band (prototype player bar): dark-glass pills, red on-air chip. z 3
+   sits with the floats rung — above the band(1) and cell chrome(2),
+   under the phone overlay(4) and react rail(5). */
+.lv-stage .stg-castbar{
+  position:absolute; inset-inline:0; inset-block-end:12px;
+  justify-content:center; margin:0; padding-inline:12px;
+  z-index:3; pointer-events:none; flex-wrap:nowrap;
+}
+.lv-stage .stg-castbar > *{ pointer-events:auto; }
+.lv-stage .stg-onair{
+  background:var(--live); box-shadow:0 4px 12px -4px rgba(194,72,61,.6);
+}
+.lv-stage .stg-cast-btn{
+  border:0; border-radius:999px;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(8px); color:#f5f1e8;
+  transition:background .14s ease, transform .12s ease;
+}
+.lv-stage .stg-cast-btn:hover{
+  background:rgba(11,18,32,.75); border-color:transparent; transform:translateY(-1px);
+}
+.lv-stage .stg-cast-btn.rec-on{
+  background:rgba(194,72,61,.85); color:#fff;
+}
+.lv-stage .stg-cast-btn.rec-on .lv-dot{ background:#fff; }
+/* the §14 light inverted OFF-state stays legible on the dark band; only
+   its hover needs restating against the glass hover above */
+.lv-stage .stg-cast-btn[aria-pressed="true"]:not(.rec-on){
+  background:#f7f8fa; color:var(--navy-deep);
+}
+.lv-stage .stg-cast-btn[aria-pressed="true"]:not(.rec-on):hover{
+  background:#fff; transform:translateY(-1px);
+}
+/* health warnings live below the stage in their own block */
+.lv-cast-warns{
+  margin-block-start:10px;
+  display:flex; flex-direction:column; gap:6px;
+}
+/* phones: the stage bottom belongs to the overlay comments + pinned
+   composer (§23, z4/z5) — the castbar docks under the topbar instead */
+@media (max-width:720px){
+  .lv-stage .stg-castbar{
+    inset-block-end:auto; inset-block-start:52px;
+    justify-content:flex-start; padding-inline:10px;
+    flex-wrap:wrap;
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .lv-stage .stg-cast-btn{ transition:none; }
+  .lv-stage .stg-cast-btn:hover,
+  .lv-stage .stg-cast-btn[aria-pressed="true"]:not(.rec-on):hover{ transform:none; }
+}
+
+/* the ticking elapsed clock beside the watching chip — mono glass, the
+   prototype's stage timecode */
+.lv-elapsed{
+  display:inline-flex; align-items:center;
+  padding:4px 10px; border-radius:7px;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(8px);
+  color:#f5f1e8;
+  font:400 11.5px/1.5 var(--mono);
+  font-variant-numeric:tabular-nums; letter-spacing:.02em;
 }

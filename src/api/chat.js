@@ -57,7 +57,14 @@ const clampLimit = (n, dflt = 40) => Math.min(100, Math.max(1, Number(n) || dflt
  *  or <img>/<video>/<audio> would resolve them against the frontend origin. */
 function mediaFrom(m) {
   return {
-    kind: m?.kind || 'FILE',                    // IMAGE | VIDEO | VOICE | FILE
+    /* The multipart route's classifier labels EVERY audio upload AUDIO — the
+       VOICE kind is unreachable from the endpoint the Composer actually uses —
+       so without this a received voice note renders as a file-download row,
+       and the sender's own bubble degrades the same way when the echo replaces
+       the optimistic message. Normalised here so every surface (player, reply
+       strip, starred, pinned label) treats audio as playable with one rule:
+       a scrubber and a speed control beat a bare download for ANY audio. */
+    kind: m?.kind === 'AUDIO' ? 'VOICE' : (m?.kind || 'FILE'),   // IMAGE | VIDEO | VOICE | FILE
     storageKey: m?.storageKey || null,
     url: assetUrl(m?.url || null),
     thumbnailKey: m?.thumbnailKey || null,
@@ -984,12 +991,19 @@ export const chat = {
     },
     /** Multipart send. `replyToId` is sent best-effort: the documented parts
      *  are clientNonce/body/files, so a backend that ignores it simply posts
-     *  an unthreaded attachment rather than failing the upload. */
-    async sendFiles(convId, { clientNonce, body, files = [], replyToId } = {}) {
+     *  an unthreaded attachment rather than failing the upload. `durationMs`
+     *  and `waveform` ride the same way for voice notes — verified live that
+     *  today's backend drops them (the echo carries neither), so until it
+     *  learns the parts a receiver first paints a 0:00 clock and the
+     *  synthetic id-seeded waveform; the moment the backend stores them,
+     *  every receiver gets the real length and the real shape for free. */
+    async sendFiles(convId, { clientNonce, body, files = [], replyToId, durationMs, waveform } = {}) {
       const fd = new FormData()
       fd.append('clientNonce', clientNonce)
       if (body) fd.append('body', body)
       if (replyToId != null) fd.append('replyToId', String(replyToId))
+      if (durationMs != null) fd.append('durationMs', String(Math.round(durationMs)))
+      if (waveform) fd.append('waveform', waveform)
       for (const f of files) fd.append('files', f)          // repeatable part name
       return msgFrom(await http.upload(`/api/v1/conversations/${convId}/messages/upload`, fd))
     },

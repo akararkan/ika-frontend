@@ -157,6 +157,21 @@
 }
 .cv-row.active .cv-dot{ border-color:var(--blue-wash); }
 .cv-dot.on{ background:var(--good); }
+/* type seal — a channel and a group announce themselves from the same
+   corner the presence dot uses on a DM row (always free here: groups have
+   no presence). Navy disc for a group, gold for a channel — gold is this
+   theme's broadcast signature — each ringed in the rail surface like the
+   dot so it reads as part of the avatar, not a sticker on it. */
+.cv-kind{
+  position:absolute;inset-block-end:-2px;inset-inline-end:-2px;
+  width:19px;height:19px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--navy);color:#f5f1e8;
+  border:2px solid var(--card);
+}
+.cv-kind .ico{ width:11px;height:11px; }
+.cv-kind.channel{ background:var(--gold);color:#fffdf8; }
+.cv-row.active .cv-kind{ border-color:var(--blue-wash); }
 
 .cv-body{ flex:1;min-width:0;display:flex;flex-direction:column;gap:2px; }
 .cv-line1{ display:flex;align-items:center;gap:6px;min-width:0; }
@@ -209,7 +224,7 @@
   display:inline-flex;align-items:center;justify-content:center;
   min-width:20px;height:20px;padding:0 6px;border-radius:999px;
   background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
-  color:#fffdf8;
+  color:#ffffff;
   font-size:11px;font-weight:800;line-height:1;text-align:center;
   font-variant-numeric:tabular-nums;letter-spacing:.2px;
   box-shadow:0 0 0 2px var(--card),0 3px 8px -3px rgba(122,102,47,.55);
@@ -305,9 +320,10 @@
 
 .ch-pane-thread{
   background:var(--paper-2);
-  /* a whisper of parchment tooth behind the bubbles */
+  /* a whisper of tooth behind the bubbles — on the porcelain canvas the
+     old gold glow read as a stain, so both corners now breathe navy */
   background-image:
-    radial-gradient(circle at 20% 12%, rgba(179,135,62,.05), transparent 42%),
+    radial-gradient(circle at 20% 12%, rgba(29,58,95,.035), transparent 42%),
     radial-gradient(circle at 82% 78%, rgba(29,58,95,.045), transparent 46%);
 }
 /* A bare loader / error dropped straight into the pane centres itself rather
@@ -345,7 +361,7 @@
   padding:9px 14px;
   min-height:62px;
   border-bottom:1px solid var(--line);
-  background:rgba(255,253,248,.92);
+  background:rgba(255,255,255,.92);
   backdrop-filter:blur(12px) saturate(140%);
   -webkit-backdrop-filter:blur(12px) saturate(140%);
   /* `backdrop-filter` CREATES A STACKING CONTEXT. Without an explicit z-index
@@ -487,12 +503,12 @@
   display:flex;flex-direction:column;min-height:0;
   background:var(--card);
   border-inline-start:1px solid var(--line);
-  box-shadow:-18px 0 44px -28px rgba(34,30,23,.4);
+  box-shadow:-18px 0 44px -28px rgba(23,31,45,.4);
   animation:chSlideIn .2s cubic-bezier(.22,.8,.24,1);
 }
 @keyframes chSlideIn{ from{ transform:translateX(14px);opacity:0 } to{ transform:none;opacity:1 } }
 @media(prefers-reduced-motion:reduce){ .ch-search{ animation:none } }
-[dir="rtl"] .ch-search{ box-shadow:18px 0 44px -28px rgba(34,30,23,.4); }
+[dir="rtl"] .ch-search{ box-shadow:18px 0 44px -28px rgba(23,31,45,.4); }
 
 .ch-search-head{
   flex:0 0 auto;
@@ -743,7 +759,11 @@
 .ch-row.mine .ch-quote:disabled:hover{ background:rgba(255,253,248,.14); }
 .ch-row.mine .ch-quote{ background:rgba(255,253,248,.14);border-inline-start-color:var(--brass-soft); }
 .ch-row.mine .ch-quote:hover{ background:rgba(255,253,248,.22); }
-.ch-quote-who{ font-size:11.5px;font-weight:700;color:var(--gold-deep);display:block; }
+.ch-quote-who{
+  font-size:11.5px;font-weight:700;color:var(--gold-deep);display:block;
+  /* the caption now carries a NAME, and a long one must not wrap the strip */
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 .ch-row.mine .ch-quote-who{ color:var(--brass-soft); }
 .ch-quote-txt{
   font-size:12.5px;color:var(--ink-soft);
@@ -960,7 +980,7 @@
 .ch-sheet-scrim{
   position:fixed;inset:0;z-index:140;
   display:flex;align-items:flex-end;justify-content:center;
-  background:rgba(34,30,23,.44);
+  background:rgba(23,31,45,.44);
   animation:chFade .15s ease-out;
 }
 .ch-sheet{
@@ -1069,7 +1089,7 @@
   min-width:18px;height:18px;padding:0 5px;border-radius:999px;
   display:inline-flex;align-items:center;justify-content:center;
   background:linear-gradient(160deg,var(--gold) 0%,var(--gold-deep) 130%);
-  color:#fffdf8;
+  color:#ffffff;
   font-size:11px;font-weight:800;line-height:1;text-align:center;
   font-variant-numeric:tabular-nums;
 }
@@ -1411,7 +1431,7 @@
   position:fixed;inset:0;z-index:130;
   display:flex;align-items:flex-start;justify-content:center;
   padding:48px 16px;overflow:auto;
-  background:rgba(34,30,23,.5);
+  background:rgba(23,31,45,.5);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   animation:chFade .2s ease-out;
 }
@@ -1613,7 +1633,7 @@
   font-size:10px;font-weight:700;line-height:1;
   font-variant-numeric:tabular-nums;
   letter-spacing:0;
-  box-shadow:0 2px 6px -2px rgba(34,30,23,.4);
+  box-shadow:0 2px 6px -2px rgba(23,31,45,.4);
   pointer-events:none;
   /* keyed on the count in Layout — every change remounts + replays the pop */
   animation:chBadgeIn .3s cubic-bezier(.34,1.56,.64,1);

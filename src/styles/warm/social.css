@@ -28,7 +28,7 @@
 
 /* =========================================================
    2 · Notifications — /notifications
-   Row list = prototype .n-row; unread = #fbf7ec wash + 9px
+   Row list = prototype .n-row; unread = #fafbfc wash + 9px
    gold dot; date-group headers re-skinned, not moved.
    ========================================================= */
 .ntf-count{background:var(--gold);color:#fff}
@@ -43,8 +43,8 @@
 .ntf-list{border-radius:15px;border-color:var(--line)}
 .ntf-row{border-bottom:1px solid var(--line-soft)}
 .ntf-row:hover{background:var(--card-2)}
-.ntf-row.unread{background:#fbf7ec}
-.ntf-row.unread:hover{background:#f7f0dd}
+.ntf-row.unread{background:#f2f6fc}
+.ntf-row.unread:hover{background:#e7eef9}
 /* base drew a red accent rail; re-purpose the pseudo as the prototype's
    9px gold unread dot (display:block also re-enables it on phones where
    the base responsive layer hid the rail). It lives in the START gutter
@@ -57,12 +57,12 @@
   inset-inline-end:auto;inset-inline-start:6px;
   width:9px;height:9px;border-radius:50%;background:var(--gold);
 }
-.ntf-row.unread .ntf-badge{border-color:#fbf7ec}
-.ntf-badge{box-shadow:0 2px 6px rgba(34,30,23,.18)}
+.ntf-row.unread .ntf-badge{border-color:#f2f6fc}
+.ntf-badge{box-shadow:0 2px 6px rgba(23,31,45,.18)}
 .ntf-tile{border-radius:12px}
 .ntf-body p{color:var(--ink-2)}
 .ntf-body p b{color:var(--ink)}
-.ntf-meta{color:#a39a85}
+.ntf-meta{color:#98a1b0}
 .ntf-x:hover{background:var(--card-2);color:var(--ink)}
 /* quoted line under a notification — italic, muted, gold-edged */
 .ntf-snippet{
@@ -123,7 +123,7 @@
 .ntf-page > .card.t-stagger:not(.ntf-list) .ntf-badge .ico{display:none}
 /* time label above the entry text (DOM order is label → time) */
 .ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body{display:flex;flex-direction:column-reverse;gap:2px}
-.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body small{font-size:12px;color:#a39a85}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body small{font-size:12px;color:#98a1b0}
 /* per-row remove button — quiet ghost inside the entry card */
 .ntf-page > .card.t-stagger:not(.ntf-list) .icon-btn{
   width:30px;height:30px;color:var(--muted);align-self:flex-start;
@@ -151,7 +151,7 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 }
 .x-kick small{color:var(--muted)}
 .x-note{background:var(--gold-wash);border:1px solid #e2cf9f;border-radius:11px}
-.x-empty{border:1px dashed #d3c8ac;border-radius:14px;background:var(--paper-2)}
+.x-empty{border:1px dashed #ccd4e0;border-radius:14px;background:var(--paper-2)}
 
 /* per-type group headers over the hit lists (serif navy + count chip) */
 .section-label{
@@ -176,7 +176,7 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 .rh-ph{height:236px}
 .rh-panel{
   left:18px;right:18px;bottom:18px;max-width:560px;
-  background:rgba(255,253,248,.96);border:1px solid var(--line);
+  background:rgba(255,255,255,.96);border:1px solid var(--line);
   border-inline-start:3px solid var(--gold);border-radius:11px;padding:14px 18px;
 }
 .rh-meta{
@@ -207,7 +207,7 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 }
 .explore-reels .pr-strip{
   left:auto;inset-inline-start:11px;bottom:11px;
-  background:rgba(255,253,248,.92);border:1px solid var(--line);border-radius:8px;
+  background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;
 }
 .explore-reels .pr-title{color:var(--ink)}
 
@@ -235,8 +235,8 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
   background:var(--card);border:1px solid var(--line);border-radius:12px;
   color:var(--ink-2);
 }
-.share-act:hover{background:var(--card-2);border-color:#d8d0bd}
-.share-url{background:#fcfaf4;border:1px solid #ddd4c0;border-radius:10px;color:var(--ink-soft)}
+.share-act:hover{background:var(--card-2);border-color:#ccd4e0}
+.share-url{background:#fcfdfe;border:1px solid #d8dee8;border-radius:10px;color:var(--ink-soft)}
 
 /* =========================================================
    6 · TagInput — chips are blue-wash tag pills

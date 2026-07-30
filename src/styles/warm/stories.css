@@ -84,7 +84,7 @@
   transition:border-color .15s ease,background .15s ease;
 }
 .sv-poll-opt:not(:disabled):hover{background:rgba(255,255,255,.24)}
-.sv-poll-opt.mine{border-color:#fffdf8}
+.sv-poll-opt.mine{border-color:#ffffff}
 .sv-poll-fill{background:rgba(255,255,255,.25)}
 /* winning side fills gold — the archive's accent for "accepted" */
 .sv-poll-opt.win .sv-poll-fill{background:linear-gradient(90deg,rgba(179,135,62,.6),rgba(179,135,62,.35))}
@@ -130,7 +130,7 @@
    the poll sticker carry classes, bg media are img/video), and unselected
    layers have inline outline:none, so outline-color stays inert on them.
    Cream matches the .se-poll-sticker.on outline. */
-.se-stage > div:not([class]){outline-color:rgba(255,253,248,.85)!important}
+.se-stage > div:not([class]){outline-color:rgba(255,255,255,.85)!important}
 
 /* tools panel + controls: white-translucent tiles, radius 12, cream actives */
 .se-tools{background:linear-gradient(180deg,transparent,rgba(10,8,5,.62) 30%)}
@@ -140,10 +140,10 @@
 .se-chip{background:rgba(255,255,255,.08);border-radius:12px;transition:background .14s ease,color .14s ease}
 .se-chip:hover{background:rgba(255,255,255,.16)}
 .se-chip.on{background:var(--card);color:var(--navy)}
-.se-color.on{outline-color:#fffdf8}
+.se-color.on{outline-color:#ffffff}
 .se-slider{background:rgba(255,255,255,.08);border-radius:12px}
-.se-slider input[type=range]{accent-color:#fffdf8}
-.se-bg-tile.on .se-bg-chip{border-color:#fffdf8}
+.se-slider input[type=range]{accent-color:#ffffff}
+.se-bg-tile.on .se-bg-chip{border-color:#ffffff}
 
 /* inline text-edit overlay — warm ink glass */
 .se-edit{background:rgba(20,17,12,.85)}
@@ -155,7 +155,7 @@
   border-radius:18px;
   box-shadow:0 16px 44px rgba(0,0,0,.4);
 }
-.se-poll-sticker.on{outline:2px dashed rgba(255,253,248,.85)}
+.se-poll-sticker.on{outline:2px dashed rgba(255,255,255,.85)}
 .se-poll-sticker-head{color:rgba(242,236,223,.85)}
 .se-poll-sticker-opts > span{
   background:rgba(255,255,255,.16);
@@ -163,7 +163,7 @@
 }
 .se-poll-or{color:rgba(255,255,255,.65)}
 /* fabs: edit = navy seal · delete = warm ink */
-.se-poll-fab{border-color:#fffdf8}
+.se-poll-fab{border-color:#ffffff}
 .se-poll-fab.edit{background:var(--navy)}
 .se-poll-fab.edit:hover{background:var(--navy-deep)}
 .se-poll-fab.del{background:#221e17}

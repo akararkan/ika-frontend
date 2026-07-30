@@ -47,6 +47,38 @@ const isFinePointer = () =>
 /** seconds → "0:07" */
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
+/** Bars sampled from a finished voice recording — matches VoiceNote's
+ *  WAVE_BARS so the sender's bubble and every receiver draw the note's REAL
+ *  amplitude shape instead of the id-seeded synthetic one. */
+const VOICE_PEAKS = 40
+
+/** Blob → base64 peak bytes (VoiceNote's `peaksOf` wire format: one byte per
+ *  bar, 0–255). Decoded at 8kHz mono — peaks need no fidelity, only shape.
+ *  Fails soft: any decode problem just means no waveform is attached, and the
+ *  players fall back to the synthetic shape exactly as before. */
+async function waveformOf(blob) {
+  try {
+    const buf = await blob.arrayBuffer()
+    const audio = await new OfflineAudioContext(1, 1, 8000).decodeAudioData(buf)
+    const data = audio.getChannelData(0)
+    if (!data.length) return null
+    const step = Math.max(1, Math.floor(data.length / VOICE_PEAKS))
+    let out = ''
+    for (let i = 0; i < VOICE_PEAKS; i++) {
+      let peak = 0
+      const end = Math.min(data.length, (i + 1) * step)
+      // Stride through the bin: a true max over every sample of a 5-minute
+      // note is work the eye cannot see at 40-bar resolution.
+      for (let j = i * step; j < end; j += 16) {
+        const v = Math.abs(data[j])
+        if (v > peak) peak = v
+      }
+      out += String.fromCharCode(Math.min(255, Math.round(peak * 255)))
+    }
+    return btoa(out)
+  } catch { return null }
+}
+
 /** seconds → "24h" / "7d" / "90d" — the disappearing-timer badge. */
 function ttlLabel(secs) {
   const n = Number(secs) || 0
@@ -166,7 +198,13 @@ export function Composer({
   React.useEffect(() => { resize() }, [text, resize])
 
   /* ---------- focus + reset when the conversation or context changes ---------- */
+  /* Mirrors the prop for the async tail of recorder.onstop: the waveform
+     decode awaits AFTER cleanupRecorder has nulled recRef.recorder, so the
+     abort below can no longer see that a recording (now an encode) is in
+     flight. The ref lets onstop notice the switch itself. */
+  const convoIdRef = React.useRef(conversationId)
   React.useEffect(() => {
+    convoIdRef.current = conversationId
     setFiles([])
     setEmojiOpen(false)
     setSchedOpen(false)
@@ -360,7 +398,12 @@ export function Composer({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
+      /* Explicit AAC-in-mp4 first: where it is genuinely recordable (Safari,
+         newer Chrome) the note plays on EVERY platform, while webm/opus from
+         Chrome is undecodable on older Safari/iOS recipients. The bare
+         'audio/mp4' stays behind opus because without the codec pin it may
+         mean opus-in-mp4 — same Safari problem in a different wrapper. */
+      const mime = ['audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
         .find(t => MediaRecorder.isTypeSupported?.(t)) || ''
       const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
       const r = recRef.current
@@ -380,8 +423,16 @@ export function Composer({
         const ext = (recorder.mimeType || '').includes('mp4') ? 'm4a'
           : (recorder.mimeType || '').includes('ogg') ? 'ogg' : 'webm'
         const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type })
+        // The note's real shape, sampled before send: the sender's bubble
+        // draws it immediately and it rides the upload for every receiver.
+        const waveform = await waveformOf(blob)
+        /* That decode is the first task boundary between "stopped" and the
+           optimistic insert — a conversation switch landing inside it slips
+           past the [conversationId] abort (recRef.recorder is already null).
+           Same rule as that abort: a switch cancels the note. */
+        if (convoIdRef.current !== conversationId) return
         await withActivity(ACTIVITY.SENDING_VOICE,
-          () => onSendFiles?.({ files: [file], body: '', durationMs: secs * 1000 }))
+          () => onSendFiles?.({ files: [file], body: '', durationMs: secs * 1000, waveform }))
       }
 
       recorder.start()

@@ -9,15 +9,15 @@
 :root{
   /* Ink / paper — pure white body, archival quiet surfaces */
   --ink:#1b1813;
-  --ink-2:#2a251d;
-  --ink-soft:#5e574b;
+  --ink-2:#232b3a;
+  --ink-soft:#4d5768;
   --muted:#9b948e;
   --paper:#ffffff;
-  --paper-2:#faf6ec;
+  --paper-2:#fbfcfd;
   --card:#ffffff;
-  --card-2:#faf6ec;
-  --line:#ece9e1;
-  --line-soft:#f6f2e8;
+  --card-2:#fbfcfd;
+  --line:#eff2f6;
+  --line-soft:#f3f5f8;
 
   /* Brand — rubrication. Legacy token names kept so every existing
      rule keeps working; --emerald IS the rubric red now. */
@@ -98,19 +98,19 @@ html,body,.sidebar,.mbody,.modal,.overlay,
    visibly darken on hover. */
 *{
   scrollbar-width:thin;
-  scrollbar-color:rgba(94,87,75,.32) transparent;
+  scrollbar-color:rgba(85,95,112,.32) transparent;
 }
 *::-webkit-scrollbar{width:10px;height:10px}
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-thumb{
-  background:rgba(94,87,75,.30);
+  background:rgba(85,95,112,.30);
   border-radius:999px;
   border:3px solid transparent;
   background-clip:padding-box;
   transition:background-color .18s ease;
 }
 *::-webkit-scrollbar-thumb:hover{
-  background:rgba(94,87,75,.55);
+  background:rgba(85,95,112,.55);
   background-clip:padding-box;
 }
 *::-webkit-scrollbar-corner{background:transparent}
@@ -180,7 +180,7 @@ img{display:block;max-width:100%}
 }
 .status::before{content:none}
 .status.published{color:var(--rubric)}
-.status.open{color:#57534b}
+.status.open{color:#4d5768}
 .status.answered{color:var(--rubric)}
 .status.closed,.status.draft{color:var(--muted)}
 .status.retracted{color:var(--rose);text-decoration:line-through;text-decoration-thickness:1px}
@@ -200,7 +200,7 @@ img{display:block;max-width:100%}
 .btn-primary:hover{background:var(--emerald-deep);transform:translateY(-1px)}
 .btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn-secondary{background:var(--card);border-color:var(--line);color:var(--ink-2)}
-.btn-secondary:hover{background:var(--card-2);border-color:#d8cfba}
+.btn-secondary:hover{background:var(--card-2);border-color:#ccd4e0}
 .btn-ghost{background:transparent;color:var(--ink-2)}
 .btn-ghost:hover{background:var(--card-2)}
 .btn-lg{height:48px;padding:0 24px;font-size:15px;border-radius:11px}
@@ -223,12 +223,12 @@ img{display:block;max-width:100%}
 /* ---------- Inputs ---------- */
 .field{
   width:100%;height:42px;border-radius:0;
-  border:0;border-bottom:1px solid #d9d3c4;background:transparent;
+  border:0;border-bottom:1px solid #dee3eb;background:transparent;
   padding:0 2px;color:var(--ink);font-size:15px;
   transition:border-color .16s,box-shadow .16s;
 }
 .field:focus{outline:none;border-color:var(--rubric);box-shadow:0 1px 0 0 var(--rubric)}
-.field::placeholder{color:#b5b0a5;font-family:var(--serif);font-style:italic}
+.field::placeholder{color:#a9b2c0;font-family:var(--serif);font-style:italic}
 .field.lg{height:48px;font-size:16px}
 textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;line-height:1.6;font-family:var(--serif);font-size:15.5px}
 
@@ -281,7 +281,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
   padding:0 14px 0 40px;font-size:14px;color:var(--ink);
   transition:.16s;
 }
-.tb-search input::placeholder{font-family:var(--serif);font-style:italic;color:#b5b0a5}
+.tb-search input::placeholder{font-family:var(--serif);font-style:italic;color:#a9b2c0}
 .tb-search input:focus{outline:none;border-color:var(--rubric);box-shadow:none;background:#fff}
 
 .tb-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
@@ -438,7 +438,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .tag-input{position:relative;margin-top:12px}
 .tag-input .tag-chips{
   display:flex;flex-wrap:wrap;gap:6px;align-items:center;
-  border:0;border-bottom:1px solid #d9d3c4;border-radius:0;
+  border:0;border-bottom:1px solid #dee3eb;border-radius:0;
   background:transparent;padding:6px 2px;min-height:42px;
 }
 .tag-input .tag-chips input:focus{outline:0}
@@ -495,7 +495,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .toast{
   position:fixed;bottom:96px;left:50%;
   transform:translateX(-50%) translateY(20px);
-  z-index:200;background:var(--ink);color:#faf6ec;
+  z-index:200;background:var(--ink);color:#eef2f7;
   padding:11px 18px;border-radius:11px;font-weight:500;font-size:13.5px;
   box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;
   transition:.25s ease;display:flex;align-items:center;gap:9px;
@@ -564,7 +564,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .ph-bg{
   background:
     repeating-linear-gradient(135deg,rgba(31,27,22,.04) 0 8px,transparent 8px 16px),
-    linear-gradient(140deg,#d8cfba,#c9bfa5);
+    linear-gradient(140deg,#ccd4e0,#c3cbd9);
   position:relative;
 }
 .ph-bg::after{

@@ -1,27 +1,32 @@
 /* =============================================================
-   IKA — "Warm Archive" theme (redesign 2026)
-   Navy from the IKA seal · gold accents · warm paper surfaces
+   IKA — "Warm Archive" theme · Porcelain edition (2026-07)
+   Navy from the IKA seal · gold accents · WHITE porcelain surfaces
    Lora (serif) · IBM Plex Sans (UI) · Amiri (Arabic/Kurdish)
 
    Token base of the warm/ override layer. Imported AFTER the base
    styles and BEFORE the warm/* area files. Style-only: re-maps the
    token layer every existing rule reads, then re-skins shell
    primitives. No markup or JS changes needed.
+
+   Porcelain retune: the warm yellow paper canvas is replaced by a
+   clean white/near-white neutral family. Navy/gold/danger/green
+   accents and the on-navy cream text are unchanged — the brand
+   keeps its warmth in the accents, not in the canvas.
    ============================================================= */
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Amiri:ital,wght@0,400;0,700&display=swap');
 
 :root{
-  /* Ink / paper — warm archive */
-  --ink:#221e17;
-  --ink-2:#2a251d;
-  --ink-soft:#57503f;
-  --muted:#8b8371;
-  --paper:#f4f0e7;
-  --paper-2:#faf6ec;
-  --card:#fffdf8;
-  --card-2:#f6f2e8;
-  --line:#e6dfcf;
-  --line-soft:#efe9db;
+  /* Ink / paper — porcelain neutrals (slate-leaning, zero yellow cast) */
+  --ink:#1c2330;
+  --ink-2:#232b3a;
+  --ink-soft:#4d5768;
+  --muted:#6b7586;
+  --paper:#f7f8fa;
+  --paper-2:#fbfcfd;
+  --card:#ffffff;
+  --card-2:#f3f5f8;
+  --line:#e4e8ee;
+  --line-soft:#eef1f5;
 
   /* Brand — navy primary. Legacy token names re-pointed so every
      existing rule (buttons, active nav, badges…) goes navy. */
@@ -57,10 +62,10 @@
   --d-science:#2f6b72;
   --d-history:#5b7a67;
 
-  /* Shadows — warm ink */
-  --shadow-sm:0 1px 2px rgba(34,30,23,.05),0 2px 6px rgba(34,30,23,.04);
-  --shadow:0 4px 16px -6px rgba(34,30,23,.12),0 1px 4px rgba(34,30,23,.05);
-  --shadow-lg:0 20px 60px -16px rgba(34,30,23,.28);
+  /* Shadows — cool slate ink */
+  --shadow-sm:0 1px 2px rgba(23,31,45,.05),0 2px 6px rgba(23,31,45,.04);
+  --shadow:0 4px 16px -6px rgba(23,31,45,.12),0 1px 4px rgba(23,31,45,.05);
+  --shadow-lg:0 20px 60px -16px rgba(23,31,45,.28);
 
   /* Radii — soft, friendly */
   --r-xs:8px; --r-sm:10px; --r:14px; --r-lg:16px; --r-xl:18px;
@@ -94,7 +99,7 @@ a:hover{color:var(--rubric)}
 
 /* ---------- Topbar ---------- */
 .topbar{
-  background:rgba(255,253,248,.9);
+  background:rgba(255,255,255,.92);
   backdrop-filter:blur(14px) saturate(140%);
 }
 .brand .word b{color:var(--brass)}
@@ -107,21 +112,21 @@ a:hover{color:var(--rubric)}
 /* ---------- Sidebar ---------- */
 .sidebar{background:var(--paper-2)}
 .nav-item{border-radius:10px}
-.nav-item.active{background:#eae2cf;color:var(--rubric)}
+.nav-item.active{background:#e7edf6;color:var(--rubric)}
 .nav-item.active .ico{color:var(--rubric)}
 .nav-item .badge{background:var(--brass)}
 .nav-item.active .badge{background:var(--brass)}
 
-/* ---------- Inputs — boxed, warm ---------- */
+/* ---------- Inputs — boxed, clean ---------- */
 .field{
-  border:1px solid #ddd4c0;border-bottom-color:#ddd4c0;
-  border-radius:10px;background:#fcfaf4;padding:0 13px;height:42px;
+  border:1px solid #d8dee8;border-bottom-color:#d8dee8;
+  border-radius:10px;background:#fcfdfe;padding:0 13px;height:42px;
 }
 .field:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
-.field::placeholder{font-family:var(--sans);font-style:normal;color:#a39a85}
+.field::placeholder{font-family:var(--sans);font-style:normal;color:#98a1b0}
 textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 .tag-input .tag-chips{
-  border:1px solid #ddd4c0;border-radius:10px;background:#fcfaf4;padding:6px 10px;
+  border:1px solid #d8dee8;border-radius:10px;background:#fcfdfe;padding:6px 10px;
 }
 
 /* ---------- Chips & tabs — filled pills ---------- */
@@ -159,7 +164,7 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 .phead h1 em{color:var(--brass)}
 
 /* ---------- Bottom nav ---------- */
-.botnav{background:rgba(255,253,248,.96)}
+.botnav{background:rgba(255,255,255,.96)}
 .botnav a.active,.botnav a.active .ico{color:var(--rubric)}
 .botnav a.mid .plus{
   background:var(--rubric);
@@ -167,21 +172,21 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 }
 
 /* ---------- Modal & toast ---------- */
-.overlay{background:rgba(20,17,12,.55)}
+.overlay{background:rgba(15,21,32,.55)}
 .mhead h3{color:var(--rubric)}
-.toast{background:var(--ink);color:#f3ecdd;border-radius:999px}
+.toast{background:var(--ink);color:#eef2f7;border-radius:999px}
 .toast .ico{color:var(--brass-soft)}
 
-/* ---------- Placeholder swatch — subtle warm stripes ---------- */
+/* ---------- Placeholder swatch — subtle cool stripes ---------- */
 .ph-bg{
-  background:repeating-linear-gradient(45deg,#efe9db 0 14px,#e7dfcc 14px 28px);
+  background:repeating-linear-gradient(45deg,#eef1f5 0 14px,#e6eaf1 14px 28px);
 }
-.ph-bg::after{color:var(--muted);background:rgba(255,253,248,.85)}
+.ph-bg::after{color:var(--muted);background:rgba(255,255,255,.85)}
 
 /* ---------- Scrollbars ---------- */
-*{scrollbar-color:rgba(139,131,113,.45) transparent}
-*::-webkit-scrollbar-thumb{background:rgba(139,131,113,.4);background-clip:padding-box}
-*::-webkit-scrollbar-thumb:hover{background:rgba(87,80,63,.55);background-clip:padding-box}
+*{scrollbar-color:rgba(122,132,148,.45) transparent}
+*::-webkit-scrollbar-thumb{background:rgba(122,132,148,.4);background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:rgba(77,88,105,.55);background-clip:padding-box}
 
 /* ---------- Ayah / quote block ---------- */
 .ayah-block{
@@ -190,4 +195,4 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
   border-radius:10px;padding:16px 18px;text-align:center;
 }
 .ayah-block .ar{font-family:var(--arabic);font-size:24px;color:var(--rubric);line-height:1.8;direction:rtl}
-.ayah-block .tr{font-size:13px;color:var(--ink-soft);font-style:italic;margin-top:8px}
+.ayah-block .tr{font-size:13px;color:var(--ink-soft);margin-top:8px;font-style:italic}

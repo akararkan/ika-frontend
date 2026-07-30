@@ -47,7 +47,7 @@
 .brand small{color:var(--muted);letter-spacing:.4px}
 .brand .mark:has(.brand-img){
   background:var(--card);
-  box-shadow:0 0 0 1px var(--line),0 4px 12px -6px rgba(34,30,23,.3);
+  box-shadow:0 0 0 1px var(--line),0 4px 12px -6px rgba(23,31,45,.3);
 }
 
 /* Search — one warm pill (theme.css already rounds + tints the input) */
@@ -57,7 +57,7 @@
   transition:border-color .15s ease,background .15s ease,box-shadow .15s ease;
 }
 .tb-search .ico{left:auto;inset-inline-start:14px}
-.tb-search input::placeholder{font-family:var(--sans);font-style:normal;color:#a39a85}
+.tb-search input::placeholder{font-family:var(--sans);font-style:normal;color:#98a1b0}
 .tb-search input:focus{
   border-color:var(--blue);background:var(--card);
   box-shadow:0 0 0 3px rgba(45,95,151,.12);
@@ -87,9 +87,9 @@
 /* ---------------- Sidebar nav ---------------- */
 .nav-item{color:var(--ink-soft)}
 .nav-item .ico{color:var(--ink-soft)}
-.nav-item:hover{background:#efe9da;color:var(--ink)}
+.nav-item:hover{background:#f2f5f9;color:var(--ink)}
 .nav-item.active,
-.nav-item.active:hover{background:#eae2cf;color:var(--navy)}
+.nav-item.active:hover{background:#e7edf6;color:var(--navy)}
 .nav-item.active .ico{color:var(--navy)}
 .nav-item .badge,
 .nav-item.active .badge{background:var(--gold);color:#fff}
@@ -102,7 +102,7 @@
 .side-section h5{color:var(--muted);letter-spacing:.6px}
 
 /* Drawer + scrim (phones — same breakpoint as the base drawer rules) */
-.nav-scrim{background:rgba(20,17,12,.55)}
+.nav-scrim{background:rgba(15,21,32,.55)}
 @media(max-width:720px){
   .sidebar{background:var(--paper-2)}
   .sidebar-head{border-bottom:1px solid var(--line)}
@@ -112,7 +112,7 @@
 .btn:active{transform:scale(.97)}
 .btn-primary:disabled{transform:none;box-shadow:none}
 .btn-secondary{background:transparent;border-color:var(--line);color:var(--ink-soft)}
-.btn-secondary:hover{background:var(--card-2);border-color:#d5cbb4;color:var(--ink)}
+.btn-secondary:hover{background:var(--card-2);border-color:#ccd4e0;color:var(--ink)}
 .btn-ghost{color:var(--ink-soft)}
 .btn-ghost:hover{background:var(--card-2);color:var(--ink)}
 /* Danger = quiet outline (prototype) — not a filled red slab */
@@ -175,11 +175,11 @@
 .modal{box-shadow:var(--shadow-lg)}
 .mhead h3{color:var(--navy)}
 .mhead .x{background:var(--card-2);transition:background .15s ease,color .15s ease}
-.mhead .x:hover{background:#efe9da;color:var(--ink)}
+.mhead .x:hover{background:#f2f5f9;color:var(--ink)}
 .mfoot{background:var(--paper-2);border-top:1px solid var(--line-soft)}
 
 /* ---------------- Dialogs (.dlg — confirm / prompt / share / follow-list) --- */
-.dlg-overlay{background:rgba(20,17,12,.55)}
+.dlg-overlay{background:rgba(15,21,32,.55)}
 /* no border-radius here: base .dlg already rounds on desktop, and the
    ≤600px bottom-sheet radius (styles-responsive.css §10.2) must survive */
 .dlg{border-color:var(--line);box-shadow:var(--shadow-lg)}
@@ -210,7 +210,7 @@
 .t-error p{color:var(--danger);font-weight:600;font-size:13.5px}
 
 /* Toast — warm ink pill (theme.css sets bg/radius; add depth + gold glint) */
-.toast{box-shadow:0 14px 34px -12px rgba(20,17,12,.5)}
+.toast{box-shadow:0 14px 34px -12px rgba(15,21,32,.5)}
 .toast .ico{color:#d9b96c}
 
 /* ---------------- Lightbox ---------------- */

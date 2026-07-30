@@ -53,10 +53,10 @@ const MD_TOOLS = [
    sees in the editor is what they get on the published research page.
    The classes themselves are defined in styles-richtext.css. */
 const TEXT_COLORS = [
-  { cls:'tc-ink',     val:'#221e17' },
-  { cls:'tc-soft',    val:'#57503f' },
-  { cls:'tc-muted',   val:'#8b8371' },
-  { cls:'tc-light',   val:'#d8cfba' },
+  { cls:'tc-ink',     val:'#1c2330' },
+  { cls:'tc-soft',    val:'#4d5768' },
+  { cls:'tc-muted',   val:'#8a93a3' },
+  { cls:'tc-light',   val:'#ccd4e0' },
   { cls:'tc-rose',    val:'#b3453e' },
   { cls:'tc-brass',   val:'#b3873e' },
   { cls:'tc-emerald', val:'#1d3a5f' },

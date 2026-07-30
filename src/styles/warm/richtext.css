@@ -95,7 +95,7 @@
    ================================================================ */
 .prose img{
   border:1px solid var(--line);
-  box-shadow:0 8px 24px -16px rgba(34,30,23,.3);
+  box-shadow:0 8px 24px -16px rgba(23,31,45,.3);
 }
 .prose img.img-behind{border:0;box-shadow:none}
 
@@ -108,7 +108,7 @@
 .prose sup a:hover{color:var(--navy)}
 
 /* Mono span wash — base used a pink-red tint */
-.prose .ff-mono{background:rgba(230,223,207,.4)}
+.prose .ff-mono{background:rgba(228,232,238,.4)}
 
 /* NOTE: no .tc-* overrides here — the base .prose .tc-* rules
    (styles-richtext.css) already carry the exact warm values that
@@ -126,12 +126,12 @@
 
 /* Format pills + Write/Preview tabs — filled navy pills when on
    (Warm Archive never underlines tabs) on a warm segmented track */
-.rte-fmt{background:#f0ebdf;border-color:var(--line)}
+.rte-fmt{background:#f2f5f9;border-color:var(--line)}
 .rte-fmt-pill:hover{color:var(--navy)}
 .rte-fmt-pill.on{background:var(--navy);color:#f7f3ea}
-.rte-tabs{background:#f0ebdf;border-color:var(--line);border-radius:999px;padding:3px;gap:2px}
+.rte-tabs{background:#f2f5f9;border-color:var(--line);border-radius:999px;padding:3px;gap:2px}
 .rte-tab{border-radius:999px}
-.rte-tab:hover{background:#efe9da;color:var(--navy)}
+.rte-tab:hover{background:#f2f5f9;color:var(--navy)}
 .rte-tab.on{background:var(--navy);color:#f7f3ea}
 
 /* ================================================================
@@ -144,7 +144,7 @@
   min-width:30px;height:30px;
   border-radius:7px;
 }
-.rte-tool:hover{background:#efe9da;color:var(--navy)}
+.rte-tool:hover{background:#f2f5f9;color:var(--navy)}
 .rte-tool.on{
   background:var(--blue-wash);
   color:var(--navy);
@@ -166,17 +166,17 @@
    9 · RTE — writing surfaces. Warm input paper (#fcfaf4), calm
    sans placeholders, blue-wash selection (base selected in red).
    ================================================================ */
-.rte-wysiwyg{background:#fcfaf4}
+.rte-wysiwyg{background:#fcfdfe}
 .rte-area{
-  background:#fcfaf4;
+  background:#fcfdfe;
   font-family:var(--sans);
   font-size:15px;
   line-height:1.65;
 }
-.rte-area::placeholder{color:#a39a85;font-style:normal}
+.rte-area::placeholder{color:#98a1b0;font-style:normal}
 .rte-wysiwyg:empty::before,
 .rte-wysiwyg:has(> p:only-child:empty)::before{
-  color:#a39a85;font-style:normal;
+  color:#98a1b0;font-style:normal;
 }
 .rte-wysiwyg ::selection{background:#dbe6f2}
 .rte-wysiwyg img:hover{outline-color:rgba(45,95,151,.55)}

@@ -22,7 +22,7 @@ const BACKGROUNDS = [
   { id:'g3', label:'Sage',   bg:'linear-gradient(160deg,#3a5244,#5b7a67)' },
   { id:'g4', label:'Rose',   bg:'linear-gradient(160deg,#5c2f3a,#8a4a5b)' },
   { id:'g5', label:'Violet', bg:'linear-gradient(160deg,#463a5c,#6b5b8a)' },
-  { id:'g6', label:'Paper',  bg:'linear-gradient(160deg,#fffdf8,#e6dfcf)' },
+  { id:'g6', label:'Paper',  bg:'linear-gradient(160deg,#ffffff,#e4e8ee)' },
 ]
 
 const FONTS = [
@@ -32,7 +32,7 @@ const FONTS = [
   { id:'display', label:'Display',family:'"Amiri", "Lora", Georgia, serif', italic:true, weight:500 },
 ]
 
-const COLORS = ['#ffffff', '#221e17', '#d9b96c', '#b3873e', '#2d5f97', '#1d3a5f', '#e5d3ac', '#b3453e']
+const COLORS = ['#ffffff', '#1c2330', '#d9b96c', '#b3873e', '#2d5f97', '#1d3a5f', '#e5d3ac', '#b3453e']
 
 /* Story canvas is 1080×1920 (Instagram-equivalent 9:16). The on-screen
    preview is scaled to fit the modal viewport; all positions are stored
@@ -121,7 +121,7 @@ function TextLayer({ layer, selected, onSelect, onChange, onDelete }) {
           onClick={(e) => { e.stopPropagation(); onDelete(layer.id) }}
           style={{
             position:'absolute', top:-12, right:-12, width:26, height:26,
-            borderRadius:'50%', background:'#221e17', color:'#fff', border:'2px solid #fff',
+            borderRadius:'50%', background:'#1c2330', color:'#fff', border:'2px solid #fff',
             display:'grid', placeItems:'center', boxShadow:'0 2px 6px rgba(0,0,0,.3)',
             zIndex:5,
           }}
@@ -518,7 +518,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
             <div className="se-colors">
               {COLORS.map(c => (
                 <button key={c} className={'se-color ' + (selected.color === c ? 'on' : '')}
-                  style={{ background: c, borderColor: c === '#ffffff' ? '#d8cfba' : 'transparent' }}
+                  style={{ background: c, borderColor: c === '#ffffff' ? '#ccd4e0' : 'transparent' }}
                   onClick={() => patchSelected({ color: c })}/>
               ))}
             </div>

@@ -303,6 +303,21 @@ export function MessageBubble({
   const sender = enrichAuthor(msg.sender, msg.senderId)
   const senderName = sender?.full || sender?.handle || 'Unknown'
 
+  /* The reply strip signs its QUOTED author. The wire gives replyTo only a
+     senderId, so the name comes from the directory — fetched with the same
+     batcher as every other stranger's card, and the generic "In reply to"
+     caption holds the line until it resolves. */
+  const quotedId = !msg.deleted && msg.replyTo && !msg.replyTo.deleted
+    ? msg.replyTo.senderId
+    : null
+  React.useEffect(() => {
+    if (quotedId) watchUsers([quotedId])
+  }, [quotedId, watchUsers])
+  const quotedWho = quotedId ? enrichAuthor(null, quotedId) : null
+  const quotedName = quotedId && String(quotedId) === String(myId)
+    ? 'You'
+    : quotedWho?.full || null
+
   /* The quick strip, narrowed to what this channel actually accepts. An emoji
      outside a non-empty `allowedReactions` is refused server-side, so offering
      it would be offering a 403. If the whitelist and the house set don't
@@ -472,6 +487,30 @@ export function MessageBubble({
     if (!protectedContent) {
       menuItems.push({ key: 'forward', label: 'Forward', icon: 'forward', run: () => onForward?.(msg) })
     }
+    /* VoiceNote surfaces no anchor, and since every audio row renders as the
+       player (mediaFrom normalises AUDIO→VOICE) this menu is the only place a
+       received recording — a lecture, a nasheed — can be SAVED. Honoured
+       against protectedContent for the same reason Copy is. */
+    if (!protectedContent) {
+      const audio = (msg.media || []).filter(m => m.kind === 'VOICE' && m.url)
+      if (audio.length) {
+        menuItems.push({
+          key: 'saveaudio',
+          label: audio.length === 1 ? 'Save audio' : `Save audio (${audio.length})`,
+          icon: 'download',
+          run: () => {
+            for (const m of audio) {
+              const a = document.createElement('a')
+              a.href = m.url
+              a.download = m.fileName || 'audio'
+              document.body.appendChild(a)
+              a.click()
+              a.remove()
+            }
+          },
+        })
+      }
+    }
     // A star is PRIVATE — nobody else can see it, so it is offered on every
     // readable message, mine or not.
     menuItems.push(msg.starred
@@ -582,10 +621,14 @@ export function MessageBubble({
                   onClick={(e) => { e.stopPropagation(); onJumpTo?.(msg.replyTo.messageId) }}
                   aria-label={msg.replyTo.deleted
                     ? 'The replied message was deleted'
-                    : 'Go to the replied message'}
+                    : `Go to the replied message${quotedName ? ` from ${quotedName === 'You' ? 'you' : quotedName}` : ''}`}
                 >
-                  <span className="ch-quote-who">
-                    {msg.replyTo.senderId === msg.senderId ? 'Reply' : 'In reply to'}
+                  {/* The caption IS the attribution — the quoted author's
+                      name once the directory resolves it, the old generic
+                      labels until then. */}
+                  <span className="ch-quote-who" dir="auto">
+                    {quotedName
+                      || (msg.replyTo.senderId === msg.senderId ? 'Reply' : 'In reply to')}
                   </span>
                   <span className={'ch-quote-txt' + (msg.replyTo.deleted ? ' gone' : '')} dir="auto">
                     {msg.replyTo.deleted

@@ -23,7 +23,7 @@
    rather than suggesting a spelling.
    ========================================================= */
 import React from 'react'
-import { Icon, Avatar, showToast } from '../ui.jsx'
+import { Icon, Avatar, Verify, showToast } from '../ui.jsx'
 import { Loader, ErrorState } from '../states.jsx'
 import { api } from '../../api/index.js'
 import { useChat } from '../../context/ChatContext.jsx'
@@ -120,8 +120,25 @@ export function CommentsPanel({ channelId, post, linkedGroupId, onClose, onCount
                 <Avatar size={30} src={who?.profileImage} initials={who?.initials || '·'} color={who?.avc}/>
               </button>
               <div className="cc-row-body">
+                {/* The author's SIGN, not just a name: clickable name with the
+                    verified mark, the @handle in the archive's gold serif, and
+                    the clock pushed to the ledger edge. `handleOf`'s 'member'
+                    fallback means "no username on the wire" — not a handle,
+                    so it is not signed as one. */}
                 <div className="cc-row-who">
-                  {who?.full || 'Member'}<span className="cc-row-t">{m.time}</span>
+                  <button
+                    type="button"
+                    className="cc-row-name"
+                    dir="auto"
+                    onClick={() => onOpenProfile?.(m.senderId)}
+                  >
+                    {who?.full || 'Member'}
+                    {who?.verified && <Verify scholar={who.role === 'SCHOLAR'}/>}
+                  </button>
+                  {who?.handle && who.handle !== 'member' && (
+                    <span className="cc-row-handle">@{who.handle}</span>
+                  )}
+                  <span className="cc-row-t">{m.time}</span>
                 </div>
                 <div className="cc-row-txt" dir="auto">{m.body}</div>
               </div>

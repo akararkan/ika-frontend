@@ -18,9 +18,9 @@ const META = {
   POST_CREATED:['compose','#3d6b4f'], POST_REACTION:['heart','#b3453e'], POST_COMMENT:['comment','#2d5f97'],
   POST_COMMENT_REACTION:['heart','#b3453e'], POST_SHARE:['share','#2d5f97'], POST_SAVED:['bookmark','#b3873e'],
   REEL_WATCH:['reels','#6b5b8a'],
-  GLOBAL_SEARCH:['search','#8b8371'], HASHTAG_SEARCH:['hash','#2d5f97'], MENTION_LOOKUP:['at','#6b5b8a'],
+  GLOBAL_SEARCH:['search','#8a93a3'], HASHTAG_SEARCH:['hash','#2d5f97'], MENTION_LOOKUP:['at','#6b5b8a'],
   USER_MENTIONED:['at','#6b5b8a'], PROFILE_VIEW:['eye','#2d5f97'], FOLLOWED_USER:['follow','#3d6b4f'],
-  QNA_QUESTION_CREATED:['qna','#8b8371'], QNA_QUESTION_SAVED:['bookmark','#b3873e'], QNA_ANSWER_CREATED:['reply','#2d5f97'],
+  QNA_QUESTION_CREATED:['qna','#8a93a3'], QNA_QUESTION_SAVED:['bookmark','#b3873e'], QNA_ANSWER_CREATED:['reply','#2d5f97'],
   QNA_REANSWER_CREATED:['reply','#2d5f97'], QNA_ANSWER_REACTION:['heart','#b3453e'],
   RESEARCH_PUBLISHED:['research','#3d6b4f'], RESEARCH_SAVED:['bookmark','#b3873e'], RESEARCH_REACTION:['heart','#b3453e'],
   RESEARCH_COMMENT:['comment','#2d5f97'], RESEARCH_COMMENT_REACTION:['heart','#b3453e'],
@@ -113,7 +113,7 @@ export function ActivityPage() {
           : (
             <div className="card t-stagger" style={{ overflow:'hidden' }}>
               {grouped.map(({ a, head }) => {
-                const [icon, tint] = META[a.type] || ['bell', '#8b8371']
+                const [icon, tint] = META[a.type] || ['bell', '#8a93a3']
                 return (
                   <React.Fragment key={a.id}>
                     {head && <div className="ntf-group">{head}</div>}

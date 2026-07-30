@@ -54,6 +54,26 @@ const clockOf = (iso) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
+/* The stage clock: elapsed h:mm:ss since startedAt, ticking once a second.
+   Its own component so the tick re-renders THIS chip, not the whole room;
+   each tick recomputes from the timestamp, so a throttled background tab
+   never drifts — it snaps right on the next tick. */
+function ElapsedClock({ startedAt }) {
+  const [, force] = React.useReducer(v => v + 1, 0)
+  React.useEffect(() => {
+    if (!startedAt) return undefined
+    const t = setInterval(force, 1000)
+    return () => clearInterval(t)
+  }, [startedAt])
+  const ms = Date.now() - Date.parse(startedAt)
+  if (!startedAt || Number.isNaN(ms) || ms < 0) return null
+  const secs = Math.floor(ms / 1000)
+  const h = Math.floor(secs / 3600)
+  const m = String(Math.floor(secs / 60) % 60).padStart(2, '0')
+  const s = String(secs % 60).padStart(2, '0')
+  return <span className="lv-elapsed" aria-label="Time live">{`${h}:${m}:${s}`}</span>
+}
+
 /* Recording lifecycle → what the owner is actually told. `null` is "the backend
    didn't say" (an older deploy), which renders as nothing rather than a guess.
 
@@ -1269,6 +1289,7 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
               <div className="lv-topbar">
                 <span className="lv-live-pill"><span className="lv-dot" aria-hidden="true"/>LIVE</span>
                 <span className="lv-count"><Icon name="eye" className="xs"/>{stream.viewerCount.toLocaleString()}</span>
+                <ElapsedClock startedAt={stream.startedAt}/>
                 <span className="lv-topbar-sp" aria-hidden="true"/>
                 {!isHost && (
                   <button className="lv-ctl" onClick={toggleSound}
@@ -1347,6 +1368,27 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
                 </div>
               )}
 
+              {/* Host broadcast controls ride the stage's bottom gradient
+                  (prototype player bar) — only while actually publishing. */}
+              {isHost && cast === 'live' && (
+                <div className="stg-castbar">
+                  <span className="stg-onair"><span className="lv-dot" aria-hidden="true"/>You’re live</span>
+                  <button className="stg-cast-btn" onClick={toggleMic} aria-pressed={!micOn}>
+                    <Icon name={micOn ? 'mic' : 'micoff'} className="xs"/>{micOn ? 'Mute' : 'Unmute'}
+                  </button>
+                  <button className="stg-cast-btn" onClick={toggleCam} aria-pressed={!camOn}>
+                    <Icon name={camOn ? 'camera' : 'videooff'} className="xs"/>{camOn ? 'Camera off' : 'Camera on'}
+                  </button>
+                  <button className={'stg-cast-btn' + (recording ? ' rec-on' : '')} onClick={toggleRecord} disabled={recBusy}
+                    aria-pressed={recording}
+                    title={recording ? 'Stop saving — the broadcast continues' : 'Start saving this broadcast'}>
+                    {recording
+                      ? <><span className="lv-dot" aria-hidden="true"/>Stop recording</>
+                      : <><Icon name="broadcast" className="xs"/>Record</>}
+                  </button>
+                </div>
+              )}
+
               {/* TikTok phones: the last few comments float over the picture
                   and the composer pins to the stage bottom. Desktop keeps the
                   side panel; CSS shows exactly one of the two. */}
@@ -1408,24 +1450,12 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
             onAccept={acceptInvite} onDecline={declineInvite}/>
         )}
 
-        {/* Host broadcast controls — only while actually publishing the camera. */}
-        {isHost && stream.isLive && cast === 'live' && (
-          <div className="stg-castbar">
-            <span className="stg-onair"><span className="lv-dot" aria-hidden="true"/>You’re live</span>
-            <button className="stg-cast-btn" onClick={toggleMic} aria-pressed={!micOn}>
-              <Icon name={micOn ? 'mic' : 'micoff'} className="xs"/>{micOn ? 'Mute' : 'Unmute'}
-            </button>
-            <button className="stg-cast-btn" onClick={toggleCam} aria-pressed={!camOn}>
-              <Icon name={camOn ? 'camera' : 'videooff'} className="xs"/>{camOn ? 'Camera off' : 'Camera on'}
-            </button>
-            <button className={'stg-cast-btn' + (recording ? ' rec-on' : '')} onClick={toggleRecord} disabled={recBusy}
-              aria-pressed={recording}
-              title={recording ? 'Stop saving — the broadcast continues' : 'Start saving this broadcast'}>
-              {recording
-                ? <><span className="lv-dot" aria-hidden="true"/>Stop recording</>
-                : <><Icon name="broadcast" className="xs"/>Record</>}
-            </button>
-
+        {/* Camera-health warnings stay BELOW the stage — long sentences must
+            never sit over the picture. The control cluster itself moved onto
+            the stage's bottom gradient (see .stg-castbar inside .lv-stage). */}
+        {isHost && stream.isLive && cast === 'live'
+          && ['recovered', 'stalled', 'lost'].includes(camHealth.state) && (
+          <div className="lv-cast-warns">
             {/* The picture died while the connection stayed up. Said plainly and
                 at the moment it happens, because the alternative is the host
                 discovering it in the recording, when nothing can be done. */}
@@ -1582,7 +1612,10 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
                   <Avatar size={26} src={card?.profileImage || null} initials={card?.initials || '·'} color={card?.avc}/>
                 </button>
                 <span className="lv-line-body">
-                  <b dir="auto">{who}</b>
+                  <b dir="auto">
+                    {who}
+                    {String(l.userId) === String(stream.hostId) && <i className="lv-line-hosttag">HOST</i>}
+                  </b>
                   <span dir="auto">{l.text}</span>
                 </span>
                 {inviteBtn}

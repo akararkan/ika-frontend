@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { useThread } from '../components/chat/useThread.js'
 import { ConversationList } from '../components/chat/ConversationList.jsx'
+import NewFollowers from '../components/chat/NewFollowers.jsx'
 import { ConversationHeader } from '../components/chat/ConversationHeader.jsx'
 import { MessageList } from '../components/chat/MessageList.jsx'
 import { Composer } from '../components/chat/Composer.jsx'
@@ -461,6 +462,18 @@ export function ChatPage() {
   const onSelect = React.useCallback((cid) => navigate(`/chat/${cid}`), [navigate])
   const onBack = React.useCallback(() => navigate('/chat'), [navigate])
 
+  /* A tapped new-follower row opens the DM directly — createDirect is
+     get-or-create on the backend, so an existing thread is reused. */
+  const openDmWithFollower = React.useCallback(async (user) => {
+    if (!user?.id) return
+    try {
+      const convo = await api.chat.conversations.createDirect(user.id)
+      if (convo?.id) navigate(`/chat/${convo.id}`)
+    } catch {
+      showToast('Could not open a chat with @' + (user.handle || 'them'))
+    }
+  }, [navigate])
+
   /* Pop the messenger out into its own tab/window. Sized rather than a bare
      tab so it lands as a usable side-by-side pane; a blocked popup falls back
      to a normal tab rather than doing nothing. */
@@ -739,6 +752,10 @@ export function ChatPage() {
           </div>
         </header>
 
+        {/* New followers ride above the inbox only — a follow is an invitation
+            to talk, so the rail answers it with a one-tap DM. */}
+        {view === 'inbox' && <NewFollowers onMessage={openDmWithFollower}/>}
+
         {view === 'requests' ? (
           <RequestsPanel onOpen={(c) => {
             const cid = typeof c === 'string' ? c : c?.id ?? c?.conversationId
@@ -902,8 +919,8 @@ export function ChatPage() {
                 setReplyTo(null); setDraft('')
                 return p
               }}
-              onSendFiles={({ files, body, durationMs }) => {
-                thread.sendFiles({ files, body, durationMs, replyToId: replyTo?.id ?? null })
+              onSendFiles={({ files, body, durationMs, waveform }) => {
+                thread.sendFiles({ files, body, durationMs, waveform, replyToId: replyTo?.id ?? null })
                 draftSent()
                 setReplyTo(null); setDraft('')
               }}

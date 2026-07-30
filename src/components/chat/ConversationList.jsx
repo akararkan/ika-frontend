@@ -162,7 +162,7 @@ function ConversationRow({ convo, active, typers, onOpen }) {
             <span className="cv-medallion" aria-hidden="true">
               {convo.avatarUrl
                 ? <img className="cv-medallion-img" src={convo.avatarUrl} alt=""/>
-                : <Icon name="users"/>}
+                : <Icon name={convo.isChannel ? 'broadcast' : 'users'}/>}
             </span>
           ) : (
             <Avatar
@@ -173,11 +173,29 @@ function ConversationRow({ convo, active, typers, onOpen }) {
             />
           )}
           {!convo.isGroup && <span className={'cv-dot' + (online ? ' on' : '')} aria-hidden="true"/>}
+          {/* Type seal: a channel and a group are different rooms with
+              different rules, and the rail should say so at a glance. It
+              rides the corner the presence dot uses on a DM row — a slot
+              that is always free here, since groups have no presence. */}
+          {convo.isGroup && (
+            <span
+              className={'cv-kind' + (convo.isChannel ? ' channel' : '')}
+              title={convo.isChannel ? 'Channel' : 'Group'}
+              aria-hidden="true"
+            >
+              <Icon name={convo.isChannel ? 'broadcast' : 'users'}/>
+            </span>
+          )}
         </div>
 
         <div className="cv-body">
           <div className="cv-line1">
             <span className="cv-name" dir="auto">{convo.displayTitle}</span>
+            {/* The seal is decorative; this is where assistive tech learns
+                what kind of room the row opens. */}
+            {convo.isGroup && (
+              <span className="sr-only">{convo.isChannel ? '(channel)' : '(group)'}</span>
+            )}
             {!convo.isGroup && peer?.verified && <Verify scholar={peer.role === 'SCHOLAR'}/>}
             <span className="cv-time">{stampOf(convo.lastMessageAt)}</span>
           </div>

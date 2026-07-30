@@ -591,7 +591,7 @@ img,video{max-width:100%;height:auto}
   /* ----- Post detail + Q&A comment composer / threads ----- */
   .card-pad > .cmt-box{position:sticky;bottom:calc(8px + var(--safe-b));z-index:5;background:var(--card);padding:8px 0;margin:0 -2px}
   .cmt-box{gap:8px;margin-top:10px}
-  .cmt-box .field{height:42px;border-radius:0;background:transparent;border:0;border-bottom:1px solid #d9d3c4;font-size:16px;padding:0 2px}
+  .cmt-box .field{height:42px;border-radius:0;background:transparent;border:0;border-bottom:1px solid #dee3eb;font-size:16px;padding:0 2px}
   .cmt-box .icon-btn{width:42px;height:42px;flex:none}
   .cmt-meta{gap:6px;flex-wrap:wrap;padding:6px 8px 0;row-gap:2px}
   .cmt-meta button{min-height:34px;padding:4px 6px;margin:0 -2px;display:inline-flex;align-items:center}

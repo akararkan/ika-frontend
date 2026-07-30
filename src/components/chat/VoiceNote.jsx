@@ -45,6 +45,16 @@ import {
  *  still keeps each bar ≥2px on the narrowest phone. */
 const WAVE_BARS = 40
 
+/** Rate is applied from three places (the pref effect, play, loadedmetadata —
+ *  Safari resets it when a source loads). Pitch must survive all of them:
+ *  Chrome defaults preservesPitch on, Safari needs the webkit- prefix, and a
+ *  sped-up voice that chipmunks is worse than no speed control at all. */
+function applyRate(a, rate) {
+  a.playbackRate = rate
+  a.preservesPitch = true
+  a.webkitPreservesPitch = true
+}
+
 /* The backend ships `waveform` as base64 peaks. When it is missing or
    unparseable we synthesise a stable pseudo-random set from the message id, so
    the bubble never renders an empty box and every client shows the SAME shape.
@@ -147,7 +157,7 @@ export function VoiceNote({ media, messageId, mine, senderName }) {
      change, not only on mount. */
   React.useEffect(() => {
     const a = audioRef.current
-    if (a) a.playbackRate = rate
+    if (a) applyRate(a, rate)
   }, [rate])
 
   const cycleSpeed = (e) => {
@@ -163,7 +173,7 @@ export function VoiceNote({ media, messageId, mine, senderName }) {
     if (a.paused) {
       // Two voice notes talking over each other is never what anyone wanted.
       pauseOtherVoices(a)
-      a.playbackRate = rate
+      applyRate(a, rate)
       a.play().catch(() => { setFailed(true); showToast('Could not play this voice note') })
     } else a.pause()
   }
@@ -283,9 +293,15 @@ export function VoiceNote({ media, messageId, mine, senderName }) {
         }}
         onLoadedMetadata={(e) => {
           const a = e.currentTarget
-          a.playbackRate = rate
+          applyRate(a, rate)
           if (Number.isFinite(a.duration) && a.duration > 0) setDur(a.duration)
-          else fixInfiniteDuration(a)
+          /* Self-recorded WebM reports Infinity here. When the wire carried a
+             real durationMs the scrubber already has its total — running the
+             seek-to-the-end fix anyway forces a FULL download of every note
+             in the thread at mount (preload="metadata" fires this handler for
+             each bubble) just to relearn a number we were given. Only a note
+             with no known length at all still pays for the walk. */
+          else if (!media.durationMs) fixInfiniteDuration(a)
         }}
         onTimeUpdate={() => { if (!playing) paint() }}
       />

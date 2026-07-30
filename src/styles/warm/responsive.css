@@ -29,7 +29,7 @@
 @media(max-width:720px){
   /* warm topbar glass (base is rgba(255,255,255,.88)) */
   .topbar{
-    background:rgba(255,253,248,.9);
+    background:rgba(255,255,255,.92);
     backdrop-filter:blur(14px) saturate(140%);
     -webkit-backdrop-filter:blur(14px) saturate(140%);
   }
@@ -39,10 +39,10 @@
   .sidebar{background:var(--paper-2)}
 
   /* drawer backdrop: warm ink, not the old #1b1813 */
-  .nav-scrim{background:rgba(34,30,23,.5)}
+  .nav-scrim{background:rgba(23,31,45,.5)}
 
   /* botnav: warm glass, hairline top border */
-  .botnav{background:rgba(255,253,248,.96);border-top:1px solid var(--line)}
+  .botnav{background:rgba(255,255,255,.96);border-top:1px solid var(--line)}
   .botnav a.active,
   .botnav a.active .ico{color:var(--navy)}
   /* active tick riding the top edge (geometry from base §10.1) */
@@ -67,19 +67,19 @@
 
   /* segmented switchers: track card-2, active cell card + navy text */
   .seg{background:var(--card-2)}
-  .seg button.on{background:var(--card);color:var(--navy);box-shadow:0 1px 3px rgba(34,30,23,.14)}
+  .seg button.on{background:var(--card);color:var(--navy);box-shadow:0 1px 3px rgba(23,31,45,.14)}
   /* view switcher active cell: bg goes navy via the token remap —
      only the old red glow needs replacing (mobile lane; desktop
      .vseg is the content-area file's job) */
   .vseg.on{box-shadow:0 5px 12px -5px rgba(22,40,63,.5)}
 
   /* notifications: unread tint was rgba(201,56,47,.05) — warm wash */
-  .ntf-row.unread{background:#fbf7ec}
+  .ntf-row.unread{background:#f2f6fc}
 
   /* mobile comment composer keeps its underline layout; warm the
      hairline and give focus a plain blue underline (theme.css's
      boxed .field:focus ring doesn't suit the underline input) */
-  .cmt-box .field{border-bottom-color:#ddd4c0}
+  .cmt-box .field{border-bottom-color:#d8dee8}
   .cmt-box .field:focus{border-bottom-color:var(--blue);box-shadow:none}
 }
 
@@ -98,7 +98,7 @@
   .auth-mark{background:rgba(217,185,108,.14);border-color:rgba(217,185,108,.4)}
   /* enhanced-auth mobile fit: shorter flourish, tighter card, calmer stagger */
   .auth-hero::before{width:48px;height:3px;margin-bottom:14px}
-  .auth-card{padding:20px 16px 18px;box-shadow:0 1px 2px rgba(34,30,23,.05),0 16px 44px -16px rgba(22,40,63,.24)}
+  .auth-card{padding:20px 16px 18px;box-shadow:0 1px 2px rgba(23,31,45,.05),0 16px 44px -16px rgba(22,40,63,.24)}
   .auth-title{font-size:21px}
   .auth-bullets li:hover{transform:none}
 }
@@ -129,8 +129,8 @@
 @media(max-width:600px){
   .modal,.cm-modal{animation:sheet .3s cubic-bezier(.2,.8,.3,1)}
   .dlg{animation:sheet .3s cubic-bezier(.2,.8,.3,1)}
-  /* dialog scrim: warm ink to match .overlay's rgba(20,17,12,.55) */
-  .dlg-overlay{background:rgba(34,30,23,.55)}
+  /* dialog scrim: warm ink to match .overlay's rgba(15,21,32,.55) */
+  .dlg-overlay{background:rgba(23,31,45,.55)}
 }
 
 /* ============================================================

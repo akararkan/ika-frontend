@@ -49,7 +49,7 @@
   font-family:var(--serif);font-size:15px;line-height:1.7;
   color:var(--ink-2);background:var(--card);
 }
-.rte-area::placeholder{color:#b5b0a5;font-family:var(--sans);font-style:italic}
+.rte-area::placeholder{color:#a9b2c0;font-family:var(--sans);font-style:italic}
 
 /* preview */
 .rte-preview{
@@ -110,10 +110,10 @@
    ============================================================ */
 
 /* Text colours (.tc-*) */
-.prose .tc-ink     {color:#221e17}
-.prose .tc-soft    {color:#57503f}
-.prose .tc-muted   {color:#8b8371}
-.prose .tc-light   {color:#d8cfba}
+.prose .tc-ink     {color:#1c2330}
+.prose .tc-soft    {color:#4d5768}
+.prose .tc-muted   {color:#8a93a3}
+.prose .tc-light   {color:#ccd4e0}
 .prose .tc-rose    {color:#b3453e}
 .prose .tc-brass   {color:#b3873e}
 .prose .tc-emerald {color:#1d3a5f}
@@ -254,7 +254,7 @@
   border-radius:14px;background:var(--card-2);border:1px solid var(--line-soft);
   font-size:12px;font-weight:600;color:var(--ink-2);transition:.15s;
 }
-.share-act:hover{background:var(--paper-2);border-color:#d8cfba;transform:translateY(-1px)}
+.share-act:hover{background:var(--paper-2);border-color:#ccd4e0;transform:translateY(-1px)}
 .share-act:active{transform:scale(.96)}
 .sa-ic{
   width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;
@@ -388,7 +388,7 @@
 }
 .prose pre{
   margin:1.2em 0;
-  background:linear-gradient(180deg,#2a251d,#1b1813);
+  background:linear-gradient(180deg,#232b3a,#161c28);
   color:#f4f2ee;
   padding:14px 16px;border-radius:12px;
   overflow-x:auto;font-size:13.5px;line-height:1.55;
@@ -466,7 +466,7 @@
 .rte-wysiwyg:empty::before,
 .rte-wysiwyg:has(> p:only-child:empty)::before{
   content:attr(data-placeholder);
-  color:#b5b0a5;font-style:italic;
+  color:#a9b2c0;font-style:italic;
   pointer-events:none;
 }
 /* selection highlight nicer than the OS default */
@@ -710,7 +710,7 @@
   transition:.12s;
 }
 .rte-img-btn:hover{background:var(--card-2);color:var(--ink)}
-.rte-img-btn.on{background:var(--ink-2);color:#faf6ec}
+.rte-img-btn.on{background:var(--ink-2);color:#eef2f7}
 .rte-img-btn.on:hover{background:var(--ink)}
 .rte-img-btn.danger{color:var(--rose)}
 .rte-img-btn.danger:hover{background:rgba(179,69,62,.08)}

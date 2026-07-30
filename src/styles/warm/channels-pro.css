@@ -119,7 +119,7 @@
   box-shadow:0 0 0 4px var(--card),var(--shadow);
   display:grid;place-items:center;overflow:hidden;
 }
-.cp-avatar .av{ border-radius:20px; }
+.cp-avatar .avatar{ border-radius:20px; }
 .cp-crest{
   position:relative;
   width:100%;height:100%;
@@ -1256,25 +1256,49 @@
 }
 .ch-meta-views .ico{ width:13px;height:13px;opacity:.8; }
 
-/* ---- the comments bar ----
-   A full-width row under the post, not a chip in the rail: on a broadcast
-   channel it is the reader's only way to reply, so it carries a button's
-   weight. The faces overlap by a third of their width — enough to read as a
-   stack, not so much that the second face becomes a sliver. */
+/* ---- the comments bar · the thread branch ----
+   Not a full-width footer any more. In the DM-shaped view that strip ran
+   the whole thread width with its label at the far margin — severed from
+   the bubble it annotates. The affordance is now a shrink-wrapped pill
+   that hangs from the message's lower corner (start corner under other
+   people's bubbles, end corner under my navy ones), tied to it by a
+   quarter-circle hairline stem — the thread visibly grows out of the
+   post. Logical properties throughout, so Arabic/Kurdish threads mirror
+   the whole branch for free. */
 .ch-cbar{
-  display:flex;align-items:center;gap:11px;
-  width:100%;margin:2px 0 2px;padding:11px 14px;
-  /* A HAIRLINE ABOVE, not a box around: the bar is the foot of the post, the
-     way a footer rule closes an article — a full border would read as a
-     separate card floating under the message. */
-  border:0;border-top:1px solid var(--line-soft);
-  border-radius:0 0 var(--r) var(--r);
-  background:transparent;cursor:pointer;
-  font:inherit;text-align:start;
-  transition:background .14s ease;
+  position:relative;
+  display:inline-flex;align-items:center;gap:9px;
+  align-self:flex-start;
+  width:auto;max-width:calc(100% - 18px);
+  min-height:40px;
+  margin-block:8px 2px;               /* the 8px gap is the stem's run   */
+  margin-inline:18px 0;               /* the branch indent under the corner */
+  padding-block:5px;padding-inline:9px 13px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--card);
+  box-shadow:var(--shadow-sm);
+  cursor:pointer;font:inherit;text-align:start;
+  transition:background .14s ease,border-color .14s ease,transform .12s ease;
 }
-.ch-cbar:hover{ background:var(--wash); }
-.ch-cbar:focus-visible{ outline:2px solid var(--blue);outline-offset:-2px; }
+.ch-cbar:hover{ background:var(--gold-wash);border-color:var(--brass-soft); }
+.ch-cbar:active{ transform:scale(.985); }
+.ch-cbar:focus-visible{ outline:2px solid var(--blue);outline-offset:2px; }
+
+/* The stem: two hairline borders and one rounded corner — a quarter-circle
+   stroke dropping from the underside of whatever closes the message
+   (bubble, rail or reaction tally) and curving into the pill at
+   mid-height. It warms to brass when you reach for the thread. */
+.ch-cbar::before{
+  content:"";position:absolute;pointer-events:none;
+  inset-inline-start:-12px;inset-block-start:-9px;
+  width:12px;height:calc(50% + 9px);
+  border-inline-start:1.5px solid var(--line);
+  border-block-end:1.5px solid var(--line);
+  border-end-start-radius:10px;
+  transition:border-color .14s ease;
+}
+.ch-cbar:hover::before{ border-color:var(--brass-soft); }
 
 .ch-cbar-faces{ display:flex;flex:0 0 auto;align-items:center; }
 .ch-cbar-face{ position:relative;display:block; }
@@ -1282,36 +1306,80 @@
    A QUARTER of the face is hidden — enough to read as a stack, little enough
    that the middle face of three is still a face and not a crescent. */
 .ch-cbar-face + .ch-cbar-face{ margin-inline-start:-7px; }
-/* The ring is the SURFACE colour, so the faces separate without a border being
-   drawn around each one — and it tracks the hover background so the stack
-   never looks cut out of the wrong paper. */
-.ch-cbar-face .av{ box-shadow:0 0 0 2px var(--paper-2); }
-.ch-cbar:hover .ch-cbar-face .av{ box-shadow:0 0 0 2px var(--wash); }
+/* The ring is the pill's own surface, so the faces separate without a border
+   being drawn around each one — and it tracks the hover wash so the stack
+   never looks cut out of the wrong paper. (Avatar's root class is `.avatar`;
+   the old `.av` selector here never matched anything.) */
+.ch-cbar-face .avatar{ box-shadow:0 0 0 2px var(--card);transition:box-shadow .14s ease; }
+.ch-cbar:hover .ch-cbar-face .avatar{ box-shadow:0 0 0 2px var(--gold-wash); }
 
-.ch-cbar-ico{ flex:0 0 auto;color:var(--blue);opacity:.75; }
+.ch-cbar-ico{ flex:0 0 auto;color:var(--gold-deep);opacity:.8;margin-inline-start:2px; }
 
 .ch-cbar-label{
-  flex:1;min-width:0;
-  font-size:15px;font-weight:650;color:var(--blue);
+  flex:0 1 auto;min-width:0;
+  font-size:13.5px;font-weight:650;color:var(--navy);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
+/* The numeral is the one gold thing on the pill — serif, tabular so a live
+   count does not jitter as it climbs. */
+.ch-cbar-n{
+  font-family:var(--serif);font-weight:700;color:var(--gold-deep);
+  font-variant-numeric:tabular-nums;
+}
+/* Empty ("Leave a comment"): the invitation is quieter than the tally —
+   ghost surface until hover, muted label. */
+.ch-cbar.empty{ background:transparent;box-shadow:none; }
+.ch-cbar.empty:hover{ background:var(--gold-wash); }
 .ch-cbar.empty .ch-cbar-label{ font-weight:600;color:var(--muted); }
 
+/* Unchanged semantics: the count moved under your eyes and you have not
+   opened the thread since. Gold ink with a soft halo, not an alarm. */
 .ch-cbar-dot{
-  flex:0 0 auto;width:9px;height:9px;border-radius:50%;
-  background:var(--blue);
+  flex:0 0 auto;width:8px;height:8px;border-radius:50%;
+  background:var(--gold);
+  box-shadow:0 0 0 3px var(--gold-wash);
 }
-.ch-cbar-go{
-  flex:0 0 auto;width:20px;height:20px;
-  color:var(--blue);opacity:.55;transition:opacity .14s ease;
-}
-.ch-cbar:hover .ch-cbar-go{ opacity:1; }
 
-/* My own posts sit in a navy bubble, but the bar is OUTSIDE it and belongs to
-   the post rather than the utterance — so it keeps the light surface, stays
-   full-width, and its text stays start-aligned even though `.ch-stack` packs
-   my rows to the end edge. */
-.ch-row.mine .ch-cbar{ margin-inline-start:0;text-align:start; }
+/* Chevron: the RTL flip and the hover nudge compose through vars so the
+   two transforms never fight — the flip mirrors the glyph, the nudge
+   always travels "forward". */
+.ch-cbar-go{
+  flex:0 0 auto;width:17px;height:17px;
+  color:var(--gold-deep);opacity:.45;
+  transform:scaleX(var(--go-flip,1)) translateX(var(--go-x,0px));
+  transition:opacity .14s ease,transform .16s ease;
+}
+.ch-cbar:hover .ch-cbar-go{ opacity:1;--go-x:2px; }
+[dir="rtl"] .ch-cbar-go{ --go-flip:-1; }
+
+/* Broadcast posts (.is-post — the wide article column, in both the
+   Messages surface and the channel reading surface): same branch with a
+   touch more presence, since here it is the reader's only way to reply. */
+.ch-row.is-post .ch-cbar{ margin-inline:24px 0;max-width:calc(100% - 24px); }
+.ch-row.is-post .ch-cbar-label{ font-size:14px; }
+
+/* MY rows: .ch-stack packs to the end edge and the branch mirrors with it —
+   pill under the navy bubble's END corner, stem on the END side. The pill
+   keeps the light surface: it belongs to the thread, not the utterance,
+   and cream stays reserved for navy. */
+.ch-row.mine .ch-cbar{ align-self:flex-end;margin-inline:0 18px; }
+.ch-row.mine.is-post .ch-cbar{ margin-inline:0 24px; }
+.ch-row.mine .ch-cbar::before{
+  inset-inline-start:auto;inset-inline-end:-12px;
+  border-inline-start:0;border-inline-end:1.5px solid var(--line);
+  border-end-start-radius:0;border-end-end-radius:10px;
+}
+
+/* Touch: the pill must clear the 44px target floor where fingers do the
+   tapping. */
+@media (max-width:720px){
+  .ch-cbar{ min-height:44px; }
+}
+@media (prefers-reduced-motion:reduce){
+  .ch-cbar,.ch-cbar::before,.ch-cbar-go,.ch-cbar-face .avatar{ transition:none; }
+  .ch-cbar:hover .ch-cbar-go{ --go-x:0px; }
+  .ch-cbar:active{ transform:none; }
+}
 
 /* =========================================================
    10 · Comments + tag panels (slide-overs, .ch-search rung 80)
@@ -1331,11 +1399,31 @@
 
 .cc-row{ display:flex;gap:9px;padding:7px 2px; }
 .cc-row-body{ flex:1;min-width:0; }
+/* the author's sign: name (a real button, straight to the profile), the
+   verified mark, the @handle in the archive's gold serif, and the clock
+   pushed to the ledger edge — logical margin, so RTL keeps the ledger. */
 .cc-row-who{
-  display:flex;align-items:baseline;gap:7px;
+  display:flex;align-items:baseline;gap:7px;min-width:0;
   font-size:12.5px;font-weight:600;color:var(--navy-deep);
 }
-.cc-row-t{ font-size:10.5px;font-weight:400;color:var(--muted); }
+.cc-row-name{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:0;border:0;background:none;cursor:pointer;
+  font:inherit;font-weight:650;color:var(--navy-deep);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cc-row-name:hover{ color:var(--blue);text-decoration:underline; }
+.cc-row-name:focus-visible{ outline:2px solid var(--blue);outline-offset:2px;border-radius:4px; }
+.cc-row-handle{
+  flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--serif);font-size:11px;font-weight:500;
+  color:var(--gold-deep);letter-spacing:.01em;
+}
+.cc-row-t{
+  flex:0 0 auto;margin-inline-start:auto;
+  font-size:10.5px;font-weight:400;color:var(--muted);
+  font-variant-numeric:tabular-nums;
+}
 .cc-row-txt{ margin-top:2px;font-size:13.5px;line-height:1.5;color:var(--ink-soft); }
 
 .cc-compose{
@@ -1641,4 +1729,56 @@
 @media (prefers-reduced-motion:reduce){
   .cm-pane{ animation:none; }
   .cst-col-tip{ transition:none; }
+}
+
+/* =========================================================
+   13 · Prototype polish — 2026-07 chat-prototypes handoff
+   These rules live HERE (not in ika-messages-theme.css)
+   because channels-pro loads last before responsive.css:
+   equal-specificity poll/discover rules must beat §9/§2
+   above and the theme layer's §8 on source order.
+   ========================================================= */
+
+/* -- Poll payload · flat payload, sunken option rows, radio ticks -- */
+.ch-poll{ background:transparent; border:0; padding:2px 0 4px; }
+.ch-row.mine .ch-poll{ background:transparent; border:0; }
+.ch-poll-q{ font-family:var(--serif); font-size:15.5px; line-height:1.45; }
+.ch-poll-opt{ background:var(--card-2); border-radius:10px; }
+.ch-poll-mark{
+  width:16px; height:16px; border-radius:50%;
+  border:1.5px solid var(--line); background:var(--card);
+}
+.ch-poll-opt.mine .ch-poll-mark{ background:var(--navy); border-color:var(--navy); color:#fff; }
+.ch-poll-opt.right .ch-poll-mark{ border-color:var(--good); }
+.ch-poll-opt.wrong .ch-poll-mark{ border-color:var(--danger); }
+.ch-poll-pct{ font-family:var(--mono); font-size:11.5px; font-variant-numeric:tabular-nums; }
+/* the same payload inside my navy bubble */
+.ch-row.mine .ch-poll-mark{ background:transparent; border-color:rgba(255,255,255,.45); }
+.ch-row.mine .ch-poll-opt.mine .ch-poll-mark{ background:rgba(255,255,255,.92); border-color:transparent; color:var(--navy); }
+
+/* -- Discover cards · taller poster cover, crest straddling the seam -- */
+.cn-card-cover{ height:96px; }
+.cn-card-crest{ inset-block-start:64px; }
+.cn-card-body{ padding:36px 18px 6px; }
+.cn-skel .cn-card-body{ padding:36px 18px 16px; }
+
+/* -- Grid entrance uses `backwards` (invariant: a `both` fill pins the
+      final transform and kills :hover lifts) -- */
+.cn-grid > .cn-card:not(.cn-skel){ animation:cnRise .34s ease backwards; }
+
+/* -- 'Your channels' rail crests match the 40px r-tile sidebar spec -- */
+.cn-mine-crest{ width:40px; height:40px; border-radius:10px; font-size:18px; }
+
+/* -- Comments slide-over · comment tiles on a rail surface -- */
+.cc-list{ padding:12px; background:var(--paper-2); }
+.cc-row{
+  padding:10px 12px; margin-bottom:8px; border-radius:14px;
+  background:var(--card); box-shadow:var(--shadow-sm);
+}
+.cc-row:last-child{ margin-bottom:0; }
+
+/* the entrance re-declared above must honour reduced motion — this block
+   sits after it in source order, so it gets the final word */
+@media (prefers-reduced-motion:reduce){
+  .cn-grid > .cn-card:not(.cn-skel){ animation:none; }
 }

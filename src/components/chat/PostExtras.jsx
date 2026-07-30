@@ -314,9 +314,11 @@ export function CommentsBar({ msg, channelId, onOpen }) {
     return () => { alive = false; io.disconnect() }
   }, [msg.id, channelId, count, watchUsers])
 
+  /* The numeral gets its own span so the stylesheet can set it apart (serif,
+     gold, tabular) without the label losing its single-ellipsis overflow. */
   const label = count === 0
     ? 'Leave a comment'
-    : `${nfmt(count)} ${count === 1 ? 'comment' : 'comments'}`
+    : <><span className="ch-cbar-n">{nfmt(count)}</span> {count === 1 ? 'comment' : 'comments'}</>
 
   return (
     <button

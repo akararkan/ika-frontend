@@ -22,7 +22,7 @@ const TABS = [
 ]
 const CAT_OF = Object.fromEntries(TABS.map(([k, , c]) => [k, c]))
 const CAT_ICON = { POSTS:'heart', QNA:'qna', RESEARCH:'research', MENTIONS:'at', SOCIAL:'follow', SYSTEM:'bell' }
-const CAT_TINT = { POSTS:'#b3453e', QNA:'#2d5f97', RESEARCH:'#b3873e', MENTIONS:'#6b5b8a', SOCIAL:'#3d6b4f', SYSTEM:'#8b8371' }
+const CAT_TINT = { POSTS:'#b3453e', QNA:'#2d5f97', RESEARCH:'#b3873e', MENTIONS:'#6b5b8a', SOCIAL:'#3d6b4f', SYSTEM:'#8a93a3' }
 
 // The daily trending digest (NOTIFICATIONS_API §11.6) has no actor and its body is a
 // comma-joined hashtag list. Parse the #tags so each can route to its tag feed.
@@ -132,7 +132,7 @@ export function NotificationsPage() {
                   // TRENDING_DIGEST: no actor — system tile + tag chips instead of a user avatar (§11.6)
                   const isTrending = n.type === 'TRENDING_DIGEST'
                   const tags = isTrending ? trendingTags(n.body) : []
-                  const tint = isTrending ? '#b3873e' : (CAT_TINT[n.category] || '#8b8371')
+                  const tint = isTrending ? '#b3873e' : (CAT_TINT[n.category] || '#8a93a3')
                   const goActor = (e) => { e.stopPropagation(); if (!isTrending && u.id) navigate(`/u/${u.id}`) }
                   return (
                     <div key={n.id} className={'ntf-row ' + (n.unread ? 'unread' : '')} style={{ cursor: n.deepLink ? 'pointer' : 'default', '--cat': tint }} onClick={() => open(n)}>

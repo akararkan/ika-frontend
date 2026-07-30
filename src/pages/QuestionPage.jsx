@@ -464,7 +464,7 @@ export function QuestionPage() {
                       <h5>Attachments</h5>
                       {a.attachments.map(at => (
                         <a key={at.id} className="src-row" href={at.url} target="_blank" rel="noreferrer" style={{ textDecoration:'none' }}>
-                          <span className="src-ic" style={{ background:'#2a251d' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
+                          <span className="src-ic" style={{ background:'#232b3a' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
                           <div className="src-info"><b>{at.name}</b><small className="muted">{at.caption || at.mediaType.toLowerCase()}</small></div>
                           <span className="src-tag">{at.mediaType}</span>
                         </a>
@@ -522,7 +522,7 @@ export function QuestionPage() {
                     ) : (
                       <div key={at.id} style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <a className="src-row" href={at.url} target="_blank" rel="noreferrer" style={{ textDecoration:'none', flex:1 }}>
-                          <span className="src-ic" style={{ background:'#2a251d' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
+                          <span className="src-ic" style={{ background:'#232b3a' }}><Icon name={attIcon(at.mediaType)} className="sm"/></span>
                           <div className="src-info"><b>{at.name}</b><small className="muted">{at.caption || at.mediaType.toLowerCase()}</small></div>
                           <span className="src-tag">{at.mediaType}</span>
                         </a>
@@ -607,8 +607,8 @@ export function QuestionPage() {
             {(ansMedia || ansVoice) && (
               <div style={{ marginTop:12 }}>
                 {ansMediaUrl && <img src={ansMediaUrl} alt="" style={{ maxWidth:'100%', borderRadius:12 }}/>}
-                {ansMedia && !ansMediaUrl && <div className="src-row"><span className="src-ic" style={{ background:'#2a251d' }}><Icon name="video" className="sm"/></span><div className="src-info"><b>{ansMedia.name}</b><small className="muted">video</small></div></div>}
-                {ansVoice && <div className="src-row"><span className="src-ic" style={{ background:'#2a251d' }}><Icon name="mic" className="sm"/></span><div className="src-info"><b>{ansVoice.name}</b><small className="muted">voice note</small></div></div>}
+                {ansMedia && !ansMediaUrl && <div className="src-row"><span className="src-ic" style={{ background:'#232b3a' }}><Icon name="video" className="sm"/></span><div className="src-info"><b>{ansMedia.name}</b><small className="muted">video</small></div></div>}
+                {ansVoice && <div className="src-row"><span className="src-ic" style={{ background:'#232b3a' }}><Icon name="mic" className="sm"/></span><div className="src-info"><b>{ansVoice.name}</b><small className="muted">voice note</small></div></div>}
                 <button className="btn btn-ghost btn-sm mt-12" style={{ color:'var(--rose)' }} onClick={() => { setAnsMedia(null); setAnsVoice(null) }}><Icon name="close" className="xs"/>Remove attachment</button>
               </div>
             )}

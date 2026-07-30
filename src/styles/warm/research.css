@@ -72,13 +72,13 @@
 }
 
 /* cover ribbons — flat warm tints instead of the old red/ink gradients */
-.r-status-ribbon.draft{background:rgba(87,80,63,.88)}
-.r-status-ribbon.archived{background:rgba(139,131,113,.9)}
+.r-status-ribbon.draft{background:rgba(77,88,105,.88)}
+.r-status-ribbon.archived{background:rgba(122,132,148,.9)}
 .r-status-ribbon.retracted{background:rgba(160,62,54,.92)}
 
 /* lifecycle card variants — no pure-white sheets, warm danger tints */
-.r-card.is-draft{background:linear-gradient(180deg,var(--card),var(--paper-2));border-color:rgba(87,80,63,.4)}
-.r-card.is-archived{background:linear-gradient(180deg,var(--card-2),#efe9db);border-color:var(--line)}
+.r-card.is-draft{background:linear-gradient(180deg,var(--card),var(--paper-2));border-color:rgba(77,88,105,.4)}
+.r-card.is-archived{background:linear-gradient(180deg,var(--card-2),#eef1f5);border-color:var(--line)}
 .r-card.is-retracted{border-color:rgba(160,62,54,.42)}
 .r-card.is-retracted .r-cover::before{background:linear-gradient(135deg,rgba(160,62,54,.28),transparent 60%)}
 
@@ -102,7 +102,7 @@
 .r-hero:hover{border-color:var(--gold);box-shadow:var(--shadow)}
 .r-hero .rh-ph{border-radius:9px}
 .r-hero .rh-panel{
-  background:rgba(255,253,248,.96);
+  background:rgba(255,255,255,.96);
   border:1px solid var(--line);
   border-inline-start:4px solid var(--gold);
   border-radius:10px;
@@ -115,7 +115,7 @@
 .rrow:hover .rrow-title{color:var(--navy-deep)}
 
 /* owner lifecycle bar — navy primary (base shadow was rubric-red) */
-.r-owner-bar{background:rgba(255,253,248,.6)}
+.r-owner-bar{background:rgba(255,255,255,.6)}
 .r-owner-bar button{transition:background .14s ease,color .14s ease,border-color .14s ease}
 .r-owner-bar button.primary{
   background:var(--navy);color:#f7f3ea;
@@ -142,10 +142,10 @@
    IBM Plex Serif/Newsreader/Archivo stacks. Re-anchor everything to
    the Warm Archive: navy accents, warm paper, Lora + IBM Plex Sans. */
 .rd-page{
-  --paper:#f4f0e7; --paper-2:#faf6ec;
-  --card:#fffdf8;  --card-2:#f6f2e8;
-  --line:#e6dfcf;  --line-soft:#efe9db;
-  --ink:#221e17; --ink-2:#2a251d; --ink-soft:#57503f; --muted:#8b8371;
+  --paper:#f7f8fa; --paper-2:#fbfcfd;
+  --card:#ffffff;  --card-2:#f3f5f8;
+  --line:#e4e8ee;  --line-soft:#eef1f5;
+  --ink:#1c2330; --ink-2:#232b3a; --ink-soft:#4d5768; --muted:#8a93a3;
   --rubric:#1d3a5f; --wash:#e8eef5;
   --emerald:#1d3a5f; --emerald-deep:#16283f;
   --emerald-bright:#2d5f97; --emerald-glow:#3a6ca5;
@@ -189,7 +189,7 @@
 /* top chips + play → warm-framed glass */
 .rd-page .rd-hero-id,
 .rd-page .rd-hero-status{background:rgba(14,22,36,.5);border-color:rgba(217,185,108,.35)}
-.rd-page .rd-hero-play{background:rgba(255,253,248,.92);border-color:rgba(255,255,255,.85);color:var(--navy)}
+.rd-page .rd-hero-play{background:rgba(255,255,255,.92);border-color:rgba(255,255,255,.85);color:var(--navy)}
 .rd-page .rd-hero-play .ico{fill:var(--navy);stroke:none}
 .rd-page .rd-hero-follow{border-radius:999px;color:var(--navy)}
 /* facts → elegant glass chips: gold seal + serif numeral */
@@ -257,7 +257,7 @@
 .rd-fmt-b.on:hover:not(:disabled){background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
 .rd-fmt-b:disabled{opacity:.5;cursor:not-allowed}
 
-.rd-page .rd-file:hover:not(:disabled){border-color:var(--gold);background:#fdfbf4}
+.rd-page .rd-file:hover:not(:disabled){border-color:var(--gold);background:#ffffff}
 /* keep the download button clear of the file metadata: give it breathing room
    and break any long token (filename / mime / caption) instead of letting it
    overflow across the button */
@@ -276,7 +276,7 @@
   font-family:var(--serif);font-size:13px;font-weight:700;color:var(--gold);
 }
 a.src-row{transition:border-color .15s ease,background .15s ease}
-a.src-row:hover{border-color:var(--gold);background:#fdfbf4}
+a.src-row:hover{border-color:var(--gold);background:#ffffff}
 a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;background:var(--gold-wash)}
 
 /* ---- apparatus rail ---- */
@@ -319,18 +319,18 @@ a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;backgrou
 /* ══════════ 4 · COMPOSER — manuscript desk (.rm-*) ══════════ */
 
 /* desk surfaces: warm paper canvas, cream top bar */
-.rm-app{--studio:#faf6ec}
-.rm-top{background:rgba(255,253,248,.9)}
+.rm-app{--studio:#fbfcfd}
+.rm-top{background:rgba(255,255,255,.9)}
 
 /* publish CTA — navy primary (base shadow was rubric-red) */
 .rm-cta{box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
 
 /* form inputs per prototype f-input: warm boxed, radius 10, blue focus */
 .rm-app .inp{
-  border:1px solid #ddd4c0;border-radius:10px;background:#fcfaf4;
+  border:1px solid #d8dee8;border-radius:10px;background:#fcfdfe;
 }
 .rm-app .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
-.rm-search{border:1px solid #ddd4c0;border-radius:11px;background:#fcfaf4;transition:border-color .15s ease,box-shadow .15s ease}
+.rm-search{border:1px solid #d8dee8;border-radius:11px;background:#fcfdfe;transition:border-color .15s ease,box-shadow .15s ease}
 .rm-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
 
 /* contents rail = the prototype's steps: navy numerals, navy done-check seals */
@@ -346,17 +346,17 @@ a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;backgrou
 .rm-mast-kick{color:var(--gold-deep)}
 
 /* cover dropzone + file add tile — dashed warm, gold on hover (scholarly) */
-.rm-cover-empty{border-color:#c9bfa5}
+.rm-cover-empty{border-color:#c3cbd9}
 .rm-cover-empty:hover{border-color:var(--gold)}
-.rm-file-add{border-color:#c9bfa5}
-.rm-file-add:hover{border-color:var(--gold);background:#fdfbf4}
+.rm-file-add{border-color:#c3cbd9}
+.rm-file-add:hover{border-color:var(--gold);background:#ffffff}
 .rm-file-ic{background:var(--gold-wash);color:var(--gold-deep)}
 
 /* source ledger — gold serif numerals + gold badges */
 .rm-src-no{font-family:var(--serif);font-weight:700;color:var(--gold)}
 .rm-src-badge{background:var(--gold-wash);color:var(--gold-deep)}
 .rm-src-item{transition:background .14s ease}
-.rm-src-item:hover{background:#fdfbf4}
+.rm-src-item:hover{background:#ffffff}
 .rm-cand{transition:background .14s ease}
 .rm-cand:hover{background:var(--paper-2)}
 
