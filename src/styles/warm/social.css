@@ -21,10 +21,10 @@
   transition:background .15s,border-color .15s,color .15s;
 }
 .tab:hover{color:var(--navy);border-color:var(--blue);background:var(--card)}
-.tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
-.tab.on:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
+.tab.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
+.tab.on:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#f2f0f0}
 /* count badges inside a selected pill (Explore tabs render <i class="muted">) */
-.tab.on i,.tab.on .muted{color:rgba(247,243,234,.8)}
+.tab.on i,.tab.on .muted{color:rgba(242,240,240,.8)}
 
 /* =========================================================
    2 · Notifications — /notifications
@@ -36,7 +36,7 @@
 .ntf-unread-toggle{border:1px solid var(--line);background:var(--card);color:var(--ink-soft)}
 .ntf-unread-toggle:hover{background:var(--card-2)}
 .ntf-unread-toggle.on{background:var(--blue-wash);border-color:#c3d3e4;color:var(--navy)}
-.ntf-unread-toggle.on .ntf-dot{background:var(--gold);box-shadow:0 0 0 3px rgba(179,135,62,.22)}
+.ntf-unread-toggle.on .ntf-dot{background:var(--gold);box-shadow:0 0 0 3px rgba(127,168,206,.22)}
 
 .ntf-group{font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--muted)}
 
@@ -62,7 +62,7 @@
 .ntf-tile{border-radius:12px}
 .ntf-body p{color:var(--ink-2)}
 .ntf-body p b{color:var(--ink)}
-.ntf-meta{color:#98a1b0}
+.ntf-meta{color:var(--muted)}
 .ntf-x:hover{background:var(--card-2);color:var(--ink)}
 /* quoted line under a notification — italic, muted, gold-edged */
 .ntf-snippet{
@@ -123,7 +123,7 @@
 .ntf-page > .card.t-stagger:not(.ntf-list) .ntf-badge .ico{display:none}
 /* time label above the entry text (DOM order is label → time) */
 .ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body{display:flex;flex-direction:column-reverse;gap:2px}
-.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body small{font-size:12px;color:#98a1b0}
+.ntf-page > .card.t-stagger:not(.ntf-list) .ntf-body small{font-size:12px;color:var(--muted)}
 /* per-row remove button — quiet ghost inside the entry card */
 .ntf-page > .card.t-stagger:not(.ntf-list) .icon-btn{
   width:30px;height:30px;color:var(--muted);align-self:flex-start;
@@ -140,7 +140,7 @@
   border-radius:13px;background:var(--card);border:1px solid var(--line);
   box-shadow:var(--shadow-sm);transition:border-color .15s,box-shadow .15s;
 }
-.explore-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.explore-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
 .explore-search .ico{color:var(--muted)}
 button.kbd{cursor:pointer;transition:border-color .15s,color .15s}
 button.kbd:hover{border-color:var(--blue);color:var(--navy)}
@@ -150,8 +150,8 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
   color:var(--gold-deep);border-bottom:1px solid var(--line);
 }
 .x-kick small{color:var(--muted)}
-.x-note{background:var(--gold-wash);border:1px solid #e2cf9f;border-radius:11px}
-.x-empty{border:1px dashed #ccd4e0;border-radius:14px;background:var(--paper-2)}
+.x-note{background:var(--gold-wash);border:1px solid #b9d6f2;border-radius:11px}
+.x-empty{border:1px dashed #c2c1bf;border-radius:14px;background:var(--paper-2)}
 
 /* per-type group headers over the hit lists (serif navy + count chip) */
 .section-label{
@@ -193,8 +193,8 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 }
 .hero-reel:hover{border-color:var(--blue)}
 .hr-ph{border-radius:0}
-.hr-ov{left:0;right:0;bottom:0;padding:56px 18px 16px;background:linear-gradient(transparent,rgba(20,17,12,.84))}
-.hr-tx i{font-family:var(--mono);letter-spacing:1.2px;color:#e5ddc9}
+.hr-ov{left:0;right:0;bottom:0;padding:56px 18px 16px;background:linear-gradient(transparent,rgba(8,14,22,.84))}
+.hr-tx i{font-family:var(--mono);letter-spacing:1.2px;color:#b9d6f2}
 .explore-reels .plate-reel{
   border:1px solid var(--line);background:var(--card);border-radius:14px;
   padding:0;overflow:hidden;transition:border-color .15s;
@@ -202,8 +202,8 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 .explore-reels .plate-reel:hover{border-color:var(--blue)}
 .explore-reels .pr-dur{
   top:8px;right:auto;inset-inline-end:8px;
-  background:rgba(20,17,12,.66);border:0;border-radius:999px;
-  color:#f0e8d6;font-family:var(--mono);padding:3px 8px;
+  background:rgba(8,14,22,.66);border:0;border-radius:999px;
+  color:#b9d6f2;font-family:var(--mono);padding:3px 8px;
 }
 .explore-reels .pr-strip{
   left:auto;inset-inline-start:11px;bottom:11px;
@@ -213,7 +213,7 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 
 /* trending-sounds rail — play chip goes navy on hover */
 .rail-row .icon-btn.tint{background:var(--blue-wash);color:var(--navy)}
-.rail-row .icon-btn.tint:hover{background:var(--navy);color:#f7f3ea}
+.rail-row .icon-btn.tint:hover{background:var(--navy);color:#f2f0f0}
 
 /* (no .tag-pill rules: the base .tag-pill/.tagcloud classes are dead —
    no JSX renders them; Explore's trending tags are .chip buttons,
@@ -235,14 +235,14 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
   background:var(--card);border:1px solid var(--line);border-radius:12px;
   color:var(--ink-2);
 }
-.share-act:hover{background:var(--card-2);border-color:#ccd4e0}
-.share-url{background:#fcfdfe;border:1px solid #d8dee8;border-radius:10px;color:var(--ink-soft)}
+.share-act:hover{background:var(--card-2);border-color:#c2c1bf}
+.share-url{background:#ffffff;border:1px solid #d9d8d6;border-radius:10px;color:var(--ink-soft)}
 
 /* =========================================================
    6 · TagInput — chips are blue-wash tag pills
    (the boxed .tag-chips field itself is skinned by theme.css)
    ========================================================= */
-.tag-input .tag-chips:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.tag-input .tag-chips:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
 .tag-input .tag-chips .chip.on{
   background:var(--blue-wash);border:1px solid transparent;border-radius:999px;
   color:var(--blue);font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;

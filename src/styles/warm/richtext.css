@@ -31,7 +31,7 @@
 /* Links — blue ink, quiet warm underline, navy on hover */
 .prose a{
   color:var(--blue);
-  border-bottom:1px solid rgba(45,95,151,.3);
+  border-bottom:1px solid rgba(31,78,126,.3);
 }
 .prose a:hover{
   color:var(--navy);
@@ -120,23 +120,23 @@
    ================================================================ */
 .rte:focus-within{
   border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+  box-shadow:0 0 0 3px rgba(31,78,126,.12);
 }
 .rte-bar{background:var(--paper-2)}
 
 /* Format pills + Write/Preview tabs — filled navy pills when on
    (Warm Archive never underlines tabs) on a warm segmented track */
-.rte-fmt{background:#f2f5f9;border-color:var(--line)}
+.rte-fmt{background:#edf3fa;border-color:var(--line)}
 .rte-fmt-pill:hover{color:var(--navy)}
-.rte-fmt-pill.on{background:var(--navy);color:#f7f3ea}
-.rte-tabs{background:#f2f5f9;border-color:var(--line);border-radius:999px;padding:3px;gap:2px}
+.rte-fmt-pill.on{background:var(--navy);color:#f2f0f0}
+.rte-tabs{background:#edf3fa;border-color:var(--line);border-radius:999px;padding:3px;gap:2px}
 .rte-tab{border-radius:999px}
-.rte-tab:hover{background:#f2f5f9;color:var(--navy)}
-.rte-tab.on{background:var(--navy);color:#f7f3ea}
+.rte-tab:hover{background:#edf3fa;color:var(--navy)}
+.rte-tab.on{background:var(--navy);color:#f2f0f0}
 
 /* ================================================================
    8 · RTE — toolbar. Paper-2 strip over its base 1px line-soft
-   bottom edge; 30px tools, radius 7, #efe9da hover, navy-on-wash
+   bottom edge; 30px tools, radius 7, #edf3fa hover, navy-on-wash
    active state.
    ================================================================ */
 .rte-tools{background:var(--paper-2)}
@@ -144,31 +144,31 @@
   min-width:30px;height:30px;
   border-radius:7px;
 }
-.rte-tool:hover{background:#f2f5f9;color:var(--navy)}
+.rte-tool:hover{background:#edf3fa;color:var(--navy)}
 .rte-tool.on{
   background:var(--blue-wash);
   color:var(--navy);
-  box-shadow:inset 0 0 0 1px rgba(45,95,151,.25);
+  box-shadow:inset 0 0 0 1px rgba(31,78,126,.25);
 }
 .rte-tool.on:hover{background:#dde7f1;color:var(--navy)}
 .rte-tool.on .rte-size-display{
   background:#fff;
-  border-color:rgba(45,95,151,.4);
+  border-color:rgba(31,78,126,.4);
   color:var(--navy);
 }
 .rte-tools select{background:var(--card);border-radius:7px}
 .rte-block-select:focus{
   border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+  box-shadow:0 0 0 3px rgba(31,78,126,.12);
 }
 
 /* ================================================================
-   9 · RTE — writing surfaces. Warm input paper (#fcfaf4), calm
+   9 · RTE — writing surfaces. White input paper (#ffffff), calm
    sans placeholders, blue-wash selection (base selected in red).
    ================================================================ */
-.rte-wysiwyg{background:#fcfdfe}
+.rte-wysiwyg{background:#ffffff}
 .rte-area{
-  background:#fcfdfe;
+  background:#ffffff;
   font-family:var(--sans);
   font-size:15px;
   line-height:1.65;
@@ -178,8 +178,8 @@
 .rte-wysiwyg:has(> p:only-child:empty)::before{
   color:#98a1b0;font-style:normal;
 }
-.rte-wysiwyg ::selection{background:#dbe6f2}
-.rte-wysiwyg img:hover{outline-color:rgba(45,95,151,.55)}
+.rte-wysiwyg ::selection{background:#cbdff3}
+.rte-wysiwyg img:hover{outline-color:rgba(31,78,126,.55)}
 
 /* ================================================================
    10 · RTE — popovers (size / family / colour / table). Base shell
@@ -187,34 +187,34 @@
    ================================================================ */
 .rte-size-input:focus{
   border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+  box-shadow:0 0 0 3px rgba(31,78,126,.12);
 }
 .rte-size-apply{
   background:var(--navy);
-  box-shadow:0 4px 12px -4px rgba(29,58,95,.4);
+  box-shadow:0 4px 12px -4px rgba(0,33,71,.4);
 }
 .rte-size-apply:hover{background:var(--navy-deep)}
 .rte-size-row.on{
   background:var(--blue-wash);
   color:var(--navy);
-  box-shadow:inset 0 0 0 1px rgba(45,95,151,.28);
+  box-shadow:inset 0 0 0 1px rgba(31,78,126,.28);
 }
 .rte-size-row.on .rte-size-num{color:var(--navy)}
 .rte-size-row.on .rte-size-hint{color:var(--blue)}
 
 /* Trigger glyph — the little A/H colour bar reads warm now */
 .rte-color-icon .bar{
-  background:linear-gradient(90deg,var(--navy),var(--gold),var(--blue));
+  background:linear-gradient(90deg,var(--navy),var(--brass-soft),var(--blue));
 }
 
 /* ================================================================
    11 · RTE — floating image toolbar. Active wrap/size buttons go
    navy-filled; delete stays warm danger.
    ================================================================ */
-.rte-img-btn.on{background:var(--navy);color:#f7f3ea}
+.rte-img-btn.on{background:var(--navy);color:#f2f0f0}
 .rte-img-btn.on:hover{background:var(--navy-deep)}
 .rte-img-btn.danger{color:var(--danger)}
-.rte-img-btn.danger:hover{background:rgba(160,62,54,.08)}
+.rte-img-btn.danger:hover{background:rgba(156,58,51,.08)}
 
 /* NOTE: no colour-picker swatch repaints needed — TEXT_COLORS in
    RichTextEditor.jsx is already the warm palette, and each swatch
@@ -226,19 +226,19 @@
    Running = blue wash; partial failure = gold warning.
    ================================================================ */
 .cm-step.running{
-  background:rgba(29,58,95,.06);
-  border-color:rgba(29,58,95,.22);
+  background:rgba(0,33,71,.06);
+  border-color:rgba(0,33,71,.22);
 }
 .cm-step.running .cm-step-icon{
   background:var(--blue-wash);
-  border-color:rgba(45,95,151,.4);
+  border-color:rgba(31,78,126,.4);
   color:var(--navy);
 }
 .cm-save-err.partial{
-  background:linear-gradient(135deg,rgba(179,135,62,.08),rgba(179,135,62,.14));
-  border-color:rgba(179,135,62,.45);
+  background:linear-gradient(135deg,rgba(127,168,206,.08),rgba(127,168,206,.14));
+  border-color:rgba(127,168,206,.45);
 }
-.cm-save-err.partial .cm-save-err-ic{background:#f4ead0;color:var(--gold-deep)}
+.cm-save-err.partial .cm-save-err-ic{background:#dce9f6;color:var(--gold-deep)}
 .cm-save-err.partial .cm-save-err-body b{color:var(--gold-deep)}
 
 /* ================================================================

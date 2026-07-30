@@ -11,7 +11,9 @@ export const ICON_PATHS = {
   home:   '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
   feed:   '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
   reels:  '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 8h18M9 3l2 5M15 3l2 5"/><path d="M11 11l4 2.5-4 2.5z" fill="currentColor" stroke="none"/>',
-  qna:    '<path d="M21 12a9 9 0 1 1-3.6-7.2L21 4v5h-5"/><path d="M9 11h6M9 14h4"/>',
+  /* A question inside a speech bubble. The old glyph (circle + swoosh corner
+     + text lines) self-intersected at 20px and read as a broken icon. */
+  qna:    '<path d="M21 11.6a8.6 8.6 0 0 1-8.7 8.4 9.2 9.2 0 0 1-4-.9L3 20.4l1.3-4.5A8.2 8.2 0 0 1 3 11.6 8.6 8.6 0 0 1 11.7 3.2 8.6 8.6 0 0 1 21 11.6z"/><path d="M9.7 9.4a2.5 2.5 0 0 1 4.8 1c0 1.6-2.3 1.9-2.3 3.1"/><path d="M12.2 16.4h.01"/>',
   research:'<path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5M8 13h8M8 17h6"/>',
   bookmark:'<path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
   bell:   '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
@@ -225,7 +227,7 @@ export function Badges({ items, max }) {
 
 /* ----- Avatar ----- */
 export function Avatar({ initials, color, size = 38, square, className = '', src }) {
-  const bg = color || 'linear-gradient(135deg,#2d5f97,#16283f)'
+  const bg = color || 'linear-gradient(135deg,#1f4e7e,#00172f)'
   const fontSize = Math.max(11, Math.round(size * 0.36))
   /* A dead image URL used to leave an EMPTY plate: the old handler hid the
      <img>, but the initials were never in the tree to fall back to. Reset on

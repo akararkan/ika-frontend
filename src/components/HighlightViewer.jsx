@@ -11,7 +11,7 @@ import { api, adapters, assetUrl } from '../api/index.js'
 export function HighlightViewer({ highlight, author, owner, onClose }) {
   const [items, setItems] = React.useState(null)
   const [idx, setIdx] = React.useState(0)
-  const u = author || { full: 'Member', handle: 'member', initials: '··', avc: 'linear-gradient(160deg,#5c422a,#b3873e)' }
+  const u = author || { full: 'Member', handle: 'member', initials: '··', avc: 'linear-gradient(160deg,#3e5570,#1f4e7e)' }
 
   React.useEffect(() => {
     let alive = true
@@ -19,7 +19,7 @@ export function HighlightViewer({ highlight, author, owner, onClose }) {
       if (!alive) return
       setItems((rows || []).map(r => ({
         id: r.storyId, createdAt: r.createdAt, type: r.storyType,
-        bg: r.mediaUrl ? `#141210 center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : 'linear-gradient(160deg,#5c422a,#b3873e)',
+        bg: r.mediaUrl ? `#0b131d center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : 'linear-gradient(160deg,#3e5570,#1f4e7e)',
         text: r.textContent || '', hasMedia: !!r.mediaUrl, time: adapters.timeAgo(r.createdAt),
       })))
     }).catch(() => { if (alive) setItems([]) })

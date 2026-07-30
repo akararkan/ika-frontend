@@ -46,13 +46,38 @@ export const activity = {
   clear(type)  { return http.del('/api/v1/users/me/activity', { query: type ? { type } : undefined }) }, // → { deleted }
 
   /** Live SSE — default `message` event carrying UserActivityRealtimeEvent (its
-      `.activity` is a full UserActivityResponse). Returns an unsubscribe fn. */
+      `.activity` is a full UserActivityResponse). Hardened per overview.md §3:
+      heartbeat watchdog (25s cadence, >60s silence → one fresh socket) and the
+      token re-read on every dial (it rotates; this stream has NO server
+      timeout, so a wedged socket would otherwise stay dead forever). Returns
+      an unsubscribe fn. */
   stream({ onActivity, onError } = {}) {
-    const token = session.getToken()
-    const url = `${API_BASE}/api/v1/users/me/activity/stream` + (token ? `?token=${encodeURIComponent(token)}` : '')
-    const es = new EventSource(url, { withCredentials: true })
-    es.onmessage = (e) => { try { const ev = JSON.parse(e.data); onActivity?.(activityFrom(ev.activity || ev)) } catch { /* ignore */ } }
-    es.onerror = () => onError?.(es.readyState)
-    return () => es.close()
+    let es = null
+    let lastBeat = Date.now()
+    let closed = false
+    const connect = () => {
+      if (closed) return
+      const token = session.getToken()
+      const url = `${API_BASE}/api/v1/users/me/activity/stream` + (token ? `?token=${encodeURIComponent(token)}` : '')
+      es = new EventSource(url, { withCredentials: true })
+      es.onmessage = (e) => {
+        lastBeat = Date.now()
+        try { const ev = JSON.parse(e.data); onActivity?.(activityFrom(ev.activity || ev)) } catch { /* ignore */ }
+      }
+      // Named lifecycle frames don't carry rows but DO prove the socket lives.
+      es.addEventListener('connected', () => { lastBeat = Date.now() })
+      es.addEventListener('heartbeat', () => { lastBeat = Date.now() })
+      es.onerror = () => onError?.(es.readyState)     // transient errors auto-reconnect
+    }
+    connect()
+    const watchdog = setInterval(() => {
+      if (closed) return
+      if (Date.now() - lastBeat > 60000) {
+        try { es?.close() } catch { /* noop */ }
+        lastBeat = Date.now()
+        connect()
+      }
+    }, 15000)
+    return () => { closed = true; clearInterval(watchdog); try { es?.close() } catch { /* noop */ } }
   },
 }

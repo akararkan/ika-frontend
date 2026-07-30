@@ -407,7 +407,7 @@ export function ResearchDetailPage() {
     {c.mediaUrl && (c.mediaType === 'VIDEO'
       ? <video src={c.mediaUrl} poster={c.mediaThumbnailUrl || undefined} controls playsInline style={{ width:'100%', borderRadius:10, marginTop:8, background:'#000' }}/>
       : <img src={c.mediaUrl} alt="" style={{ width:'100%', borderRadius:10, marginTop:8 }}/>)}
-    {c.voiceUrl && <VoicePlayer src={c.voiceUrl} duration={c.voiceDurationSeconds} className="vp-flush"/>}
+    {c.voiceUrl && <VoicePlayer src={c.voiceUrl} duration={c.voiceDurationSeconds} className="vnp-flush"/>}
   </>)
   const copyCite = () => { navigator.clipboard?.writeText(r.citation); showToast('Citation copied') }
   const cite = () => { setR(p => p && ({ ...p, metrics:{ ...p.metrics, citations:p.metrics.citations + 1 } })); api.research.cite(id).then(() => showToast('Recorded — thank you for citing')).catch(() => {}) }
@@ -697,7 +697,7 @@ export function ResearchDetailPage() {
               <div className="rd-sec-head"><span className="rd-sec-ic"><Icon name="comment" className="sm"/></span><h2>Comments</h2><span className="rd-sec-n">{fmt(r.metrics.comments)}</span></div>
               {r.commentsEnabled ? (
                 <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
-                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#2d5f97,#16283f)" size={32} src={user?.profileImage}/>
+                  <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={32} src={user?.profileImage}/>
                   <MentionBox className="field" placeholder={cFile ? `${cFile.name} attached…` : 'Add a comment…'} value={cText} onChange={e => setCText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') addComment() }}/>
                   <input ref={cFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setCFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={cFile ? cFile.name : 'Attach image / video / voice'} onClick={() => cFileRef.current?.click()} style={cFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
@@ -726,7 +726,7 @@ export function ResearchDetailPage() {
 
                   {replyTo === c.id && (
                     <div className="cmt-box" style={{ marginTop:8 }}>
-                      <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#2d5f97,#16283f)" size={28} src={user?.profileImage}/>
+                      <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={28} src={user?.profileImage}/>
                       <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(c); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
                       <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c)}><Icon name="send" className="sm"/></button>
                     </div>

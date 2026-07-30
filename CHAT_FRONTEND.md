@@ -198,7 +198,7 @@ The botnav lives outside `<main>`, so no combinator rooted at `.ch-main` can rea
 
 Most of the `@media` at-rules in the file are `prefers-reduced-motion` companions sitting next to the animation they disable. The viewport/interaction breakpoints are the interesting minority: ≤1180, ≤900, ≤720 (twice), ≤600, ≤460, plus `hover:none`.
 
-[warm/channels-pro.css](src/styles/warm/channels-pro.css) is the newest layer and sits **after** `ika-messages-theme.css`, still **before** `responsive.css`. It is almost entirely new prefixes (`.cp-` profile, `.cm-` manage console, `.ca-` admins, `.cil-` invite links, `.cst-` statistics, `.cs-` stories, `.chl-` highlights, `.cc-` comment/tag panels, `.pc-` post composer) plus the in-bubble payload skins (`.ch-poll`, `.ch-loc`, `.ch-contact`, `.ch-vnote`, `.ch-postrail`). Only one surface in it stacks — `.cs-viewer` at **150**, the same rung as the chat lightbox — so the "nothing in chat may exceed 199" rule is intact.
+[warm/channels-pro.css](src/styles/warm/channels-pro.css) is the newest layer and sits **after** `ika-messages-theme.css`, still **before** `responsive.css`. It is almost entirely new prefixes (`.cp-` profile, `.cm-` manage console, `.ca-` admins, `.cil-` invite links, `.cst-` statistics, `.cc-` comment/tag panels, `.pc-` post composer) plus the in-bubble payload skins (`.ch-poll`, `.ch-loc`, `.ch-contact`, `.ch-vnote`, `.ch-postrail`). Nothing in it stacks above the chat ladder any more — the one surface that did, `.cs-viewer` at 150, left with the channel-stories removal — so the "nothing in chat may exceed 199" rule is intact.
 
 The ordering of the whole warm block after the base block is what makes the redesign win at equal specificity: `.main.ch-main` and `.main.wide` ([styles.css](src/styles/styles.css)) are both two-class selectors, so chat's `grid-template-columns` override carries on source order alone.
 
@@ -220,7 +220,7 @@ Routes: `chat`, `chat/requests`, `chat/:id` all mount [ChatPage.jsx](src/pages/C
 | `MessageList` | Scroll choreography: stick-to-bottom, prepend anchoring, run grouping, day/unread rules, jump pill, `aria-live` announcer. | [MessageList.jsx](src/components/chat/MessageList.jsx) |
 | `MessageBubble` | One message in every shape (TEXT / album / VOICE / FILE / SYSTEM) + reply quote, reactions, receipts, hover rail, long-press sheet. | [MessageBubble.jsx](src/components/chat/MessageBubble.jsx) |
 | `MediaBlock`, `VideoTile` (local) | Album/file layout; a video tile that plays a muted preview under a fine pointer (never on touch, reduced-motion or Save-Data) and carries a duration chip. | [MessageBubble.jsx](src/components/chat/MessageBubble.jsx) |
-| `VoiceNote` | The voice player: rAF-smooth waveform, drag-scrub, the shared 1×–2× speed cycle, the unheard dot, continuous playback, and the `Infinity`-duration fix for self-recorded WebM. | [VoiceNote.jsx](src/components/chat/VoiceNote.jsx) |
+| `VoiceNote` | The voice player: rAF-smooth waveform, drag-scrub, the shared 1×–2× speed cycle, the unheard dot, continuous playback, and the decode-measured length for header-less recordings (Firefox's WebM states no duration at all). | [VoiceNote.jsx](src/components/chat/VoiceNote.jsx) |
 | `VideoPlayer` | The app's video surface — transport, buffered scrubber with hover times, volume, 0.5×–2×, PiP, fullscreen, keyboard and tap-zone gestures. Used by the lightbox. | [VideoPlayer.jsx](src/components/chat/VideoPlayer.jsx) |
 | `mediaPrefs` | Playback preferences shared by every player + the heard-voice registry + the DOM-order handoff for continuous playback. | [mediaPrefs.js](src/components/chat/mediaPrefs.js) |
 | `callLog` | This device's call history: `recordCall` / `entriesFor` / `statsOf` / `describeCall`, plus the `useConversationCalls` / `useCallStats` bindings. | [callLog.js](src/components/chat/callLog.js) |
@@ -242,8 +242,8 @@ Routes: `chat`, `chat/requests`, `chat/:id` all mount [ChatPage.jsx](src/pages/C
 | `StreamTile` (local) | One `<video>` bound imperatively to a `MediaStream`, with an avatar fallback for audio-only peers. | [CallOverlay.jsx](src/components/chat/CallOverlay.jsx) |
 | `deleteIntentOf` | Single source of truth for what `DELETE /conversations/{id}` means to *this* user. | [conversationActions.js](src/components/chat/conversationActions.js) |
 | `MediaLightbox`, `ForwardPicker` (local) | Full-screen media viewer with focus trap; forward-target sheet filtered to `myStatus === 'ACTIVE'`. | [ChatPage.jsx](src/pages/ChatPage.jsx) |
-| `ChannelsPage` | Create / discover / subscribe, the category directory and the live-story tray. Reading and posting happen at `/chat/<channelId>` — a channel *is* a conversation. | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx) |
-| `ChannelPage` | A channel's **profile** (`/channels/:id`): cover, verified badge, category, stories, highlights, and the admin console entry. Distinct from its timeline. | [ChannelPage.jsx](src/pages/ChannelPage.jsx) |
+| `ChannelsPage` | Create / discover / subscribe and the category directory. Reading and posting happen at `/chat/<channelId>` — a channel *is* a conversation. | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx) |
+| `ChannelPage` | A channel's **profile** (`/channels/:id`): cover, verified badge, category, and the admin console entry. Distinct from its timeline. | [ChannelPage.jsx](src/pages/ChannelPage.jsx) |
 | `ChannelManage` | The tabbed admin console — info, settings, admins & rights, invite links, join requests, discussion group + slow mode, statistics. Tabs are gated on the caller's own rights. | [ChannelManage.jsx](src/components/channels/ChannelManage.jsx) |
 | `PostExtras` | The typed payloads inside a bubble — `PollCard`, `LocationCard`, `ContactCard`, `VideoNote` — plus `PostRail` (tags, signature, view/forward/comment counters). | [PostExtras.jsx](src/components/chat/PostExtras.jsx) |
 | `PostComposer` | Sends the types a textarea can't express: POLL (incl. quiz), LOCATION, CONTACT. | [PostComposer.jsx](src/components/chat/PostComposer.jsx) |
@@ -262,7 +262,7 @@ onSendText={({ body }) => { thread.sendText({ body, replyToId: replyTo?.id ?? nu
 ```
 Call it as `onSendText(body)` and the destructure yields `undefined`; `useThread.sendText` trims `''` and returns early — but the Composer has *already* run `onDraftChange('')`, so the message vanishes and the typed text is gone with it. No toast, no failed bubble.
 
-**`Composer.onSendFiles({ files, body, durationMs })` — same object form, and `durationMs` is voice-only.** The attachment path sends `{ files: payload, body }`; the recorder's `onstop` sends `{ files: [file], body: '', durationMs: secs * 1000 }`. `durationMs` never reaches the server (the multipart endpoint has no duration part) — `useThread.sendFiles` only stamps it on the *optimistic* media so a pending voice bubble shows `0:07` instead of `0:00` until the echo lands. Drop it and voice bubbles flash 0:00; make it positional and the whole payload is `undefined`.
+**`Composer.onSendFiles({ files, body, durationMs })` — same object form, and `durationMs` is voice-only.** The attachment path sends `{ files: payload, body }`; the recorder's `onstop` sends `{ files: [file], body: '', durationMs, waveform }` — both measured by decoding the finished blob (`waveformOf`), because the recording timer floor-counts whole seconds. Both are also APPENDED to the multipart body best-effort, but **today's backend drops them** (measured: the echo carries neither), so they survive only on the *optimistic* media until `reconcile` swaps in the server's copy. Persisting them server-side is the single change that would make every receiver's clock and waveform correct at first paint. Drop it and voice bubbles flash 0:00; make it positional and the whole payload is `undefined`.
 
 **Return the promise from both handlers if you want the double-send guard.** Composer's `sending` flag exists so the send button can't swap to the MIC between the draft clearing and the request resolving. ChatPage's handlers are block-bodied arrows that do *not* `return thread.sendText(...)`, so `await` resolves on the next microtask and the guard is effectively inert. If you touch this area, return the promise rather than deleting the flag.
 
@@ -390,6 +390,8 @@ They are unrelated surfaces that sort next to each other alphabetically:
 
 The picker classes all carry a hyphen after `fwd`; the badge deliberately does not. Never write a prefix selector like `[class^="ch-fwd"]` — it hits both. The comment above `.ch-fwdmark` flags the collision by name only (`/* forwarded marker (NOT .ch-fwd — that is the forward-target picker) */`); it says nothing about attribute selectors, so the prefix-selector hazard is undocumented in the file. Keep the comment and, if you touch it, add the selector warning.
 
+**A second naming trap, global this time: never use `hidden` as a chat state class.** [styles.css](src/styles/styles.css) ships a global utility `.hidden{display:none!important}` that wins over any chat rule. The avatar column's no-avatar spacer (`.ch-row-av` on every non-tail row of a run) was once `ch-row-av hidden` expecting chat.css's `visibility:hidden` — the utility collapsed the column instead, so same-sender bubbles zig-zagged (flush-left without the avatar, indented with it). The spacer class is now **`ghost`**. Related alignment rule: a reaction row extends the stack below the bubble, and the bottom-aligned avatar would sink to the pills' level — `.ch-row:not(.is-post):has(.ch-reacts) .ch-row-av` in [ika-messages-theme.css](src/styles/warm/ika-messages-theme.css) lifts it by exactly the pills' extension (calibrated to that layer's own `.ch-react` metrics; recalibrate if the pill padding or the `-9px` nestle overlap changes).
+
 ### Shell geometry: `--ch-top` and `--ch-bottom`
 
 ```css
@@ -514,7 +516,8 @@ Everything goes through [src/api/http.js](src/api/http.js) (`http.get(path, quer
 | `conversations.mute` | `POST /{id}/mute` | raw | `setMuted` ← header / row menu / info panel switch |
 | `conversations.pin` | `POST /{id}/pin` | raw | `setPinned` ← header / row menu / info panel ("Pin to the top" switch, parallel to the mute and archive switches) |
 | `conversations.archive` | `POST /{id}/archive` | raw | `setArchived` ← header / row menu / info panel switch |
-| `messages.page` | `GET /conversations/{id}/messages` | `{items: msg[] newest→older, nextCursor, hasMore}` | `reload` / `loadOlder` / `jumpTo` in [useThread.js](src/components/chat/useThread.js); shared-media scan in [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
+| `messages.page` | `GET /conversations/{id}/messages` | `{items: msg[] newest→older, nextCursor, hasMore}` | `reload` / `loadOlder` / `jumpTo` in [useThread.js](src/components/chat/useThread.js); [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) falls back to a page scan only when the media index below is absent |
+| `messages.media` | `GET /conversations/{id}/media?kind=` | `msg[]` (one row per attachment-carrying message, newest first) | the shared-media strip in [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) — one request per kind (IMAGE + VIDEO), merged newest-first |
 | `messages.sync` | `GET /conversations/{id}/messages/sync` | `msg[]` **ascending** | `gapSync`, fired on every `connected` event |
 | `messages.search` | `GET /conversations/{id}/messages/search` | `msg[]` | [ChatSearchPanel.jsx](src/components/chat/ChatSearchPanel.jsx), "This chat" scope |
 | `messages.send` | `POST /conversations/{id}/messages` | `msg` | `sendText` / `retry` |
@@ -539,12 +542,12 @@ Everything goes through [src/api/http.js](src/api/http.js) (`http.get(path, quer
 | `members.transferOwner` | `POST /{id}/transfer-owner` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
 | `members.createInvite` | `POST /{id}/invite-link` | raw `{conversationId, token, expiresAt, maxUses, useCount}` | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx), always `expiresInHours: 168`; `maxUses` never sent |
 | `members.revokeInvite` | `DELETE /{id}/invite-link` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
-| `members.join` | `POST /conversations/join` | `convoFrom` | [ChatJoinPage.jsx](src/pages/ChatJoinPage.jsx) |
+| `members.join` | `POST /conversations/join` | `{ status, pending, conversation }` — the `JoinByTokenResponse` envelope unwrapped; `conversation` is **null** on an approval-required link (`PENDING_APPROVAL`), which is a success arm, not an error | [ChatJoinPage.jsx](src/pages/ChatJoinPage.jsx), which renders a "Request sent" state for the pending arm instead of navigating |
 | `requests.list` | `GET /message-requests` (`status` defaults to `PENDING`) | page of `requestFrom` | `loadRequests` ← [RequestsPanel.jsx](src/components/chat/RequestsPanel.jsx) |
 | `requests.count` | `GET /message-requests/count` | `number` | seed effect in [ChatContext.jsx](src/context/ChatContext.jsx) |
 | `requests.accept` / `.decline` / `.block` | `POST /message-requests/{id}/…` | raw | `acceptRequest` / `rejectRequest` |
 | `presence` | `GET /presence?userIds=csv` | `[{userId, status (lowercased), lastSeenEpochMs}]` | `flushPresence` ← `watchPresence`, coalesced on a 60 ms timer with a 60 s per-user cache |
-| `typing` | `POST /conversations/{id}/typing` (`{isTyping, activity?}` — `activity` ∈ TYPING · RECORDING_VOICE · SENDING_PHOTO/VIDEO/VOICE/FILE, sent best-effort; servers that only know `isTyping` ignore it) | raw | `sendTyping` ← `onTyping(isTyping, activity)` in [Composer.jsx](src/components/chat/Composer.jsx) |
+| `typing` | `POST /conversations/{id}/typing` (`{isTyping, activity?}` — `activity` is the full `ChatAction` enum, honored by the backend since the 2026-07-31 realtime.md update: TYPING · RECORDING_VOICE · SENDING_VOICE · RECORDING/SENDING_VIDEO_NOTE · SENDING_PHOTO/VIDEO/FILE/AUDIO/LOCATION · CHOOSING_STICKER. The server accepts the `typing` spelling and `UPLOADING_*` synonyms and degrades unknowns to TYPING, so inbound SSE values are always canonical. [activity.js](src/components/chat/activity.js) carries the same 11 states — attached audio announces SENDING_AUDIO (music); the mic path announces SENDING_VOICE explicitly) | raw | `sendTyping` ← `onTyping(isTyping, activity)` in [Composer.jsx](src/components/chat/Composer.jsx) |
 | `unreadCount` | `GET /messaging/unread-count` | `number` (`r.count ?? 0`) | seed **and** re-seed on every `connected` |
 | `searchAll` | `GET /messaging/search` | `msg[]` | [ChatSearchPanel.jsx](src/components/chat/ChatSearchPanel.jsx), "All chats" scope |
 | `stream` | `GET /messaging/stream?token=` | unsubscribe fn | a single instance, owned by [ChatContext.jsx](src/context/ChatContext.jsx) |
@@ -841,14 +844,33 @@ because 0.5× is a real review speed for a recorded demo and meaningless for
 speech. Both re-apply `playbackRate` after every `loadedmetadata` — **Safari
 resets it when a source loads**.
 
-Three traps specific to voice notes:
+Four traps specific to voice notes:
 
+- **The recorder's mime order is a compatibility contract, not a preference.**
+  [Composer.jsx](src/components/chat/Composer.jsx) pins each browser to its
+  known-good format — Firefox → ogg/opus, Chrome/Edge → webm/opus, Safari →
+  AAC-mp4 — via the candidate order (`isTypeSupported` takes the first match).
+  Putting mp4 ahead of webm once flipped Chrome onto fragmented AAC-mp4 and
+  every new note arrived as a dead FILE row. The uploaded part's Content-Type
+  is the **bare container** (`blob.type` minus `;codecs=…`) so a strict
+  server-side whitelist still reads it as audio; and `mediaFrom` (chat.js)
+  normalises both `AUDIO` **and** `FILE`-with-`audio/*`-mime to `VOICE`, so a
+  note the classifier missed still renders the player instead of a download.
 - **A note this app recorded reports `Infinity` duration.** Chromium's
   `MediaRecorder` writes WebM with no duration header, so `duration` is
-  `Infinity` until the element has seeked past the end once. The
-  seek-to-`1e101`-then-rewind dance in `onLoadedMetadata` is what makes the
-  scrubber work at all on your own notes; without it the bar is dead and the
-  clock shows the placeholder forever.
+  `Infinity` at `loadedmetadata`. It is *not* chased with the old
+  seek-to-`1e101` trick any more (that forced a full download per bubble at
+  thread open); `totalOf` falls back through `seekable`/known duration, and
+  `measureDuration` (mediaPrefs.js) decodes the file once for the real length —
+  when the bubble scrolls into view (so the at-rest clock is right without a
+  tap) and on any `play` event, which is what covers a chain-started note.
+  **Never add a `currentTime` rung to `totalOf`:** with nothing else known it
+  computes `currentTime / currentTime = 1` and pins the played line at 100% on
+  its first frame while the sound plays on. `total === 0` means UNKNOWN, and
+  the player renders no fill and no playhead (`data-nolength="1"`, written by
+  `paint()` — never a className, which React owns and would wipe) rather than
+  a number it does not have. `paint()` also owns `aria-valuenow/max/text` for
+  the same reason.
 - **Continuous playback only rolls into notes you have not heard.** The handoff
   walks the DOM (`audio[data-ika-voice]`, forward only) rather than the React
   tree, and skips any element whose `data-heard` is `1`. Without that guard,
@@ -954,8 +976,8 @@ The "only three things" above is no longer the whole story: a channel now has a
 **profile** (`/channels/:id`, [ChannelPage.jsx](src/pages/ChannelPage.jsx))
 distinct from its **timeline** (`/chat/:id`). The split is the organising idea —
 the profile carries everything that *describes* the channel (cover, verified
-badge, category, stories, highlights, the admin console), the timeline carries
-its posts. The discovery card offers both: "About" and "Open".
+badge, category, the admin console), the timeline carries its posts. The
+discovery card offers both: "About" and "Open".
 
 [src/api/channels.js](src/api/channels.js) is the whole wire surface;
 `api.chat.channels` and `api.channels` are the **same object** (chat.js imports
@@ -1057,7 +1079,7 @@ message, not a mode. Offered only on a channel you can post to; the retry path
 replays it from the outbox, so a retry never wakes the subscribers the original
 send deliberately did not.
 
-**The channel masthead's four visual rules** (verified against rendered
+**The channel masthead's three visual rules** (verified against rendered
 screenshots at 1180px and 520px — re-check them if you touch `.cp-*`):
 
 1. **Only the avatar straddles the cover seam.** The negative margin rides
@@ -1067,19 +1089,11 @@ screenshots at 1180px and 520px — re-check them if you touch `.cp-*`):
 2. **Derived cover art is composed, not flat**: tint gradient + corner glows +
    the same concentric broadcast rings the discovery card wears, so profile and
    card read as one identity. A photo suppresses the rings.
-3. **The gold conic halo means "live now" and nothing else.** Story rings (rail
-   and tray) wear it — as a painted `.cs-halo` circle with the art inset by its
-   own paper border, not a box-shadow, because a conic gradient can't ride a
-   shadow. Highlights are the *permanent* archive and deliberately wear the
-   quiet hairline double-ring instead; giving them gold would erase the
-   distinction the two rails exist to draw.
-4. **Console tabs are pills** (navy-filled `.on`, same vocabulary as `.cn-chip`)
+3. **Console tabs are pills** (navy-filled `.on`, same vocabulary as `.cn-chip`)
    — the style guide is explicit: pills, not underlines.
 
-One rendering quirk worth knowing: `-webkit-line-clamp` clips at the *content*
-box but still paints into the padding box — vertical padding on the clamped
-story-ring text leaked a ghost fourth line under the ellipsis. Horizontal
-padding only; the circle's grid centring supplies the vertical space.
+(A fourth rule about the story-ring halo and the highlight rail left with the
+channel-stories removal — those rails no longer exist on this surface.)
 
 **Covers are a background LAYER, never a replacement.** The uploaded image goes
 in as a `--cover` custom property and the sheet stacks it over the derived
@@ -1110,12 +1124,43 @@ countdown from the server's own `Retry-After` rather than a local guess that a
 second tab has already invalidated. ChatPage passes `slowModeSeconds={0}` for
 owners and admins, who are exempt server-side.
 
-Stories posted **as** a channel are ordinary stories whose `authorId` is the
-channel id and whose visibility is `CHANNEL` — TTL, view log, A/B poll and the
-tray SSE are the user-story machinery unchanged. Highlights **snapshot** a story,
-so the archive survives the TTL; only a *live* story can be archived (the call
-404s once it has expired), which is why the picker lists live stories instead of
-taking an id.
+**Channel stories & highlights were REMOVED** (backend deletion, 2026-07): every
+`/channels/{id}/stories|highlights` route — and the tray — now 404s, and the
+`canManageStories` admin right is gone from `AdminRights`. The client followed:
+`ChannelStories.jsx` / `ChannelHighlights.jsx`, the `channels.stories` /
+`channels.highlights` service sections, their adapters and the `.cs-`/`.chl-`
+stylesheet blocks are deleted, and `RIGHT_KEYS` no longer lists
+`canManageStories`. **User** (personal) stories are untouched — `api/stories.js`,
+`StoryViewer`/`StoryEditor`/`HighlightViewer` and `stories.css` are the
+user-story surface and were never channel-scoped.
+
+**The manage console has a Subscribers tab**
+([ChannelSubscribers.jsx](src/components/channels/ChannelSubscribers.jsx)):
+the paged roster (`members.list`), kick (`members.remove`), restrict/unrestrict
+(`members.restrict`) and direct add (`members.add`, gated on `canInviteUsers`,
+join-source `ADDED_BY_ADMIN`) — all the shared conversation member endpoints,
+now reachable from the channel side. Admin rows deliberately carry no actions
+there (the endpoints answer `CANNOT_ACT_ON_ADMIN`); they are managed from the
+Admins tab. The roster follows `member.changed` frames with silent reloads.
+`hiddenSubscribers` is also *enforced* client-side now: ConversationInfo's
+roster treats a 403 on a channel as the setting working (a quiet note), not as
+an error toast.
+
+**Chat @-mentions (2026-07-30, per the messages.md update).** The server
+extracts `@handle`s from every send and rings a dedicated **`MESSAGE_MENTION`**
+bell for mentioned members — through mute, presence and the group-size cutoff
+(never on `silent` sends). The client side: the chat
+[Composer.jsx](src/components/chat/Composer.jsx) textarea is now a
+[MentionBox.jsx](src/components/MentionBox.jsx) (`as="textarea"` — the shared
+autocomplete; upgraded to forward the Composer's `taRef` and to COMPOSE a
+caller `onBlur` with its own popup-close blur rather than being overridden by
+it), the popup flips ABOVE the field in chat (`.ch-inputwrap .mention-pop`,
+z 60 — under `.ch-pop` at 100), bubbles already linkify mentions via
+`linkify`, and the notifications inbox renders the kind with the `at` glyph.
+Enter picks a mention while the popup is open and sends when it is closed —
+MentionBox forwards `onKeyDown` only with the popup shut. The multipart
+classifier also changed upstream: `audio/*` now yields **VOICE** directly;
+`mediaFrom`'s AUDIO/FILE rescues remain for rows stored before the change.
 
 ### Live streaming — the app owns everything except the video
 
@@ -1706,7 +1751,7 @@ Do these in order; steps 1–2 are mandatory, 3–5 depend on who cares.
    - [Composer.jsx](src/components/chat/Composer.jsx) — reply/edit strip
    - [ChatPage.jsx](src/pages/ChatPage.jsx) — `.ch-pinbar-text`, the pin bar
    - [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) — pinned list
-3. **[useThread.js](src/components/chat/useThread.js)** — `kindOfFile()` maps a `File` to a kind for the optimistic bubble, and `buildOptimistic()` must emit `msgFrom`'s field set plus the three local-only flags `clientNonce` / `pending` / `failed`. `reconcile()` deletes the pending entry and inserts the server object under the real id, so anything the client stitched on locally is gone at that moment. The worked example is `durationMs` on a voice note: the multipart endpoint has no duration part, so `sendFiles` carries it on the optimistic media purely to stop the pending bubble rendering 0:00, and the server re-derives its own value (there is a comment on `sendFiles` saying so). A field the real message genuinely lacks will read as `undefined` from reconcile onward.
+3. **[useThread.js](src/components/chat/useThread.js)** — `kindOfFile()` maps a `File` to a kind for the optimistic bubble, and `buildOptimistic()` must emit `msgFrom`'s field set plus the three local-only flags `clientNonce` / `pending` / `failed`. `reconcile()` deletes the pending entry and inserts the server object under the real id, so anything the client stitched on locally is gone at that moment. The worked example is `durationMs` on a voice note: it IS sent as a multipart part now, but the endpoint ignores it, so `sendFiles` carries it on the optimistic media and the reconciled message has `durationMs: null` — which is why the players fall back to `measureDuration`. A field the real message genuinely lacks will read as `undefined` from reconcile onward.
 4. If the type is a centred notice rather than a bubble, it only needs `isSystem` — the early return for system messages in [MessageBubble.jsx](src/components/chat/MessageBubble.jsx) handles layout.
 
 ### Adding a new conversation action
@@ -1731,7 +1776,7 @@ Do these in order; steps 1–2 are mandatory, 3–5 depend on who cares.
 - **Typing indicator** ([MessageList.jsx](src/components/chat/MessageList.jsx)): animated dots are `aria-hidden`; an `sr-only` sibling carries the text.
 - **Menus**: items are `role="menuitem"` throughout, but trigger annotation is uneven and worth knowing before you copy a pattern. Only some triggers carry both `aria-haspopup="menu"` and `aria-expanded` — `ConversationHeader`'s "Conversation actions" button, `.cv-menu-btn` in [ConversationList.jsx](src/components/chat/ConversationList.jsx), the member-row `.cv-menu-btn` ("Actions for {username}") in [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx), and the bubble's "Message actions" overflow button in [MessageBubble.jsx](src/components/chat/MessageBubble.jsx). The quick-react trigger ("React to message", same file) sets `aria-expanded` only, even though its Popover inherits the default `role="menu"` and its `.ch-qr` emoji buttons are `role="menuitem"` — add the missing `aria-haspopup` if you touch it. The Composer's emoji trigger likewise has `aria-expanded` alone, but there the omission is correct: its Popover is passed `role="dialog"`. The long-press sheet is an explicit `role="menu"` with no button trigger at all. `ConversationHeader` wraps its items in a `role="none"` `.ch-hd-menu-items` div so they stay direct children of Popover's `role="menu"` in the a11y tree.
 - **Rows are `div role="button" tabIndex=0`** with Enter/Space handling ([ConversationList.jsx](src/components/chat/ConversationList.jsx)). The row's menu button is a **sibling**, not a child: both the row and `.cv-menu-btn` live under the `.cv-menu-host` wrapper. Keep that shape — the ARIA button role gives its subtree presentational children, so folding the menu button inside the row would prune it from the accessibility tree. The pin bar is the case where that was actually hit, and it splits into two sibling buttons (`.ch-pinbar-main` and `.ch-pinbar-x`) for exactly this reason — see the comment above it in [ChatPage.jsx](src/pages/ChatPage.jsx).
-- **Voice scrubber** is `role="slider"` with `aria-valuemin/max/now` and Arrow/Space/Enter keys ([MessageBubble.jsx](src/components/chat/MessageBubble.jsx)).
+- **Voice scrubber** is `role="slider"` with Arrow/Space/Enter keys ([VoiceNote.jsx](src/components/chat/VoiceNote.jsx), and its feed twin [VoicePlayer.jsx](src/components/VoicePlayer.jsx)). Only `aria-valuemin` is rendered declaratively — `aria-valuenow/max/text` are written by `paint()` and by nothing else, because rendering them too let a re-render reset a live slider mid-drag.
 - **`Icon` accepts only `{ name, className, style }`** ([ui.jsx](src/components/ui.jsx)). Passing `title`, `aria-label` or `aria-hidden` to it is silently dropped — put the name on a wrapping element or an `sr-only` span.
 
 ### Known open issues (honest list)

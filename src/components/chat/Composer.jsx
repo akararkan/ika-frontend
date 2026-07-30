@@ -23,6 +23,7 @@
    ========================================================= */
 import React from 'react'
 import { Icon, showToast } from '../ui.jsx'
+import { MentionBox } from '../MentionBox.jsx'
 import { Popover } from './Popover.jsx'
 import { ACTIVITY, uploadActivityOf } from './activity.js'
 
@@ -52,16 +53,20 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
  *  amplitude shape instead of the id-seeded synthetic one. */
 const VOICE_PEAKS = 40
 
-/** Blob → base64 peak bytes (VoiceNote's `peaksOf` wire format: one byte per
- *  bar, 0–255). Decoded at 8kHz mono — peaks need no fidelity, only shape.
- *  Fails soft: any decode problem just means no waveform is attached, and the
- *  players fall back to the synthetic shape exactly as before. */
+/** Blob → { waveform, durationMs }. The waveform is base64 peak bytes
+ *  (VoiceNote's `peaksOf` wire format: one byte per bar, 0–255), decoded at
+ *  8kHz mono — peaks need no fidelity, only shape. `durationMs` is the
+ *  decoder's EXACT length: the recording timer floor-counts whole seconds,
+ *  and a 4.7s note reported as 4000ms makes the played line hit 100% with
+ *  sound still playing. Fails soft: any decode problem returns nulls, the
+ *  players fall back to the synthetic shape and the timer's count. */
 async function waveformOf(blob) {
   try {
     const buf = await blob.arrayBuffer()
     const audio = await new OfflineAudioContext(1, 1, 8000).decodeAudioData(buf)
+    const durationMs = Math.round((audio.duration || 0) * 1000) || null
     const data = audio.getChannelData(0)
-    if (!data.length) return null
+    if (!data.length) return { waveform: null, durationMs }
     const step = Math.max(1, Math.floor(data.length / VOICE_PEAKS))
     let out = ''
     for (let i = 0; i < VOICE_PEAKS; i++) {
@@ -75,8 +80,8 @@ async function waveformOf(blob) {
       }
       out += String.fromCharCode(Math.min(255, Math.round(peak * 255)))
     }
-    return btoa(out)
-  } catch { return null }
+    return { waveform: btoa(out), durationMs }
+  } catch { return { waveform: null, durationMs: null } }
 }
 
 /** seconds → "24h" / "7d" / "90d" — the disappearing-timer badge. */
@@ -398,12 +403,21 @@ export function Composer({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      /* Explicit AAC-in-mp4 first: where it is genuinely recordable (Safari,
-         newer Chrome) the note plays on EVERY platform, while webm/opus from
-         Chrome is undecodable on older Safari/iOS recipients. The bare
-         'audio/mp4' stays behind opus because without the codec pin it may
-         mean opus-in-mp4 — same Safari problem in a different wrapper. */
-      const mime = ['audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
+      /* Each browser is pinned to its KNOWN-GOOD recording, in the order that
+         picks it (isTypeSupported takes the first match):
+           · ogg/opus — Firefox's pick: it will not record mp4, and its WebM
+             output is UNDECODABLE IN CHROME ("demuxer seek failed"), which
+             silently kills a Firefox user's notes for most recipients.
+             Chrome and Firefox both play ogg/opus.
+           · webm/opus — Chrome/Edge's pick, and the format the whole pipeline
+             (upload classifier included) is proven against. Putting mp4 ahead
+             of it once flipped Chrome onto fragmented AAC-mp4 and broke every
+             new note — do not reorder these.
+           · AAC-in-mp4 — Safari's only option; playable everywhere. The bare
+             'audio/mp4' stays behind the pinned one because without the codec
+             pin it can mean opus-in-mp4, which Safari cannot decode. */
+      const mime = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/ogg']
         .find(t => MediaRecorder.isTypeSupported?.(t)) || ''
       const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
       const r = recRef.current
@@ -422,17 +436,23 @@ export function Composer({
         if (cancelled || blob.size < 900) return
         const ext = (recorder.mimeType || '').includes('mp4') ? 'm4a'
           : (recorder.mimeType || '').includes('ogg') ? 'ogg' : 'webm'
-        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type })
-        // The note's real shape, sampled before send: the sender's bubble
-        // draws it immediately and it rides the upload for every receiver.
-        const waveform = await waveformOf(blob)
+        /* The part's Content-Type is the bare container — `blob.type` carries
+           the ';codecs=…' parameter, and a strict server-side whitelist that
+           matches whole strings reads the parameterised form as "not audio"
+           and files the note as a plain FILE. */
+        const file = new File([blob], `voice-${Date.now()}.${ext}`,
+          { type: (blob.type || 'audio/webm').split(';')[0] })
+        // The note's real shape and exact length, sampled before send: the
+        // sender's bubble draws both immediately and they ride the upload
+        // for every receiver.
+        const { waveform, durationMs } = await waveformOf(blob)
         /* That decode is the first task boundary between "stopped" and the
            optimistic insert — a conversation switch landing inside it slips
            past the [conversationId] abort (recRef.recorder is already null).
            Same rule as that abort: a switch cancels the note. */
         if (convoIdRef.current !== conversationId) return
         await withActivity(ACTIVITY.SENDING_VOICE,
-          () => onSendFiles?.({ files: [file], body: '', durationMs: secs * 1000, waveform }))
+          () => onSendFiles?.({ files: [file], body: '', durationMs: durationMs ?? secs * 1000, waveform }))
       }
 
       recorder.start()
@@ -651,7 +671,13 @@ export function Composer({
           />
 
           <div className="ch-inputwrap">
-            <textarea
+            {/* @-autocomplete rides the same MentionBox as posts/Q&A/research —
+                the backend extracts mentions from the body and rings a
+                dedicated MESSAGE_MENTION bell (through mute and presence), so
+                the composer should help write them. Enter picks a mention
+                while the popup is open and still sends when it is closed. */}
+            <MentionBox
+              as="textarea"
               ref={taRef}
               className="ch-input"
               rows={1}

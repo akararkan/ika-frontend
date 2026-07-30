@@ -15,7 +15,7 @@
 .st-ring .avatar{width:100%!important;height:100%!important;font-size:15px}
 /* unseen — cinnabar gradient ring (the prototype's lit story ring, our colour) */
 .st-ring.unseen{border:0;background:linear-gradient(135deg,var(--emerald-bright),var(--emerald-deep))}
-.st-ring.add{border-style:dashed;border-color:#c9c3b3;background:none}
+.st-ring.add{border-style:dashed;border-color:#c2c1bf;background:none}
 .st-cover{width:100%;height:100%;border-radius:50%;background:var(--paper-2) center/cover no-repeat}
 .st:hover .st-ring{border-color:var(--ink-soft)}
 .st:hover .st-ring.unseen{border-color:transparent;filter:brightness(.94)}
@@ -23,7 +23,7 @@
 /* ---------- Segmented control (matches the prototype's .m-seg) ---------- */
 .seg{display:flex;gap:3px;background:var(--paper-2);border-radius:12px;padding:3px;margin-bottom:16px}
 .seg button{flex:1;padding:9px 6px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--ink-soft);transition:.15s}
-.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(27,24,19,.12)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(13,21,32,.12)}
 .seg button:active{transform:scale(.97)}
 
 /* ---------- Composer bar ---------- */
@@ -36,7 +36,7 @@
   color:#a9b2c0;font-family:var(--sans);font-style:normal;font-size:15px;
   transition:.16s;
 }
-.cb-fake:hover{border-color:#ccd4e0;color:var(--ink-soft);background:var(--paper-2)}
+.cb-fake:hover{border-color:#c2c1bf;color:var(--ink-soft);background:var(--paper-2)}
 .cb-icons{display:flex;gap:2px;flex:none}
 .cb-ico{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--ink-soft);transition:.15s}
 .cb-ico:hover{background:var(--wash);color:var(--rubric)}
@@ -104,55 +104,147 @@
 }
 .pm-play .ico{width:24px;height:24px;fill:#fff;stroke:none}
 
+/* Orbit voice-POST player — the ring (canvas draws the waveform circle; this
+   sheet is only the card, the center button, the rate pill and the footer).
+   White card per the Orbit mock; Q&A/research keep the compact .vnp below. */
+.ovp{position:relative;margin:0 16px 14px;border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden}
+/* SQUARE ring area, centered — the mock's proportions (a 300px square inside
+   the card); a full-width rectangle floated the ring in dead space. */
+.ovp-stage{position:relative;width:min(100%,340px);aspect-ratio:1/1;margin:0 auto}
+/* pan-y, NOT none: a vertical flick anywhere on the card must still scroll
+   the feed — the component only captures pointers that land on the ring band */
+.ovp-ring{position:absolute;inset:0;cursor:pointer;touch-action:pan-y;border-radius:16px}
+.ovp-ring:focus-visible{outline:2px solid var(--blue);outline-offset:-4px}
+.ovp-canvas{width:100%;height:100%;display:block}
+.ovp-play{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;
+  background:#13233d;   /* the mock's exact center-button navy */
+  color:#fff;display:grid;place-items:center;
+  box-shadow:0 6px 20px rgba(19,35,61,.3);transition:transform .12s ease;
+}
+.ovp-play:hover{transform:translate(-50%,-50%) scale(1.04)}
+.ovp-play:active{transform:translate(-50%,-50%) scale(.96)}
+.ovp-play:disabled{opacity:.6;cursor:default}
+.ovp-play .ico{width:24px;height:24px}
+.ovp-rate{
+  position:absolute;top:12px;inset-inline-end:12px;z-index:1;
+  padding:4px 10px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);font:600 12px ui-monospace,monospace;color:var(--ink-soft);cursor:pointer;
+}
+.ovp-rate.on{background:var(--ox-sky-wash,#DCE9F6);border-color:var(--ox-sky,#B9D6F2);color:var(--navy)}
+.ovp-foot{display:flex;align-items:center;gap:12px;padding:0 22px 16px}
+.ovp-time{font:600 13px ui-monospace,monospace;color:var(--ink)}
+.ovp-time.is-total{color:var(--muted)}
+.ovp-hint{flex:1;text-align:center;font-size:10.5px;font-weight:500;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase}
+
 /* voice note player */
-.vp{
+.vnp{
   position:relative;margin:0 16px 14px;border-radius:20px;padding:18px 20px;
   background:
-    #27221b;
-  color:#e8eef5;overflow:hidden;
-  box-shadow:0 16px 30px -22px rgba(16,14,11,.85);
+    #16222f;
+  color:#e7eff8;overflow:hidden;
+  box-shadow:0 16px 30px -22px rgba(8,14,22,.85);
 }
-.vp.vp-flush{margin:12px 0 0}              /* inside Q&A answer/reply cards */
-.vp-top{display:flex;align-items:center;gap:16px}
-.vp-play{
+.vnp.vnp-flush{margin:12px 0 0}              /* inside Q&A answer/reply cards */
+.vnp-top{display:flex;align-items:center;gap:16px}
+.vnp-play{
   width:56px;height:56px;flex:none;border:none;cursor:pointer;border-radius:50%;
-  background:linear-gradient(160deg,#fdfcf9,#ece9e1);color:#272118;
+  background:linear-gradient(160deg,#ffffff,#e9e8e6);color:#16222f;
   display:grid;place-items:center;
   box-shadow:0 10px 22px -8px rgba(0,0,0,.5);
   transition:transform .18s cubic-bezier(.34,1.56,.64,1);
 }
-.vp-play:hover{transform:scale(1.06)}
-.vp-play:active{transform:scale(.94)}
-.vp-play:disabled{opacity:.55;cursor:default;transform:none}
-.vp-play.playing{animation:vppulse 2s ease-out infinite}
-@keyframes vppulse{
-  0%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 0 rgba(222,196,191,.5)}
-  70%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 14px rgba(222,196,191,0)}
-  100%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 0 rgba(222,196,191,0)}
+.vnp-play:hover{transform:scale(1.06)}
+.vnp-play:active{transform:scale(.94)}
+.vnp-play:disabled{opacity:.55;cursor:default;transform:none}
+.vnp-play.playing{animation:vnppulse 2s ease-out infinite}
+@keyframes vnppulse{
+  0%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 0 rgba(185,214,242,.5)}
+  70%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 14px rgba(185,214,242,0)}
+  100%{box-shadow:0 10px 22px -8px rgba(0,0,0,.5),0 0 0 0 rgba(185,214,242,0)}
 }
-.vp-play .ico{width:24px;height:24px;fill:#272118;stroke:none;margin-left:2px}
-.vp-play.playing .ico{margin-left:0}
-.vp-wave{flex:1;display:flex;align-items:center;gap:3px;height:52px;cursor:pointer}
-.vp-wave i{flex:1;min-width:2px;border-radius:4px;background:rgba(222,196,191,.30);transition:background .15s,transform .15s;transform-origin:center;display:block}
-.vp-wave i.on{background:#e0a299}
-.vp-wave i.live{transform:scaleY(1.18)}
-.vp-bot{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
-.vp-tag{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.05em;color:#e6c6c2;text-transform:uppercase;font-weight:600}
-.vp-tag .ico{width:14px;height:14px;stroke:#e6c6c2;fill:none}
-.vp-time{font-variant-numeric:tabular-nums;font-size:14px;color:#f7efed;letter-spacing:.5px;font-weight:600}
+.vnp-play .ico{width:24px;height:24px;fill:#16222f;stroke:none;margin-left:2px}
+.vnp-play.playing .ico{margin-left:0}
+.vnp-wave{
+  position:relative;flex:1;min-width:0;height:52px;cursor:pointer;
+  overflow:hidden;border-radius:6px;touch-action:none;
+}
+.vnp-wave:focus-visible{outline:2px solid #b9d6f2;outline-offset:4px}
+/* Two identical bar layers; the top one is pre-coloured "played" and
+   clipped to --p, so the fill moves at display refresh rate without a
+   single re-render (same contract as the chat player). */
+.vnp-wave-layer{position:absolute;inset:0;display:flex;align-items:center;gap:3px;pointer-events:none}
+.vnp-wave-layer i{flex:1;min-width:2px;border-radius:4px;background:rgba(185,214,242,.30);display:block}
+.vnp-wave-layer.played{clip-path:inset(0 calc((1 - var(--p,0))*100%) 0 0)}
+[dir="rtl"] .vnp-wave-layer.played{clip-path:inset(0 0 0 calc((1 - var(--p,0))*100%))}
+.vnp-wave-layer.played i{background:#b9d6f2}
+/* the playhead — a soft light standing where the sound is */
+.vnp-head{
+  position:absolute;top:8%;bottom:8%;
+  inset-inline-start:calc(var(--p,0)*100%);
+  width:2px;border-radius:2px;background:#d6e7f8;
+  box-shadow:0 0 10px rgba(185,214,242,.8);
+  opacity:0;transition:opacity .2s ease;pointer-events:none;
+}
+.vnp.playing .vnp-head,
+.vnp-wave:hover .vnp-head{opacity:.9}
+/* A length nothing can state yet: no playhead. A head parked at zero while
+   the sound runs is a wrong answer; none is the honest one. */
+.vnp-wave[data-nolength="1"] .vnp-head{display:none}
+.vnp.failed .vnp-wave-layer i{opacity:.45}
+.vnp-bot{display:flex;align-items:center;gap:10px;margin-top:12px}
+.vnp-tag{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.05em;color:#d6e7f8;text-transform:uppercase;font-weight:600}
+.vnp-tag .ico{width:14px;height:14px;stroke:#d6e7f8;fill:none}
+.vnp-rate{
+  margin-inline-start:auto;
+  min-width:36px;padding:4px 9px;border-radius:999px;
+  border:1px solid rgba(185,214,242,.32);background:transparent;
+  color:#d6e7f8;font:600 11.5px/1 inherit;font-family:inherit;cursor:pointer;
+  transition:background .14s ease,border-color .14s ease,transform .1s ease;
+}
+.vnp-rate:hover{background:rgba(185,214,242,.14)}
+.vnp-rate:active{transform:scale(.94)}
+.vnp-rate:focus-visible{outline:2px solid #b9d6f2;outline-offset:2px}
+.vnp-rate.on{background:#b9d6f2;border-color:#b9d6f2;color:#00172f}
+.vnp-time{font-variant-numeric:tabular-nums;font-size:14px;color:#ffffff;letter-spacing:.5px;font-weight:600}
+@media (prefers-reduced-motion:reduce){
+  .vnp-head{transition:none}
+}
 
-/* repost */
+/* repost — the quote card carrying the ORIGINAL post (X/Telegram style):
+   one compact identity line, a clamped body, and the REAL media flush in
+   the card. The whole card is one tap target for the original. */
 .post-repost{
   margin:0 16px 14px;border:1px solid var(--line);border-radius:14px;
-  padding:13px 14px;background:var(--card-2);
+  padding:11px 13px 12px;background:var(--card);
+  cursor:pointer;
 }
-.rp-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.rp-name{font-size:13.5px;font-weight:600;color:var(--ink)}
-.rp-time{font-size:12px;color:var(--muted);margin-left:auto}
+.post-repost:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.post-repost.is-note{cursor:default;background:var(--card-2)}
+.rp-head{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0}
+.rp-name{
+  font-size:13.5px;font-weight:700;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.rp-handle{
+  font-size:12.5px;color:var(--muted);flex:0 1 auto;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.rp-time{font-size:12px;color:var(--muted);white-space:nowrap;margin-left:auto}
+.rp-mark{color:var(--muted);flex:none}
 .rp-body{
   font-size:14px;color:var(--ink-soft);line-height:1.55;
-  /* Preserve the original post's blank lines + spacing in the repost embed. */
+  /* Preserve the original post's blank lines + spacing in the repost embed —
+     but CLAMP it: the quote is a preview, the tap shows the whole post, and
+     an unclamped original dwarfs the reposter's own note above it. */
   white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;
+}
+.rp-chip{
+  display:inline-flex;align-items:center;gap:6px;margin-top:8px;
+  padding:5px 11px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card-2);font-size:12.5px;font-weight:600;color:var(--ink-soft);
 }
 
 /* stats + actions */
@@ -209,7 +301,7 @@
 .cmt-box{display:flex;gap:10px;align-items:center;margin-top:16px}
 .cmt-field{
   flex:1;height:38px;border-radius:0;
-  background:transparent;border:0;border-bottom:1px solid #dee3eb;
+  background:transparent;border:0;border-bottom:1px solid #d9d8d6;
   display:flex;align-items:center;padding:0 2px;
   color:#a9b2c0;font-family:var(--serif);font-style:italic;font-size:14px;
 }

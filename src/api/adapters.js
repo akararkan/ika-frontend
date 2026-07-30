@@ -38,8 +38,8 @@ export function handleOf(username, fallback = 'member') {
 }
 
 const AVATAR_GRADIENTS = [
-  '#1d3a5f',
-  '#7a5b3f',
+  '#002147',
+  '#4e6580',
   '#4a6b8a',
   '#8a4a5b',
   '#5b7a67',
@@ -207,7 +207,7 @@ function mediaFromUrls(urls = [], types = []) {
     const t = tarr[i] || 'IMAGE'
     const src = assetUrl(url)   // backend media URLs are relative → make absolute
     if (t === 'IMAGE') return { type: 'IMAGE', url: src, label: 'image', bg: `center/cover no-repeat url("${src}")`, ratio: '16/10' }
-    if (t === 'VIDEO') return { type: 'VIDEO', url: src, label: 'video', bg: 'linear-gradient(160deg,#26221b,#141210)', ratio: '16/10' }
+    if (t === 'VIDEO') return { type: 'VIDEO', url: src, label: 'video', bg: 'linear-gradient(160deg,#1a2836,#0b131d)', ratio: '16/10' }
     return { type: t, url: src, label: t.toLowerCase() }
   })
 }
@@ -227,7 +227,7 @@ export function postFromFeedItem(dto) {
   const cover = dto.mediaUrl ? assetUrl(dto.mediaUrl) : null   // VOICE_POST: this is the audio URL
   let media = []
   if (isReel && (video || cover)) {
-    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#26221b,#141210)', ratio: '9/16' }]
+    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#1a2836,#0b131d)', ratio: '9/16' }]
   } else if (!isVoice && dto.mediaUrl) {
     media = mediaFromUrls([dto.mediaUrl], ['IMAGE'])
   }
@@ -275,7 +275,7 @@ export function researchFromFeedItem(dto) {
     title: dto.textPreview || 'Untitled research',
     cover: dto.mediaUrl
       ? `center/cover no-repeat url("${assetUrl(dto.mediaUrl)}")`
-      : 'radial-gradient(120% 100% at 30% 10%,#2d5f97,#16283f)',
+      : 'radial-gradient(120% 100% at 30% 10%,#1f4e7e,#00172f)',
     hasCover: !!dto.mediaUrl,
     time: timeAgo(dto.createdAt),
     createdAt: dto.createdAt || null,
@@ -466,7 +466,7 @@ export function researchFrom(dto) {
     keywords: dto.keywords || '',
     visibility: dto.visibility || 'PUBLIC',
     tags: dto.tags || [],
-    cover: dto.coverImageUrl ? `center/cover no-repeat url("${assetUrl(dto.coverImageUrl)}")` : 'radial-gradient(120% 100% at 30% 10%,#2d5f97,#16283f)',
+    cover: dto.coverImageUrl ? `center/cover no-repeat url("${assetUrl(dto.coverImageUrl)}")` : 'radial-gradient(120% 100% at 30% 10%,#1f4e7e,#00172f)',
     hasVideo: !!dto.videoPromoThumbnailUrl,
     metrics: {
       views: dto.viewCount || 0, downloads: dto.downloadCount || 0, reactions: dto.reactionCount || 0,
@@ -591,7 +591,7 @@ export function researchDetailFrom(dto) {
     })),
     sources: (dto.sources || []).map(sourceFrom),   // includes MEDIA_FILE → clickable fileUrl
     figures: (dto.mediaFiles || []).filter(m => m.mediaType === 'IMAGE').map(m => ({
-      bg: m.fileUrl ? `center/cover no-repeat url("${assetUrl(m.fileUrl)}")` : 'linear-gradient(140deg,#5c422a,#b3873e)',
+      bg: m.fileUrl ? `center/cover no-repeat url("${assetUrl(m.fileUrl)}")` : 'linear-gradient(140deg,#3e5570,#1f4e7e)',
       label: m.caption || m.originalFileName || 'figure',
     })),
     citation: dto.citation || '',

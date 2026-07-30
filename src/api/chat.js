@@ -56,15 +56,25 @@ const clampLimit = (n, dflt = 40) => Math.min(100, Math.max(1, Number(n) || dflt
 /** MessageMedia → view media. Backend media URLs are RELATIVE → assetUrl them
  *  or <img>/<video>/<audio> would resolve them against the frontend origin. */
 function mediaFrom(m) {
+  /* The multipart classifier NOW labels audio/* uploads VOICE (messages.md
+     §2.2) — but the AUDIO→VOICE and FILE-with-audio-mime→VOICE rescues stay:
+     every row stored before that change (and any deploy still running the old
+     classifier) carries AUDIO, or FILE for a container the old classifier did
+     not recognise (m4a from Safari/newer Chrome, ogg from Firefox). Normalised
+     here so every surface (player, reply strip, starred, pinned label) treats
+     audio as playable with one rule: a scrubber and a speed control beat a
+     bare download for ANY audio. */
+  const audioMime = /^audio\//i.test(m?.mime || '')
+  /* Belt for rows the mime rule cannot reach: uploads from the broken
+     mp4-first recorder window (and any server that stored no mime) are only
+     recognisable by name. Bare audio extensions are unambiguous; `.webm` is
+     both a video and an audio container, so it only counts when it wears the
+     recorder's own `voice-<ts>` prefix. */
+  const audioName = /\.(m4a|mp3|ogg|oga|opus|aac|wav|weba)$/i.test(m?.fileName || '')
+    || /^voice-\d+\.webm$/i.test(m?.fileName || '')
   return {
-    /* The multipart route's classifier labels EVERY audio upload AUDIO — the
-       VOICE kind is unreachable from the endpoint the Composer actually uses —
-       so without this a received voice note renders as a file-download row,
-       and the sender's own bubble degrades the same way when the echo replaces
-       the optimistic message. Normalised here so every surface (player, reply
-       strip, starred, pinned label) treats audio as playable with one rule:
-       a scrubber and a speed control beat a bare download for ANY audio. */
-    kind: m?.kind === 'AUDIO' ? 'VOICE' : (m?.kind || 'FILE'),   // IMAGE | VIDEO | VOICE | FILE
+    kind: (m?.kind === 'AUDIO' || (m?.kind === 'FILE' && (audioMime || audioName)))
+      ? 'VOICE' : (m?.kind || 'FILE'),   // IMAGE | VIDEO | VOICE | FILE
     storageKey: m?.storageKey || null,
     url: assetUrl(m?.url || null),
     thumbnailKey: m?.thumbnailKey || null,
@@ -1367,7 +1377,21 @@ export const chat = {
       })
     },
     revokeInvite(convId)                { return http.del(`/api/v1/conversations/${convId}/invite-link`) },
-    async join(token)                   { return convoFrom(await http.post('/api/v1/conversations/join', { token })) },
+    /** Redeem an invite token. The wire answer is a `JoinByTokenResponse`
+     *  envelope `{ status, conversation }` — and `conversation` is NULL when
+     *  the link requires approval (`PENDING_APPROVAL`: the use is consumed and
+     *  a join request is filed, so this is a success, not an error). Older
+     *  deployments answered with the bare conversation; the unwrap tolerates
+     *  both. Callers branch on `pending`, never on the body alone. */
+    async join(token) {
+      const res = await http.post('/api/v1/conversations/join', { token })
+      const dto = res?.conversation ?? (res?.id ? res : null)
+      return {
+        status: res?.status || (dto ? 'JOINED' : 'PENDING_APPROVAL'),
+        pending: res?.status === 'PENDING_APPROVAL',
+        conversation: dto ? convoFrom(dto) : null,
+      }
+    },
   },
 
   /* ---------- message requests (strangers get 3 pre-acceptance messages) ---------- */

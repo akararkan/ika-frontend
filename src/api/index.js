@@ -13,7 +13,6 @@ export {
 } from './chat.js'
 export {
   adminFrom, inviteFrom, joinRequestFrom, statsFrom,
-  channelStoryFrom, channelHighlightFrom, highlightStoryFrom, trayItemFrom,
   rightsFrom, rightsTo, can as canRight,
   RIGHT_KEYS, RIGHT_LABELS, JOIN_SOURCE_LABELS,
 } from './channels.js'

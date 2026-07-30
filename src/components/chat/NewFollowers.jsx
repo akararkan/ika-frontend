@@ -30,11 +30,13 @@ export default function NewFollowers({ onMessage }) {
 
   const load = React.useCallback(async () => {
     try {
-      const list = await api.notifications.list({ page: 0, size: 30 })
+      // Server-side type filter — NEW_FOLLOWER never aggregates, so 30 rows
+      // of the right kind beat 30 mixed rows filtered down to a handful.
+      const { items } = await api.notifications.list({ type: 'NEW_FOLLOWER', page: 0, size: 30 })
       const seen = localStorage.getItem(seenKey(uid)) || ''
       // One row per follower — the same person re-following must not stack.
       const byActor = new Map()
-      for (const n of list) {
+      for (const n of items) {
         if (n.type !== 'NEW_FOLLOWER' || !n._actor?.id) continue
         if (seen && n.createdAt && n.createdAt <= seen) continue
         const prev = byActor.get(n._actor.id)

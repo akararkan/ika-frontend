@@ -12,7 +12,8 @@ import { openShare } from './ShareSheet.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import { authorOf } from '../lib/userView.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { api } from '../api/index.js'
+import { api, applyPostDelta } from '../api/index.js'
+import { useRealtime } from '../hooks/useRealtime.js'
 import { PlayableVideo } from './PlayableVideo.jsx'
 
 export function Reels({ onClose, initialId }) {
@@ -280,6 +281,10 @@ export function Reels({ onClose, initialId }) {
      time someone moves code here. Declaration order now matches use order. */
   const [cmtOpen, setCmtOpen] = React.useState(false)
   const [cmts, setCmts] = React.useState(null)          // null = not loaded yet
+  const [cmtFor, setCmtFor] = React.useState(null)      // which reel the sheet was opened for — pins the SSE subscription
+  const cmtForRef = React.useRef(null)                  // same value for async guards (a fetch resolving after a swipe)
+  const seenCR = React.useRef(new Set())                // comment ids whose +1 already ran (fetch-seeded; replay exactly-once)
+  const delCR = React.useRef(new Set())                 // comment ids whose -1 already ran
   const [cText, setCText] = React.useState('')
   const [cBusy, setCBusy] = React.useState(false)
 
@@ -350,10 +355,63 @@ export function Reels({ onClose, initialId }) {
   }
 
   // ---- In-place comments sheet (state hoisted above the keydown effect) ----
-  React.useEffect(() => { setCmtOpen(false); setCmts(null); setCText(''); setProgress(0); setBuffered(0); setDuration(0) }, [reel?.id])
+  React.useEffect(() => { setCmtOpen(false); setCmtFor(null); cmtForRef.current = null; setCmts(null); setCText(''); setProgress(0); setBuffered(0); setDuration(0) }, [reel?.id])
+  /* Live sheet: while comments are OPEN, the reel's post stream keeps them
+     moving — someone else's comment appears in place, deletions vanish, and
+     the reel's counters ride the deltas. A closed sheet holds no socket: a
+     swipe-heavy surface must not churn one connection per reel. Pinned to
+     `cmtFor` (the reel the sheet was OPENED for), not the current reel — a
+     swipe with the sheet open renders one frame where reel has advanced but
+     cmtOpen hasn't reset yet, and keying on reel.id would dial a throwaway
+     socket to the new reel (and let a late old-stream event patch it). The
+     handler double-checks the pin for the same one-frame reason. The server
+     filters our own echoes; the ledgers make replayed deliveries count
+     exactly once (rows were already deduped by id — counters must match). */
+  useRealtime('posts', cmtOpen && cmtFor ? cmtFor : null, {
+    onEvent: (evt) => {
+      if (!reel || reel.id !== cmtFor) return
+      const t = evt.eventType
+      if (t === 'COMMENT_CREATED' && evt.commentId) {
+        if (seenCR.current.has(evt.commentId)) return
+        seenCR.current.add(evt.commentId)
+        patch(r => ({ ...r, comments: (r.comments || 0) + 1 }))
+        setCmts(cs => !cs || cs.some(c => c.id === evt.commentId) ? cs : [...cs, {
+          id: evt.commentId,
+          _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
+                     initials: (evt.actorUsername || 'M').slice(0, 2).toUpperCase(), avc: 'linear-gradient(135deg,#1f4e7e,#00172f)' },
+          body: evt.textContent || '', time: 'now',
+        }])
+      } else if (t === 'COMMENT_DELETED' && evt.commentId) {
+        if (delCR.current.has(evt.commentId)) return
+        delCR.current.add(evt.commentId)
+        patch(r => ({ ...r, comments: Math.max(0, (r.comments || 0) - 1) }))
+        setCmts(cs => cs ? cs.filter(c => c.id !== evt.commentId) : cs)
+      } else if (t !== 'REPLY_CREATED') {
+        // REPLY_CREATED is deliberately counter-only-skipped too (the sheet
+        // renders no reply threads and a replayed +1 could never be audited);
+        // everything else — reactions, views, shares — rides the delta helper.
+        patch(r => applyPostDelta(r, evt))
+      }
+    },
+  })
   const openComments = () => {
+    const rid = reel.id
     setCmtOpen(true)
-    if (cmts == null) api.posts.comments(reel.id, { pageSize: 30 }).then(r => setCmts(r || [])).catch(() => setCmts([]))
+    setCmtFor(rid)
+    cmtForRef.current = rid
+    /* Refetch on EVERY open — the sheet holds no socket while closed, so
+       comments that landed in between would otherwise never appear (the old
+       `cmts == null` guard kept a stale list forever). Existing rows stay on
+       screen while the fresh page loads; the counter reconciles to at least
+       the fetched truth. A swipe mid-fetch nulls cmtForRef, so a late resolve
+       can never resurrect the previous reel's list onto the new one. */
+    api.posts.comments(rid, { pageSize: 30 }).then(r => {
+      if (cmtForRef.current !== rid) return
+      const list = r || []
+      list.forEach(c => seenCR.current.add(c.id))
+      setCmts(list)
+      patch(x => ({ ...x, comments: Math.max(x.comments || 0, list.length) }))
+    }).catch(() => setCmts(cs => cs || []))
   }
   const postCmt = () => {
     const v = cText.trim(); if (!v || cBusy) return
@@ -407,7 +465,7 @@ export function Reels({ onClose, initialId }) {
             <div className="rv-card rv-peek" aria-hidden="true">
               {r.media?.[0]?.poster
                 ? <div className="rv-bg" style={{ backgroundImage: `url(${r.media[0].poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }}/>
-                : <div className="rv-bg" style={{ background: r.media?.[0]?.bg || 'linear-gradient(160deg,#2a2317,#0d0b07)' }}/>}
+                : <div className="rv-bg" style={{ background: r.media?.[0]?.bg || 'linear-gradient(160deg,#1b2939,#080e16)' }}/>}
             </div>
           ) : null) : (
           <div className="rv-card">
@@ -437,7 +495,7 @@ export function Reels({ onClose, initialId }) {
               </div>
             ) : (
               <>
-                <div className="rv-bg" style={{ background: m0?.bg || 'linear-gradient(160deg,#2a2317,#0d0b07)' }}/>
+                <div className="rv-bg" style={{ background: m0?.bg || 'linear-gradient(160deg,#1b2939,#080e16)' }}/>
                 <div className="rv-center">{reel.body?.slice(0, 80)}</div>
               </>
             )}
@@ -569,7 +627,11 @@ export function Reels({ onClose, initialId }) {
                     const cu = authorOf(c)
                     return (
                       <div key={c.id} className="rvc-row">
-                        <span role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/u/${c.author}`)}>
+                        {/* Live-synthesized rows carry no author id (the thin
+                            wire has no actorId) — never navigate to /u/undefined. */}
+                        <span role={c.author ? 'button' : undefined}
+                          style={c.author ? { cursor:'pointer' } : undefined}
+                          onClick={() => c.author && navigate(`/u/${c.author}`)}>
                           <Avatar initials={cu.initials} color={cu.avc} size={30} src={cu.profileImage}/>
                         </span>
                         <div className="rvc-col">
@@ -581,7 +643,7 @@ export function Reels({ onClose, initialId }) {
                   })}
             </div>
             <div className="rvc-box">
-              <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#2d5f97,#16283f)" size={30} src={user?.profileImage}/>
+              <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={30} src={user?.profileImage}/>
               <input className="rvc-field" dir="auto" placeholder="Add a comment…" value={cText}
                 onChange={e => setCText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') postCmt() }}/>

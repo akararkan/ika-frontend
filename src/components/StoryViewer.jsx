@@ -12,8 +12,8 @@ import { api, adapters, assetUrl } from '../api/index.js'
 
 function gradientFor(id = '') {
   const grads = [
-    'linear-gradient(160deg,#16283f,#2d5f97)', 'linear-gradient(160deg,#5c422a,#b3873e)',
-    'linear-gradient(160deg,#3a5244,#5b7a67)', 'linear-gradient(160deg,#5c2f3a,#8a4a5b)',
+    'linear-gradient(160deg,#00172f,#1f4e7e)', 'linear-gradient(160deg,#3e5570,#1f4e7e)',
+    'linear-gradient(160deg,#426a5a,#5b7a67)', 'linear-gradient(160deg,#5c2f3a,#8a4a5b)',
     'linear-gradient(160deg,#463a5c,#6b5b8a)',
   ]
   let h = 0; for (let i = 0; i < String(id).length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
@@ -58,7 +58,9 @@ function VotersSheet({ poll, onClose }) {
 }
 
 // "Seen by" — author-only viewer list. Hydrates each viewerId into a user row.
-function ViewersSheet({ storyId, onClose }) {
+// `bump` ticks on every live story_viewed (stream 4) so an OPEN sheet refetches
+// as views land — no polling, and a closed sheet costs nothing.
+function ViewersSheet({ storyId, bump = 0, onClose }) {
   const [list, setList] = React.useState(null)
   React.useEffect(() => {
     let alive = true
@@ -68,7 +70,7 @@ function ViewersSheet({ storyId, onClose }) {
       if (alive) setList(users.filter(Boolean))
     }).catch(() => { if (alive) setList([]) })
     return () => { alive = false }
-  }, [storyId])
+  }, [storyId, bump])
   return (
     <div className="overlay open" onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ zIndex:62 }}>
       <div className="modal" style={{ maxWidth:440, width:'92%' }} onClick={e => e.stopPropagation()}>
@@ -109,13 +111,13 @@ function AddToHighlightSheet({ storyId, authorId, onClose }) {
         <div className="phead" style={{ padding:'14px 16px 4px' }}><h3 style={{ margin:0 }}><Icon name="star" className="sm"/> Add to highlight</h3><button className="icon-btn" onClick={onClose}><Icon name="close" className="sm"/></button></div>
         <div style={{ padding:'4px 16px 16px', maxHeight:'60vh', overflowY:'auto' }}>
           <button className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={newHl}>
-            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#1d3a5f' }}><Icon name="compose" className="sm"/></span>
+            <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background:'#002147' }}><Icon name="compose" className="sm"/></span>
             <div className="rail-info"><div className="rail-name"><b>New highlight</b></div></div>
           </button>
           {hls == null ? <div className="muted text-sm" style={{ padding:'10px 0' }}>Loading…</div>
             : hls.map(h => (
               <button key={h.highlightId || h.id} className="rail-row" style={{ width:'100%', textAlign:'left' }} onClick={() => addTo(h.highlightId || h.id)}>
-                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#5c422a,#b3873e)' }}/>
+                <span className="ntf-tile" style={{ width:38, height:38, borderRadius:10, background: h.coverUrl ? `center/cover no-repeat url("${assetUrl(h.coverUrl)}")` : 'linear-gradient(160deg,#3e5570,#1f4e7e)' }}/>
                 <div className="rail-info"><div className="rail-name"><b>{h.title}</b></div></div>
               </button>
             ))}
@@ -180,6 +182,19 @@ function PollWidget({ poll, isOwner, live }) {
   )
 }
 
+/* StoryByAuthor rows → viewer items. Module-level so the initial load and
+   every live reconcile (tray story_removed, stream-4 reconnect) map rows
+   identically. When the story has media, the StoryEditor has already baked
+   the text layers into the image — `textContent` is metadata for search/
+   notifications, never a duplicate center caption. */
+const mapStories = (rows) => (rows || []).map(r => ({
+  id: r.storyId, type: r.storyType, visibility: r.visibility,
+  bg: r.mediaUrl ? `#0b131d center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : gradientFor(r.storyId),
+  text: r.textContent || '',
+  hasMedia: !!r.mediaUrl,
+  time: adapters.timeAgo(r.createdAt),
+}))
+
 export function StoryViewer({ authorId, author, onClose }) {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -189,30 +204,32 @@ export function StoryViewer({ authorId, author, onClose }) {
   const [poll, setPoll] = React.useState(null)
   const [liveTally, setLiveTally] = React.useState(null)   // latest POLL_VOTE_CAST from the tray stream
   const [showViewers, setShowViewers] = React.useState(false)
+  const [seenBump, setSeenBump] = React.useState(0)   // ticks (debounced) per live story_viewed → the open Seen-by sheet refetches
+  const seenT = React.useRef(0)                       // trailing debounce — a viewer burst is ONE refetch, not one per event
+  React.useEffect(() => () => clearTimeout(seenT.current), [])
+  const pollRef = React.useRef(null)                  // current poll, for handlers that must name it without re-subscribing
   const [addHl, setAddHl] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const u = author || { full: 'Member', handle: 'member', initials: '··', avc: gradientFor(authorId) }
 
-  // Author-only: live poll tallies via the story-tray SSE (POLL_VOTE_CAST).
-  React.useEffect(() => {
-    if (!isOwner) return
-    return api.stories.trayStream({ onPollVote: (ev) => ev?.pollId && setLiveTally(ev) })
-  }, [isOwner])
+  /* Tray SSE: the author's live poll tallies (POLL_VOTE_CAST) — and, for
+     EVERYONE, `story_removed` for this author: the per-story stream 4 is not
+     emitted by the backend yet, so the tray event is the one live signal that
+     a story died while we watch. Its payload names only the author, so the
+     reconcile is a re-fetch of the authoritative list, never a guess. */
+  React.useEffect(() => api.stories.trayStream({
+    onPollVote: (ev) => { if (isOwner && ev?.pollId) setLiveTally(ev) },
+    onStoryRemoved: (ev) => {
+      if (String(ev?.authorId) !== String(authorId)) return
+      api.stories.byAuthor(authorId).then(rows => setItems(mapStories(rows))).catch(() => {})
+    },
+  }), [isOwner, authorId])
 
   React.useEffect(() => {
     let alive = true
     api.stories.byAuthor(authorId).then(rows => {
       if (!alive) return
-      setItems((rows || []).map(r => ({
-        id: r.storyId, type: r.storyType, visibility: r.visibility,
-        bg: r.mediaUrl ? `#141210 center/contain no-repeat url("${assetUrl(r.mediaUrl)}")` : gradientFor(r.storyId),
-        text: r.textContent || '',
-        // When the story has media, the StoryEditor has already baked the text
-        // layers into the image. The `textContent` field is metadata for
-        // search/notifications — do NOT render it as a duplicate center caption.
-        hasMedia: !!r.mediaUrl,
-        time: adapters.timeAgo(r.createdAt),
-      })))
+      setItems(mapStories(rows))
     }).catch(() => {}).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [authorId])
@@ -249,8 +266,71 @@ export function StoryViewer({ authorId, author, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, items.length, poll])
 
+  React.useEffect(() => { pollRef.current = poll }, [poll])
+
+  /* Per-story live stream (stream 4) while THIS story is on screen — one
+     socket per story, closed on advance/unmount by the effect cleanup.
+     (Emit-side the backend currently sends only connected/heartbeat here —
+     see storyStream's note — so today the tray subscription above carries
+     removals; everything below lights up the moment the server wires its
+     broadcasts, with the tray path staying idempotent beside it.)
+     · a remote delete / TTL expiry mid-view SKIPS the dead story instead of
+       leaving a ghost (the render guard snaps idx back when the shrink lands
+       past the end, and closes only when nothing is left);
+     · poll tallies move live for EVERY viewer — via setLiveTally, because
+       PollWidget snapshots `poll` at mount and `live` is its only live
+       channel. StoryRealtimeEvent spells the tallies pollVoteACount/BCount
+       (the tray says voteA/voteB) — accept both, fall back to a ±1 from
+       pollChoice when the counts are omitted;
+     · the owner's open "Seen by" sheet refreshes as views land (debounced —
+       a burst of viewers is one refetch). */
+  React.useEffect(() => {
+    const sid = item?.id
+    if (!sid) return undefined
+    let first = true
+    return api.stories.storyStream(sid, {
+      onConnected: () => {
+        // Every RE-connect reconciles what the dead socket missed (§3). The
+        // first connect skips — the [authorId] load just fetched this list.
+        if (first) { first = false; return }
+        api.stories.byAuthor(authorId).then(rows => setItems(mapStories(rows))).catch(() => {})
+      },
+      onRemoved: () => setItems(list => list.filter(x => x.id !== sid)),
+      onPollVoted: (ev) => {
+        if (!ev) return
+        const cur = pollRef.current
+        if (!cur) return
+        const a = typeof ev.voteA === 'number' ? ev.voteA
+          : typeof ev.pollVoteACount === 'number' ? ev.pollVoteACount
+          : (ev.pollChoice === 'A' ? (cur.voteA || 0) + 1 : undefined)
+        const b = typeof ev.voteB === 'number' ? ev.voteB
+          : typeof ev.pollVoteBCount === 'number' ? ev.pollVoteBCount
+          : (ev.pollChoice === 'B' ? (cur.voteB || 0) + 1 : undefined)
+        if (a == null && b == null) return
+        setPoll(p => p ? { ...p, voteA: a ?? p.voteA, voteB: b ?? p.voteB } : p)
+        setLiveTally({ pollId: ev.pollId ?? cur.pollId, voteA: a ?? cur.voteA, voteB: b ?? cur.voteB })
+      },
+      onViewed: () => {
+        if (!isOwner) return
+        clearTimeout(seenT.current)
+        seenT.current = setTimeout(() => setSeenBump(v => v + 1), 1200)
+      },
+    })
+  }, [item?.id, isOwner, authorId])
+
+  /* Every story gone (all deleted/expired, live or on load) → close — from an
+     effect, never mid-render: a render-phase onClose is a parent setState
+     during this component's render. */
+  React.useEffect(() => { if (!loading && !items.length) onClose() }, [loading, items.length, onClose])
+
   if (loading) return <div className="reels-view is-story" style={{ display:'grid', placeItems:'center', color:'#fff' }}>Loading…<button className="rv-close" onClick={onClose} style={{ position:'absolute', top:18, right:22 }}><Icon name="close"/></button></div>
-  if (!item) { onClose(); return null }
+  if (!item) {
+    /* A live shrink can land idx past the end (the last-position story died
+       remotely while earlier ones remain) — snap back during render (React's
+       sanctioned same-component pattern) instead of ejecting the viewer. */
+    if (items.length) { setIdx(items.length - 1); return null }
+    return null   // truly empty → the close effect above handles it
+  }
 
   const step = (d) => { const n = idx + d; if (n < 0) return; if (n >= items.length) { onClose(); return } setIdx(n) }
 
@@ -322,7 +402,7 @@ export function StoryViewer({ authorId, author, onClose }) {
               </div>
             )}
           </div>
-          {showViewers && <ViewersSheet storyId={item.id} onClose={() => setShowViewers(false)}/>}
+          {showViewers && <ViewersSheet storyId={item.id} bump={seenBump} onClose={() => setShowViewers(false)}/>}
         </div>
         <div className="rv-nav">
           <button onClick={() => step(-1)} disabled={idx === 0}><Icon name="chevup"/></button>

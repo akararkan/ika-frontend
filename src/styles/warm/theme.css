@@ -1,64 +1,105 @@
 /* =============================================================
-   IKA — "Warm Archive" theme · Porcelain edition (2026-07)
-   Navy from the IKA seal · gold accents · WHITE porcelain surfaces
-   Lora (serif) · IBM Plex Sans (UI) · Amiri (Arabic/Kurdish)
+   IKA — OXFORD edition (2026-07-30)
+   University of Oxford visual identity · Lora (serif) ·
+   IBM Plex Sans (UI) · Amiri (Arabic/Kurdish)
 
    Token base of the warm/ override layer. Imported AFTER the base
    styles and BEFORE the warm/* area files. Style-only: re-maps the
    token layer every existing rule reads, then re-skins shell
    primitives. No markup or JS changes needed.
 
-   Porcelain retune: the warm yellow paper canvas is replaced by a
-   clean white/near-white neutral family. Navy/gold/danger/green
-   accents and the on-navy cream text are unchanged — the brand
-   keeps its warmth in the accents, not in the canvas.
+   THE OXFORD SYSTEM (see OXFORD_THEME.md for the full spec):
+   · Oxford Blue  #002147 — the dominant identity: primary actions,
+     own-message bubbles, active nav, headings, seals.
+   · Oxford Sky   #B9D6F2 — the secondary: selected washes, on-dark
+     accents (everywhere the old gold lived on navy/dark surfaces).
+   · White #FFFFFF (body) + Off-White #F2F0F0 (rails, secondary
+     surfaces) — backgrounds only ever these two.
+   · Stone #D9D8D6 — borders, dividers, subtle chrome. Text/icon
+     neutrals stay COOL slate (ink family): stone is for lines,
+     never for words.
+   · Oxford Green #426A5A — success ONLY. Amber — warnings.
+     Muted red — errors/destructive. All three restrained, AA+.
+   · Dark surfaces (reels, stories, auth pane, lightbox) remain
+     dark by design and use the blue-black ramp, with off-white/sky
+     text — never pure grey-blacks, never the old warm blacks.
+   Legacy token NAMES (--gold, --brass…) are kept so every existing
+   rule keeps reading — their VALUES now point into the Oxford
+   ramp. New code should prefer the --ox-* names.
    ============================================================= */
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Amiri:ital,wght@0,400;0,700&display=swap');
 
 :root{
-  /* Ink / paper — porcelain neutrals (slate-leaning, zero yellow cast) */
+  /* ---- THE OXFORD RAMP (source of truth; new code reads these) ---- */
+  --ox-blue:#002147;         /* Oxford Blue — the identity            */
+  --ox-blue-deep:#00172f;    /* pressed / hover-on-primary            */
+  --ox-blue-mid:#163e66;     /* emphasised accent text on white (AA+) */
+  --ox-blue-link:#1f4e7e;    /* links, interactive, focus (7:1 on #fff)*/
+  --ox-blue-glow:#2e6094;    /* focus glow, hovers of link blue       */
+  --ox-steel:#7fa8ce;        /* muted accent, rings on dark           */
+  --ox-sky:#b9d6f2;          /* Oxford Sky Blue — the secondary       */
+  --ox-sky-bright:#d6e7f8;   /* bright on-dark accent text            */
+  --ox-sky-wash:#dce9f6;     /* accent wash (selected fills)          */
+  --ox-wash:#e7eff8;         /* quiet blue wash                       */
+  --ox-white:#ffffff;        /* Oxford White — the body               */
+  --ox-off-white:#f2f0f0;    /* Oxford Off-White — secondary surfaces */
+  --ox-stone:#d9d8d6;        /* Oxford Stone — borders & dividers     */
+  --ox-stone-soft:#e9e8e6;   /* hairlines                             */
+  --ox-stone-strong:#c2c1bf; /* pronounced borders                    */
+  --ox-green:#426a5a;        /* Oxford Green — SUCCESS ONLY           */
+  --ox-green-wash:#e4ede9;
+  --ox-amber:#8a5a17;        /* warnings — 5.6:1 on white             */
+  --ox-amber-wash:#f5ead7;
+  --ox-red:#9c3a33;          /* errors / destructive — 6.3:1 on white */
+  --ox-red-wash:#f6e4e2;
+
+  /* Ink / paper — text neutrals stay COOL slate (stone is for lines,
+     never for words); backgrounds are only ever white / off-white. */
   --ink:#1c2330;
   --ink-2:#232b3a;
   --ink-soft:#4d5768;
-  --muted:#6b7586;
-  --paper:#f7f8fa;
-  --paper-2:#fbfcfd;
-  --card:#ffffff;
-  --card-2:#f3f5f8;
-  --line:#e4e8ee;
-  --line-soft:#eef1f5;
+  --muted:#616b7c;   /* 4.5:1 on off-white, 5.2:1 on white — AA on BOTH surfaces */
+  --paper:var(--ox-white);       /* body — Oxford White               */
+  --paper-2:#f7f6f5;             /* rails — half-step to off-white    */
+  --card:var(--ox-white);
+  --card-2:var(--ox-off-white);
+  --line:var(--ox-stone);
+  --line-soft:var(--ox-stone-soft);
 
-  /* Brand — navy primary. Legacy token names re-pointed so every
-     existing rule (buttons, active nav, badges…) goes navy. */
-  --rubric:#1d3a5f;
-  --wash:#e8eef5;
-  --emerald:#1d3a5f;
-  --emerald-deep:#16283f;
-  --emerald-bright:#2d5f97;
-  --emerald-glow:#3a6ca5;
-  --brass:#b3873e;           /* verify seal & scholarly gold */
-  --brass-soft:#e5d3ac;
-  --brass-tint:#f6ecd8;
+  /* Brand — legacy token names, re-pointed into the Oxford ramp so
+     every existing rule (buttons, active nav, badges…) follows. */
+  --rubric:var(--ox-blue);
+  --wash:var(--ox-wash);
+  --emerald:var(--ox-blue);
+  --emerald-deep:var(--ox-blue-deep);
+  --emerald-bright:var(--ox-blue-link);
+  --emerald-glow:var(--ox-blue-glow);
+  --brass:var(--ox-blue-link);   /* the old scholarly gold, now blue  */
+  --brass-soft:var(--ox-sky);
+  --brass-tint:var(--ox-sky-wash);
   --rose:#b3453e;
-  --blue:#2d5f97;
+  --blue:var(--ox-blue-link);
 
-  /* Warm-archive vocabulary (aliases used by the warm/* layer) */
-  --navy:#1d3a5f;
-  --navy-deep:#16283f;
-  --blue-wash:#e8eef5;
-  --gold:#b3873e;
-  --gold-deep:#7a662f;
-  --gold-wash:#f6ecd8;
-  --good:#3d6b4f;
-  --good-wash:#e7f0e9;
-  --danger:#a03e36;
+  /* Warm-archive vocabulary (aliases used by the warm/* layer).
+     The gold names survive; their values are Oxford now. */
+  --navy:var(--ox-blue);
+  --navy-deep:var(--ox-blue-deep);
+  --blue-wash:var(--ox-wash);
+  --gold:var(--ox-blue-link);
+  --gold-deep:var(--ox-blue-mid);
+  --gold-wash:var(--ox-sky-wash);
+  --good:var(--ox-green);
+  --good-wash:var(--ox-green-wash);
+  --warn:var(--ox-amber);
+  --warn-wash:var(--ox-amber-wash);
+  --danger:var(--ox-red);
   --like:#b3453e;
 
-  /* Discipline spine colors — same warmth, navy-anchored */
+  /* Discipline spine colors — muted, Oxford-adjacent categoricals */
   --d-hadith:#8a4a5b;
-  --d-tafsir:#1d3a5f;
+  --d-tafsir:var(--ox-blue);
   --d-aqidah:#6b5b8a;
-  --d-fiqh:#7a5b3f;
+  --d-fiqh:#4e6580;
   --d-science:#2f6b72;
   --d-history:#5b7a67;
 
@@ -79,7 +120,7 @@
 
 /* ---------- Global surface & selection ---------- */
 body{background:var(--paper)}
-::selection{background:#dbe6f2;color:var(--ink)}
+::selection{background:#cbdff3;color:var(--ink)}
 a{color:var(--blue)}
 a:hover{color:var(--rubric)}
 
@@ -87,15 +128,15 @@ a:hover{color:var(--rubric)}
 .btn{border-radius:10px}
 .btn-primary{
   background:var(--rubric);
-  box-shadow:0 8px 18px -10px rgba(29,58,95,.55);
+  box-shadow:0 8px 18px -10px rgba(0,33,71,.55);
 }
 .btn-primary:hover{background:var(--emerald-deep)}
 .btn-lg{border-radius:12px}
 .cta-compose{
   background:var(--rubric);
-  box-shadow:0 10px 22px -10px rgba(29,58,95,.45);
+  box-shadow:0 10px 22px -10px rgba(0,33,71,.45);
 }
-.cta-compose:hover{box-shadow:0 14px 28px -12px rgba(29,58,95,.55)}
+.cta-compose:hover{box-shadow:0 14px 28px -12px rgba(0,33,71,.55)}
 
 /* ---------- Topbar ---------- */
 .topbar{
@@ -112,21 +153,21 @@ a:hover{color:var(--rubric)}
 /* ---------- Sidebar ---------- */
 .sidebar{background:var(--paper-2)}
 .nav-item{border-radius:10px}
-.nav-item.active{background:#e7edf6;color:var(--rubric)}
+.nav-item.active{background:#e1ebf6;color:var(--rubric)}
 .nav-item.active .ico{color:var(--rubric)}
 .nav-item .badge{background:var(--brass)}
 .nav-item.active .badge{background:var(--brass)}
 
 /* ---------- Inputs — boxed, clean ---------- */
 .field{
-  border:1px solid #d8dee8;border-bottom-color:#d8dee8;
-  border-radius:10px;background:#fcfdfe;padding:0 13px;height:42px;
+  border:1px solid #d9d8d6;border-bottom-color:#d9d8d6;
+  border-radius:10px;background:#ffffff;padding:0 13px;height:42px;
 }
-.field:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.field:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
 .field::placeholder{font-family:var(--sans);font-style:normal;color:#98a1b0}
 textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 .tag-input .tag-chips{
-  border:1px solid #d8dee8;border-radius:10px;background:#fcfdfe;padding:6px 10px;
+  border:1px solid #d9d8d6;border-radius:10px;background:#ffffff;padding:6px 10px;
 }
 
 /* ---------- Chips & tabs — filled pills ---------- */
@@ -137,7 +178,7 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 }
 .chip:first-child{border-left:1px solid var(--line);padding-left:16px}
 .chip:hover{border-color:var(--blue);color:var(--rubric)}
-.chip.on{background:var(--rubric);border-color:var(--rubric);color:#f7f3ea}
+.chip.on{background:var(--rubric);border-color:var(--rubric);color:#f2f0f0}
 .chips{gap:8px}
 .tab.on{color:var(--rubric);border-bottom-color:var(--brass)}
 
@@ -147,10 +188,13 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
   letter-spacing:.4px;font-size:11px;
 }
 .pill.scholar,.pill.role{color:var(--brass)}
-.verify{background:var(--blue)}
-.verify.scholar{background:var(--brass)}
+/* Two ranks, two blues: the scholar seal is the DEEPER Oxford Blue —
+   darker = more senior. (--blue and --brass now resolve to the same
+   link blue, so distinct literals are required here.) */
+.verify{background:var(--ox-blue-link)}
+.verify.scholar{background:var(--ox-blue)}
 .status{padding:3px 11px;border-radius:999px;letter-spacing:.5px}
-.status.published{color:#3d6b4f;background:#e7f0e9}
+.status.published{color:#426a5a;background:#e4ede9}
 .status.answered{color:var(--blue);background:var(--wash)}
 .status.open{color:var(--ink-soft);background:var(--card-2)}
 
@@ -168,18 +212,18 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 .botnav a.active,.botnav a.active .ico{color:var(--rubric)}
 .botnav a.mid .plus{
   background:var(--rubric);
-  box-shadow:0 7px 16px -7px rgba(29,58,95,.5);
+  box-shadow:0 7px 16px -7px rgba(0,33,71,.5);
 }
 
 /* ---------- Modal & toast ---------- */
 .overlay{background:rgba(15,21,32,.55)}
 .mhead h3{color:var(--rubric)}
-.toast{background:var(--ink);color:#eef2f7;border-radius:999px}
+.toast{background:var(--ink);color:#f2f0f0;border-radius:999px}
 .toast .ico{color:var(--brass-soft)}
 
 /* ---------- Placeholder swatch — subtle cool stripes ---------- */
 .ph-bg{
-  background:repeating-linear-gradient(45deg,#eef1f5 0 14px,#e6eaf1 14px 28px);
+  background:repeating-linear-gradient(45deg,#e9e8e6 0 14px,#e6eaf1 14px 28px);
 }
 .ph-bg::after{color:var(--muted);background:rgba(255,255,255,.85)}
 
@@ -187,6 +231,63 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 *{scrollbar-color:rgba(122,132,148,.45) transparent}
 *::-webkit-scrollbar-thumb{background:rgba(122,132,148,.4);background-clip:padding-box}
 *::-webkit-scrollbar-thumb:hover{background:rgba(77,88,105,.55);background-clip:padding-box}
+
+/* ---------- Oxford DARK palette (opt-in) ----------
+   The token remap for a future dark mode: set data-theme="dark" on
+   <html> and every token-driven rule follows. Surfaces are Oxford
+   blue-blacks (never neutral grey-black), Sky carries the accents,
+   and stone flips to hairline blues. NOTE: rules that hard-code
+   light-surface literals (the in-place hex layer in warm/*) do NOT
+   flip yet — full dark mode requires tokenising that layer first;
+   until then this block is the palette contract, not a switch. */
+:root[data-theme="dark"]{
+  --ink:#e8edf3;
+  --ink-2:#dce4ec;
+  --ink-soft:#a9b8c8;
+  --muted:#7f92a6;
+  --paper:#0a121c;           /* the body — deep Oxford night      */
+  --paper-2:#0e1826;         /* rails                             */
+  --card:#101c2c;            /* surfaces                          */
+  --card-2:#162436;
+  --line:#22344a;            /* stone flips to hairline blue      */
+  --line-soft:#1a2a3d;
+  --wash:#152a42;
+  --blue-wash:#152a42;
+  --rubric:#b9d6f2;          /* headings carry Sky on dark        */
+  --blue:#8fb8e0;            /* links — 7:1 on #0a121c            */
+  --navy:#b9d6f2;            /* "navy" accents read as Sky        */
+  --navy-deep:#d6e7f8;
+  --gold:#8fb8e0;
+  --gold-deep:#b9d6f2;
+  --gold-wash:#152a42;
+  --brass:#8fb8e0;
+  --brass-soft:#2e4a68;
+  --brass-tint:#152a42;
+  --good:#7fbfa5;
+  --good-wash:#12291f;
+  --warn:#d9a75a;
+  --warn-wash:#2c2210;
+  --danger:#d98078;
+  --like:#d98078;
+  --rose:#d98078;
+  /* The emerald aliases drive .btn-primary and friends: on dark they stay
+     BUTTON-capable blues (white text holds 8.6:1 on #1f4e7e), while
+     --rubric carries Sky for headings — two different jobs, two values. */
+  --emerald:#1f4e7e;
+  --emerald-deep:#2e6094;   /* hover LIGHTENS on dark */
+  --emerald-bright:#8fb8e0;
+  --emerald-glow:#a9cbe8;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.3);
+  --shadow:0 4px 16px -6px rgba(0,0,0,.55),0 1px 4px rgba(0,0,0,.35);
+  --shadow-lg:0 20px 60px -16px rgba(0,0,0,.75);
+}
+:root[data-theme="dark"] body{background:var(--paper)}
+:root[data-theme="dark"] ::selection{background:#1f4e7e;color:#fff}
+/* --rubric is Sky on dark (headings) but .btn-primary reads --rubric in the
+   light theme — on dark it must not become a sky slab with white text. */
+:root[data-theme="dark"] .btn-primary,
+:root[data-theme="dark"] .cta-compose{background:var(--emerald)}
+:root[data-theme="dark"] .btn-primary:hover{background:var(--emerald-deep)}
 
 /* ---------- Ayah / quote block ---------- */
 .ayah-block{

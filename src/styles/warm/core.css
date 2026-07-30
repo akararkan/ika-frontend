@@ -60,7 +60,7 @@
 .tb-search input::placeholder{font-family:var(--sans);font-style:normal;color:#98a1b0}
 .tb-search input:focus{
   border-color:var(--blue);background:var(--card);
-  box-shadow:0 0 0 3px rgba(45,95,151,.12);
+  box-shadow:0 0 0 3px rgba(31,78,126,.12);
 }
 
 /* Icon buttons — 38px bordered circles on card; .tint is the solid navy one */
@@ -71,8 +71,8 @@
 }
 .icon-btn:hover{background:var(--card-2);color:var(--ink)}
 .icon-btn:active{transform:scale(.92)}
-.icon-btn.tint{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
-.icon-btn.tint:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
+.icon-btn.tint{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
+.icon-btn.tint:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#f2f0f0}
 .icon-btn .dot{
   top:6px;right:auto;inset-inline-end:7px;                 /* RTL-safe corner */
   background:var(--gold);border-color:var(--card);
@@ -87,14 +87,14 @@
 /* ---------------- Sidebar nav ---------------- */
 .nav-item{color:var(--ink-soft)}
 .nav-item .ico{color:var(--ink-soft)}
-.nav-item:hover{background:#f2f5f9;color:var(--ink)}
+.nav-item:hover{background:#edf3fa;color:var(--ink)}
 .nav-item.active,
-.nav-item.active:hover{background:#e7edf6;color:var(--navy)}
+.nav-item.active:hover{background:#e1ebf6;color:var(--navy)}
 .nav-item.active .ico{color:var(--navy)}
 .nav-item .badge,
 .nav-item.active .badge{background:var(--gold);color:#fff}
 
-.cta-compose{border-radius:11px;background:var(--navy);color:#f7f3ea}
+.cta-compose{border-radius:11px;background:var(--navy);color:#f2f0f0}
 .cta-compose:hover{background:var(--navy-deep)}
 
 .you-card{background:var(--card);border-color:var(--line);border-radius:12px}
@@ -112,7 +112,7 @@
 .btn:active{transform:scale(.97)}
 .btn-primary:disabled{transform:none;box-shadow:none}
 .btn-secondary{background:transparent;border-color:var(--line);color:var(--ink-soft)}
-.btn-secondary:hover{background:var(--card-2);border-color:#ccd4e0;color:var(--ink)}
+.btn-secondary:hover{background:var(--card-2);border-color:#c2c1bf;color:var(--ink)}
 .btn-ghost{color:var(--ink-soft)}
 .btn-ghost:hover{background:var(--card-2);color:var(--ink)}
 /* Danger = quiet outline (prototype) — not a filled red slab */
@@ -153,13 +153,13 @@
   color:var(--ink-soft);transition:.15s;
 }
 .tab:hover{border-color:var(--blue);color:var(--navy)}
-.tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+.tab.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
 
 /* View-mode switcher — active segment goes navy (base shadow was rubric red) */
 .view-seg{background:var(--card);border-color:var(--line)}
 .vseg:hover{color:var(--navy)}
-.vseg.on{background:var(--navy);color:#f7f3ea;box-shadow:0 5px 12px -6px rgba(29,58,95,.45)}
-.vseg.on .ico{color:#f7f3ea}
+.vseg.on{background:var(--navy);color:#f2f0f0;box-shadow:0 5px 12px -6px rgba(0,33,71,.45)}
+.vseg.on .ico{color:#f2f0f0}
 
 /* ---------------- Cards ---------------- */
 .card{transition:border-color .15s ease,box-shadow .15s ease}
@@ -175,7 +175,7 @@
 .modal{box-shadow:var(--shadow-lg)}
 .mhead h3{color:var(--navy)}
 .mhead .x{background:var(--card-2);transition:background .15s ease,color .15s ease}
-.mhead .x:hover{background:#f2f5f9;color:var(--ink)}
+.mhead .x:hover{background:#edf3fa;color:var(--ink)}
 .mfoot{background:var(--paper-2);border-top:1px solid var(--line-soft)}
 
 /* ---------------- Dialogs (.dlg — confirm / prompt / share / follow-list) --- */
@@ -211,14 +211,14 @@
 
 /* Toast — warm ink pill (theme.css sets bg/radius; add depth + gold glint) */
 .toast{box-shadow:0 14px 34px -12px rgba(15,21,32,.5)}
-.toast .ico{color:#d9b96c}
+.toast .ico{color:#b9d6f2}
 
 /* ---------------- Lightbox ---------------- */
-.lightbox{background:rgba(20,17,12,.93)}
+.lightbox{background:rgba(8,14,22,.93)}
 .lb-img{border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.lb-close,.lb-nav{background:rgba(255,253,248,.14);color:#f3ecdd;transition:background .15s ease}
-.lb-close:hover,.lb-nav:hover{background:rgba(255,253,248,.26)}
-.lb-count{background:rgba(20,17,12,.6);color:#f3ecdd}
+.lb-close,.lb-nav{background:rgba(255,255,255,.14);color:#dce9f6;transition:background .15s ease}
+.lb-close:hover,.lb-nav:hover{background:rgba(255,255,255,.26)}
+.lb-count{background:rgba(8,14,22,.6);color:#dce9f6}
 
 /* ---------------- Reduced motion ---------------- */
 @media (prefers-reduced-motion:reduce){

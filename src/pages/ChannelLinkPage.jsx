@@ -52,12 +52,22 @@ export function ChannelLinkPage() {
   }, [handle])
 
   const open = async () => {
-    if (!ch || busy) return
+    if (!ch || busy || ch.pendingJoinRequest) return
     const isMember = ch.subscribed || String(ch.ownerId) === String(user?.id)
     if (!isMember) {
       setBusy(true)
       try {
-        await api.channels.subscribe(ch.id)
+        const res = await api.channels.subscribe(ch.id)
+        /* On a joinByRequest channel this FILES A REQUEST and answers with a
+           non-member (`pendingJoinRequest: true`) — navigating to the thread
+           would 403. Stay on the card and let it say what happened. */
+        if (res?.pendingJoinRequest) {
+          setCh(res)
+          setBusy(false)
+          showToast('Request sent — an admin needs to approve you')
+          return
+        }
+        if (res) setCh(res)
         try { const c = await api.chat.conversations.get(ch.id); if (c) upsertConvo(c) }
         catch { /* it will arrive with the next inbox load */ }
         showToast('Subscribed')
@@ -110,8 +120,10 @@ export function ChannelLinkPage() {
                 {ch.subscriberCount}<span className="cn-card-metaw">&nbsp;subscriber{ch.subscriberCount === 1 ? '' : 's'}</span>
               </span>
               <div className="cn-card-acts">
-                <button className="cn-btn primary" disabled={busy} onClick={open}>
-                  {busy ? 'Opening…' : isMember ? 'Open channel' : 'Subscribe & open'}
+                <button className="cn-btn primary" disabled={busy || ch.pendingJoinRequest} onClick={open}>
+                  {busy ? 'Opening…'
+                    : ch.pendingJoinRequest ? 'Awaiting approval'
+                    : isMember ? 'Open channel' : 'Subscribe & open'}
                 </button>
               </div>
             </footer>

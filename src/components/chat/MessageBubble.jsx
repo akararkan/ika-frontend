@@ -555,9 +555,13 @@ export function MessageBubble({
       }
       data-mid={msg.id}
     >
-      {/* avatar column — always occupies space so bubbles in a run stay aligned */}
+      {/* avatar column — always occupies space so bubbles in a run stay
+          aligned. The spacer class is `ghost`, NOT `hidden`: styles.css ships
+          a global `.hidden{display:none!important}` utility that collapses
+          the column entirely, which made every non-tail bubble slide left
+          into the gutter and jump right again on the avatar row. */}
       {!mine && (
-        <div className={'ch-row-av' + (showAvatar ? '' : ' hidden')}>
+        <div className={'ch-row-av' + (showAvatar ? '' : ' ghost')}>
           {showAvatar && (
             <button
               type="button"

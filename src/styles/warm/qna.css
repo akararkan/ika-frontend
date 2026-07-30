@@ -7,7 +7,7 @@
 
 /* ================= 1 · Page mast + tabs + toolbar ================= */
 
-/* Kicker — base hard-codes old rubric red #8a221b. */
+/* Kicker — base hard-codes old rubric red #7f2620. */
 .qna-page .phead-kicker{color:var(--gold-deep)}
 .qna-page .phead-kicker::before{background:var(--gold)}
 .qna-page .phead-ar{font-family:var(--arabic);color:var(--muted)}
@@ -22,10 +22,10 @@
   color:var(--ink-soft);transition:.15s;
 }
 .qna-page .tab:hover{color:var(--navy);border-color:var(--blue)}
-.qna-page .tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+.qna-page .tab.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
 
 /* View-mode segment — base .vseg.on ships a red drop shadow. */
-.qna-page .vseg.on{box-shadow:0 5px 12px -5px rgba(29,58,95,.45)}
+.qna-page .vseg.on{box-shadow:0 5px 12px -5px rgba(0,33,71,.45)}
 
 /* ================= 2 · Status pills (list + detail) ================= */
 /* Base .status is a bare letterspaced text line — Warm Archive reads
@@ -39,7 +39,7 @@
 .qna-page .status.answered,.qd-page .status.answered{background:var(--blue-wash);color:var(--blue)}
 .qna-page .status.closed,.qd-page .status.closed{background:var(--card-2);color:var(--muted)}
 /* resolved = has an accepted answer → the accepted-gold pair */
-.qna-page .status.resolved,.qd-page .status.resolved{background:#f4ead0;color:var(--gold-deep)}
+.qna-page .status.resolved,.qd-page .status.resolved{background:#dce9f6;color:var(--gold-deep)}
 .qna-page .status.resolved .ico,.qd-page .status.resolved .ico{color:var(--gold)}
 
 /* ================= 3 · Question cards (feed / grid / grouped) ================= */
@@ -103,7 +103,7 @@
 /* Resolved chip in the masthead — accepted-gold pill */
 .qd-page .qd-head .pill.scholar{
   padding:3px 10px;border-radius:999px;
-  background:#f4ead0;color:var(--gold-deep);
+  background:#dce9f6;color:var(--gold-deep);
   font-weight:700;letter-spacing:.4px;
 }
 .qd-page .qd-head .pill.scholar .ico{color:var(--gold)}
@@ -119,7 +119,7 @@
 .qd-page .section-label i{
   font-family:var(--sans);font-style:normal;
   font-size:12.5px;font-weight:700;letter-spacing:0;
-  color:#f7f3ea;background:var(--navy);
+  color:#f2f0f0;background:var(--navy);
   min-width:24px;height:24px;border-radius:999px;
   display:grid;place-items:center;padding:0 8px;
   font-variant-numeric:tabular-nums;box-shadow:none;
@@ -128,11 +128,11 @@
 /* ================= 5 · Answers ================= */
 .qd-page .answer{border:1.5px solid var(--line);border-radius:15px;padding:20px 22px;box-shadow:none}
 /* THE accepted moment — gold border, no red inset bar, no gradients */
-.qd-page .answer.accepted{background:var(--card);border-color:#d9b96c;box-shadow:none}
+.qd-page .answer.accepted{background:var(--card);border-color:#b9d6f2;box-shadow:none}
 .qd-page .ans-banner.accepted{
   display:inline-flex;width:fit-content;
   padding:4px 11px;border-radius:999px;margin-bottom:12px;
-  background:#f4ead0;color:var(--gold-deep);
+  background:#dce9f6;color:var(--gold-deep);
   font-size:11px;font-weight:700;letter-spacing:.8px;
 }
 .qd-page .ans-banner.accepted .ico{color:var(--gold)}
@@ -141,13 +141,13 @@
 .qd-page .ans-sources h5{color:var(--gold-deep);letter-spacing:.8px}
 
 /* Action states — base .on-brass is a red-tinted leftover */
-.qd-page .btn.on-brass{background:var(--gold-wash);color:var(--gold-deep);border-color:#d9b96c}
+.qd-page .btn.on-brass{background:var(--gold-wash);color:var(--gold-deep);border-color:#b9d6f2}
 .qd-page .btn.on-brass .ico{fill:var(--gold);stroke:var(--gold)}
 .qd-page .btn.on-rose{background:#f6e4e2;color:var(--like);border-color:#d9a49e}
 .qd-page .btn.on-rose .ico{fill:var(--like);stroke:var(--like)}
 /* Accept button once accepted → quiet gold endorsement */
-.qd-page .ans-accept.btn-secondary{color:var(--gold-deep);border-color:#d9b96c;background:var(--gold-wash)}
-.qd-page .ans-accept.btn-secondary:hover{background:#f4ead0;border-color:var(--gold)}
+.qd-page .ans-accept.btn-secondary{color:var(--gold-deep);border-color:#b9d6f2;background:var(--gold-wash)}
+.qd-page .ans-accept.btn-secondary:hover{background:#dce9f6;border-color:var(--gold)}
 
 /* Reply thread micro-interactions */
 .qd-page .cmt-meta button:hover{color:var(--navy)}
@@ -155,7 +155,7 @@
 /* ================= 6 · Answer composer ================= */
 /* No overflow:hidden here — MentionBox's .mention-pop must escape. */
 .qd-page .ans-composer.card{border-radius:16px;transition:border-color .15s ease,box-shadow .15s ease}
-.qd-page .ans-composer.card:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.08)}
+.qd-page .ans-composer.card:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,78,126,.08)}
 /* cite / attach / voice — square icon buttons (prototype composer) */
 .qd-page .ans-composer .icon-btn{
   width:40px;height:40px;border-radius:10px;

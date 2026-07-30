@@ -181,7 +181,7 @@ const tsOf = (x) => (x?.createdAt ? new Date(x.createdAt).getTime() : 0)
 export function FeedPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)' }
+  const me = user || { id:'me', full:'You', handle:'you', initials:'Y', avc:'linear-gradient(135deg,#1f4e7e,#00172f)' }
   const [posts, setPosts] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState(false)

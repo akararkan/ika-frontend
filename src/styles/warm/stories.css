@@ -9,17 +9,17 @@
 
 /* =============== 1 · Story / highlight viewer — the warm dark room ========== */
 /* Prototype .story-overlay backdrop */
-.reels-view.is-story{background:rgba(12,10,7,.92)}
+.reels-view.is-story{background:rgba(8,14,22,.92)}
 
 /* head: avatar + name in white over a soft warm scrim */
-.reels-view.is-story .rv-top{background:linear-gradient(180deg,rgba(10,8,5,.62),transparent)}
+.reels-view.is-story .rv-top{background:linear-gradient(180deg,rgba(8,14,22,.62),transparent)}
 .reels-view.is-story .rvm-time{font-variant-numeric:tabular-nums}
 
 /* close = outlined circle (prototype .story-nav treatment) */
 .reels-view.is-story .rv-close{
   background:rgba(255,255,255,.08);
   border:1px solid rgba(255,255,255,.25);
-  color:#e5ddc9;
+  color:#b9d6f2;
 }
 .reels-view.is-story .rv-close:hover{background:rgba(255,255,255,.14)}
 
@@ -29,8 +29,8 @@
 .reels-view.is-story .rv-progress i.cur::after{background:#fff}
 
 /* foot gradient (prototype .story-foot) + cream foot ink */
-.reels-view.is-story .rv-bg::after{background:linear-gradient(180deg,transparent 55%,rgba(10,8,5,.78))}
-.reels-view.is-story .rv-meta{color:#f2ecdf}
+.reels-view.is-story .rv-bg::after{background:linear-gradient(180deg,transparent 55%,rgba(8,14,22,.78))}
+.reels-view.is-story .rv-meta{color:#f2f0f0}
 
 /* center text (prototype .story-center .big) — serif, big, soft shadow */
 .reels-view.is-story .rv-center{
@@ -65,7 +65,7 @@
     width:46px;height:46px;
     background:transparent;
     border:1px solid rgba(255,255,255,.25);
-    color:#e5ddc9;
+    color:#b9d6f2;
     transition:background .15s ease,border-color .15s ease;
   }
   .reels-view.is-story .rv-nav button:hover:not(:disabled){background:rgba(255,255,255,.12)}
@@ -73,12 +73,12 @@
 
 /* =============== 2 · Story poll (viewer) — white-on-translucent ballot ====== */
 .sv-poll{
-  background:rgba(12,10,7,.58);
+  background:rgba(8,14,22,.58);
   border:1px solid rgba(255,255,255,.22);
   border-radius:18px;
   box-shadow:0 16px 44px rgba(0,0,0,.4);
 }
-.sv-poll-head{color:rgba(242,236,223,.85)}
+.sv-poll-head{color:rgba(242,240,240,.85)}
 .sv-poll-opt{
   background:rgba(255,255,255,.16);
   transition:border-color .15s ease,background .15s ease;
@@ -87,18 +87,18 @@
 .sv-poll-opt.mine{border-color:#ffffff}
 .sv-poll-fill{background:rgba(255,255,255,.25)}
 /* winning side fills gold — the archive's accent for "accepted" */
-.sv-poll-opt.win .sv-poll-fill{background:linear-gradient(90deg,rgba(179,135,62,.6),rgba(179,135,62,.35))}
+.sv-poll-opt.win .sv-poll-fill{background:linear-gradient(90deg,rgba(127,168,206,.6),rgba(127,168,206,.35))}
 .sv-poll-foot{color:rgba(255,255,255,.85);transition:color .15s ease}
 .sv-poll-foot:not(.static):hover{color:#fff}
 
 /* =============== 3 · Story editor — the atelier, re-skinned warm =========== */
-.story-editor{background:#141210}
+.story-editor{background:#0b131d}
 
 /* top bar: warm scrim, no gilded hairline */
-.se-bar{background:linear-gradient(180deg,rgba(10,8,5,.6),transparent)}
-.se-kicker{color:rgba(242,236,223,.55)}
+.se-bar{background:linear-gradient(180deg,rgba(8,14,22,.6),transparent)}
+.se-kicker{color:rgba(242,240,240,.55)}
 /* Arabic masthead — Amiri, quiet gold (kills base 'Scheherazade New' ref) */
-.se-bar-title b{font-family:var(--arabic);color:#d9b96c}
+.se-bar-title b{font-family:var(--arabic);color:#b9d6f2}
 
 /* buttons: rgba(255,255,255,.08), radius 12 */
 .se-bar-btn{
@@ -133,10 +133,10 @@
 .se-stage > div:not([class]){outline-color:rgba(255,255,255,.85)!important}
 
 /* tools panel + controls: white-translucent tiles, radius 12, cream actives */
-.se-tools{background:linear-gradient(180deg,transparent,rgba(10,8,5,.62) 30%)}
+.se-tools{background:linear-gradient(180deg,transparent,rgba(8,14,22,.62) 30%)}
 .se-fonts{background:rgba(255,255,255,.08);border-radius:12px}
 .se-font.on{background:var(--card);color:var(--navy)}
-.se-font.on i{color:rgba(29,58,95,.6)}
+.se-font.on i{color:rgba(0,33,71,.6)}
 .se-chip{background:rgba(255,255,255,.08);border-radius:12px;transition:background .14s ease,color .14s ease}
 .se-chip:hover{background:rgba(255,255,255,.16)}
 .se-chip.on{background:var(--card);color:var(--navy)}
@@ -146,27 +146,27 @@
 .se-bg-tile.on .se-bg-chip{border-color:#ffffff}
 
 /* inline text-edit overlay — warm ink glass */
-.se-edit{background:rgba(20,17,12,.85)}
+.se-edit{background:rgba(8,14,22,.85)}
 
 /* =============== 4 · Poll sticker (editor) — matches the viewer ballot ===== */
 .se-poll-sticker{
-  background:rgba(12,10,7,.62);
+  background:rgba(8,14,22,.62);
   border:1px solid rgba(255,255,255,.22);
   border-radius:18px;
   box-shadow:0 16px 44px rgba(0,0,0,.4);
 }
 .se-poll-sticker.on{outline:2px dashed rgba(255,255,255,.85)}
-.se-poll-sticker-head{color:rgba(242,236,223,.85)}
+.se-poll-sticker-head{color:rgba(242,240,240,.85)}
 .se-poll-sticker-opts > span{
   background:rgba(255,255,255,.16);
   border-color:rgba(255,255,255,.18);
 }
 .se-poll-or{color:rgba(255,255,255,.65)}
-/* fabs: edit = navy seal · delete = warm ink */
+/* fabs: edit = navy seal · delete = night ink */
 .se-poll-fab{border-color:#ffffff}
 .se-poll-fab.edit{background:var(--navy)}
 .se-poll-fab.edit:hover{background:var(--navy-deep)}
-.se-poll-fab.del{background:#221e17}
+.se-poll-fab.del{background:#101a28}
 
 /* poll editor card — light modal, hairline + warm shadow */
 .se-poll-card{

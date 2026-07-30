@@ -263,6 +263,7 @@ export function ConversationInfo({
 
   const [members, setMembers] = React.useState([])
   const [loadingMembers, setLoadingMembers] = React.useState(false)
+  const [membersHidden, setMembersHidden] = React.useState(false)
   const [invite, setInvite] = React.useState(null)
   const [media, setMedia] = React.useState([])
   const [savingSettings, setSavingSettings] = React.useState(false)
@@ -306,9 +307,11 @@ export function ConversationInfo({
   // Both inputs are hoisted to primitives so the declared deps and the ones the
   // compiler infers agree — a bare `convo` dep would refetch on every inbox tick.
   const convoId = convo?.id
+  const isChannel = !!convo?.isChannel
   const loadMembers = React.useCallback(async () => {
     if (!isGroup || !convoId) return
     setLoadingMembers(true)
+    setMembersHidden(false)
     try {
       // A group may hold up to 256 members (the eager-fan-out cutoff), so the
       // page size has to cover the whole roster or an admin silently loses
@@ -320,11 +323,15 @@ export function ConversationInfo({
         .filter(m => m.status === 'ACTIVE' || m.status === 'RESTRICTED')
         .sort((a, b) => (rank[a.role] - rank[b.role]) || a.username.localeCompare(b.username)))
     } catch (e) {
-      showToast(chatError(e, 'Could not load members'))
+      /* A channel with `hiddenSubscribers` answers 403 SUBSCRIBERS_HIDDEN for
+         everyone below admin — that is the setting doing its job, not a
+         failure, so the panel says so instead of raising an error toast. */
+      if (isChannel && e?.status === 403) { setMembers([]); setMembersHidden(true) }
+      else showToast(chatError(e, 'Could not load members'))
     } finally {
       setLoadingMembers(false)
     }
-  }, [isGroup, convoId])
+  }, [isGroup, isChannel, convoId])
 
   React.useEffect(() => { loadMembers() }, [loadMembers])
 
@@ -335,22 +342,40 @@ export function ConversationInfo({
     if (ids.length) watchUsers(ids)
   }, [members, convo?.peer?.id, watchUsers])
 
-  /* ----- shared media (best-effort: scan the recent page) ----- */
+  /* ----- shared media -----
+     The dedicated `media_by_conversation` index (`GET /conversations/{id}/media`)
+     — one row per attachment, newest first, no timeline scan, so the strip is
+     right even when the last 60 messages were all text. One request per kind;
+     an album arrives once, as its message. Falls back to scanning the recent
+     page on a deploy without the endpoint. */
   React.useEffect(() => {
     let alive = true
     if (!convo?.id) return undefined
-    api.chat.messages.page(convo.id, { limit: 60 })
-      .then(res => {
-        if (!alive) return
-        const assets = []
-        for (const m of res.items) {
-          for (const md of m.media || []) {
-            if (md.kind === 'IMAGE' || md.kind === 'VIDEO') assets.push(md)
-          }
+    const flat = (msgs) => {
+      const assets = []
+      for (const m of msgs) {
+        for (const md of m.media || []) {
+          if (md.kind === 'IMAGE' || md.kind === 'VIDEO') assets.push({ ...md, _at: m.createdAt || '' })
         }
-        setMedia(assets.slice(0, 12))
+      }
+      return assets
+    }
+    Promise.all([
+      api.chat.messages.media(convo.id, { kind: 'IMAGE', limit: 12 }),
+      api.chat.messages.media(convo.id, { kind: 'VIDEO', limit: 12 }),
+    ])
+      .then(([imgs, vids]) => {
+        if (!alive) return
+        setMedia(flat([...imgs, ...vids])
+          .sort((a, b) => (a._at < b._at ? 1 : a._at > b._at ? -1 : 0))
+          .slice(0, 12))
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!alive) return
+        api.chat.messages.page(convo.id, { limit: 60 })
+          .then(res => { if (alive) setMedia(flat(res.items).slice(0, 12)) })
+          .catch(() => {})
+      })
     return () => { alive = false }
   }, [convo?.id])
 
@@ -803,7 +828,14 @@ export function ConversationInfo({
               {convo.isChannel ? 'Subscribers' : 'Members'}
               <span className="ci-label-n">· {convo.memberCount || members.length}</span>
             </div>
-            {loadingMembers && !members.length && <Loader label="Loading members…"/>}
+            {loadingMembers && !members.length && !membersHidden && <Loader label="Loading members…"/>}
+            {membersHidden && (
+              <p className="ci-note">
+                <Icon name="eyeoff" className="xs"/>
+                This channel keeps its subscriber list private — only its admins
+                can see who is here. The count above stays public.
+              </p>
+            )}
             {visibleMembers.map(m => (
               <MemberRow
                 key={m.userId}

@@ -90,9 +90,9 @@ export default function App() {
               <Route path="chat/:id" element={<ChatPage/>}/>
               {/* A channel IS a conversation, so its POSTS live at
                   /chat/<channelId>. /channels discovers; /channels/:id is the
-                  channel's profile — cover, stories, highlights and the admin
-                  console, i.e. everything that describes the channel rather
-                  than carrying its posts. */}
+                  channel's profile — cover, badges and the admin console,
+                  i.e. everything that describes the channel rather than
+                  carrying its posts. */}
               <Route path="channels" element={<ChannelsPage/>}/>
               <Route path="channels/:id" element={<ChannelPage/>}/>
               {/* The routes behind the server-minted share links:

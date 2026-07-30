@@ -5,9 +5,8 @@
    timeline is the ordinary conversation at /chat/<id> and always
    was; what had no home until now is everything that describes
    the channel rather than carrying its posts — cover art, the
-   verified badge, the category, live stories, the permanent
-   highlight rail, and (for admins) the door into the management
-   console.
+   verified badge, the category, and (for admins) the door into
+   the management console.
 
    Three viewer states, not two, and the page has to say which:
      · SUBSCRIBED   → open the timeline
@@ -35,8 +34,6 @@ import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
 import { chatError } from '../components/chat/chatErrors.js'
 import { tintOf, crestOf, nfmt, dateLabel } from '../components/channels/channelArt.js'
-import { ChannelStoryRail } from '../components/channels/ChannelStories.jsx'
-import { ChannelHighlightRail } from '../components/channels/ChannelHighlights.jsx'
 import { ChannelManage } from '../components/channels/ChannelManage.jsx'
 
 /* The settings that a READER can see the effect of, rendered as plain badges.
@@ -273,13 +270,6 @@ export function ChannelPage() {
 
         {ch.description && <p className="cp-desc" dir="auto">{ch.description}</p>}
         <SettingBadges ch={ch}/>
-
-        {/* ---------- stories & highlights ----------
-            Both are audience-gated server-side (public → anyone, private →
-            subscribers), so they are rendered for everyone and the fetch
-            itself decides — a 403 simply yields an empty rail. */}
-        <ChannelStoryRail channel={ch} canManage={canManage}/>
-        <ChannelHighlightRail channel={ch} canManage={canManage}/>
 
         {/* ---------- what a non-member is being offered ---------- */}
         {!isMember && (

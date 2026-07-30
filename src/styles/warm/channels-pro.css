@@ -1,6 +1,6 @@
 /* =========================================================
-   CHANNELS PRO — profile, management console, stories,
-   highlights, statistics, and the channel-post surfaces
+   CHANNELS PRO — profile, management console, statistics,
+   and the channel-post surfaces
    ---------------------------------------------------------
    Loaded AFTER ika-messages-theme.css, so anything here that
    touches a shared class wins. It deliberately touches almost
@@ -13,22 +13,21 @@
      .ca-*   admins, rights, join requests
      .cil-*  invite links
      .cst-*  statistics (tiles + charts)
-     .cs-*   channel STORIES (rail, viewer, composer, tray)
-     .chl-*  HIGHLIGHTS (rail + sheet)
      .cc-*   post comments + tag lookup panels
      .pc-*   the poll/location/contact composer
      .ch-poll / .ch-loc / .ch-contact / .ch-postrail / .ch-vnote
              typed payloads and the post rail, inside a bubble
 
+   (Channel stories & highlights — the old .cs- and .chl-
+   blocks — were removed with the backend feature.)
+
    The `.tint-N` spine (chat-extras §20) supplies `--t` (the
    discipline hue) and `--tw` (its wash) — channel art is keyed
    on it so a channel wears one colour everywhere.
 
-   Z-INDEX. Only one surface here stacks: `.cs-viewer` at 150,
-   the same rung as the chat lightbox. Nothing exceeds 199 — the
-   confirm dialog (200) and the toast (200) are the app's
-   permanent ceiling and every destructive action in this file
-   raises one.
+   Z-INDEX. Nothing here stacks above 199 — the confirm dialog
+   (200) and the toast (200) are the app's permanent ceiling and
+   every destructive action in this file raises one.
    ========================================================= */
 
 /* =========================================================
@@ -95,7 +94,7 @@
    — there is nothing there to be illegible against. */
 .cp-cover-scrim{
   position:absolute;inset:0;
-  background:linear-gradient(to bottom,rgba(22,40,63,0) 40%,rgba(22,40,63,.38) 100%);
+  background:linear-gradient(to bottom,rgba(0,23,47,0) 40%,rgba(0,23,47,.38) 100%);
 }
 .cp-cover:not(.has-img) .cp-cover-scrim{ display:none; }
 
@@ -126,7 +125,7 @@
   display:grid;place-items:center;
   background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
   color:#fff;font-family:var(--serif);font-size:42px;font-weight:600;
-  text-shadow:0 1px 2px rgba(22,40,63,.4);
+  text-shadow:0 1px 2px rgba(0,23,47,.4);
 }
 /* A soft top-light across the crest — the same glass the app's medallions
    carry, so the derived monogram doesn't read flatter than a real photo. */
@@ -303,7 +302,7 @@
   flex:0 0 auto;width:38px;height:38px;border-radius:12px;overflow:hidden;
   display:grid;place-items:center;
   background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
-  color:#fffdf8;font-family:var(--serif);font-size:17px;font-weight:600;
+  color:#ffffff;font-family:var(--serif);font-size:17px;font-weight:600;
   box-shadow:inset 0 -8px 14px -10px rgba(0,0,0,.5);
 }
 .cm-head-mark img{ width:100%;height:100%;object-fit:cover;display:block; }
@@ -349,8 +348,8 @@
 .cm-tab-btn .ico{ color:var(--muted);transition:color .14s ease; }
 .cm-tab-btn:hover{ background:var(--gold-wash);color:var(--navy); }
 .cm-tab-btn:hover .ico{ color:var(--gold-deep); }
-.cm-tab-btn.on{ background:var(--navy);border-color:var(--navy);color:#f7f3ea; }
-.cm-tab-btn.on .ico{ color:#d9b96c; }
+.cm-tab-btn.on{ background:var(--navy);border-color:var(--navy);color:#f2f0f0; }
+.cm-tab-btn.on .ico{ color:#b9d6f2; }
 .cm-tab-btn:focus-visible{ outline:2px solid var(--blue);outline-offset:2px; }
 
 /* NOTE the names: .cm-pane / .cm-stack, not .cm-tab — the compose modal
@@ -430,17 +429,17 @@
   display:inline-flex;align-items:center;gap:6px;
   padding:6px 11px;border-radius:999px;cursor:pointer;
   border:1px solid rgba(255,255,255,.28);
-  background:rgba(22,40,63,.52);
+  background:rgba(0,23,47,.52);
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  color:#fffdf8;font:600 12px/1.3 var(--sans);white-space:nowrap;
+  color:#ffffff;font:600 12px/1.3 var(--sans);white-space:nowrap;
   transition:background .14s ease,border-color .14s ease;
 }
-.cm-art-btn:hover{ background:rgba(22,40,63,.74);border-color:rgba(255,255,255,.45); }
-.cm-art-btn:focus-within{ outline:2px solid #fffdf8;outline-offset:1px; }
+.cm-art-btn:hover{ background:rgba(0,23,47,.74);border-color:rgba(255,255,255,.45); }
+.cm-art-btn:focus-within{ outline:2px solid #ffffff;outline-offset:1px; }
 .cm-art-btn .ico{ width:13px;height:13px; }
 .cm-art-spin{
   width:12px;height:12px;border-radius:50%;flex:0 0 auto;
-  border:2px solid rgba(255,255,255,.35);border-top-color:#fffdf8;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#ffffff;
   animation:cnSpin .7s linear infinite;
 }
 
@@ -464,14 +463,14 @@
   width:100%;height:100%;border-radius:16px;
   display:grid;place-items:center;
   background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
-  color:#fffdf8;font-family:var(--serif);font-size:30px;font-weight:600;
+  color:#ffffff;font-family:var(--serif);font-size:30px;font-weight:600;
 }
 /* the camera seal on the avatar's corner — the one obvious "change me" */
 .cm-art-cam{
   position:absolute;inset-block-end:-6px;inset-inline-end:-6px;
   width:28px;height:28px;border-radius:50%;cursor:pointer;
   display:grid;place-items:center;
-  background:var(--navy);color:#f7f3ea;
+  background:var(--navy);color:#f2f0f0;
   box-shadow:0 0 0 2px var(--card);
   transition:background .14s ease,transform .14s ease;
 }
@@ -525,7 +524,7 @@
   background:var(--line);transition:background .2s ease,box-shadow .2s ease;
 }
 .cm-dirty.on{ color:var(--gold-deep); }
-.cm-dirty.on::before{ background:var(--gold);box-shadow:0 0 0 3px rgba(179,135,62,.18); }
+.cm-dirty.on::before{ background:var(--gold);box-shadow:0 0 0 3px rgba(127,168,206,.18); }
 .cm-save-note{ font-size:12px;color:var(--danger); }
 
 /* =========================================================
@@ -562,6 +561,28 @@
 .ca-rights-head .ci-label{ flex:1;margin:0; }
 
 .icon-btn.danger:hover{ color:var(--danger); }
+
+/* ---- the subscriber roster (same .ca-row anatomy) ----
+   The bar holds a growing search plus the add button; the roster rows reuse
+   .ca-row wholesale so admins and subscribers read as one system. */
+.ca-bar{ display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+.ca-bar-search{ min-width:0; }
+
+/* Picker rows are BUTTONS (whole row toggles), so undo the button chrome. */
+.ca-pick{
+  width:100%;font:inherit;text-align:start;cursor:pointer;
+  transition:border-color .14s ease,background .14s ease;
+}
+.ca-pick:hover:not(:disabled){ border-color:var(--ox-blue-link); }
+.ca-pick.on{ border-color:var(--ox-blue-link);background:var(--ox-wash); }
+.ca-pick.on > .ico{ color:var(--ox-blue-link); }
+.ca-pick:disabled{ cursor:default;opacity:.6; }
+
+.cn-tag.danger{
+  background:var(--ox-red-wash);color:var(--ox-red);border-color:var(--ox-red-wash);
+}
+
+.ca-more{ justify-content:center; }
 
 /* =========================================================
    5 · Invite links
@@ -748,290 +769,6 @@
 .cst-empty b{ color:var(--ink-soft); }
 
 /* =========================================================
-   7 · Channel stories — rail, viewer, composer, tray
-   ========================================================= */
-
-.cs-rail-wrap{ margin-top:4px; }
-
-/* 4px head-room on every edge: the halo grows 4% on hover, and a rail with
-   `overflow-x:auto` clips on the cross axis too — without the padding the
-   hover scale would shave the top of the ring. */
-.cs-rail{ display:flex;gap:12px;overflow-x:auto;padding:4px 2px 6px;scrollbar-width:thin; }
-
-.cs-add,.cs-ring{
-  flex:0 0 auto;border:0;background:transparent;cursor:pointer;padding:0;
-  display:grid;gap:7px;justify-items:center;width:80px;
-}
-.cs-add-mark{
-  width:78px;height:78px;border-radius:50%;
-  display:grid;place-items:center;
-  border:2px dashed var(--brass-soft);color:var(--gold-deep);
-  background:var(--gold-wash);
-  transition:border-color .16s ease,background .16s ease,transform .16s ease;
-}
-.cs-add:hover .cs-add-mark{
-  border-color:var(--gold);background:var(--brass-tint);transform:scale(1.04);
-}
-.cs-add-label,.cs-ring-meta{
-  font-size:11px;color:var(--muted);
-  max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-
-/* The halo IS the live marker — the platform's story-ring anatomy: a conic
-   brass ring painted on its own circle, the art inset by its own paper-
-   coloured border so ring and image never touch. Drawn this way (not as a
-   box-shadow) because a conic gradient cannot ride a shadow, and the flat
-   gold ring read as a tag rather than as a story. */
-.cs-halo{
-  display:block;padding:3px;border-radius:50%;
-  background:conic-gradient(from 210deg,
-    var(--gold) 0%, #e0bc74 22%, var(--gold-deep) 48%,
-    var(--gold) 72%, #e8ca8a 88%, var(--gold) 100%);
-  transition:transform .16s ease;
-}
-.cs-ring:hover .cs-halo,
-.cs-tray-item:hover .cs-halo{ transform:scale(1.04); }
-
-.cs-ring-art{
-  width:72px;height:72px;border-radius:50%;overflow:hidden;
-  display:grid;place-items:center;
-  border:2.5px solid var(--paper);
-  background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
-}
-.cs-ring-art img{ width:100%;height:100%;object-fit:cover; }
-.cs-ring-text{
-  /* Horizontal padding ONLY. -webkit-line-clamp clips at the content box, but
-     the padding box still paints — vertical padding leaked a ghost fourth
-     line under the ellipsis. The circle's grid centring supplies the vertical
-     breathing room instead. */
-  padding:0 9px;font-size:10.5px;line-height:1.35;color:#fff;text-align:center;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
-  overflow:hidden;
-}
-
-.cs-rail-empty{
-  margin:0;align-self:center;max-width:44ch;
-  font-size:12.5px;line-height:1.55;color:var(--muted);
-}
-
-/* ---- the viewer ---- */
-.cs-viewer{
-  position:fixed;inset:0;z-index:150;
-  display:grid;place-items:center;padding:24px 16px;
-  background:rgba(22,40,63,.86);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-}
-.cs-stage{
-  position:relative;
-  width:100%;max-width:460px;max-height:calc(100dvh - 48px);
-  display:flex;flex-direction:column;
-  background:var(--navy-deep);
-  border-radius:var(--r-xl);overflow:hidden;
-  box-shadow:var(--shadow-lg);
-}
-
-.cs-pips{ display:flex;gap:3px;padding:10px 12px 0; }
-.cs-pip{
-  flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.24);
-}
-.cs-pip.on{ background:var(--gold); }
-.cs-pip.done{ background:rgba(255,255,255,.55); }
-
-.cs-vhead{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 12px;color:#fff;
-}
-.cs-vwho{ flex:1;min-width:0;display:flex;align-items:center;gap:8px; }
-.cs-vcrest{
-  width:30px;height:30px;border-radius:50%;
-  display:grid;place-items:center;
-  background:var(--gold);color:#fff;font-family:var(--serif);font-size:14px;
-}
-.cs-vtitle{
-  font-size:13.5px;font-weight:600;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.cs-vtime{ font-size:11px;color:rgba(255,255,255,.6); }
-.cs-vacts{ display:flex;gap:2px;flex:0 0 auto; }
-.cs-vhead .icon-btn{ color:rgba(255,255,255,.8); }
-.cs-vhead .icon-btn:hover{ color:#fff;background:rgba(255,255,255,.12); }
-
-.cs-body{
-  flex:1;min-height:0;overflow-y:auto;
-  display:flex;flex-direction:column;
-}
-.cs-media{
-  width:100%;max-height:62vh;object-fit:contain;background:#000;
-  display:block;
-}
-.cs-textonly{
-  flex:1;display:grid;place-items:center;
-  padding:44px 24px;min-height:240px;
-  font-family:var(--serif);font-size:20px;line-height:1.5;color:#fff;text-align:center;
-}
-.cs-caption{
-  padding:12px 16px;font-size:13.5px;line-height:1.55;color:rgba(255,255,255,.88);
-}
-
-/* ---- the A/B poll on a story ---- */
-.cs-poll{ padding:14px 16px 18px;display:grid;gap:10px; }
-.cs-poll-q{ font-size:14px;font-weight:600;color:#fff; }
-.cs-poll-opts{ display:grid;gap:8px; }
-.cs-poll-opt{
-  position:relative;overflow:hidden;
-  display:flex;align-items:center;gap:10px;
-  padding:11px 14px;border-radius:var(--r);
-  border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);
-  color:#fff;font:inherit;font-size:13.5px;cursor:pointer;text-align:start;
-}
-.cs-poll-opt:hover{ border-color:rgba(255,255,255,.45); }
-.cs-poll-opt.mine{ border-color:var(--gold); }
-.cs-poll-fill{
-  position:absolute;inset-inline-start:0;inset-block:0;
-  width:var(--pct,0%);background:rgba(179,135,62,.34);
-  transition:width .28s ease;
-}
-.cs-poll-label{ position:relative;flex:1;min-width:0; }
-.cs-poll-pct{ position:relative;font-weight:600;font-size:12.5px; }
-.cs-poll-total{ font-size:11.5px;color:rgba(255,255,255,.6); }
-
-.cs-nav{
-  position:absolute;top:50%;transform:translateY(-50%);
-  border:0;cursor:pointer;
-  width:36px;height:36px;border-radius:50%;
-  display:grid;place-items:center;
-  background:rgba(22,40,63,.6);color:#fff;
-}
-.cs-nav:hover{ background:rgba(22,40,63,.85); }
-.cs-nav.prev{ inset-inline-start:8px; }
-.cs-nav.next{ inset-inline-end:8px; }
-
-/* ---- the sheet that rides over the viewer (viewers, archive picker) ---- */
-.cs-sheet{
-  position:absolute;inset-inline:0;bottom:0;
-  max-height:70%;display:flex;flex-direction:column;
-  background:var(--card);border-radius:var(--r-xl) var(--r-xl) 0 0;
-  box-shadow:var(--shadow-lg);
-}
-.cs-sheet-head{
-  flex:0 0 auto;display:flex;align-items:center;gap:10px;
-  padding:14px 16px;border-bottom:1px solid var(--line);
-}
-.cs-sheet-head h3{
-  flex:1;margin:0;display:flex;align-items:center;gap:6px;
-  font-family:var(--serif);font-size:15px;font-weight:600;color:var(--navy-deep);
-}
-.cs-sheet-body{ flex:1;min-height:0;overflow-y:auto;padding:10px 12px 16px; }
-.cs-sheet-empty{
-  margin:0;padding:20px 8px;text-align:center;
-  font-size:12.5px;line-height:1.6;color:var(--muted);
-}
-.cs-viewer-row{
-  display:flex;align-items:center;gap:10px;padding:7px 4px;
-  border-bottom:1px solid var(--line-soft);
-}
-.cs-viewer-id{
-  flex:1;min-width:0;font-size:12px;color:var(--ink-soft);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.cs-viewer-t{ font-size:11px;color:var(--muted); }
-
-/* ---- the composer ---- */
-.cn-modal-body.single{ display:block; }
-.cs-preview{
-  display:flex;align-items:flex-start;gap:10px;
-  padding:10px;border:1px solid var(--line);border-radius:var(--r);
-  background:var(--paper-2);
-}
-.cs-preview img,.cs-preview video{
-  width:96px;height:96px;object-fit:cover;border-radius:var(--r-sm);
-}
-.cs-ttl{ display:flex;gap:6px;flex-wrap:wrap; }
-.cs-pollform{
-  display:grid;gap:10px;padding:12px;
-  border:1px solid var(--line);border-radius:var(--r);background:var(--paper-2);
-}
-.cs-pollrow{ display:grid;grid-template-columns:1fr 1fr;gap:10px; }
-
-/* ---- the subscriber tray ---- */
-.cs-tray{ display:flex;gap:14px;overflow-x:auto;padding-bottom:6px; }
-.cs-tray-item{
-  flex:0 0 auto;border:0;background:transparent;cursor:pointer;padding:0;
-  display:grid;gap:6px;justify-items:center;width:76px;position:relative;
-}
-.cs-tray-ring{
-  width:62px;height:62px;border-radius:50%;overflow:hidden;
-  display:grid;place-items:center;
-  border:2.5px solid var(--paper);
-  background:linear-gradient(140deg,var(--navy),var(--navy-deep));
-}
-.cs-tray-ring img{ width:100%;height:100%;object-fit:cover; }
-.cs-tray-crest{ color:#fff;font-family:var(--serif);font-size:24px; }
-.cs-tray-name{
-  font-size:11px;color:var(--ink-soft);max-width:76px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.cs-tray-n{
-  position:absolute;top:-2px;inset-inline-end:2px;
-  min-width:17px;height:17px;padding:0 4px;border-radius:999px;
-  display:grid;place-items:center;
-  background:var(--gold);color:#fff;font-size:10px;font-weight:700;
-}
-
-/* =========================================================
-   8 · Highlights
-   ========================================================= */
-
-.chl-wrap{ margin-top:4px; }
-.chl-empty{
-  margin:0;max-width:56ch;
-  font-size:12.5px;line-height:1.6;color:var(--muted);
-}
-.chl-empty b{ color:var(--ink-soft); }
-
-.chl-rail{ display:flex;gap:14px;overflow-x:auto;padding:2px 2px 6px; }
-.chl-item{ flex:0 0 auto;display:grid;gap:7px;justify-items:center;width:84px; }
-/* Deliberately NOT the story halo: gold conic = "live right now", and a
-   highlight is the permanent archive. It wears the quiet double-ring of a
-   plate in a book — hairline, paper gap, art — and only warms on hover. */
-.chl-cover{
-  width:76px;height:76px;border-radius:50%;overflow:hidden;cursor:pointer;
-  display:grid;place-items:center;padding:0;
-  border:2.5px solid var(--paper);
-  background:linear-gradient(150deg,var(--card-2),var(--paper-2));
-  color:var(--gold-deep);
-  box-shadow:0 0 0 1px var(--line);
-  transition:box-shadow .16s ease,transform .16s ease;
-}
-.chl-cover img{ width:100%;height:100%;object-fit:cover;border-radius:50%; }
-.chl-cover:hover{ box-shadow:0 0 0 1.5px var(--gold);transform:scale(1.04); }
-.chl-cover:focus-visible{ outline:2px solid var(--blue);outline-offset:3px; }
-.chl-cover-mark{ width:22px;height:22px;opacity:.8; }
-.chl-title{
-  font-size:11.5px;color:var(--ink-soft);max-width:84px;text-align:center;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.chl-move{ display:flex;gap:2px; }
-
-.chl-pick{
-  display:flex;align-items:center;gap:10px;width:100%;
-  padding:8px;border:1px solid var(--line-soft);border-radius:var(--r-sm);
-  background:var(--card);cursor:pointer;text-align:start;margin-bottom:6px;
-}
-.chl-pick:hover{ border-color:var(--gold); }
-.chl-pick-art{
-  width:44px;height:44px;border-radius:var(--r-xs);overflow:hidden;flex:0 0 auto;
-  display:grid;place-items:center;background:var(--card-2);color:var(--muted);
-}
-.chl-pick-art img{ width:100%;height:100%;object-fit:cover; }
-.chl-pick-body{ flex:1;min-width:0;display:grid;gap:2px; }
-.chl-pick-t{
-  font-size:13px;color:var(--ink-soft);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.chl-pick-s{ font-size:11px;color:var(--muted); }
-
-/* =========================================================
    9 · Typed payloads inside a bubble
    ========================================================= */
 
@@ -1079,7 +816,7 @@
   transition:width .3s cubic-bezier(.2,.8,.3,1);
 }
 .ch-row.mine .ch-poll-fill{ background:rgba(255,255,255,.16); }
-.ch-poll-opt.right .ch-poll-fill{ background:rgba(61,107,79,.16); }
+.ch-poll-opt.right .ch-poll-fill{ background:rgba(66,106,90,.16); }
 .ch-poll-mark{
   position:relative;width:15px;flex:0 0 auto;
   display:grid;place-items:center;color:var(--navy);
@@ -1167,7 +904,7 @@
 .ch-vnote video{ width:100%;height:100%;object-fit:cover;display:block; }
 .ch-vnote-play{
   position:absolute;inset:0;display:grid;place-items:center;
-  background:rgba(22,40,63,.32);color:#fff;
+  background:rgba(0,23,47,.32);color:#fff;
 }
 
 /* ---- the channel-post rail ----
@@ -1524,10 +1261,7 @@
   .cp-facts dt{ flex:none; }
   .cp-facts dd{ text-align:start; }
 
-  .cs-pollrow,.pc-two{ grid-template-columns:1fr; }
-  .cs-stage{ max-width:none;height:100%;max-height:none;border-radius:0; }
-  .cs-viewer{ padding:0; }
-  .cs-media{ max-height:none;flex:1;min-height:0; }
+  .pc-two{ grid-template-columns:1fr; }
 
   .cst-tiles{ grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); }
   .cst-cols{ height:96px; }
@@ -1549,15 +1283,11 @@
   .ch-postrail{ max-width:100%; }
 }
 
-/* RTL: the only asymmetric marks are the story-viewer arrows, and they are
-   already written with logical properties. The chart bars grow from the inline
-   start, so they flip for free. Nothing to mirror by hand. */
+/* RTL: the chart bars grow from the inline start, so they flip for free.
+   Nothing to mirror by hand. */
 
 @media(prefers-reduced-motion:reduce){
-  .cs-poll-fill,.ch-poll-fill,.cst-col-bar{ transition:none; }
-  .cs-halo,.cs-add-mark,.chl-cover{ transition:none; }
-  .cs-ring:hover .cs-halo,.cs-tray-item:hover .cs-halo,
-  .cs-add:hover .cs-add-mark,.chl-cover:hover{ transform:none; }
+  .ch-poll-fill,.cst-col-bar{ transition:none; }
 }
 
 /* =========================================================
@@ -1608,7 +1338,7 @@
   height:32px;padding:0 13px;
   font-size:12.5px;background:var(--card-2);
 }
-.cn-chip.sm.on{ background:var(--navy);color:#f7f3ea; }
+.cn-chip.sm.on{ background:var(--navy);color:#f2f0f0; }
 
 /* ---- discovery cards: unclutter the cover's corner ---- */
 /* the ornament mark must never collide with the state flag — smaller, dimmer,
@@ -1665,7 +1395,7 @@
 .cm-modal .ci-switch::before{ content:"";position:absolute;inset:-11px; }
 
 /* ---- destructive affordance visible at rest, not only on hover ---- */
-.icon-btn.danger{ color:var(--danger);opacity:.72;border-color:rgba(160,62,54,.25); }
+.icon-btn.danger{ color:var(--danger);opacity:.72;border-color:rgba(156,58,51,.25); }
 .icon-btn.danger:hover{ opacity:1;background:#f6e4e2;color:var(--danger); }
 
 /* ---- invites: the creation box must not outweigh the links it produces ---- */

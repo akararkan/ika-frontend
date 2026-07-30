@@ -2,7 +2,7 @@
    ChannelManage — the admin console
    ---------------------------------------------------------
    Everything an admin can change about a channel, behind one
-   modal with six tabs. Which tabs appear is decided by the
+   tabbed modal. Which tabs appear is decided by the
    caller's OWN rights, read from `GET /channels/{id}/admins`
    rather than guessed from `myRole`: an admin with
    `canChangeInfo` off must not be shown an Info form whose every
@@ -34,6 +34,7 @@ import { channelSettingsTo } from '../../api/chat.js'
 import { chatError } from '../chat/chatErrors.js'
 import { useChat } from '../../context/ChatContext.jsx'
 import { ChannelAdmins, ChannelRequests } from './ChannelAdmins.jsx'
+import { ChannelSubscribers } from './ChannelSubscribers.jsx'
 import { ChannelInvites } from './ChannelInvites.jsx'
 import { ChannelStats } from './ChannelStats.jsx'
 import { tintOf, crestOf } from './channelArt.js'
@@ -495,6 +496,8 @@ export function ChannelManage({ channel, onClose, onChanged }) {
         'How the channel behaves for its subscribers.'],
       ['admins',    'Admins',   'shield',    !!me,
         'Rights only ever remove capability — a new admin starts with all of them.'],
+      ['subscribers','Subscribers','users',  !!me,
+        'Everyone who is in — and the door for letting people in or showing them out.'],
       ['invites',   'Invites',  'link',      may('canInviteUsers'),
         'Private doors into the channel — each link admits people on its own terms.'],
       ['requests',  'Requests', 'hourglass', may('canApproveJoinRequests'),
@@ -571,6 +574,7 @@ export function ChannelManage({ channel, onClose, onChanged }) {
                 {tab === 'info'       && <InfoTab channel={channel} onChanged={onChanged}/>}
                 {tab === 'settings'   && <SettingsTab channel={channel} onChanged={onChanged}/>}
                 {tab === 'admins'     && <ChannelAdmins channel={channel} myId={myId}/>}
+                {tab === 'subscribers'&& <ChannelSubscribers channel={channel} myId={myId} me={me} subscribe={subscribe}/>}
                 {tab === 'invites'    && <ChannelInvites channel={channel}/>}
                 {tab === 'requests'   && <ChannelRequests channel={channel} subscribe={subscribe}/>}
                 {tab === 'discussion' && <DiscussionTab channel={channel} onChanged={onChanged}/>}

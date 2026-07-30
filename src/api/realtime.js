@@ -130,12 +130,22 @@ export function applyPostDelta(post, evt) {
 }
 
 /* ---------------------------------------------------------
-   RESEARCH counter deltas — same model as posts (events carry
-   NO counts; apply +/-1 by type). `metrics` is the detail
+   RESEARCH counter deltas — reactions/comments ride the
+   granular events as +/-1 (they carry NO counts); the
+   *_COUNT_UPDATED family carries the named ABSOLUTE counter
+   (RESEARCH_BACKEND_NOTES A2) which is preferred when present
+   — an absolute can never drift under coalescing or a
+   reconnect replay, a blind +1 can. `metrics` is the detail
    page's { views, downloads, reactions, comments, saves,
    citations } object. Own actions are actor-skipped by the
    caller, so this only ever runs for OTHER users' events.
    --------------------------------------------------------- */
+/* Monotonic counters take max(local, absolute): a straight set could revert
+   an in-flight optimistic +1 (my own event is actor-skipped, so nothing would
+   ever correct it) or regress on a replayed stale absolute. Falls back to +1
+   when the wire omits the number. */
+const monoAbs = (evt, key, cur) => (typeof evt[key] === 'number' ? Math.max(cur, evt[key]) : cur + 1)
+
 export function applyResearchDelta(metrics, evt) {
   if (!metrics) return metrics
   const m = { ...metrics }
@@ -145,9 +155,9 @@ export function applyResearchDelta(metrics, evt) {
     case 'COMMENT_CREATED':
     case 'REPLY_CREATED':          m.comments  = (m.comments || 0) + 1; break
     case 'COMMENT_DELETED':        m.comments  = Math.max(0, (m.comments || 0) - 1); break
-    case 'VIEW_COUNT_UPDATED':     m.views     = (m.views || 0) + 1; break
-    case 'DOWNLOAD_COUNT_UPDATED': m.downloads = (m.downloads || 0) + 1; break
-    case 'CITATION_COUNT_UPDATED': m.citations = (m.citations || 0) + 1; break
+    case 'VIEW_COUNT_UPDATED':     m.views     = monoAbs(evt, 'viewCount', m.views || 0); break
+    case 'DOWNLOAD_COUNT_UPDATED': m.downloads = monoAbs(evt, 'downloadCount', m.downloads || 0); break
+    case 'CITATION_COUNT_UPDATED': m.citations = monoAbs(evt, 'citationCount', m.citations || 0); break
     // SAVE fires for save AND unsave — prefer the authoritative absolute count when
     // the wire carries it, else use the `saved` direction flag (guide §4).
     case 'SAVE_COUNT_UPDATED':

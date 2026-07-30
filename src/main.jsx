@@ -32,11 +32,11 @@ import './styles/warm/chat-extras.css'
    classes and wins on source order) and BEFORE responsive.css so the mobile
    one-pane collapse still has the final say. Style-only; no markup changes. */
 import './styles/warm/ika-messages-theme.css'
-/* The channel build-out: profile page, management console, stories,
-   highlights, statistics, and the typed message payloads (poll / location /
-   contact / video note). Sits AFTER the theme layer because a handful of its
-   rules extend shared `.cn-`/`.ch-` classes and must win on source order —
-   and still BEFORE responsive.css, which keeps the last word on layout. */
+/* The channel build-out: profile page, management console, statistics, and
+   the typed message payloads (poll / location / contact / video note). Sits
+   AFTER the theme layer because a handful of its rules extend shared
+   `.cn-`/`.ch-` classes and must win on source order — and still BEFORE
+   responsive.css, which keeps the last word on layout. */
 import './styles/warm/channels-pro.css'
 import './styles/warm/responsive.css'
 

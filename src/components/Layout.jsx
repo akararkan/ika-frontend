@@ -12,6 +12,7 @@ import { ComposeModal } from './ComposeModal.jsx'
 import { CallOverlay } from './chat/CallOverlay.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
+import { initChime, playChime } from '../lib/chime.js'
 import { api } from '../api/index.js'
 
 const NAV = [
@@ -105,24 +106,21 @@ export function Layout() {
 
   // live unread badge: seed from /unread/count, then SET from `unread-count` SSE
   // events (absolute — never hand-increment; aggregated rows wouldn't add up).
-  // Self-heals: a hard close (readyState 2 = expired token) → refresh + reopen.
+  // ONE shared stream app-wide (api.notifications.subscribe fans a single
+  // hardened socket out — watchdog + expired-token heal live in there, not
+  // here). The chime rides this subscription; the 1.2s throttle in chime.js
+  // absorbs coalesced bursts. `onConnected` fires on EVERY (re)connect and is
+  // the reconcile signal — a badge event missed while the socket was dead is
+  // recovered by re-reading the exact O(1) counter.
   React.useEffect(() => {
-    api.notifications.unreadCount().then(setUnread).catch(() => {})
-    let close = null, closed = false, healing = false
-    const open = () => {
-      close = api.notifications.stream({
-        onUnreadCount: setUnread,
-        onError: async (readyState) => {
-          if (closed || readyState !== 2 || healing) return   // 2 = CLOSED; 0/CONNECTING auto-reconnects
-          healing = true
-          try { await api.auth.refresh() } catch { /* refresh failed → leave it; RequireAuth handles 401s */ }
-          close?.(); open()
-          setTimeout(() => { healing = false }, 8000)
-        },
-      })
-    }
-    open()
-    return () => { closed = true; close?.() }
+    initChime()                                  // arm the autoplay unlock on the first gesture
+    const reseed = () => api.notifications.unreadCount().then(setUnread).catch(() => {})
+    reseed()
+    return api.notifications.subscribe({
+      onUnreadCount: setUnread,
+      onNotification: (n) => { if (n?.unread) playChime('notification') },
+      onConnected: reseed,
+    })
   }, [])
 
   const onSearch = (e) => {

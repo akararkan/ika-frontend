@@ -105,7 +105,7 @@ export function PlayableVideo({
     return (
       <div className={['media-video-shell', wrapperClassName].filter(Boolean).join(' ')} style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden', background:'#000', borderRadius: isModal ? 0 : 12, ...style }}>
         {!poster && !isDirectVideoUrl(src) ? (
-          <div style={{ position:'absolute', inset:0, display:'grid', placeItems:'center', background:'linear-gradient(135deg,#1a1714,#0e0b09)', color:'#fff', zIndex:1 }}>
+          <div style={{ position:'absolute', inset:0, display:'grid', placeItems:'center', background:'linear-gradient(135deg,#0d1520,#080e16)', color:'#fff', zIndex:1 }}>
             <div style={{ textAlign:'center', padding:'16px 18px', borderRadius:16, background:'rgba(255,255,255,.08)', backdropFilter:'blur(8px)' }}>
               <div style={{ width:54, height:54, borderRadius:'50%', display:'grid', placeItems:'center', margin:'0 auto 10px', background:'rgba(255,255,255,.16)' }}>
                 <span style={{ width:0, height:0, borderLeft:'14px solid white', borderTop:'9px solid transparent', borderBottom:'9px solid transparent', marginLeft:4 }} />

@@ -70,7 +70,12 @@ function buildUrl(path, query) {
   if (query && Object.keys(query).length) {
     const usp = new URLSearchParams()
     for (const [k, v] of Object.entries(query)) {
-      if (v !== undefined && v !== null && v !== '') usp.append(k, v)
+      if (v === undefined || v === null || v === '') continue
+      /* An array becomes a REPEATABLE param (?type=A&type=B) — the Spring
+         convention for multi-value filters. append(k, array) would join with
+         commas, which the server reads as one (invalid) enum value. */
+      if (Array.isArray(v)) { for (const item of v) { if (item != null && item !== '') usp.append(k, item) } }
+      else usp.append(k, v)
     }
     const qs = usp.toString()
     if (qs) url += (url.includes('?') ? '&' : '?') + qs

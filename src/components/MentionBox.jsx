@@ -15,9 +15,19 @@ import { api } from '../api/index.js'
 // The "@token" immediately before the caret (no whitespace inside it).
 const MENTION_RE = /(?:^|\s)@([\w.]*)$/
 
-export function MentionBox({ as = 'input', value = '', onChange, onKeyDown, className = '', ...rest }) {
+export const MentionBox = React.forwardRef(function MentionBox(
+  { as = 'input', value = '', onChange, onKeyDown, onBlur, className = '', ...rest },
+  fwdRef,
+) {
   const Tag = as
   const ref = React.useRef(null)
+  /* The chat Composer holds a ref to its textarea (autogrow, focus, caret) —
+     merge it with the internal one so this stays a true drop-in there too. */
+  const setRefs = React.useCallback((el) => {
+    ref.current = el
+    if (typeof fwdRef === 'function') fwdRef(el)
+    else if (fwdRef) fwdRef.current = el
+  }, [fwdRef])
   const anchor = React.useRef({ start: 0, caret: 0 })   // where the active @token sits
   const caretToSet = React.useRef(null)                 // caret to restore after an insert
   const seq = React.useRef(0)                            // drops stale search responses
@@ -33,9 +43,16 @@ export function MentionBox({ as = 'input', value = '', onChange, onKeyDown, clas
     }
   })
 
+  const lastQuery = React.useRef('')
   const search = (q) => {
     const mine = ++seq.current
-    api.users.search(q, { size: 6 })
+    lastQuery.current = q
+    /* The dedicated suggest endpoint is ranked, ~30s server-cached and
+       BLOCK-AWARE (you never see someone who blocked you); generic user
+       search filters none of that and stays only as the fallback for a
+       deploy without the mentions API. */
+    api.mentions.suggest(q, 6)
+      .catch(() => api.users.search(q, { size: 6 }))
       .then(list => {
         if (mine !== seq.current) return
         const rows = (list || []).slice(0, 6)
@@ -57,6 +74,10 @@ export function MentionBox({ as = 'input', value = '', onChange, onKeyDown, clas
   }
 
   const choose = (u) => {
+    // Lock-in signal: lets the activity feed say "you mentioned @x". The
+    // TARGET's notification fires from the server pipeline when the composed
+    // text is actually saved — never from this call. Fire-and-forget.
+    if (u.id) api.mentions.click(lastQuery.current, u.id).catch(() => {})
     const handle = u.handle || u.username || ''
     const el = ref.current
     const caret = el?.selectionStart ?? value.length
@@ -81,12 +102,14 @@ export function MentionBox({ as = 'input', value = '', onChange, onKeyDown, clas
   return (
     <div className="mention-wrap">
       <Tag
-        ref={ref}
+        ref={setRefs}
         className={className}
         value={value}
         onChange={onType}
         onKeyDown={onKey}
-        onBlur={() => setTimeout(() => setOpen(false), 130)}
+        /* Compose, don't override: the popup must still close on blur when the
+           caller passes its own onBlur (the chat Composer's stopTyping). */
+        onBlur={(e) => { setTimeout(() => setOpen(false), 130); onBlur?.(e) }}
         {...rest}
       />
       {open && items.length > 0 && (
@@ -112,4 +135,4 @@ export function MentionBox({ as = 'input', value = '', onChange, onKeyDown, clas
       )}
     </div>
   )
-}
+})

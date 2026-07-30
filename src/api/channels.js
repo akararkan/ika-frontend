@@ -14,10 +14,13 @@
      · reach         — per-post view/forward counters, stats
      · conversation  — a LINKED discussion group whose messages
                        are the channel's comments
-     · presence      — channel stories, highlights, the tray
+
+   (Channel stories & highlights were REMOVED from the backend —
+   every /channels/{id}/stories|highlights route now 404s. User
+   stories in ./stories.js are unaffected.)
 
    Two id families cross this file and they are NOT the same:
-   channel/conversation/user/story ids are UUIDs (plain strings),
+   channel/conversation/user ids are UUIDs (plain strings),
    while a POST id is a 64-bit Snowflake that does not survive a
    JS double. Every post id therefore goes through `mid()` and is
    compared with the ./ids.js helpers — never `-`, `>=` or
@@ -33,7 +36,6 @@
    cycle safe.
    ========================================================= */
 import { http } from './http.js'
-import { assetUrl } from './config.js'
 import { authorFrom, handleOf, timeAgo } from './adapters.js'
 import { msgFrom, convoFrom, channelFrom } from './chat.js'
 import { mid } from './ids.js'
@@ -74,7 +76,6 @@ export const RIGHT_KEYS = [
   'canChangeInfo',
   'canAddAdmins',
   'canManageLive',
-  'canManageStories',
 ]
 
 /** Label + one-line explanation for each right — the editor's copy. */
@@ -88,7 +89,6 @@ export const RIGHT_LABELS = {
   canChangeInfo:          ['Change info', 'Title, photo, cover, settings, discussion group.'],
   canAddAdmins:           ['Add admins', 'Promote, edit and demote other admins.'],
   canManageLive:          ['Manage live', 'Start and manage live streams and video chats.'],
-  canManageStories:       ['Manage stories', 'Post and delete stories and highlights.'],
 }
 
 /** AdminRights → a fully-populated flags object. `null` = full rights. */
@@ -247,92 +247,6 @@ export const JOIN_SOURCE_LABELS = {
   ADDED_BY_ADMIN: 'Added by an admin',
   COMMENT: 'Commented on a post',
   UNKNOWN: 'Unknown',
-}
-
-/* =========================================================
-   Stories & highlights
-   ---------------------------------------------------------
-   A channel story is an ORDINARY story whose author id is the
-   CHANNEL's id and whose visibility is "CHANNEL" — TTL, view
-   logs, polls and the tray SSE are the user-story machinery
-   unchanged. Highlights SNAPSHOT a story, so the archive
-   survives the source expiring; that is why the snapshot row
-   carries its own media rather than a story id to dereference.
-   ========================================================= */
-
-/** StoryByAuthorEntity → view story. `authorId` IS the channel id. */
-export function channelStoryFrom(dto) {
-  if (!dto) return null
-  const expiresAt = dto.expiresAt || null
-  return {
-    storyId: dto.storyId,
-    channelId: dto.authorId || null,
-    authorId: dto.authorId || null,
-    storyType: dto.storyType || 'IMAGE',
-    visibility: dto.visibility || 'CHANNEL',
-    mediaUrl: assetUrl(dto.mediaUrl || null),
-    thumbnailUrl: assetUrl(dto.thumbnailUrl || null),
-    textContent: dto.textContent || '',
-    createdAt: dto.createdAt || null,
-    expiresAt,
-    time: timeAgo(dto.createdAt),
-    expired: !!expiresAt && new Date(expiresAt).getTime() < Date.now(),
-  }
-}
-
-/** HighlightByAuthorEntity → view highlight. */
-export function channelHighlightFrom(dto) {
-  if (!dto) return null
-  return {
-    highlightId: dto.highlightId,
-    channelId: dto.authorId || null,
-    title: dto.title || 'Highlight',
-    coverUrl: assetUrl(dto.coverUrl || null),
-    displayOrder: dto.displayOrder ?? 0,
-    createdAt: dto.createdAt || null,
-  }
-}
-
-/** StoryInHighlightEntity → view snapshot (self-contained by design). */
-export function highlightStoryFrom(dto) {
-  if (!dto) return null
-  return {
-    highlightId: dto.highlightId,
-    storyId: dto.storyId,
-    channelId: dto.authorId || null,
-    storyType: dto.storyType || 'IMAGE',
-    mediaUrl: assetUrl(dto.mediaUrl || null),
-    thumbnailUrl: assetUrl(dto.thumbnailUrl || null),
-    textContent: dto.textContent || '',
-    createdAt: dto.createdAt || null,
-  }
-}
-
-/** ChannelStoryTrayItem → view tray row. */
-export function trayItemFrom(dto) {
-  if (!dto) return null
-  return {
-    channelId: dto.channelId,
-    handle: bare(dto.handle),
-    title: dto.title || 'Channel',
-    avatarUrl: assetUrl(dto.avatarUrl || null),
-    verified: !!dto.verified,
-    stories: (dto.stories || []).map(channelStoryFrom).filter(Boolean),
-  }
-}
-
-/** StoryPollEntity → view A/B poll (distinct from an in-post POLL message). */
-export function storyPollFrom(dto) {
-  if (!dto) return null
-  return {
-    pollId: dto.pollId,
-    storyId: dto.storyId,
-    question: dto.question || '',
-    optionA: dto.optionA || 'A',
-    optionB: dto.optionB || 'B',
-    authorId: dto.authorId || null,
-    createdAt: dto.createdAt || null,
-  }
 }
 
 /* =========================================================
@@ -502,94 +416,6 @@ export const channels = {
     },
   },
 
-  /* ---------- stories (posted AS the channel) ---------- */
-
-  stories: {
-    /** JSON create — `mediaUrl` must already be uploaded. Needs at least one
-     *  of mediaUrl / textContent. `lifetimeHours` is 8 | 16 | 24. */
-    async create(id, { storyType, textContent, mediaUrl, thumbnailUrl, lifetimeHours = 24 } = {}) {
-      return channelStoryFrom(await http.post(`/api/v1/channels/${id}/stories`, {
-        storyType: storyType || undefined,
-        textContent: textContent || undefined,
-        mediaUrl: mediaUrl || undefined,
-        thumbnailUrl: thumbnailUrl || undefined,
-        lifetimeHours,
-      }))
-    },
-    /** Multipart create — uploads through R2 first; type auto-detects. */
-    async upload(id, { media, thumbnail, storyType, textContent, lifetimeHours = 24 } = {}) {
-      const fd = new FormData()
-      if (media) fd.append('media', media)
-      if (thumbnail) fd.append('thumbnail', thumbnail)
-      if (storyType) fd.append('storyType', storyType)
-      if (textContent) fd.append('textContent', textContent)
-      fd.append('lifetimeHours', String(lifetimeHours))
-      return channelStoryFrom(await http.upload(`/api/v1/channels/${id}/stories`, fd))
-    },
-    /** Live stories, newest first. Public → anyone; private → subscribers. */
-    async list(id) {
-      const rows = await http.get(`/api/v1/channels/${id}/stories`)
-      return (rows || []).map(channelStoryFrom).filter(Boolean)
-    },
-    remove(id, storyId) { return http.del(`/api/v1/channels/${id}/stories/${storyId}`) },             // 204
-
-    /* Views reuse the SHARED story endpoints — a channel story is a story. */
-    recordView(storyId) { return http.post(`/api/v1/stories/${storyId}/views`, {}) },                 // 202
-    /** Owner/admins only; a plain subscriber is refused. Newest first. */
-    async viewers(storyId) {
-      const rows = await http.get(`/api/v1/stories/${storyId}/views`)
-      return (rows || []).map(v => ({
-        storyId: v?.storyId, viewerId: v?.viewerId, viewedAt: v?.viewedAt || null,
-        time: timeAgo(v?.viewedAt),
-      }))
-    },
-
-    /* A/B story poll — NOT the in-post POLL message type. */
-    async attachPoll(id, storyId, { question, optionA, optionB } = {}) {
-      return storyPollFrom(await http.post(`/api/v1/channels/${id}/stories/${storyId}/poll`, {
-        question, optionA, optionB,
-      }))
-    },
-    vote(pollId, choice)  { return http.post(`/api/v1/polls/${pollId}/vote`, {}, { query: { choice } }) },
-    results(pollId)       { return http.get(`/api/v1/polls/${pollId}/results`) },
-    myVote(pollId)        { return http.get(`/api/v1/polls/${pollId}/vote/me`) },
-
-    /** My subscribed channels that currently have live stories. */
-    async tray() {
-      const rows = await http.get('/api/v1/channels/stories/tray')
-      return (rows || []).map(trayItemFrom).filter(t => t && t.stories.length)
-    },
-  },
-
-  /* ---------- highlights (permanent profile rail) ---------- */
-
-  highlights: {
-    async list(id) {
-      const rows = await http.get(`/api/v1/channels/${id}/highlights`)
-      return (rows || []).map(channelHighlightFrom).filter(Boolean)
-        .sort((a, b) => a.displayOrder - b.displayOrder)
-    },
-    async create(id, { title, coverUrl } = {}) {
-      return channelHighlightFrom(await http.post(`/api/v1/channels/${id}/highlights`, {
-        title, coverUrl: coverUrl || null,
-      }))
-    },
-    /** Snapshot a LIVE story — archive it before the TTL fires or this 404s. */
-    async addStory(id, highlightId, storyId) {
-      return highlightStoryFrom(await http.post(`/api/v1/channels/${id}/highlights/${highlightId}/stories/${storyId}`, {}))
-    },
-    async stories(id, highlightId) {
-      const rows = await http.get(`/api/v1/channels/${id}/highlights/${highlightId}/stories`)
-      return (rows || []).map(highlightStoryFrom).filter(Boolean)
-    },
-    removeStory(id, highlightId, storyId) {
-      return http.del(`/api/v1/channels/${id}/highlights/${highlightId}/stories/${storyId}`)          // 204
-    },
-    remove(id, highlightId) { return http.del(`/api/v1/channels/${id}/highlights/${highlightId}`) },  // 204
-    /** Full left-to-right id list; foreign ids are skipped server-side. */
-    async reorder(id, order) {
-      const rows = await http.patch(`/api/v1/channels/${id}/highlights/order`, { order })
-      return (rows || []).map(channelHighlightFrom).filter(Boolean)
-    },
-  },
+  /* Channel stories & highlights were removed from the backend — the whole
+     /channels/{id}/stories|highlights surface (and the tray) now 404s. */
 }

@@ -39,7 +39,6 @@ import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
 import { chatError } from '../components/chat/chatErrors.js'
 import { tintOf, crestOf, nfmt } from '../components/channels/channelArt.js'
-import { ChannelStoryTray } from '../components/channels/ChannelStories.jsx'
 
 const HANDLE_RE = /^[a-z0-9_]{3,32}$/
 
@@ -354,9 +353,9 @@ function ChannelCard({ ch, onOpen, onToggle, onProfile, busy, mine, preview }) {
                 <Icon name="share" className="xs"/>
               </button>
             )}
-            {/* "About" is the profile — cover, stories, highlights, admin
-                console. "Open" is the posts. They are different places and the
-                card offers both rather than making one of them a mystery. */}
+            {/* "About" is the profile — cover, badges, admin console. "Open"
+                is the posts. They are different places and the card offers
+                both rather than making one of them a mystery. */}
             <button className="cn-btn" onClick={() => onProfile?.(ch)}>About</button>
             <button className="cn-btn" onClick={() => onOpen?.(ch)}>Open</button>
             {canToggle && (
@@ -636,9 +635,6 @@ export function ChannelsPage() {
             </button>
           </div>
         </header>
-
-        {/* ---- live channel stories, ahead of everything else ---- */}
-        <ChannelStoryTray onOpen={(c) => navigate(`/channels/${c.channelId}`)}/>
 
         {/* ---- my channels: the only place a private one shows up ---- */}
         {!!mine.length && (

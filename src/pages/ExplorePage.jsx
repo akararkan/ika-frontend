@@ -40,9 +40,9 @@ const detailHref = (h) => {
 
 /* Stable colour from username so the avatar matches the one on the detail page. */
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg,#2d5f97,#16283f)',
-  'linear-gradient(135deg,#b3873e,#5c422a)',
-  'linear-gradient(135deg,#5b7a67,#3a5244)',
+  'linear-gradient(135deg,#1f4e7e,#00172f)',
+  'linear-gradient(135deg,#1f4e7e,#3e5570)',
+  'linear-gradient(135deg,#5b7a67,#426a5a)',
   'linear-gradient(135deg,#8a4a5b,#5c2f3a)',
   'linear-gradient(135deg,#6b5b8a,#463a5c)',
 ]
@@ -380,7 +380,7 @@ export function ExplorePage() {
               <h3 className="x-kick">Trending reels</h3>
               {reels.length ? (<>
                 <button className="hero-reel" onClick={() => navigate('/reels')}>
-                  <span className="hr-ph" style={{ background: reels[0].media?.[0]?.bg || '#232b42' }}/>
+                  <span className="hr-ph" style={{ background: reels[0].media?.[0]?.bg || '#16223a' }}/>
                   <span className="hr-ov">
                     <span className="hr-play"><Icon name="play"/></span>
                     <span className="hr-tx">
@@ -392,7 +392,7 @@ export function ExplorePage() {
                 <div className="explore-reels">
                   {reels.slice(1).map(r => (
                     <button key={r.id} className="plate-reel" onClick={() => navigate('/reels')}>
-                      <span className="pr-scr" style={{ background:r.media?.[0]?.bg || '#232b42' }}>
+                      <span className="pr-scr" style={{ background:r.media?.[0]?.bg || '#16223a' }}>
                         <span className="pr-play"><Icon name="play"/></span>
                         <span className="pr-dur font-mono">▶ {fmt(r.views)}</span>
                       </span>

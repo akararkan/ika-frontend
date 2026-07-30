@@ -85,7 +85,7 @@ function StoryDraftPreview({ draft, onEdit, onClear }) {
 
 export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublished, onEdited }) {
   const { user } = useAuth()
-  const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#2d5f97,#16283f)' }
+  const me = user || { full: 'You', initials: 'Y', avc: 'linear-gradient(135deg,#1f4e7e,#00172f)' }
   const isEdit = !!editPost   // edit mode → PATCH /api/v1/posts/{id} (§6.4)
 
   const [tab, setTab] = React.useState(isEdit ? (editPost.type || 'TEXT') : type)

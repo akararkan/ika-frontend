@@ -148,7 +148,7 @@ export function ProfilePage() {
                 onClick={() => setHlOpen({ id: hid(h), title: h.title })}
                 title={`${h.title} — tap to view, drag to reorder`}>
                 <span className="st-ring unseen">
-                  <span className="st-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'linear-gradient(135deg,#d9b96c,#b3873e)' }}/>
+                  <span className="st-cover" style={h.coverUrl ? { backgroundImage:`url("${assetUrl(h.coverUrl)}")` } : { background:'linear-gradient(135deg,#b9d6f2,#1f4e7e)' }}/>
                 </span>
                 <b>{h.title}</b>
               </button>

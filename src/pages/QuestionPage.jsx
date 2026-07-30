@@ -60,6 +60,9 @@ export function QuestionPage() {
   const [q, setQ] = React.useState(null)
   const [answers, setAnswers] = React.useState([])
   const seenAns = React.useRef(new Set())   // answer ids ever shown → dedup the optimistic post vs the server's own-action SSE echo
+  const seenRe = React.useRef(new Set())    // reanswer ids whose replyCount bump already ran (echo/replay exactly-once)
+  const seenDel = React.useRef(new Set())   // answer/reply ids whose count DECREMENT already ran (own echo / replay exactly-once)
+  const pendingRe = React.useRef(new Map()) // root answer id → optimistic reply bumps still in flight (the echo lands on these)
   const [loading, setLoading] = React.useState(true)
 
   // answer composer
@@ -105,6 +108,11 @@ export function QuestionPage() {
   React.useEffect(() => {
     let alive = true
     setLoading(true)
+    // Fresh question → fresh exactly-once ledgers (ids are per-question; the
+    // component stays mounted across /qna/:id navigations).
+    seenRe.current = new Set()
+    seenDel.current = new Set()
+    pendingRe.current = new Map()
     api.qna.get(id).then(x => { if (alive) setQ(x) }).catch(() => { if (alive) setQ(false) }).finally(() => { if (alive) setLoading(false) })
     loadAnswers()
     return () => { alive = false }
@@ -132,13 +140,43 @@ export function QuestionPage() {
         if (upsertAnswer(fresh)) setQ(p => p && ({ ...p, answers: (p.answers || 0) + 1 }))   // count only on a real add
       } else if (t === 'REANSWER_CREATED' && fresh) {
         const rid = root || fresh.parentAnswerId
-        patchA(rid, x => ({ ...x, replyCount: (x.replyCount || 0) + 1 }))
-        setRepliesMap(m => m[rid] ? ({ ...m, [rid]: m[rid].some(r => r.id === fresh.id) ? m[rid] : [...m[rid], fresh] }) : m)
+        /* Q&A ECHOES the actor's own events (unlike posts/research), and the
+           echo can land BEFORE the POST resolves. `seenRe` makes every bump
+           exactly-once across replays; `pendingRe` absorbs the echo of a
+           reply THIS TAB posted optimistically (identity is the wrong dedup
+           key — my own reply from ANOTHER tab must still count here). An
+           absorbed echo also REPLACES my tmp row instead of appending a
+           twin, so the thread never momentarily shows the reply twice. */
+        if (rid && !seenRe.current.has(fresh.id)) {
+          seenRe.current.add(fresh.id)
+          const pending = pendingRe.current.get(rid) || 0
+          if (pending > 0) {
+            pendingRe.current.set(rid, pending - 1)
+            setRepliesMap(m => {
+              const list = m[rid]
+              if (!list || list.some(r => r.id === fresh.id)) return m
+              const ti = list.findIndex(r => String(r.id).startsWith('tmp-'))
+              return { ...m, [rid]: ti === -1 ? [...list, fresh]
+                : list.map((r, i) => i === ti ? { ...fresh, _replyToHandle: r._replyToHandle || null } : r) }
+            })
+          } else {
+            patchA(rid, x => ({ ...x, replyCount: (x.replyCount || 0) + 1 }))
+            setRepliesMap(m => m[rid] ? ({ ...m, [rid]: m[rid].some(r => r.id === fresh.id) ? m[rid] : [...m[rid], fresh] }) : m)
+          }
+        }
       } else if (t === 'ANSWER_DELETED') {
+        /* Deletes echo too: my optimistic decrement already ran (seenDel was
+           stamped in deleteA/deleteReply), and a replay must not decrement
+           twice. Row filters stay unconditional — they are idempotent. */
+        const countOnce = !seenDel.current.has(aid)
+        seenDel.current.add(aid)
         seenAns.current.delete(aid)
+        seenRe.current.delete(aid)
         setAnswers(arr => arr.filter(x => x.id !== aid))
-        if (root) { patchA(root, x => ({ ...x, replyCount: Math.max(0, (x.replyCount || 0) - 1) })); setRepliesMap(m => m[root] ? ({ ...m, [root]: m[root].filter(r => r.id !== aid) }) : m) }
-        else setQ(p => p && ({ ...p, answers: Math.max(0, (p.answers || 0) - 1) }))
+        if (root) {
+          if (countOnce) patchA(root, x => ({ ...x, replyCount: Math.max(0, (x.replyCount || 0) - 1) }))
+          setRepliesMap(m => m[root] ? ({ ...m, [root]: m[root].filter(r => r.id !== aid) }) : m)
+        } else if (countOnce) setQ(p => p && ({ ...p, answers: Math.max(0, (p.answers || 0) - 1) }))
       } else if (fresh && ['ANSWER_EDITED','ANSWER_REACTION_ADDED','ANSWER_REACTION_REMOVED','ANSWER_REACTION_CHANGED','ANSWER_ACCEPTED','ANSWER_UNACCEPTED'].includes(t)) {
         if (root) setRepliesMap(m => m[root] ? ({ ...m, [root]: m[root].map(r => r.id === fresh.id ? mergeViewer(fresh, r) : r) }) : m)
         else patchA(fresh.id, prev => mergeViewer(fresh, prev))
@@ -256,6 +294,7 @@ export function QuestionPage() {
   const deleteA = async (a) => {
     const ok = await uiConfirm({ title:'Delete this answer?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
+    seenDel.current.add(a.id)   // this decrement is THE one — the SSE echo/replay must not repeat it
     seenAns.current.delete(a.id)
     setAnswers(arr => arr.filter(x => x.id !== a.id))
     setQ(p => p && ({ ...p, answers:Math.max(0,(p.answers||0)-1) }))
@@ -267,7 +306,18 @@ export function QuestionPage() {
     const open = openReplies[a.id]
     setOpenReplies(o => ({ ...o, [a.id]: !open }))
     if (!open && !repliesMap[a.id]) {
-      try { const list = await api.qna.reanswers(id, a.id); setRepliesMap(m => ({ ...m, [a.id]: list || [] })) } catch { setRepliesMap(m => ({ ...m, [a.id]: [] })) }
+      try {
+        const list = await api.qna.reanswers(id, a.id)
+        // Loaded rows are counted in the server's replyCount already — a late
+        // SSE replay for any of them must not bump again…
+        ;(list || []).forEach(r => seenRe.current.add(r.id))
+        setRepliesMap(m => ({ ...m, [a.id]: list || [] }))
+        // …but our DISPLAYED replyCount can predate rows this fetch just
+        // returned (their event lost the race to this round trip and will be
+        // seenRe-skipped) — reconcile up to the authoritative list so the
+        // pre-seed can never strand the label below the rows it loaded.
+        patchA(a.id, x => ({ ...x, replyCount: Math.max(x.replyCount || 0, (list || []).length) }))
+      } catch { setRepliesMap(m => ({ ...m, [a.id]: [] })) }
     }
   }
   const submitReply = async (a) => {
@@ -279,14 +329,25 @@ export function QuestionPage() {
       replyToAnswerId: target?.id || null, replyToUserId: target?.userId || null, _replyToHandle: target?.handle || null }
     setRepliesMap(m => ({ ...m, [a.id]: [...(m[a.id]||[]), tmp] }))
     patchA(a.id, x => ({ ...x, replyCount:(x.replyCount||0)+1 }))
+    // The bump above is optimistic and the Q&A stream WILL echo this reply —
+    // possibly before the POST resolves. pendingRe lets the echo recognise it
+    // and absorb into this bump instead of adding a second one.
+    pendingRe.current.set(a.id, (pendingRe.current.get(a.id) || 0) + 1)
     try {
       const req = { body: v }
       const saved = file
         ? await api.qna.postReanswerUpload(id, targetId, buildAnswerForm(req, file.type.startsWith('audio') ? null : file, file.type.startsWith('audio') ? file : null))  // §11.6
         : await api.qna.postReanswer(id, targetId, req)
+      if (!seenRe.current.has(saved.id)) {
+        // The echo hasn't landed yet: retire the pending slot ourselves and
+        // stamp the id so the late echo (or a replay) is skipped entirely.
+        pendingRe.current.set(a.id, Math.max(0, (pendingRe.current.get(a.id) || 0) - 1))
+        seenRe.current.add(saved.id)
+      }
       // Swap the temp for the saved reply AND drop any duplicate the server's own SSE echo may have added.
       setRepliesMap(m => { const list = (m[a.id]||[]).map(r => r.id===tmp.id ? saved : r); return { ...m, [a.id]: list.filter((r,i,arr) => arr.findIndex(x => x.id === r.id) === i) } })
     } catch (e) {
+      pendingRe.current.set(a.id, Math.max(0, (pendingRe.current.get(a.id) || 0) - 1))
       setRepliesMap(m => ({ ...m, [a.id]: (m[a.id]||[]).filter(r => r.id !== tmp.id) }))   // roll back the optimistic reply
       patchA(a.id, x => ({ ...x, replyCount:Math.max(0,(x.replyCount||0)-1) }))
       showToast(qnaError(e, 'Could not reply'))
@@ -305,6 +366,7 @@ export function QuestionPage() {
   const deleteReply = async (aid, r) => {
     const ok = await uiConfirm({ title:'Delete this reply?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
+    seenDel.current.add(r.id)   // this decrement is THE one — the SSE echo/replay must not repeat it
     setRepliesMap(m => ({ ...m, [aid]: (m[aid]||[]).filter(x => x.id!==r.id) }))
     patchA(aid, x => ({ ...x, replyCount:Math.max(0,(x.replyCount||0)-1) }))
     api.qna.deleteAnswer(id, r.id).catch(() => {})
@@ -445,7 +507,7 @@ export function QuestionPage() {
                   {a.mediaUrl && (a.mediaType === 'VIDEO'
                     ? <video src={a.mediaUrl} poster={a.mediaThumbnailUrl || undefined} controls playsInline style={{ width:'100%', borderRadius:12, marginTop:12, background:'#000' }}/>
                     : <img src={a.mediaUrl} alt="" style={{ width:'100%', borderRadius:12, marginTop:12 }}/>)}
-                  {a.voiceUrl && <VoicePlayer src={a.voiceUrl} duration={a.voiceDurationSeconds} className="vp-flush"/>}
+                  {a.voiceUrl && <VoicePlayer src={a.voiceUrl} duration={a.voiceDurationSeconds} className="vnp-flush"/>}
                   {a.links && a.links.split(',').map(s => s.trim()).filter(Boolean).length > 0 && (
                     <div className="ans-links" style={{ marginTop:10, display:'flex', flexWrap:'wrap', gap:8 }}>
                       {a.links.split(',').map(s => s.trim()).filter(Boolean).map((url, j) => (
@@ -538,7 +600,7 @@ export function QuestionPage() {
               {/* reply composer + thread */}
               {replyTo === a.id && (
                 <div className="cmt-box" style={{ marginTop:10 }}>
-                  <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#2d5f97,#16283f)" size={28} src={user?.profileImage}/>
+                  <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={28} src={user?.profileImage}/>
                   <MentionBox className="field" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
                     onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null) } }}/>
                   <input ref={replyFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setReplyFile(f); e.target.value='' }}/>
@@ -576,7 +638,7 @@ export function QuestionPage() {
                         {!rEditing && r.mediaUrl && (r.mediaType === 'VIDEO'
                           ? <video src={r.mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, marginTop:8, background:'#000' }}/>
                           : <img src={r.mediaUrl} alt="" style={{ width:'100%', borderRadius:10, marginTop:8 }}/>)}
-                        {!rEditing && r.voiceUrl && <VoicePlayer src={r.voiceUrl} duration={r.voiceDurationSeconds} className="vp-flush"/>}
+                        {!rEditing && r.voiceUrl && <VoicePlayer src={r.voiceUrl} duration={r.voiceDurationSeconds} className="vnp-flush"/>}
                       </div>
                       <div className="cmt-meta">
                         <button onClick={() => reactReply(a.id, r)} disabled={isTmp} style={r._liked ? { color:'var(--rose)' } : undefined}><Icon name="heart" className="xs"/>{r.likes || 0}</button>

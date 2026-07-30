@@ -8,43 +8,43 @@
 
 :root{
   /* Ink / paper — pure white body, archival quiet surfaces */
-  --ink:#1b1813;
+  --ink:#101a28;
   --ink-2:#232b3a;
   --ink-soft:#4d5768;
   --muted:#9b948e;
   --paper:#ffffff;
-  --paper-2:#fbfcfd;
+  --paper-2:#f7f6f5;
   --card:#ffffff;
-  --card-2:#fbfcfd;
-  --line:#eff2f6;
-  --line-soft:#f3f5f8;
+  --card-2:#f7f6f5;
+  --line:#f0efee;
+  --line-soft:#f2f0f0;
 
   /* Brand — rubrication. Legacy token names kept so every existing
      rule keeps working; --emerald IS the rubric red now. */
-  --rubric:#1d3a5f;
-  --wash:#e8eef5;
-  --emerald:#1d3a5f;
-  --emerald-deep:#16283f;
-  --emerald-bright:#2d5f97;
-  --emerald-glow:#3a6ca5;
-  --brass:#1b1813;          /* default verify seal = ink */
-  --brass-soft:#e5d3ac;
-  --brass-tint:#e8eef5;
+  --rubric:#002147;
+  --wash:#e7eff8;
+  --emerald:#002147;
+  --emerald-deep:#00172f;
+  --emerald-bright:#1f4e7e;
+  --emerald-glow:#2e6094;
+  --brass:#101a28;          /* default verify seal = ink */
+  --brass-soft:#b9d6f2;
+  --brass-tint:#e7eff8;
   --rose:#b3453e;
-  --blue:#1f3a6e;
+  --blue:#163e66;
 
   /* Discipline spine colors (classic cloth-binding palette) */
-  --d-hadith:#1d3a5f;
-  --d-tafsir:#1f3a6e;
+  --d-hadith:#002147;
+  --d-tafsir:#163e66;
   --d-aqidah:#4a3a78;
-  --d-fiqh:#6e4a2f;
+  --d-fiqh:#4e6580;
   --d-science:#2f6b72;
   --d-history:#57534b;
 
-  /* Shadows — paper-light, warm ink */
-  --shadow-sm:0 1px 2px rgba(27,24,19,.04),0 2px 5px rgba(27,24,19,.03);
-  --shadow:0 3px 14px -6px rgba(27,24,19,.10),0 1px 4px rgba(27,24,19,.04);
-  --shadow-lg:0 16px 44px -14px rgba(27,24,19,.22);
+  /* Shadows — paper-light, Oxford ink */
+  --shadow-sm:0 1px 2px rgba(13,21,32,.04),0 2px 5px rgba(13,21,32,.03);
+  --shadow:0 3px 14px -6px rgba(13,21,32,.10),0 1px 4px rgba(13,21,32,.04);
+  --shadow-lg:0 16px 44px -14px rgba(13,21,32,.22);
 
   /* Radii — editorial restraint */
   --r-xs:7px; --r-sm:9px; --r:12px; --r-lg:14px; --r-xl:18px;
@@ -169,7 +169,7 @@ img{display:block;max-width:100%}
   font-size:10.5px;font-weight:600;letter-spacing:1.3px;
   text-transform:uppercase;
 }
-.pill.scholar{color:#7a662f}
+.pill.scholar{color:#163e66}
 .pill.role{color:var(--rubric)}
 .pill.dot::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor}
 
@@ -195,12 +195,12 @@ img{display:block;max-width:100%}
 }
 .btn-primary{
   background:var(--rubric);color:#fff;
-  box-shadow:0 6px 14px -8px rgba(29,58,95,.45);
+  box-shadow:0 6px 14px -8px rgba(0,33,71,.45);
 }
 .btn-primary:hover{background:var(--emerald-deep);transform:translateY(-1px)}
 .btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn-secondary{background:var(--card);border-color:var(--line);color:var(--ink-2)}
-.btn-secondary:hover{background:var(--card-2);border-color:#ccd4e0}
+.btn-secondary:hover{background:var(--card-2);border-color:#c2c1bf}
 .btn-ghost{background:transparent;color:var(--ink-2)}
 .btn-ghost:hover{background:var(--card-2)}
 .btn-lg{height:48px;padding:0 24px;font-size:15px;border-radius:11px}
@@ -223,7 +223,7 @@ img{display:block;max-width:100%}
 /* ---------- Inputs ---------- */
 .field{
   width:100%;height:42px;border-radius:0;
-  border:0;border-bottom:1px solid #dee3eb;background:transparent;
+  border:0;border-bottom:1px solid #d9d8d6;background:transparent;
   padding:0 2px;color:var(--ink);font-size:15px;
   transition:border-color .16s,box-shadow .16s;
 }
@@ -258,16 +258,16 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .brand{display:flex;align-items:center;gap:10px;width:200px;flex:none;min-width:0}
 .brand .mark{
   width:36px;height:36px;border-radius:50%;
-  background:linear-gradient(135deg,#fff 0%,#f7efe7 100%);
+  background:linear-gradient(135deg,#fff 0%,#dce9f6 100%);
   display:grid;place-items:center;color:var(--rubric);
-  box-shadow:0 8px 18px -8px rgba(27,24,19,.34),0 0 0 1px rgba(27,24,19,.06);
+  box-shadow:0 8px 18px -8px rgba(13,21,32,.34),0 0 0 1px rgba(13,21,32,.06);
   position:relative;overflow:hidden;flex:none;
 }
 .brand .mark::after{content:none}
 .brand .mark svg{width:18px;height:18px;position:relative;stroke:var(--rubric);stroke-width:1.8;fill:none}
 /* When the real logo image is present, the mark becomes a clean round badge. */
 .brand-img{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
-.brand .mark:has(.brand-img){background:#fff;border-radius:50%;box-shadow:0 6px 16px -8px rgba(27,24,19,.32),0 0 0 1px rgba(27,24,19,.06)}
+.brand .mark:has(.brand-img){background:#fff;border-radius:50%;box-shadow:0 6px 16px -8px rgba(13,21,32,.32),0 0 0 1px rgba(13,21,32,.06)}
 .brand .mark:has(.brand-img)::after{display:none}
 .brand .word{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.2px;color:var(--ink)}
 .brand .word b{color:var(--rubric)}
@@ -347,10 +347,10 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
   background:var(--rubric);
   color:#fff;font-weight:600;font-size:14.5px;
   display:flex;align-items:center;justify-content:center;gap:9px;
-  box-shadow:0 10px 22px -10px rgba(29,58,95,.4);
+  box-shadow:0 10px 22px -10px rgba(0,33,71,.4);
   transition:.16s;
 }
-.cta-compose:hover{transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(29,58,95,.5)}
+.cta-compose:hover{transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(0,33,71,.5)}
 
 .you-card{
   margin-top:auto;display:flex;align-items:center;gap:10px;
@@ -438,7 +438,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .tag-input{position:relative;margin-top:12px}
 .tag-input .tag-chips{
   display:flex;flex-wrap:wrap;gap:6px;align-items:center;
-  border:0;border-bottom:1px solid #dee3eb;border-radius:0;
+  border:0;border-bottom:1px solid #d9d8d6;border-radius:0;
   background:transparent;padding:6px 2px;min-height:42px;
 }
 .tag-input .tag-chips input:focus{outline:0}
@@ -486,7 +486,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .botnav a.mid .plus{
   width:48px;height:38px;border-radius:13px;display:grid;place-items:center;
   background:var(--rubric);
-  color:#fff;box-shadow:0 7px 16px -7px rgba(29,58,95,.45);
+  color:#fff;box-shadow:0 7px 16px -7px rgba(0,33,71,.45);
 }
 .botnav a.mid .plus .ico{width:22px;height:22px;stroke-width:2.4}
 @media(max-width:720px){.botnav{display:flex}}
@@ -495,7 +495,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 .toast{
   position:fixed;bottom:96px;left:50%;
   transform:translateX(-50%) translateY(20px);
-  z-index:200;background:var(--ink);color:#eef2f7;
+  z-index:200;background:var(--ink);color:#f2f0f0;
   padding:11px 18px;border-radius:11px;font-weight:500;font-size:13.5px;
   box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;
   transition:.25s ease;display:flex;align-items:center;gap:9px;
@@ -506,7 +506,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 /* ---------- Overlay / modal ---------- */
 .overlay{
   position:fixed;inset:0;z-index:120;display:none;
-  background:rgba(27,24,19,.5);backdrop-filter:blur(6px);
+  background:rgba(13,21,32,.5);backdrop-filter:blur(6px);
   align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;
 }
 .overlay.open{display:flex;animation:fade .22s}
@@ -563,14 +563,14 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
 /* placeholder swatch */
 .ph-bg{
   background:
-    repeating-linear-gradient(135deg,rgba(31,27,22,.04) 0 8px,transparent 8px 16px),
-    linear-gradient(140deg,#ccd4e0,#c3cbd9);
+    repeating-linear-gradient(135deg,rgba(15,25,38,.04) 0 8px,transparent 8px 16px),
+    linear-gradient(140deg,#c2c1bf,#c2c1bf);
   position:relative;
 }
 .ph-bg::after{
   content:attr(data-label);
   position:absolute;inset:auto auto 8px 10px;
   font-family:var(--mono);font-size:10.5px;
-  color:rgba(27,24,19,.55);letter-spacing:.3px;
+  color:rgba(13,21,32,.55);letter-spacing:.3px;
   background:rgba(255,255,255,.7);padding:2px 7px;border-radius:5px;
 }

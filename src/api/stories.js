@@ -10,6 +10,55 @@ import { API_BASE, session } from './config.js'
 // different route, change TRAY_PATH (this one constant) to match.
 const TRAY_PATH = '/api/v1/stories/tray/stream'
 
+/* Shared skeleton for both story streams (tray + per-story): casing-agnostic
+   listeners (backends have shipped both lower_snake `event:` names and raw
+   UPPER_SNAKE enums; EventSource dispatches each event to exactly one
+   listener, so double-registering never double-fires), the unnamed `message`
+   fallback routed by payload type, and the overview.md §3 watchdog: server
+   beats every ~25s, so >60s of total silence is a wedged proxy the browser
+   never declared dead → ONE fresh socket. The token is re-read on every dial
+   WE make (initial, watchdog, heal) — but the browser's own auto-reconnects
+   reuse the ORIGINAL url, so after the ~hourly token rotation the first
+   auto-reconnect 401s and the EventSource dies CLOSED with no retry; the
+   onerror heal below re-dials with a fresh token. Returns an unsubscribe fn. */
+function hardenedStoryStream(path, eventNames, route, onError) {
+  const parse = (e) => { try { return JSON.parse(e.data) } catch { return {} } }
+  let es = null
+  let lastBeat = Date.now()
+  let closed = false
+  const connect = () => {
+    if (closed) return
+    const token = session.getToken()
+    const url = `${API_BASE}${path}` + (token ? `?token=${encodeURIComponent(token)}` : '')
+    es = new EventSource(url, { withCredentials: true })
+    es.onerror = () => {
+      onError?.(es.readyState)
+      // CLOSED never retries by itself (stale ?token after rotation is the
+      // usual cause). Re-dial with a fresh token; the delay bounds any loop
+      // and the readyState re-check skips if a newer socket is already live.
+      if (closed || es.readyState !== 2) return
+      setTimeout(() => {
+        if (!closed && es?.readyState === 2) { lastBeat = Date.now(); connect() }
+      }, 3000)
+    }
+    eventNames.forEach(n => {
+      es.addEventListener(n,               (e) => { lastBeat = Date.now(); route(n, parse(e)) })
+      es.addEventListener(n.toUpperCase(), (e) => { lastBeat = Date.now(); route(n, parse(e)) })
+    })
+    es.addEventListener('message', (e) => { lastBeat = Date.now(); route(null, parse(e)) })
+  }
+  connect()
+  const watchdog = setInterval(() => {
+    if (closed) return
+    if (Date.now() - lastBeat > 60000) {
+      try { es?.close() } catch { /* noop */ }
+      lastBeat = Date.now()
+      connect()
+    }
+  }, 15000)
+  return () => { closed = true; clearInterval(watchdog); try { es?.close() } catch { /* noop */ } }
+}
+
 export const stories = {
   byAuthor(authorId) { return http.get(`/api/v1/stories/by-author/${authorId}`) },
   create(req)        { return http.post('/api/v1/stories', req) },
@@ -40,26 +89,57 @@ export const stories = {
       (named if the server set `event:`, else `message`), so nothing double-fires
       — and a casing change on the server can never silently kill live updates. */
   trayStream({ onNewStory, onStoryRemoved, onPollVote, onConnected, onError } = {}) {
-    const token = session.getToken()
-    const url = `${API_BASE}${TRAY_PATH}` + (token ? `?token=${encodeURIComponent(token)}` : '')
-    const es = new EventSource(url, { withCredentials: true })
-    const parse = (e) => { try { return JSON.parse(e.data) } catch { return {} } }
     const route = (name, data) => {
       switch ((name || data.eventType || data.type || '').toUpperCase()) {
         case 'NEW_STORY':      return onNewStory?.(data)
         case 'STORY_REMOVED':  return onStoryRemoved?.(data)
         case 'POLL_VOTE_CAST': return onPollVote?.(data)
         case 'CONNECTED':      return onConnected?.(data)
-        default:               return                 // HEARTBEAT / unknown → ignore
+        default:               return                 // HEARTBEAT / unknown → beat only
       }
     }
-    ;['new_story','story_removed','poll_vote_cast','connected','heartbeat'].forEach(n => {
-      es.addEventListener(n,             (e) => route(n, parse(e)))
-      es.addEventListener(n.toUpperCase(), (e) => route(n, parse(e)))
-    })
-    es.addEventListener('message', (e) => route(null, parse(e)))   // unnamed events → route by payload type
-    es.onerror = () => onError?.(es.readyState)
-    return () => es.close()
+    return hardenedStoryStream(TRAY_PATH,
+      ['new_story', 'story_removed', 'poll_vote_cast', 'connected', 'heartbeat'],
+      route, onError)
+  },
+
+  /** Per-story live stream (realtime overview stream 4 —
+   *  `/api/v1/stories/{id}/stream`, 5-min server timeout, page-scoped: open
+   *  while THIS story is on screen, close on advance/unmount). Fires:
+   *    onViewed(ev)    — someone saw it (server dedupes per viewer)
+   *    onEngaged(ev)   — a reaction/reply landed (or a count event)
+   *    onPollVoted(ev) — StoryRealtimeEvent tallies: OPTIONAL
+   *      `pollVoteACount`/`pollVoteBCount` + `pollChoice` (NOT the tray's
+   *      voteA/voteB shape; there is no pollId — the stream is story-scoped).
+   *      One of the documented delta-model EXCEPTIONS — apply, don't ±1.
+   *    onRemoved(ev)   — expired or deleted mid-view → skip past it
+   *  NOTE: emit-side the backend currently sends only connected/heartbeat on
+   *  this stream (the broadcast call sites are not wired yet) — this client
+   *  path is forward-compatible and the tray stream covers removals today.
+   *  Returns an unsubscribe fn. */
+  storyStream(storyId, { onViewed, onEngaged, onPollVoted, onRemoved, onConnected, onError } = {}) {
+    const route = (name, data) => {
+      switch ((name || data.eventType || data.type || '').toUpperCase()) {
+        case 'STORY_VIEWED':
+        case 'VIEW_COUNT_UPDATED':     return onViewed?.(data)
+        case 'STORY_REACTED':
+        case 'STORY_UNREACTED':
+        case 'STORY_REPLIED':
+        case 'REACTION_COUNT_UPDATED':
+        case 'REPLY_COUNT_UPDATED':    return onEngaged?.(data)
+        case 'STORY_POLL_VOTED':       return onPollVoted?.(data)
+        case 'STORY_EXPIRED':
+        case 'STORY_DELETED':          return onRemoved?.(data)
+        case 'CONNECTED':              return onConnected?.(data)
+        default:                       return
+      }
+    }
+    return hardenedStoryStream(`/api/v1/stories/${storyId}/stream`, [
+      'story_viewed', 'story_reacted', 'story_unreacted', 'story_replied',
+      'story_poll_voted', 'story_expired', 'story_deleted',
+      'view_count_updated', 'reaction_count_updated', 'reply_count_updated',
+      'connected', 'heartbeat',
+    ], route, onError)
   },
 }
 

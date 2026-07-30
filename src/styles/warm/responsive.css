@@ -9,7 +9,7 @@
          warm botnav + navy actives, navy compose plus
      3 · m-* guardrails: pill tabs stay pills, active pill is
          FILLED NAVY (never ink, never underline), tracks card-2
-     4 · dark reels surfaces stay dark (#141210) under mobile
+     4 · dark reels surfaces stay dark (#0b131d) under mobile
      5 · defensive sheet-slide re-assert (a sibling's unqualified
          .modal/.dlg animation must not stomp the phone sheets)
      6 · touch physics: hover lifts stand down on touch, presses
@@ -21,7 +21,7 @@
 
 /* ---------- 1 · Base hooks (all sizes — matches base §10.0 scope) ---------- */
 /* muted-state cue on the reels mute toggle: old red → warm danger */
-.rv-mute.off{background:rgba(160,62,54,.4)}
+.rv-mute.off{background:rgba(156,58,51,.4)}
 
 /* ============================================================
    2 · PHONE SHELL (≤720px) — topbar / drawer / scrim / botnav
@@ -38,7 +38,7 @@
      (base ≤720 drawer sets var(--paper)) */
   .sidebar{background:var(--paper-2)}
 
-  /* drawer backdrop: warm ink, not the old #1b1813 */
+  /* drawer backdrop: warm ink, not the old #101a28 */
   .nav-scrim{background:rgba(23,31,45,.5)}
 
   /* botnav: warm glass, hairline top border */
@@ -50,8 +50,8 @@
   /* center compose plus: navy fill, navy glow (base §11 ships a red
      rgba(179,39,30,…) shadow that the token remap cannot reach) */
   .botnav a.mid .plus{
-    background:var(--navy);color:#f7f3ea;
-    box-shadow:0 7px 18px -6px rgba(29,58,95,.62),inset 0 1px 0 rgba(255,255,255,.28);
+    background:var(--navy);color:#f2f0f0;
+    box-shadow:0 7px 18px -6px rgba(0,33,71,.62),inset 0 1px 0 rgba(255,255,255,.28);
   }
 }
 
@@ -63,7 +63,7 @@
      the active fill from ink-2 to navy (chips/tabs are FILLED navy
      pills in Warm Archive; never underlines) */
   .tab{border-color:var(--line);background:var(--card);color:var(--ink-soft)}
-  .tab.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+  .tab.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
 
   /* segmented switchers: track card-2, active cell card + navy text */
   .seg{background:var(--card-2)}
@@ -71,7 +71,7 @@
   /* view switcher active cell: bg goes navy via the token remap —
      only the old red glow needs replacing (mobile lane; desktop
      .vseg is the content-area file's job) */
-  .vseg.on{box-shadow:0 5px 12px -5px rgba(22,40,63,.5)}
+  .vseg.on{box-shadow:0 5px 12px -5px rgba(0,23,47,.5)}
 
   /* notifications: unread tint was rgba(201,56,47,.05) — warm wash */
   .ntf-row.unread{background:#f2f6fc}
@@ -79,7 +79,7 @@
   /* mobile comment composer keeps its underline layout; warm the
      hairline and give focus a plain blue underline (theme.css's
      boxed .field:focus ring doesn't suit the underline input) */
-  .cmt-box .field{border-bottom-color:#d8dee8}
+  .cmt-box .field{border-bottom-color:#d9d8d6}
   .cmt-box .field:focus{border-bottom-color:var(--blue);box-shadow:none}
 }
 
@@ -89,32 +89,32 @@
    panel (desktop auth colors belong to warm/user.css)
    ============================================================ */
 @media(max-width:720px){
-  .auth-left{background:linear-gradient(165deg,#16283f,#1d3a5f 55%,#274b78)}
+  .auth-left{background:linear-gradient(165deg,#00172f,#002147 55%,#163e66)}
   .auth-left::after{
     background:
-      radial-gradient(800px 400px at 80% 0%,rgba(217,185,108,.14),transparent 60%),
-      radial-gradient(700px 500px at 0% 100%,rgba(45,95,151,.28),transparent 60%);
+      radial-gradient(800px 400px at 80% 0%,rgba(185,214,242,.14),transparent 60%),
+      radial-gradient(700px 500px at 0% 100%,rgba(31,78,126,.28),transparent 60%);
   }
-  .auth-mark{background:rgba(217,185,108,.14);border-color:rgba(217,185,108,.4)}
+  .auth-mark{background:rgba(185,214,242,.14);border-color:rgba(185,214,242,.4)}
   /* enhanced-auth mobile fit: shorter flourish, tighter card, calmer stagger */
   .auth-hero::before{width:48px;height:3px;margin-bottom:14px}
-  .auth-card{padding:20px 16px 18px;box-shadow:0 1px 2px rgba(23,31,45,.05),0 16px 44px -16px rgba(22,40,63,.24)}
+  .auth-card{padding:20px 16px 18px;box-shadow:0 1px 2px rgba(23,31,45,.05),0 16px 44px -16px rgba(0,23,47,.24)}
   .auth-title{font-size:21px}
   .auth-bullets li:hover{transform:none}
 }
 
 /* ============================================================
    5 · DARK REELS SURFACES (≤720px) — the only dark pages; they
-   must stay #141210 under mobile widths
+   must stay #0b131d under mobile widths
    ============================================================ */
 @media(max-width:720px){
-  .reels-view{background:#141210}
+  .reels-view{background:#0b131d}
   /* in-viewer glass tab bar: warm-black gradient (was 16,14,11) */
-  .rv-mtabbar{background:linear-gradient(180deg,rgba(20,18,16,0),rgba(20,18,16,.64))}
+  .rv-mtabbar{background:linear-gradient(180deg,rgba(11,19,29,0),rgba(11,19,29,.64))}
   /* its compose plus: navy fill, navy glow (base glow is red) */
-  .rv-mtabbar a.mid .plus{background:var(--navy);box-shadow:0 5px 14px rgba(22,40,63,.5)}
-  /* watch-history remove chip: warm ink */
-  .watched-x{background:rgba(34,30,23,.85)}
+  .rv-mtabbar a.mid .plus{background:var(--navy);box-shadow:0 5px 14px rgba(0,23,47,.5)}
+  /* watch-history remove chip: night ink */
+  .watched-x{background:rgba(16,26,40,.85)}
 }
 
 /* ============================================================

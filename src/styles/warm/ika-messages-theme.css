@@ -45,10 +45,10 @@
   --mx-ease:cubic-bezier(.22,.8,.24,1);
   --mx-spring:cubic-bezier(.34,1.56,.64,1);
   /* the handoff's warm-interaction family (paper derivatives) */
-  --mx-hover:#f2f5f9;        /* row hover        */
-  --mx-active:#e7edf6;       /* row active (tan) */
-  --mx-soft:#f2f5f9;         /* control hover    */
-  --mx-canvas:#f1f4f8;       /* thread canvas    */
+  --mx-hover:#edf3fa;        /* row hover        */
+  --mx-active:#e1ebf6;       /* row active (tan) */
+  --mx-soft:#edf3fa;         /* control hover    */
+  --mx-canvas:#f4f4f3;       /* thread canvas    */
   --mx-online:#3d9a5f;       /* presence green   */
 }
 
@@ -69,7 +69,7 @@
 }
 .ch-list-search:focus-within{
   border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(45,95,151,.10);
+  box-shadow:0 0 0 3px rgba(31,78,126,.10);
 }
 
 .chat-list{ padding:4px 8px 20px; }
@@ -93,7 +93,7 @@
 /* the type seal's ring tracks the same surfaces as the presence dot */
 .cv-kind{ border-color:var(--paper-2); }
 .cv-row.active .cv-kind{ border-color:var(--mx-active); }
-.cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--mx-active),0 3px 8px -3px rgba(122,102,47,.55); }
+.cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--mx-active),0 3px 8px -3px rgba(22,62,102,.55); }
 /* group medallions keep their gold wash but soften to the new radius */
 .cv-medallion{ border-radius:14px; }
 
@@ -109,7 +109,7 @@
 
 /* skeleton ring + section labels sit on the new paper */
 .cv-skel-av{ border-radius:14px; }
-.chat-group-label{ color:#98a1b0; }
+.chat-group-label{ color:var(--muted); }
 
 /* request rows share the rail's warm hover family — card-2 is
    invisible against the new paper-2 rail */
@@ -144,11 +144,18 @@
    per-day wrappers + pointer-events handling. */
 
 /* the empty-thread mark gets the broadcast medallion's quiet pulse */
+/* [IKA-FIX] AA on tinted surfaces: empty-state hints sit on the canvas
+   and active-row meta on the sky tint — the muted slate dips under 4.5
+   there, so both step one shade darker. */
+.ch-blank-sub,.ch-start{ color:var(--ink-soft); }
+.cv-row.active .cv-time,
+.cv-row.active .cv-preview{ color:#57616f; }
+
 .ch-blank-mark{ position:relative; }
 .ch-blank-mark::before,
 .ch-blank-mark::after{
   content:""; position:absolute; inset:-1px; border-radius:26px;
-  border:1.5px solid rgba(179,135,62,.45);
+  border:1.5px solid rgba(127,168,206,.45);
   animation:mxRing 3.2s ease-out infinite;
   pointer-events:none;
 }
@@ -181,7 +188,7 @@
   box-shadow:0 1px 1.5px rgba(23,31,45,.07), 0 6px 18px -12px rgba(23,31,45,.16);
 }
 .ch-row.mine .ch-bubble{
-  box-shadow:0 2px 4px rgba(22,40,63,.14), 0 10px 26px -14px rgba(22,40,63,.45);
+  box-shadow:0 2px 4px rgba(0,23,47,.14), 0 10px 26px -14px rgba(0,23,47,.45);
 }
 .ch-bubble.failed{ border:1px solid var(--danger); }
 .ch-bubble.deleted{ border:1px dashed var(--line); box-shadow:none; }
@@ -223,7 +230,7 @@
   background:transparent; box-shadow:none;
   color:var(--muted);
 }
-.ch-tool:hover{ background:#e7edf6; color:var(--navy); border-color:transparent; }
+.ch-tool:hover{ background:#e1ebf6; color:var(--navy); border-color:transparent; }
 
 /* ---- voice notes: the played wave + playhead go blue ----
    (prototype/doc spec — blue is the activity colour; the halo,
@@ -246,6 +253,10 @@
    its blue-wash pressed state under the cursor */
 .ch-cbtn:not(.on):hover{ background:var(--mx-soft); }
 .ch-cbtn.on, .ch-cbtn.on:hover{ background:var(--blue-wash); }
+/* Send-later stays a bare glyph — no hover plate. The OPEN state keeps its
+   wash (the popover must show what it is anchored to) and focus-visible
+   keeps its ring, which is keyboard affordance, not hover. */
+.ch-sched-btn:not(.on):hover{ background:transparent; }
 
 .ch-inputwrap{
   border-radius:999px;
@@ -254,17 +265,19 @@
   padding-inline:16px 46px;
 }
 .ch-inputwrap:focus-within{
-  box-shadow:0 0 0 3px rgba(45,95,151,.10);
+  box-shadow:0 0 0 3px rgba(31,78,126,.10);
 }
 .ch-input{ font-size:15px; padding:10px 0; }
 
-/* The schedule clock is a SIBLING after the pill in the markup
-   (Composer.jsx — the pill holds only the textarea). Pulling it
-   back over the pill's end inset makes it read as in-pill, like
-   the prototype, without touching the DOM or its Popover anchor. */
+/* NO negative margin here. This rule once pulled the clock back over the
+   pill's end inset to fake an "in-pill" look, which was safe only while the
+   clock was the FIRST button after the pill. It is not any more — the poll /
+   location / contact button sits between them, so the pull-back printed the
+   clock straight on top of that glyph and the pair read as one crashed icon.
+   The buttons are plain flex siblings now: one icon each, .ch-inputrow's
+   gap between them. */
 .ch-inputrow .ch-sched-btn{
   width:36px; height:36px;
-  margin-inline-start:-44px;
   margin-block-end:5px;
   position:relative; z-index:1;
 }
@@ -323,42 +336,42 @@
    Every §20 property that would bleed through is restated.
    ========================================================= */
 .cn-hero{
-  border:0; box-shadow:0 18px 44px -24px rgba(22,40,63,.55);
+  border:0; box-shadow:0 18px 44px -24px rgba(0,23,47,.55);
   gap:22px; padding:26px 28px;
   background:
-    radial-gradient(120% 160% at 88% -20%, rgba(45,95,151,.5) 0%, rgba(45,95,151,0) 55%),
-    linear-gradient(150deg,#16283f 0%,#1d3a5f 60%,#274b78 100%);
-  color:#f3ecdd;
+    radial-gradient(120% 160% at 88% -20%, rgba(31,78,126,.5) 0%, rgba(31,78,126,0) 55%),
+    linear-gradient(150deg,#00172f 0%,#002147 60%,#163e66 100%);
+  color:#dce9f6;
 }
 [dir="rtl"] .cn-hero{
   background:
-    radial-gradient(120% 160% at 12% -20%, rgba(45,95,151,.5) 0%, rgba(45,95,151,0) 55%),
-    linear-gradient(-150deg,#16283f 0%,#1d3a5f 60%,#274b78 100%);
+    radial-gradient(120% 160% at 12% -20%, rgba(31,78,126,.5) 0%, rgba(31,78,126,0) 55%),
+    linear-gradient(-150deg,#00172f 0%,#002147 60%,#163e66 100%);
 }
 .cn-hero-art{
   width:68px; height:68px; border-radius:50%;
-  border:1px solid rgba(217,185,108,.4);
+  border:1px solid rgba(185,214,242,.4);
   background:radial-gradient(circle at 50% 38%, rgba(255,255,255,.2), rgba(255,255,255,.07) 70%);
   box-shadow:inset 0 1px 2px rgba(255,255,255,.25);
-  color:#d9b96c;
+  color:#b9d6f2;
 }
 .cn-hero-art .ico{ width:30px; height:30px; }
 /* the §20 pulse rings survive, re-inked for the navy plate */
 .cn-hero-art::before,
-.cn-hero-art::after{ border-color:rgba(217,185,108,.42); }
+.cn-hero-art::after{ border-color:rgba(185,214,242,.42); }
 .cn-hero .cn-eyebrow{ color:#a9b7cb; letter-spacing:.16em; }
-.cn-hero .cn-title{ color:#f7f3ea; font-size:clamp(27px,3.2vw,36px); }
-.cn-hero .cn-title em{ color:#d9b96c; }
-.cn-hero .cn-sub{ color:#c8bfa9; font-size:13.5px; }
+.cn-hero .cn-title{ color:#f2f0f0; font-size:clamp(27px,3.2vw,36px); }
+.cn-hero .cn-title em{ color:#b9d6f2; }
+.cn-hero .cn-sub{ color:#a9c4de; font-size:13.5px; }
 .cn-hero-stats{ color:#a9b7cb; }
-.cn-hero .cn-hero-stats b{ color:#f3ecdd; }
-.cn-hero .cn-hero-sep{ color:rgba(217,185,108,.55); }
+.cn-hero .cn-hero-stats b{ color:#dce9f6; }
+.cn-hero .cn-hero-sep{ color:rgba(185,214,242,.55); }
 /* the CTA inverts: paper button on navy */
 .cn-hero .btn-primary{
   background:#ffffff; color:var(--navy);
   box-shadow:0 10px 24px -12px rgba(0,0,0,.5);
 }
-.cn-hero .btn-primary:hover{ background:#e7edf6; color:var(--navy-deep); }
+.cn-hero .btn-primary:hover{ background:#e1ebf6; color:var(--navy-deep); }
 .cn-hero .btn-primary .ico{ color:var(--gold-deep); }
 
 /* =========================================================
@@ -447,9 +460,9 @@
 .lv-card:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
 .lv-card-thumb{
   background:
-    radial-gradient(120% 130% at 85% 12%, rgba(45,95,151,.55) 0%, rgba(45,95,151,0) 55%),
-    linear-gradient(135deg,#16283f 0%,#1d3a5f 70%,#22456b 100%);
-  color:rgba(247,243,234,.45);
+    radial-gradient(120% 130% at 85% 12%, rgba(31,78,126,.55) 0%, rgba(31,78,126,0) 55%),
+    linear-gradient(135deg,#00172f 0%,#002147 70%,#22456b 100%);
+  color:rgba(242,240,240,.45);
 }
 .lv-card-body h3{ color:var(--navy-deep); font-size:15.5px; }
 .lv-card-meta .pill{
@@ -542,7 +555,7 @@
 .lv-ingest-t b{ font-weight:650; }
 
 /* the ended plate */
-.lv-ended .ico.lg{ width:34px; height:34px; color:rgba(217,185,108,.8); }
+.lv-ended .ico.lg{ width:34px; height:34px; color:rgba(185,214,242,.8); }
 
 /* =========================================================
    10.5 · Calls — the .cl-* surface joins the design language
@@ -560,8 +573,8 @@
   border-radius:20px;
   border:1px solid rgba(255,255,255,.08);
   background:
-    radial-gradient(120% 150% at 85% -12%, rgba(45,95,151,.42) 0%, rgba(45,95,151,0) 55%),
-    linear-gradient(165deg,#16283f 0%,#101d30 100%);
+    radial-gradient(120% 150% at 85% -12%, rgba(31,78,126,.42) 0%, rgba(31,78,126,0) 55%),
+    linear-gradient(165deg,#00172f 0%,#101d30 100%);
   box-shadow:0 32px 80px -32px rgba(0,0,0,.7);
 }
 /* a VOICE call has no video to protect — let the plate glow through
@@ -580,12 +593,12 @@
 /* the ringing card — a warm halo behind the seal */
 .cl-await-av::before{
   content:""; position:absolute; inset:-34px; border-radius:50%;
-  background:radial-gradient(circle, rgba(217,185,108,.16) 0%, transparent 65%);
+  background:radial-gradient(circle, rgba(185,214,242,.16) 0%, transparent 65%);
   pointer-events:none;
 }
 .cl-await-nm{ font-size:23px; }
 .cl-await-sub{ font-size:13.5px; }
-.cl-overlay.ringing .cl-await-sub{ color:#f0cf7a; }
+.cl-overlay.ringing .cl-await-sub{ color:#d6e7f8; }
 
 /* controls — glass coins that lift; the off-inversion stays */
 .cl-ctl{
@@ -617,7 +630,7 @@
 .cl-btn.decline{ box-shadow:0 10px 26px -10px rgba(194,72,61,.6); }
 @keyframes mxAnswer{
   0%,100%{ box-shadow:0 10px 26px -10px rgba(47,122,85,.65); }
-  50%{ box-shadow:0 10px 34px -8px rgba(95,208,138,.75); }
+  50%{ box-shadow:0 10px 34px -8px rgba(127,191,165,.75); }
 }
 
 /* self view — a framed miniature. max-height caps it on SHORT stages
@@ -636,9 +649,9 @@
 /* the collapsed pill — brand ring + gold seam so it reads as IKA,
    not as a generic dark blob floating over the page */
 .cl-pill{
-  border:1px solid rgba(217,185,108,.35);
+  border:1px solid rgba(185,214,242,.35);
   background:
-    radial-gradient(120% 150% at 80% -20%, rgba(45,95,151,.5) 0%, rgba(45,95,151,0) 60%),
+    radial-gradient(120% 150% at 80% -20%, rgba(31,78,126,.5) 0%, rgba(31,78,126,0) 60%),
     var(--navy-deep);
   padding:5px;
 }
@@ -697,7 +710,7 @@
   /* the two header actions stack rather than fighting over one row */
   .cn-head > .lv-head-acts{ flex-direction:column; align-items:stretch; }
   .cn-hero{
-    box-shadow:0 14px 34px -20px rgba(22,40,63,.5);
+    box-shadow:0 14px 34px -20px rgba(0,23,47,.5);
     /* restate chat-extras §20.7's phone metrics — this file loads
        after it, so the desktop gap/padding above would win */
     gap:16px; padding:22px;
@@ -761,7 +774,7 @@
   background:var(--blue-wash); color:var(--navy); font-weight:650;
 }
 .ch-row.mine .ch-text .tk-mention{
-  background:rgba(255,255,255,.16); color:#f5f1e8;
+  background:rgba(255,255,255,.16); color:#f2f0f0;
 }
 
 /* -- Messages · a deleted tombstone is a PILL, not speech. (0,3,0) on the
@@ -789,7 +802,7 @@
 /* -- Info panel · the hero crest wears the broadcast double ring -- */
 .ci-hero-av::before, .ci-hero-av::after{
   content:""; position:absolute; inset:-1px; border-radius:27px;
-  border:1.5px solid rgba(179,135,62,.45);
+  border:1.5px solid rgba(127,168,206,.45);
   animation:mxRing 3.2s ease-out infinite; pointer-events:none;
 }
 .ci-hero-av::after{ animation-delay:1.6s; }
@@ -841,8 +854,8 @@
 /* -- Live · the stage is the navy broadcast plate -- */
 .lv-stage{
   background:
-    radial-gradient(120% 150% at 85% -12%, rgba(45,95,151,.42) 0%, rgba(45,95,151,0) 55%),
-    linear-gradient(135deg,#16283f 0%,#1d3a5f 70%,#22456b 100%);
+    radial-gradient(120% 150% at 85% -12%, rgba(31,78,126,.42) 0%, rgba(31,78,126,0) 55%),
+    linear-gradient(135deg,#00172f 0%,#002147 70%,#22456b 100%);
 }
 /* the player-gradient band the stage controls ride on; z 1 stays above
    the z-auto video and the camera-off plate, and slots under the cell
@@ -860,7 +873,7 @@
 /* :not(.rec-on) — the Record button also carries aria-pressed, but there
    pressed means recording ON and it must keep its red .rec-on fill */
 .stg-cast-btn[aria-pressed="true"]:not(.rec-on){
-  background:#f7f8fa; color:var(--navy-deep); border-color:#f7f8fa;
+  background:#ffffff; color:var(--navy-deep); border-color:#ffffff;
 }
 .stg-cast-btn[aria-pressed="true"]:not(.rec-on):hover{ background:#fff; border-color:#fff; }
 
@@ -868,8 +881,8 @@
 .lv-ended{ gap:10px; }
 .lv-ended .ico.lg{
   width:58px; height:58px; padding:13px;
-  border:1px solid rgba(217,185,108,.55); border-radius:50%;
-  background:rgba(217,185,108,.08);
+  border:1px solid rgba(185,214,242,.55); border-radius:50%;
+  background:rgba(185,214,242,.08);
 }
 .lv-ended h3{ font-size:22px; }
 
@@ -939,6 +952,13 @@
   padding:2px 9px; border-color:var(--line-soft);
   box-shadow:0 2px 6px -2px rgba(23,31,45,.2);
 }
+/* [IKA-FIX] The reaction row extends the stack ~13px BELOW the bubble
+   (22px pill − 9px overlap), and the bottom-aligned avatar would sink to its
+   level — the face hanging under the message instead of beside its last
+   line. Lift it by exactly that extension, calibrated to the pill metrics
+   above. Broadcast posts top-align their avatar (channels-pro.css) and are
+   excluded. */
+.ch-row:not(.is-post):has(.ch-reacts) .ch-row-av{ margin-bottom:15px; }
 
 /* ---- new followers — an invitation to talk, answered in place ---- */
 .cv-flw{
@@ -993,7 +1013,7 @@
   flex:0 0 auto;
   display:inline-flex; align-items:center; gap:5px;
   padding:5px 11px; border-radius:999px;
-  background:var(--navy); color:#f7f3ea;
+  background:var(--navy); color:#f2f0f0;
   font-size:11.5px; font-weight:650;
 }
 .cv-flw-row:hover .cv-flw-cta{ background:var(--navy-deep); }
@@ -1024,7 +1044,7 @@
 .lv-ctl:hover{ background:rgba(255,255,255,.26); transform:translateY(-1px); }
 .lv-sound-pill{
   border-radius:999px;
-  background:rgba(255,255,255,.14); backdrop-filter:blur(8px); color:#f5f1e8;
+  background:rgba(255,255,255,.14); backdrop-filter:blur(8px); color:#f2f0f0;
   font-weight:650;
 }
 .lv-sound-pill:hover{ background:rgba(255,255,255,.26); }
@@ -1103,7 +1123,7 @@
 .lv-line-hosttag{
   display:inline-block; vertical-align:1px;
   margin-inline-start:6px; padding:1px 6px;
-  border-radius:5px; background:var(--navy); color:#f7f3ea;
+  border-radius:5px; background:var(--navy); color:#f2f0f0;
   font:700 9px/1.5 var(--sans); font-style:normal; letter-spacing:.06em;
 }
 
@@ -1122,7 +1142,7 @@
 }
 .lv-stage .stg-cast-btn{
   border:0; border-radius:999px;
-  background:rgba(11,18,32,.55); backdrop-filter:blur(8px); color:#f5f1e8;
+  background:rgba(11,18,32,.55); backdrop-filter:blur(8px); color:#f2f0f0;
   transition:background .14s ease, transform .12s ease;
 }
 .lv-stage .stg-cast-btn:hover{
@@ -1135,7 +1155,7 @@
 /* the §14 light inverted OFF-state stays legible on the dark band; only
    its hover needs restating against the glass hover above */
 .lv-stage .stg-cast-btn[aria-pressed="true"]:not(.rec-on){
-  background:#f7f8fa; color:var(--navy-deep);
+  background:#ffffff; color:var(--navy-deep);
 }
 .lv-stage .stg-cast-btn[aria-pressed="true"]:not(.rec-on):hover{
   background:#fff; transform:translateY(-1px);
@@ -1166,7 +1186,7 @@
   display:inline-flex; align-items:center;
   padding:4px 10px; border-radius:7px;
   background:rgba(11,18,32,.55); backdrop-filter:blur(8px);
-  color:#f5f1e8;
+  color:#f2f0f0;
   font:400 11.5px/1.5 var(--mono);
   font-variant-numeric:tabular-nums; letter-spacing:.02em;
 }

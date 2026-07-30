@@ -48,7 +48,7 @@ export function dateLabel(iso) {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-/** "in 6h" / "in 3d" / "expired" — for invite links and story TTLs. */
+/** "in 6h" / "in 3d" / "expired" — for invite-link expiries. */
 export function untilLabel(iso) {
   if (!iso) return ''
   const ms = new Date(iso).getTime() - Date.now()

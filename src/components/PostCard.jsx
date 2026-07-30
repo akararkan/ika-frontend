@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, linkify, fmt, showToast } from './ui.jsx'
 import { openShare } from './ShareSheet.jsx'
 import { uiPrompt } from './Dialog.jsx'
-import { VoicePlayer } from './VoicePlayer.jsx'
+import { OrbitVoice } from './OrbitVoice.jsx'
 import { PlayableVideo } from './PlayableVideo.jsx'
 import { authorOf } from '../lib/userView.js'
 import { api } from '../api/index.js'
@@ -145,21 +145,48 @@ function RepostEmbed({ post }) {
     return () => { alive = false }
   }, [post.id, post.sharedPostId])
 
-  if (orig === undefined) return <div className="post-repost"><p className="rp-body muted">Loading original…</p></div>
-  if (!orig) return <div className="post-repost"><p className="rp-body muted">Original post is unavailable.</p></div>
+  if (orig === undefined) return <div className="post-repost is-note"><p className="rp-body muted">Loading original…</p></div>
+  if (!orig) return <div className="post-repost is-note"><p className="rp-body muted">Original post is unavailable.</p></div>
   const u = orig._author || authorOf(orig)
-  const m = orig.media?.[0]
+  const media = (orig.media || []).filter(x => x.url)
+  const m = media[0]
+  const extra = media.length - 1
+  const isReel = orig.type === 'REEL'
+  const isVoice = orig.type === 'VOICE_POST'
+  const go = () => navigate(`/posts/${orig.id}`)
   return (
-    <div className="post-repost" role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/posts/${orig.id}`)}>
+    <div
+      className="post-repost"
+      role="button"
+      tabIndex={0}
+      aria-label={`View the original post by ${u.full}`}
+      onClick={go}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go() } }}
+    >
       <div className="rp-head">
-        <Avatar initials={u.initials} color={u.avc} size={28} src={u.profileImage}/>
+        <Avatar initials={u.initials} color={u.avc} size={20} src={u.profileImage}/>
         <span className="rp-name">{u.full}</span>
         {u.verified && <Verify scholar={u.role === 'SCHOLAR'}/>}
+        <span className="rp-handle">@{u.handle}</span>
         <span className="rp-time">· {orig.time}</span>
+        {/* names the box: this is the ORIGINAL a repost is carrying */}
+        <Icon name="repost" className="rp-mark xs"/>
       </div>
       {orig.body && <p className="rp-body">{linkify(orig.body)}</p>}
-      {m && (m.type === 'IMAGE' || m.type === 'VIDEO') && (
-        <div className="rp-media ph-bg" style={{ background: m.bg }}>{m.type === 'VIDEO' && <span className="pm-play"><Icon name="play"/></span>}</div>
+      {isVoice ? (
+        <span className="rp-chip"><Icon name="mic" className="xs"/>Voice note</span>
+      ) : m && (
+        /* The REAL media, not a tinted placeholder: an image shows itself, a
+           video shows its poster (or its own first frame via preload=metadata
+           when no poster exists). Play/Reel badges + a +N flag for albums. */
+        <div className="rp-media" style={{ aspectRatio: m.ratio || '16/10' }}>
+          {m.type === 'VIDEO'
+            ? <video className="rp-thumb" src={m.url} poster={m.poster || undefined} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true"/>
+            : <img className="rp-thumb" src={m.url} alt="" loading="lazy"/>}
+          {m.type === 'VIDEO' && <span className="rp-play" aria-hidden="true"><Icon name="play"/></span>}
+          {isReel && <span className="rp-flag"><Icon name="reels" className="xs"/>Reel</span>}
+          {extra > 0 && <span className="rp-more">+{extra}</span>}
+        </div>
       )}
     </div>
   )
@@ -167,7 +194,11 @@ function RepostEmbed({ post }) {
 
 function PostMedia({ post, onOpenReel, onOpenImage }) {
   if (post.type === 'VOICE_POST') {
-    return <VoicePlayer src={post.audioUrl} duration={post.media?.[0]?.duration}/>
+    // The Orbit ring — same props contract as the old bar player (lazy
+    // resolveSrc for feed items that arrive without the audio URL). Seeded by
+    // the post id so the at-rest ring and the post-resolve ring match.
+    return <OrbitVoice src={post.audioUrl} duration={post.media?.[0]?.duration} seed={String(post.id)}
+      resolveSrc={post.audioUrl ? null : () => api.posts.get(post.id).then(p => p?.audioUrl || null)}/>
   }
   if (post.type === 'REPOST') {
     return <RepostEmbed post={post}/>

@@ -53,7 +53,7 @@
 .r-card:hover .r-play{background:rgba(255,255,255,.3)}
 .r-play:active{transform:scale(.94)}
 
-/* meta row muted; citations get the gold seal (base used #8a221b red) */
+/* meta row muted; citations get the gold seal (base used #7f2620 red) */
 .r-foot{color:var(--muted)}
 .r-foot span:last-child{color:var(--gold-deep);font-weight:700}
 .r-foot span:last-child .ico{color:var(--gold)}
@@ -74,13 +74,13 @@
 /* cover ribbons — flat warm tints instead of the old red/ink gradients */
 .r-status-ribbon.draft{background:rgba(77,88,105,.88)}
 .r-status-ribbon.archived{background:rgba(122,132,148,.9)}
-.r-status-ribbon.retracted{background:rgba(160,62,54,.92)}
+.r-status-ribbon.retracted{background:rgba(156,58,51,.92)}
 
 /* lifecycle card variants — no pure-white sheets, warm danger tints */
 .r-card.is-draft{background:linear-gradient(180deg,var(--card),var(--paper-2));border-color:rgba(77,88,105,.4)}
-.r-card.is-archived{background:linear-gradient(180deg,var(--card-2),#eef1f5);border-color:var(--line)}
-.r-card.is-retracted{border-color:rgba(160,62,54,.42)}
-.r-card.is-retracted .r-cover::before{background:linear-gradient(135deg,rgba(160,62,54,.28),transparent 60%)}
+.r-card.is-archived{background:linear-gradient(180deg,var(--card-2),#e9e8e6);border-color:var(--line)}
+.r-card.is-retracted{border-color:rgba(156,58,51,.42)}
+.r-card.is-retracted .r-cover::before{background:linear-gradient(135deg,rgba(156,58,51,.28),transparent 60%)}
 
 /* tag chips inside research cards → blue-wash pills (prototype .pill.tag) */
 .r-card .qna-tags a,.rrow .qna-tags a{
@@ -90,7 +90,7 @@
 }
 .r-card .qna-tags a:hover,.rrow .qna-tags a:hover{background:#dce6f2;text-decoration:none}
 
-/* page-mast kicker: base hardcodes red #8a221b */
+/* page-mast kicker: base hardcodes red #7f2620 */
 .phead-kicker{color:var(--gold-deep)}
 
 /* ═══════ 2 · FEATURED HERO PLATE + COMPACT ROWS + OWNER BAR ═══════ */
@@ -118,39 +118,39 @@
 .r-owner-bar{background:rgba(255,255,255,.6)}
 .r-owner-bar button{transition:background .14s ease,color .14s ease,border-color .14s ease}
 .r-owner-bar button.primary{
-  background:var(--navy);color:#f7f3ea;
-  box-shadow:0 6px 14px -6px rgba(29,58,95,.45);
+  background:var(--navy);color:#f2f0f0;
+  box-shadow:0 6px 14px -6px rgba(0,33,71,.45);
 }
 .r-owner-bar button.primary:hover{background:var(--navy-deep);border-color:var(--navy-deep)}
 .r-owner-bar button.danger{color:var(--danger)}
-.r-owner-bar button.danger:hover{background:rgba(160,62,54,.08);border-color:rgba(160,62,54,.3)}
+.r-owner-bar button.danger:hover{background:rgba(156,58,51,.08);border-color:rgba(156,58,51,.3)}
 
 /* MINE-tab filter hint tints (base published/draft/retracted were red-washed) */
 .r-section-hint{border-radius:14px}
 .r-section-hint.published .ico-wrap{background:var(--good-wash);color:var(--good)}
 .r-section-hint.draft .ico-wrap{background:var(--gold-wash);color:var(--gold-deep)}
-.r-section-hint.retracted .ico-wrap{background:rgba(160,62,54,.1);color:var(--danger)}
+.r-section-hint.retracted .ico-wrap{background:rgba(156,58,51,.1);color:var(--danger)}
 
 /* grouped-view section heads — rule warms to gold near the label */
-.lg-line{background:linear-gradient(90deg,rgba(179,135,62,.45),var(--line) 55%,transparent)}
+.lg-line{background:linear-gradient(90deg,rgba(127,168,206,.45),var(--line) 55%,transparent)}
 
 /* view-mode switcher active seg — base shadow was rubric-red */
-.vseg.on{box-shadow:0 5px 12px -5px rgba(29,58,95,.45)}
+.vseg.on{box-shadow:0 5px 12px -5px rgba(0,33,71,.45)}
 
 /* ════════════ 3 · READER (.rd-page) — token re-point ════════════
    The base reader scope re-points tokens to an evergreen palette and
    IBM Plex Serif/Newsreader/Archivo stacks. Re-anchor everything to
    the Warm Archive: navy accents, warm paper, Lora + IBM Plex Sans. */
 .rd-page{
-  --paper:#f7f8fa; --paper-2:#fbfcfd;
-  --card:#ffffff;  --card-2:#f3f5f8;
-  --line:#e4e8ee;  --line-soft:#eef1f5;
+  --paper:#ffffff; --paper-2:#f7f6f5;
+  --card:#ffffff;  --card-2:#f2f0f0;
+  --line:#d9d8d6;  --line-soft:#e9e8e6;
   --ink:#1c2330; --ink-2:#232b3a; --ink-soft:#4d5768; --muted:#8a93a3;
-  --rubric:#1d3a5f; --wash:#e8eef5;
-  --emerald:#1d3a5f; --emerald-deep:#16283f;
-  --emerald-bright:#2d5f97; --emerald-glow:#3a6ca5;
-  --accent-bg:#e8eef5;
-  --brass:#b3873e; --brass-soft:#e5d3ac; --brass-tint:#f6ecd8;
+  --rubric:#002147; --wash:#e7eff8;
+  --emerald:#002147; --emerald-deep:#00172f;
+  --emerald-bright:#1f4e7e; --emerald-glow:#2e6094;
+  --accent-bg:#e7eff8;
+  --brass:#1f4e7e; --brass-soft:#b9d6f2; --brass-tint:#dce9f6;
   --rose:#b3453e;
   --serif:"Lora","Amiri",Georgia,"Noto Naskh Arabic","Geeza Pro",serif;
   --sans:"IBM Plex Sans","Helvetica Neue",system-ui,"SF Arabic","Geeza Pro","Noto Sans Arabic",Tahoma,Arial,sans-serif;
@@ -160,35 +160,35 @@
 .rd-page .rd-progress{background:var(--gold)}
 
 /* toolbar: saved/active seal in gold wash (base literals were close but off-palette) */
-.rd-page .rd-toolbar-actions button.active{color:var(--gold-deep);background:var(--gold-wash);border-color:#e0cfa4}
+.rd-page .rd-toolbar-actions button.active{color:var(--gold-deep);background:var(--gold-wash);border-color:#b9d6f2}
 
 /* ---- masthead hero: illuminated navy cover, gold frame, glass ledger ---- */
 .rd-page .rd-hero{
   border-radius:18px;
-  background:linear-gradient(135deg,#16283f 0%,#1d3a5f 55%,#274b78 100%);
-  box-shadow:0 26px 64px -28px rgba(22,40,63,.55);
+  background:linear-gradient(135deg,#00172f 0%,#002147 55%,#163e66 100%);
+  box-shadow:0 26px 64px -28px rgba(0,23,47,.55);
 }
 /* the "illuminated edge" — a fine gold hairline frame + top light, above the
    cover/scrim but below the text so it never obscures the title */
 .rd-page .rd-hero::after{
   content:"";position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:inherit;
-  box-shadow:inset 0 0 0 1px rgba(217,185,108,.30),inset 0 1px 0 rgba(255,255,255,.16);
+  box-shadow:inset 0 0 0 1px rgba(185,214,242,.30),inset 0 1px 0 rgba(255,255,255,.16);
 }
 .rd-page .rd-hero-pattern{
   opacity:.5;
-  background-image:radial-gradient(rgba(217,185,108,.16) 1px,transparent 1.4px);
+  background-image:radial-gradient(rgba(185,214,242,.16) 1px,transparent 1.4px);
   background-size:18px 18px;
 }
 /* deeper, warmer bottom scrim so white text stays crisp over bright covers */
 .rd-page .rd-hero.has-cover .rd-hero-scrim{
   background:linear-gradient(180deg,rgba(14,22,36,.5) 0%,rgba(14,22,36,.04) 24%,rgba(14,22,36,.34) 52%,rgba(11,17,29,.94) 100%);
 }
-.rd-page .rd-eyebrow{color:#d9b96c}
+.rd-page .rd-eyebrow{color:#b9d6f2}
 .rd-page .rd-hero-title{font-size:clamp(28px,3.6vw,40px)}
 .rd-page .rd-hero-status.published .dot{background:#8fd0a8}
 /* top chips + play → warm-framed glass */
 .rd-page .rd-hero-id,
-.rd-page .rd-hero-status{background:rgba(14,22,36,.5);border-color:rgba(217,185,108,.35)}
+.rd-page .rd-hero-status{background:rgba(14,22,36,.5);border-color:rgba(185,214,242,.35)}
 .rd-page .rd-hero-play{background:rgba(255,255,255,.92);border-color:rgba(255,255,255,.85);color:var(--navy)}
 .rd-page .rd-hero-play .ico{fill:var(--navy);stroke:none}
 .rd-page .rd-hero-follow{border-radius:999px;color:var(--navy)}
@@ -196,16 +196,16 @@
 .rd-page .rd-hero .rd-facts{border-top:none;margin-top:20px;padding-top:0;gap:9px}
 .rd-page .rd-hero .rd-fact{
   margin:0;padding:7px 14px;border-radius:999px;
-  background:rgba(14,22,36,.34);border:1px solid rgba(217,185,108,.3);
+  background:rgba(14,22,36,.34);border:1px solid rgba(185,214,242,.3);
   -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
   color:rgba(255,255,255,.9);font-size:13px;
 }
-.rd-page .rd-hero .rd-fact + .rd-fact{border-left:1px solid rgba(217,185,108,.3)}
-.rd-page .rd-hero .rd-fact .ico{color:#e0c079}
+.rd-page .rd-hero .rd-fact + .rd-fact{border-left:1px solid rgba(185,214,242,.3)}
+.rd-page .rd-hero .rd-fact .ico{color:#b9d6f2}
 .rd-page .rd-hero .rd-fact b{font-family:var(--serif);font-size:16px;font-weight:600;color:#fff;margin-inline-end:1px}
 
 /* ---- TOC: navy hover wash (base literal was evergreen) ---- */
-.rd-page .rd-toc-a:hover{background:rgba(29,58,95,.06)}
+.rd-page .rd-toc-a:hover{background:rgba(0,33,71,.06)}
 
 /* ---- reading sections as warm cards: radius 18, generous padding ---- */
 .rd-page .card.rd-card2{
@@ -223,7 +223,7 @@
   font-family:var(--serif);font-size:19px;font-weight:600;
   letter-spacing:0;text-transform:none;color:var(--navy);
 }
-.rd-page .rd-sec-head::after{background:linear-gradient(90deg,rgba(179,135,62,.35),var(--line) 55%)}
+.rd-page .rd-sec-head::after{background:linear-gradient(90deg,rgba(127,168,206,.35),var(--line) 55%)}
 
 /* ABSTRACT block — card-2 plate + 3px gold inline-start bar */
 .rd-page .prose.rd-abstract{
@@ -251,10 +251,10 @@
   transition:background-color .14s,border-color .14s,color .14s;
 }
 .rd-fmt-b:hover:not(:disabled){border-color:var(--blue);color:var(--navy)}
-.rd-fmt-b.on{background:var(--navy);border-color:var(--navy);color:#f7f3ea}
+.rd-fmt-b.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
 /* the selected pill must stay light on hover — `:hover:not(:disabled)` (0,3,0)
    outranks `.on` (0,2,0), which was repainting the label navy-on-navy */
-.rd-fmt-b.on:hover:not(:disabled){background:var(--navy-deep);border-color:var(--navy-deep);color:#f7f3ea}
+.rd-fmt-b.on:hover:not(:disabled){background:var(--navy-deep);border-color:var(--navy-deep);color:#f2f0f0}
 .rd-fmt-b:disabled{opacity:.5;cursor:not-allowed}
 
 .rd-page .rd-file:hover:not(:disabled){border-color:var(--gold);background:#ffffff}
@@ -277,17 +277,17 @@
 }
 a.src-row{transition:border-color .15s ease,background .15s ease}
 a.src-row:hover{border-color:var(--gold);background:#ffffff}
-a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;background:var(--gold-wash)}
+a.src-row:hover .src-action{color:var(--gold-deep);border-color:#b9d6f2;background:var(--gold-wash)}
 
 /* ---- apparatus rail ---- */
 .rd-page .rd-panel-h{color:var(--gold-deep)}
 /* Download = navy primary (base hover literal was evergreen #1a5142) */
-.rd-page .rd-dlpdf{box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
-.rd-page .rd-dlpdf:hover:not(:disabled){background:var(--navy);box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
+.rd-page .rd-dlpdf{box-shadow:0 8px 18px -10px rgba(0,33,71,.55)}
+.rd-page .rd-dlpdf:hover:not(:disabled){background:var(--navy);box-shadow:0 8px 18px -10px rgba(0,33,71,.55)}
 /* React / Save toggles — warm like + gold seal (base .btn.on-* are red-washed) */
 .rd-page .rd-act.on-rose{background:rgba(179,69,62,.1);color:var(--like);border-color:rgba(179,69,62,.32)}
 .rd-page .rd-act.on-rose .ico{fill:var(--like);stroke:var(--like)}
-.rd-page .rd-act.on-brass{background:var(--gold-wash);color:var(--gold-deep);border-color:#e0cfa4}
+.rd-page .rd-act.on-brass{background:var(--gold-wash);color:var(--gold-deep);border-color:#b9d6f2}
 .rd-page .rd-act.on-brass .ico{fill:var(--gold);stroke:var(--gold)}
 /* cite panel — citation is a moment of endorsement: gold margin rule */
 .rd-page .cite-box{
@@ -298,15 +298,15 @@ a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;backgrou
 .rd-page .qna-tags a:hover{background:#dce6f2}
 
 /* full-screen promo player — base stage glow was rubric-red */
-.rd-vp-stage{box-shadow:0 40px 100px -25px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.08),0 0 90px -20px rgba(45,95,151,.25)}
+.rd-vp-stage{box-shadow:0 40px 100px -25px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.08),0 0 90px -20px rgba(31,78,126,.25)}
 
 /* status banners — draft speaks gold (base scoped rule turned it navy) */
 .rd-page .rd-banner{border-radius:14px}
 .rd-page .rd-banner.draft b,
 .rd-page .rd-banner.draft .rd-banner-ico{color:var(--gold-deep)}
 .rd-page .rd-banner.draft .rd-banner-ico{background:var(--gold-wash)}
-.rd-page .rd-banner.retracted{background:linear-gradient(135deg,rgba(160,62,54,.05),rgba(160,62,54,.1));border-color:rgba(160,62,54,.3)}
-.rd-page .rd-banner.retracted .rd-banner-ico{background:rgba(160,62,54,.1);color:var(--danger)}
+.rd-page .rd-banner.retracted{background:linear-gradient(135deg,rgba(156,58,51,.05),rgba(156,58,51,.1));border-color:rgba(156,58,51,.3)}
+.rd-page .rd-banner.retracted .rd-banner-ico{background:rgba(156,58,51,.1);color:var(--danger)}
 .rd-page .rd-banner.retracted b{color:var(--danger)}
 
 /* scholarly discussion — comment bubbles on card-2 inside the section card */
@@ -319,36 +319,36 @@ a.src-row:hover .src-action{color:var(--gold-deep);border-color:#e0cfa4;backgrou
 /* ══════════ 4 · COMPOSER — manuscript desk (.rm-*) ══════════ */
 
 /* desk surfaces: warm paper canvas, cream top bar */
-.rm-app{--studio:#fbfcfd}
+.rm-app{--studio:#f7f6f5}
 .rm-top{background:rgba(255,255,255,.9)}
 
 /* publish CTA — navy primary (base shadow was rubric-red) */
-.rm-cta{box-shadow:0 8px 18px -10px rgba(29,58,95,.55)}
+.rm-cta{box-shadow:0 8px 18px -10px rgba(0,33,71,.55)}
 
 /* form inputs per prototype f-input: warm boxed, radius 10, blue focus */
 .rm-app .inp{
-  border:1px solid #d8dee8;border-radius:10px;background:#fcfdfe;
+  border:1px solid #d9d8d6;border-radius:10px;background:#ffffff;
 }
-.rm-app .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
-.rm-search{border:1px solid #d8dee8;border-radius:11px;background:#fcfdfe;transition:border-color .15s ease,box-shadow .15s ease}
-.rm-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(45,95,151,.12)}
+.rm-app .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
+.rm-search{border:1px solid #d9d8d6;border-radius:11px;background:#ffffff;transition:border-color .15s ease,box-shadow .15s ease}
+.rm-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
 
 /* contents rail = the prototype's steps: navy numerals, navy done-check seals */
-.rm-rail-ck{background:var(--navy);color:#f7f3ea}
+.rm-rail-ck{background:var(--navy);color:#f2f0f0}
 .rm-rail-item{transition:background .14s ease}
 
 /* section ledger — gold numerals & gilded tags on the manuscript canvas */
 .rm-secno{color:var(--gold-deep)}
-.rm-secrule{background:linear-gradient(90deg,rgba(179,135,62,.35),var(--line) 60%)}
+.rm-secrule{background:linear-gradient(90deg,rgba(127,168,206,.35),var(--line) 60%)}
 
 /* masthead title line */
 .rm-mast-title{caret-color:var(--navy)}
 .rm-mast-kick{color:var(--gold-deep)}
 
 /* cover dropzone + file add tile — dashed warm, gold on hover (scholarly) */
-.rm-cover-empty{border-color:#c3cbd9}
+.rm-cover-empty{border-color:#c2c1bf}
 .rm-cover-empty:hover{border-color:var(--gold)}
-.rm-file-add{border-color:#c3cbd9}
+.rm-file-add{border-color:#c2c1bf}
 .rm-file-add:hover{border-color:var(--gold);background:#ffffff}
 .rm-file-ic{background:var(--gold-wash);color:var(--gold-deep)}
 

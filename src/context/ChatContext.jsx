@@ -17,6 +17,7 @@ import { maxId, cmpId } from '../api/ids.js'
 import { showToast } from '../components/ui.jsx'
 import { useAuth } from './AuthContext.jsx'
 import { chatError } from '../components/chat/chatErrors.js'
+import { playChime } from '../lib/chime.js'
 
 const ChatCtx = React.createContext(null)
 
@@ -271,6 +272,18 @@ export function ChatProvider({ children }) {
     const open = String(conversationId) === String(activeIdRef.current)
     const active = open && visible
     const bump = isNew && !mine && !active              // count toward the badge?
+
+    /* The message chime rides the same gate as the badge: someone else's new
+       message in a thread you are NOT actively looking at. Mute silences the
+       chime the way it silences push — but not the count (an unknown convo
+       cannot be muted: nobody mutes a stranger before their first message).
+       NEW_MESSAGE notifications only fire for OFFLINE users, so this is the
+       only sound an online user gets for chat; chime.js's global throttle
+       absorbs any overlap with the channel-post notification bell. */
+    if (bump) {
+      const row = convosRef.current.find(c => String(c.id) === String(conversationId))
+      if (!row?.muted) playChime('message')
+    }
 
     /* Delivered receipt for a conversation I am NOT looking at. The open
        thread acks its own messages (useThread.markDelivered) — without this,

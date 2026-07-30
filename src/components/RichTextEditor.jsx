@@ -56,14 +56,14 @@ const TEXT_COLORS = [
   { cls:'tc-ink',     val:'#1c2330' },
   { cls:'tc-soft',    val:'#4d5768' },
   { cls:'tc-muted',   val:'#8a93a3' },
-  { cls:'tc-light',   val:'#ccd4e0' },
+  { cls:'tc-light',   val:'#c2c1bf' },
   { cls:'tc-rose',    val:'#b3453e' },
-  { cls:'tc-brass',   val:'#b3873e' },
-  { cls:'tc-emerald', val:'#1d3a5f' },
-  { cls:'tc-blue',    val:'#2d5f97' },
-  { cls:'tc-brown',   val:'#7a5b3f' },
-  { cls:'tc-deep',    val:'#16283f' },
-  { cls:'tc-bright',  val:'#3a6ca5' },
+  { cls:'tc-brass',   val:'#1f4e7e' },
+  { cls:'tc-emerald', val:'#002147' },
+  { cls:'tc-blue',    val:'#1f4e7e' },
+  { cls:'tc-brown',   val:'#4e6580' },
+  { cls:'tc-deep',    val:'#00172f' },
+  { cls:'tc-bright',  val:'#2e6094' },
   { cls:'tc-white',   val:'#ffffff' },
 ]
 const HIGHLIGHT_COLORS = [
@@ -73,7 +73,7 @@ const HIGHLIGHT_COLORS = [
   { cls:'hl-blue',    val:'#90caf9' },
   { cls:'hl-coral',   val:'#ffab91' },
   { cls:'hl-pink',    val:'#ce93d8' },
-  { cls:'hl-cream',   val:'#f3eee1' },
+  { cls:'hl-cream',   val:'#eef3f9' },
   { cls:'hl-orange',  val:'#ffe0b2' },
 ]
 /* Font sizes as actual pixel values — the picker button shows the current

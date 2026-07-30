@@ -17,12 +17,12 @@ import { Icon } from './ui.jsx'
 /* ---------- Editor preset palette ---------- */
 
 const BACKGROUNDS = [
-  { id:'g1', label:'Navy',   bg:'linear-gradient(160deg,#16283f,#2d5f97)' },
-  { id:'g2', label:'Gold',   bg:'linear-gradient(160deg,#5c422a,#b3873e)' },
-  { id:'g3', label:'Sage',   bg:'linear-gradient(160deg,#3a5244,#5b7a67)' },
+  { id:'g1', label:'Navy',   bg:'linear-gradient(160deg,#00172f,#1f4e7e)' },
+  { id:'g2', label:'Steel',  bg:'linear-gradient(160deg,#3e5570,#7fa8ce)' },
+  { id:'g3', label:'Sage',   bg:'linear-gradient(160deg,#426a5a,#5b7a67)' },
   { id:'g4', label:'Rose',   bg:'linear-gradient(160deg,#5c2f3a,#8a4a5b)' },
   { id:'g5', label:'Violet', bg:'linear-gradient(160deg,#463a5c,#6b5b8a)' },
-  { id:'g6', label:'Paper',  bg:'linear-gradient(160deg,#ffffff,#e4e8ee)' },
+  { id:'g6', label:'Paper',  bg:'linear-gradient(160deg,#ffffff,#d9d8d6)' },
 ]
 
 const FONTS = [
@@ -32,7 +32,7 @@ const FONTS = [
   { id:'display', label:'Display',family:'"Amiri", "Lora", Georgia, serif', italic:true, weight:500 },
 ]
 
-const COLORS = ['#ffffff', '#1c2330', '#d9b96c', '#b3873e', '#2d5f97', '#1d3a5f', '#e5d3ac', '#b3453e']
+const COLORS = ['#ffffff', '#1c2330', '#b9d6f2', '#1f4e7e', '#7fa8ce', '#002147', '#426a5a', '#b3453e']
 
 /* Story canvas is 1080×1920 (Instagram-equivalent 9:16). The on-screen
    preview is scaled to fit the modal viewport; all positions are stored
@@ -100,7 +100,7 @@ function TextLayer({ layer, selected, onSelect, onChange, onDelete }) {
     touchAction:'none',
     userSelect: 'none',
     textShadow: layer.bgOn ? 'none' : '0 2px 8px rgba(0,0,0,.45)',
-    outline:    selected ? '2px dashed rgba(29,58,95,.85)' : 'none',
+    outline:    selected ? '2px dashed rgba(0,33,71,.85)' : 'none',
     outlineOffset: 4,
   }
   return (
@@ -242,7 +242,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
       rotation: 0, scale: 1,
       font: 'serif', size: 56, color: '#ffffff',
       align: 'center', bold: false, italic: false,
-      bgOn: false, bgColor: 'rgba(27,24,19,.5)',
+      bgOn: false, bgColor: 'rgba(13,21,32,.5)',
       _edit: true,
     }
     setLayers(prev => [...prev, layer])
@@ -254,8 +254,8 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
     const onPaper = bgPreset?.id === 'g6'
     setLayers(prev => [...prev, {
       id, text:'۞', x:50, y:50, rotation:0, scale:1,
-      font:'serif', size:96, color: onPaper ? '#1d3a5f' : '#ffffff',
-      align:'center', bold:false, italic:false, bgOn:false, bgColor:'rgba(27,24,19,.5)',
+      font:'serif', size:96, color: onPaper ? '#002147' : '#ffffff',
+      align:'center', bold:false, italic:false, bgOn:false, bgColor:'rgba(13,21,32,.5)',
     }])
     setSelectedId(id)
   }
@@ -302,7 +302,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
       // Parse the preset gradient and reapply on canvas (canvas can't render
       // CSS gradients directly). We use two-stop linear gradient extracted
       // from the preset background string.
-      const colors = (bgPreset.bg.match(/#[0-9a-f]{6}/gi) || ['#16283f','#2d5f97'])
+      const colors = (bgPreset.bg.match(/#[0-9a-f]{6}/gi) || ['#00172f','#1f4e7e'])
       // Reproduce CSS `linear-gradient(<deg>, …)` exactly: 0deg points up,
       // clockwise; the gradient line spans the box projection at that angle.
       const deg = +(bgPreset.bg.match(/linear-gradient\((\d+)deg/) || [0, 160])[1]
@@ -335,10 +335,10 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
         else         { sw = v.videoWidth;  sh = sw / cr; sx = 0; sy = (v.videoHeight - sh) / 2 }
         ctx.drawImage(v, sx, sy, sw, sh, 0, 0, EXPORT_W, EXPORT_H)
       } else {
-        ctx.fillStyle = '#191613'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
+        ctx.fillStyle = '#0f1926'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
       }
     } else {
-      ctx.fillStyle = '#191613'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
+      ctx.fillStyle = '#0f1926'; ctx.fillRect(0, 0, EXPORT_W, EXPORT_H)
     }
 
     // Text layers — render in order on top
@@ -455,7 +455,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
         }}
       >
         <div className="se-stage" ref={stageRef}
-          style={{ background: bgPreset?.bg || '#191613' }}
+          style={{ background: bgPreset?.bg || '#0f1926' }}
           onPointerDown={() => deselectAll()}
         >
           {bgKind === 'image' && bgUrl && (
@@ -518,7 +518,7 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
             <div className="se-colors">
               {COLORS.map(c => (
                 <button key={c} className={'se-color ' + (selected.color === c ? 'on' : '')}
-                  style={{ background: c, borderColor: c === '#ffffff' ? '#ccd4e0' : 'transparent' }}
+                  style={{ background: c, borderColor: c === '#ffffff' ? '#c2c1bf' : 'transparent' }}
                   onClick={() => patchSelected({ color: c })}/>
               ))}
             </div>

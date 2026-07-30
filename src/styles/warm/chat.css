@@ -116,7 +116,7 @@
   border-radius:999px;background:var(--gold);color:#fff;
   font-size:10.5px;font-weight:700;line-height:17px;
 }
-.ch-list-tabs .tab.on .badge{ background:rgba(247,243,234,.26);color:#f7f3ea; }
+.ch-list-tabs .tab.on .badge{ background:rgba(242,240,240,.26);color:#f2f0f0; }
 
 /* the scrolling list itself */
 .chat-list{
@@ -166,11 +166,11 @@
   position:absolute;inset-block-end:-2px;inset-inline-end:-2px;
   width:19px;height:19px;border-radius:50%;
   display:inline-flex;align-items:center;justify-content:center;
-  background:var(--navy);color:#f5f1e8;
+  background:var(--navy);color:#f2f0f0;
   border:2px solid var(--card);
 }
 .cv-kind .ico{ width:11px;height:11px; }
-.cv-kind.channel{ background:var(--gold);color:#fffdf8; }
+.cv-kind.channel{ background:var(--gold);color:#ffffff; }
 .cv-row.active .cv-kind{ border-color:var(--blue-wash); }
 
 .cv-body{ flex:1;min-width:0;display:flex;flex-direction:column;gap:2px; }
@@ -227,11 +227,11 @@
   color:#ffffff;
   font-size:11px;font-weight:800;line-height:1;text-align:center;
   font-variant-numeric:tabular-nums;letter-spacing:.2px;
-  box-shadow:0 0 0 2px var(--card),0 3px 8px -3px rgba(122,102,47,.55);
+  box-shadow:0 0 0 2px var(--card),0 3px 8px -3px rgba(22,62,102,.55);
   animation:chBadgeIn .3s cubic-bezier(.34,1.56,.64,1);
 }
-.cv-row:hover .cv-badge{ box-shadow:0 0 0 2px var(--card-2),0 3px 8px -3px rgba(122,102,47,.55); }
-.cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--blue-wash),0 3px 8px -3px rgba(122,102,47,.55); }
+.cv-row:hover .cv-badge{ box-shadow:0 0 0 2px var(--card-2),0 3px 8px -3px rgba(22,62,102,.55); }
+.cv-row.active .cv-badge{ box-shadow:0 0 0 2px var(--blue-wash),0 3px 8px -3px rgba(22,62,102,.55); }
 /* muted conversations still count, they just don't shout */
 .cv-row.muted-row .cv-badge{ background:var(--muted); }
 @keyframes chBadgeIn{
@@ -244,7 +244,7 @@
   flex:0 0 auto;
   width:9px;height:9px;border-radius:50%;
   background:var(--gold);
-  box-shadow:0 0 0 3px rgba(179,135,62,.18);
+  box-shadow:0 0 0 3px rgba(127,168,206,.18);
   animation:chBadgeIn .3s cubic-bezier(.34,1.56,.64,1);
 }
 /* muted conversations still count, they just don't shout */
@@ -308,7 +308,7 @@
   transition:background .14s,border-color .14s,color .14s;
 }
 .rq-btn:hover{ background:var(--card-2);color:var(--ink); }
-.rq-btn.primary{ background:var(--navy);border-color:var(--navy);color:#f7f3ea; }
+.rq-btn.primary{ background:var(--navy);border-color:var(--navy);color:#f2f0f0; }
 .rq-btn.primary:hover{ background:var(--navy-deep); }
 .rq-btn.danger{ color:var(--danger);border-color:#e8cfcb; }
 .rq-btn.danger:hover{ background:#faeeec;color:var(--danger); }
@@ -323,8 +323,8 @@
   /* a whisper of tooth behind the bubbles — on the porcelain canvas the
      old gold glow read as a stain, so both corners now breathe navy */
   background-image:
-    radial-gradient(circle at 20% 12%, rgba(29,58,95,.035), transparent 42%),
-    radial-gradient(circle at 82% 78%, rgba(29,58,95,.045), transparent 46%);
+    radial-gradient(circle at 20% 12%, rgba(0,33,71,.035), transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(0,33,71,.045), transparent 46%);
 }
 /* A bare loader / error dropped straight into the pane centres itself rather
    than sticking to the top edge of a flex column. */
@@ -469,7 +469,7 @@
   background:var(--gold-wash);
   cursor:pointer;
 }
-.ch-pinbar:hover{ background:#f2e5cb; }
+.ch-pinbar:hover{ background:#d6e7f8; }
 /* the jump-to-pin action is its own button so the close control can be a
    sibling rather than an (inaccessible) nested one */
 .ch-pinbar-main{
@@ -491,7 +491,7 @@
   border:0;background:transparent;cursor:pointer;color:var(--gold-deep);
   display:inline-flex;padding:4px;border-radius:6px;flex:0 0 auto;
 }
-.ch-pinbar-x:hover{ background:rgba(122,102,47,.14); }
+.ch-pinbar-x:hover{ background:rgba(22,62,102,.14); }
 
 /* --- search slide-over (ChatSearchPanel) ---------------------------------
    A panel, not a bar: it overlays the END edge of the shell so the thread
@@ -641,7 +641,13 @@
 .ch-row.run-start{ margin-top:10px; }
 
 .ch-row-av{ width:30px;flex:0 0 auto;align-self:flex-end;margin-bottom:2px; }
-.ch-row-av.hidden{ visibility:hidden; }
+/* The no-avatar rows of a run keep the column as an invisible SPACER so every
+   bubble in the run shares one left edge. `ghost`, not `hidden` — the global
+   `.hidden{display:none!important}` utility (styles.css) would collapse the
+   column and stagger the run. */
+.ch-row-av.ghost{ visibility:hidden; }
+/* (The reaction-row avatar lift lives in ika-messages-theme.css, beside the
+   pill metrics it is calibrated against.) */
 
 .ch-stack{ display:flex;flex-direction:column;min-width:0;max-width:min(68%,560px); }
 .ch-row.mine .ch-stack{ align-items:flex-end; }
@@ -668,8 +674,8 @@
 .ch-row.mine .ch-bubble{
   background:var(--navy);
   border-color:var(--navy);
-  color:#f5f1e8;
-  box-shadow:0 6px 16px -10px rgba(29,58,95,.5);
+  color:#f2f0f0;
+  box-shadow:0 6px 16px -10px rgba(0,33,71,.5);
 }
 .ch-row.mine .ch-bubble a{ color:#cfe0f0;text-decoration:underline; }
 /* the tail: square off the corner nearest the avatar on the run's last bubble */
@@ -683,7 +689,7 @@
   font-style:italic;color:var(--muted);
   background:var(--card-2);border-style:dashed;box-shadow:none;
 }
-.ch-row.mine .ch-bubble.deleted{ background:rgba(29,58,95,.1);border-color:var(--line);color:var(--muted); }
+.ch-row.mine .ch-bubble.deleted{ background:rgba(0,33,71,.1);border-color:var(--line);color:var(--muted); }
 /* a bubble that is only media needs no padding around it */
 .ch-bubble.media-only{ padding:4px;overflow:hidden; }
 /* highlight when jumped to from search / a reply quote */
@@ -705,7 +711,7 @@
   font-variant-numeric:tabular-nums;
   user-select:none;
 }
-.ch-row.mine .ch-meta{ color:rgba(245,241,232,.66); }
+.ch-row.mine .ch-meta{ color:rgba(242,240,240,.66); }
 .ch-meta .ico{ width:13px;height:13px; }
 .ch-meta-edited{ font-style:italic; }
 
@@ -737,7 +743,7 @@
   position:absolute;inset-block-end:9px;inset-inline-end:11px;
   float:none;margin:0;z-index:2;
   padding:2px 7px;border-radius:999px;
-  background:rgba(22,40,63,.6);color:#f2ede2;
+  background:rgba(0,23,47,.6);color:#f2f0f0;
   backdrop-filter:blur(4px);
 }
 .ch-bubble.media-only .ch-tick.seen{ color:#a9dcff; }
@@ -756,9 +762,9 @@
 /* a deleted target is not navigable — drop the affordance, keep the quote */
 .ch-quote:disabled{ cursor:default; }
 .ch-quote:disabled:hover{ background:var(--card-2); }
-.ch-row.mine .ch-quote:disabled:hover{ background:rgba(255,253,248,.14); }
-.ch-row.mine .ch-quote{ background:rgba(255,253,248,.14);border-inline-start-color:var(--brass-soft); }
-.ch-row.mine .ch-quote:hover{ background:rgba(255,253,248,.22); }
+.ch-row.mine .ch-quote:disabled:hover{ background:rgba(255,255,255,.14); }
+.ch-row.mine .ch-quote{ background:rgba(255,255,255,.14);border-inline-start-color:var(--brass-soft); }
+.ch-row.mine .ch-quote:hover{ background:rgba(255,255,255,.22); }
 .ch-quote-who{
   font-size:11.5px;font-weight:700;color:var(--gold-deep);display:block;
   /* the caption now carries a NAME, and a long one must not wrap the strip */
@@ -769,7 +775,7 @@
   font-size:12.5px;color:var(--ink-soft);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.ch-row.mine .ch-quote-txt{ color:rgba(245,241,232,.8); }
+.ch-row.mine .ch-quote-txt{ color:rgba(242,240,240,.8); }
 .ch-quote-txt.gone{ font-style:italic;color:var(--muted); }
 
 /* forwarded marker (NOT .ch-fwd — that is the forward-target picker) */
@@ -778,7 +784,7 @@
   font-size:11px;font-style:italic;color:var(--muted);
   margin-bottom:3px;
 }
-.ch-row.mine .ch-fwdmark{ color:rgba(245,241,232,.62); }
+.ch-row.mine .ch-fwdmark{ color:rgba(242,240,240,.62); }
 .ch-fwdmark .ico{ width:12px;height:12px; }
 
 /* --- media --- */
@@ -800,14 +806,14 @@
   position:absolute;inset:0;margin:auto;
   width:48px;height:48px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(22,40,63,.62);color:#fff;
+  background:rgba(0,23,47,.62);color:#fff;
   backdrop-filter:blur(3px);pointer-events:none;
 }
 .ch-asset-play .ico{ width:22px;height:22px; }
 .ch-asset-more{
   position:absolute;inset:0;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(22,40,63,.58);color:#fff;
+  background:rgba(0,23,47,.58);color:#fff;
   font-size:20px;font-weight:700;pointer-events:none;
 }
 
@@ -820,21 +826,21 @@
   transition:border-color .14s;
 }
 .ch-file:hover{ border-color:var(--blue); }
-.ch-row.mine .ch-file{ background:rgba(255,253,248,.13);border-color:rgba(255,253,248,.22); }
-.ch-row.mine .ch-file:hover{ background:rgba(255,253,248,.2); }
+.ch-row.mine .ch-file{ background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.22); }
+.ch-row.mine .ch-file:hover{ background:rgba(255,255,255,.2); }
 .ch-file-ico{
   width:36px;height:36px;flex:0 0 auto;border-radius:9px;
   display:inline-flex;align-items:center;justify-content:center;
   background:var(--blue-wash);color:var(--navy);
 }
-.ch-row.mine .ch-file-ico{ background:rgba(255,253,248,.2);color:#f5f1e8; }
+.ch-row.mine .ch-file-ico{ background:rgba(255,255,255,.2);color:#f2f0f0; }
 .ch-file-body{ min-width:0;flex:1; }
 .ch-file-name{
   font-size:13px;font-weight:600;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .ch-file-size{ font-size:11px;color:var(--muted); }
-.ch-row.mine .ch-file-size{ color:rgba(245,241,232,.66); }
+.ch-row.mine .ch-file-size{ color:rgba(242,240,240,.66); }
 
 /* voice note */
 .ch-voice{ display:flex;align-items:center;gap:10px;min-width:210px;padding:2px 0; }
@@ -842,9 +848,9 @@
   width:36px;height:36px;flex:0 0 auto;border-radius:50%;
   display:inline-flex;align-items:center;justify-content:center;
   border:0;cursor:pointer;
-  background:var(--navy);color:#f7f3ea;
+  background:var(--navy);color:#f2f0f0;
 }
-.ch-row.mine .ch-voice-play{ background:rgba(255,253,248,.9);color:var(--navy); }
+.ch-row.mine .ch-voice-play{ background:rgba(255,255,255,.9);color:var(--navy); }
 .ch-voice-play .ico{ width:16px;height:16px; }
 .ch-voice-body{ flex:1;min-width:0; }
 .ch-wave{
@@ -856,13 +862,13 @@
   transition:background .1s;
 }
 .ch-wave-bar.played{ background:var(--gold); }
-.ch-row.mine .ch-wave-bar{ background:rgba(255,253,248,.35); }
-.ch-row.mine .ch-wave-bar.played{ background:#f5f1e8; }
+.ch-row.mine .ch-wave-bar{ background:rgba(255,255,255,.35); }
+.ch-row.mine .ch-wave-bar.played{ background:#f2f0f0; }
 .ch-voice-time{
   font-size:11px;color:var(--muted);margin-top:2px;
   font-variant-numeric:tabular-nums;
 }
-.ch-row.mine .ch-voice-time{ color:rgba(245,241,232,.7); }
+.ch-row.mine .ch-voice-time{ color:rgba(242,240,240,.7); }
 
 /* --- reactions --- */
 .ch-reacts{
@@ -1139,7 +1145,7 @@
 .ch-tray-name{
   position:absolute;inset-block-end:0;inset-inline:0;
   padding:2px 4px;font-size:9px;text-align:center;
-  background:rgba(22,40,63,.66);color:#f2ede2;
+  background:rgba(0,23,47,.66);color:#f2f0f0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .ch-tray-x{
@@ -1147,7 +1153,7 @@
   width:19px;height:19px;border-radius:50%;
   display:inline-flex;align-items:center;justify-content:center;
   border:0;cursor:pointer;
-  background:rgba(22,40,63,.72);color:#fff;
+  background:rgba(0,23,47,.72);color:#fff;
 }
 .ch-tray-x .ico{ width:11px;height:11px; }
 
@@ -1194,8 +1200,8 @@
   width:38px;height:38px;flex:0 0 auto;border-radius:50%;
   display:inline-flex;align-items:center;justify-content:center;
   border:0;cursor:pointer;
-  background:var(--navy);color:#f7f3ea;
-  box-shadow:0 8px 18px -10px rgba(29,58,95,.6);
+  background:var(--navy);color:#f2f0f0;
+  box-shadow:0 8px 18px -10px rgba(0,33,71,.6);
   transition:background .14s,transform .12s,opacity .14s;
 }
 .ch-send:hover{ background:var(--navy-deep); }
@@ -1224,7 +1230,7 @@
   border:0;background:transparent;cursor:pointer;color:var(--danger);
   font-size:12.5px;font-weight:650;padding:4px 8px;border-radius:8px;
 }
-.ch-rec-x:hover{ background:rgba(160,62,54,.1); }
+.ch-rec-x:hover{ background:rgba(156,58,51,.1); }
 
 /* emoji picker */
 /* Portalled through <Popover> like every other floating surface — in-flow it
@@ -1760,7 +1766,7 @@
 .ch-lightbox{
   position:fixed;inset:0;z-index:150;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(18,16,13,.92);
+  background:rgba(8,14,22,.92);
   padding:24px;
   animation:chFade .16s ease-out;
 }
@@ -1774,20 +1780,20 @@
   width:40px;height:40px;border-radius:50%;
   display:inline-flex;align-items:center;justify-content:center;
   border:0;cursor:pointer;
-  background:rgba(255,253,248,.14);color:#f7f3ea;
+  background:rgba(255,255,255,.14);color:#f2f0f0;
   backdrop-filter:blur(6px);
 }
-.ch-lightbox-x:hover{ background:rgba(255,253,248,.24); }
+.ch-lightbox-x:hover{ background:rgba(255,255,255,.24); }
 .ch-lightbox-dl{
   position:absolute;inset-block-start:18px;inset-inline-start:18px;
   display:inline-flex;align-items:center;gap:7px;
   padding:9px 14px;border-radius:999px;
   border:0;cursor:pointer;text-decoration:none;
-  background:rgba(255,253,248,.14);color:#f7f3ea;
+  background:rgba(255,255,255,.14);color:#f2f0f0;
   font-size:13px;font-weight:600;
   backdrop-filter:blur(6px);
 }
-.ch-lightbox-dl:hover{ background:rgba(255,253,248,.24); }
+.ch-lightbox-dl:hover{ background:rgba(255,255,255,.24); }
 
 /* album paging */
 .ch-lightbox-nav{
@@ -1795,16 +1801,16 @@
   width:44px;height:44px;border-radius:50%;
   display:inline-flex;align-items:center;justify-content:center;
   border:0;cursor:pointer;
-  background:rgba(255,253,248,.14);color:#f7f3ea;
+  background:rgba(255,255,255,.14);color:#f2f0f0;
   backdrop-filter:blur(6px);
 }
-.ch-lightbox-nav:hover{ background:rgba(255,253,248,.26); }
+.ch-lightbox-nav:hover{ background:rgba(255,255,255,.26); }
 .ch-lightbox-nav.prev{ inset-inline-start:16px; }
 .ch-lightbox-nav.next{ inset-inline-end:16px; }
 .ch-lightbox-n{
   position:absolute;inset-block-end:20px;inset-inline:0;
   text-align:center;font-size:12.5px;font-weight:600;
-  color:rgba(247,243,234,.78);
+  color:rgba(242,240,240,.78);
   font-variant-numeric:tabular-nums;
 }
 @media(max-width:600px){

@@ -16,11 +16,42 @@ import { useRealtime } from '../hooks/useRealtime.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api, applyPostDelta } from '../api/index.js'
 
+/* ----- live reply-thread helpers ------------------------------------------
+   A comment-scoped SSE event carries only a commentId, and that id can name a
+   TOP-LEVEL comment or a REPLY inside any lazily-loaded thread — the wire does
+   not say which. These map/drop the id across every loaded thread, and return
+   the SAME map reference when nothing matched so the setState bails out (the
+   handler calls them for every comment event, matched or not). Pure — safe
+   under StrictMode's double-invoked updaters. */
+function patchInThreads(m, cid, fn) {
+  let changed = false
+  const out = {}
+  for (const k of Object.keys(m)) {
+    const list = m[k] || []
+    if (list.some(r => r.id === cid)) {
+      changed = true
+      out[k] = list.map(r => r.id === cid ? fn(r) : r)
+    } else out[k] = list
+  }
+  return changed ? out : m
+}
+function dropFromThreads(m, cid) {
+  let changed = false
+  const out = {}
+  for (const k of Object.keys(m)) {
+    const list = m[k] || []
+    const next = list.filter(r => r.id !== cid)
+    if (next.length !== list.length) changed = true
+    out[k] = next
+  }
+  return changed ? out : m
+}
+
 export function PostPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const me = user || { full:'You', initials:'Y', avc:'linear-gradient(135deg,#2d5f97,#16283f)' }
+  const me = user || { full:'You', initials:'Y', avc:'linear-gradient(135deg,#1f4e7e,#00172f)' }
 
   const [post, setPost] = React.useState(null)
   const [comments, setComments] = React.useState([])
@@ -36,6 +67,24 @@ export function PostPage() {
   const [repliesMap, setRepliesMap] = React.useState({})   // commentId → [reply views]
   const [openReplies, setOpenReplies] = React.useState({}) // commentId → shown?
 
+  /* Exactly-once ledgers for the comment-scoped SSE events. The posts stream
+     never echoes the actor's own events, but a watchdog-forced reconnect CAN
+     replay recent ones — and the rows are deduped by id while the counters
+     were not, so every replay used to drift post.comments/replyCount with no
+     visible row evidence. `seenC` = comment/reply ids whose +1 already ran
+     (seeded from every fetch and own successful posts); `delC` = ids whose
+     delete already counted. Reset per post. */
+  const seenC = React.useRef(new Set())
+  const delC = React.useRef(new Set())
+  /* Read-only mirrors so the SSE handler can DECIDE (is this id top-level?
+     which loaded thread holds it? how many replies cascade away with it?)
+     before dispatching pure setState updaters — side-effect-free under
+     StrictMode's double invocation. */
+  const commentsRef = React.useRef(comments)
+  React.useEffect(() => { commentsRef.current = comments }, [comments])
+  const repliesRef = React.useRef(repliesMap)
+  React.useEffect(() => { repliesRef.current = repliesMap }, [repliesMap])
+
   const replyHandleOf = React.useCallback((reply, parentComment) => {
     if (reply?._replyToHandle) return reply._replyToHandle
     if (reply?.replyToUserId) {
@@ -50,8 +99,16 @@ export function PostPage() {
   React.useEffect(() => {
     let alive = true
     setLoading(true)
+    seenC.current = new Set()
+    delC.current = new Set()
     Promise.all([api.posts.get(id), api.posts.comments(id).catch(() => [])])
-      .then(([p, c]) => { if (!alive) return; setPost(p); setComments(c) })
+      .then(([p, c]) => {
+        if (!alive) return
+        // Fetched rows are inside the fetched counters — a replayed create
+        // for any of them must not bump again.
+        ;(c || []).forEach(x => seenC.current.add(x.id))
+        setPost(p); setComments(c)
+      })
       .catch(() => { if (alive) setPost(false) })
       .finally(() => { if (alive) setLoading(false) })
     api.posts.recordView(id).catch(() => {})
@@ -70,30 +127,94 @@ export function PostPage() {
     onConnected: () => setLive(true),
     onError: () => setLive(false),
     onEvent: (evt) => {
-      setPost(prev => applyPostDelta(prev, evt))
+      const t = evt.eventType
+      /* Comment-scoped COUNTERS are handled explicitly below behind the
+         exactly-once ledgers — applyPostDelta's blind ±1 would re-drift on a
+         reconnect replay while the rows stay deduped. Everything else still
+         rides the shared delta helper. */
+      const commentScoped = t === 'COMMENT_CREATED' || t === 'REPLY_CREATED' || t === 'COMMENT_DELETED'
+      if (!commentScoped) setPost(prev => applyPostDelta(prev, evt))
       // SAVE_COUNT_UPDATED carries no direction → debounce-re-read the true count (§7)
-      if (evt.eventType === 'SAVE_COUNT_UPDATED') refreshSaveCountSoon()
-      if (evt.eventType === 'COMMENT_CREATED' && evt.commentId) {
-        setComments(cs => cs.some(c => c.id === evt.commentId) ? cs : [...cs, {   // dedup: never echo a comment we already have
-          id: evt.commentId,
-          _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
-                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#2d5f97,#16283f)' },
-          body: evt.textContent || '', time: 'now', likes: 0,
-        }])
+      if (t === 'SAVE_COUNT_UPDATED') refreshSaveCountSoon()
+      const synthRow = () => ({
+        id: evt.commentId,
+        _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
+                   initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#1f4e7e,#00172f)' },
+        body: evt.textContent || '', time: 'now', likes: 0,
+      })
+      if (t === 'COMMENT_CREATED' && evt.commentId && !seenC.current.has(evt.commentId)) {
+        seenC.current.add(evt.commentId)
+        setPost(p => p ? { ...p, comments: (p.comments || 0) + 1 } : p)
+        setComments(cs => cs.some(c => c.id === evt.commentId) ? cs : [...cs, synthRow()])
       }
-      if (evt.eventType === 'REPLY_CREATED' && evt.commentId) {
+      if (t === 'REPLY_CREATED' && evt.commentId && !seenC.current.has(evt.commentId)) {
+        seenC.current.add(evt.commentId)
         const pid = evt.parentCommentId
+        setPost(p => p ? { ...p, comments: (p.comments || 0) + 1 } : p)
         setComments(cs => cs.map(c => c.id === pid ? { ...c, replyCount: (c.replyCount || 0) + 1 } : c))
-        setRepliesMap(m => m[pid] ? { ...m, [pid]: m[pid].some(r => r.id === evt.commentId) ? m[pid] : [...m[pid], {
-          id: evt.commentId,
-          _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
-                     initials: (evt.actorUsername || 'M').slice(0,2).toUpperCase(), avc:'linear-gradient(135deg,#2d5f97,#16283f)' },
-          body: evt.textContent || '', time: 'now', likes: 0,
-        }] } : m)
+        setRepliesMap(m => m[pid]
+          ? { ...m, [pid]: m[pid].some(r => r.id === evt.commentId) ? m[pid] : [...m[pid], synthRow()] }
+          : m)
       }
-      if (evt.eventType === 'COMMENT_DELETED') setComments(cs => cs.filter(c => c.id !== evt.commentId))
-      if (evt.eventType === 'COMMENT_REACTION_ADDED') setComments(cs => cs.map(c => c.id === evt.commentId ? { ...c, likes: (c.likes || 0) + 1 } : c))
-      if (evt.eventType === 'COMMENT_REACTION_REMOVED') setComments(cs => cs.map(c => c.id === evt.commentId ? { ...c, likes: Math.max(0, (c.likes || 0) - 1) } : c))
+      if (t === 'COMMENT_DELETED' && evt.commentId && !delC.current.has(evt.commentId)) {
+        delC.current.add(evt.commentId)
+        const cid = evt.commentId
+        /* Decide from the mirrors, then dispatch pure updaters: was this a
+           top-level comment (its counted replies cascade away with it — the
+           thin wire sends no per-reply deletes) or a reply (find its parent
+           in a loaded thread when the wire doesn't name it, so the "View N
+           replies" label can follow)? */
+        const topRow = commentsRef.current.find(c => c.id === cid)
+        const pid = evt.parentCommentId
+          || (topRow ? null : Object.keys(repliesRef.current).find(k => (repliesRef.current[k] || []).some(r => r.id === cid)) || null)
+        const cascade = topRow ? 1 + (topRow.replyCount || 0) : 1
+        setPost(p => p ? { ...p, comments: Math.max(0, (p.comments || 0) - cascade) } : p)
+        setComments(cs => cs
+          .filter(c => c.id !== cid)
+          .map(c => pid && c.id === pid ? { ...c, replyCount: Math.max(0, (c.replyCount || 0) - 1) } : c))
+        setRepliesMap(m => {
+          const dropped = dropFromThreads(m, cid)
+          if (!topRow || !(cid in dropped)) return dropped
+          const rest = { ...dropped }
+          delete rest[cid]   // a deleted top-level takes its loaded thread with it
+          return rest
+        })
+      }
+      if (evt.eventType === 'COMMENT_REACTION_ADDED' || evt.eventType === 'COMMENT_REACTION_REMOVED') {
+        /* The other viewer's heart moves live — on top-level comments AND on
+           replies (the old handler only patched top level, so reacting to a
+           reply never showed for anyone else). */
+        const d = evt.eventType === 'COMMENT_REACTION_ADDED' ? 1 : -1
+        const bump = (c) => ({ ...c, likes: Math.max(0, (c.likes || 0) + d) })
+        setComments(cs => cs.map(c => c.id === evt.commentId ? bump(c) : c))
+        setRepliesMap(m => patchInThreads(m, evt.commentId, bump))
+      }
+      if (evt.eventType === 'COMMENT_EDITED' && evt.commentId && typeof evt.textContent === 'string') {
+        // Thin payload like COMMENT_CREATED (ids + text): patch the body in
+        // place wherever the row lives. Without textContent there is nothing
+        // to render — skip rather than blank the comment.
+        const edit = (c) => ({ ...c, body: evt.textContent, edited: true })
+        setComments(cs => cs.map(c => c.id === evt.commentId ? edit(c) : c))
+        setRepliesMap(m => patchInThreads(m, evt.commentId, edit))
+      }
+      if (evt.eventType === 'POST_UPDATED') {
+        /* The author edited while we're reading — re-read the canonical post
+           for its CONTENT (body/media/tags/visibility) but keep our local
+           counters and viewer flags: they are delta-maintained, and a
+           snapshot taken while my own like/comment is still in flight would
+           clobber it — with own-event suppression, nothing would ever
+           correct that. */
+        api.posts.get(id).then(p => {
+          if (!p) return
+          setPost(prev => prev ? {
+            ...p,
+            likes: prev.likes, liked: prev.liked,
+            saves: prev.saves, saved: prev.saved,
+            comments: prev.comments, shares: prev.shares,
+            views: Math.max(prev.views || 0, p.views || 0),
+          } : p)
+        }).catch(() => {})
+      }
       if (evt.eventType === 'POST_DELETED') { showToast('This post was removed'); navigate('/') }
     },
   })
@@ -145,8 +266,14 @@ export function PostPage() {
   const delComment = async (cid) => {
     const ok = await uiConfirm({ title:'Delete this comment?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
+    delC.current.add(cid)
+    // Deleting a top-level comment takes its counted replies with it — the
+    // same cascade math the SSE handler applies for other viewers' deletes.
+    const row = commentsRef.current.find(c => c.id === cid)
+    const cascade = 1 + (row?.replyCount || 0)
     setComments(cs => cs.filter(c => c.id !== cid))
-    setPost(p => p ? { ...p, comments: Math.max(0, (p.comments || 0) - 1) } : p)
+    setRepliesMap(m => { const { [cid]: _orphaned, ...rest } = m; return _orphaned ? rest : m })
+    setPost(p => p ? { ...p, comments: Math.max(0, (p.comments || 0) - cascade) } : p)
     try { await api.posts.deleteComment(cid) } catch { showToast('Could not delete comment') }
   }
 
@@ -155,7 +282,15 @@ export function PostPage() {
     const wasOpen = openReplies[cid]
     setOpenReplies(o => ({ ...o, [cid]: !wasOpen }))
     if (!wasOpen && !repliesMap[cid]) {
-      try { const list = await api.posts.replies(cid); setRepliesMap(m => ({ ...m, [cid]: list || [] })) }
+      try {
+        const list = await api.posts.replies(cid)
+        // Fetched replies are already inside the fetched counters — a replayed
+        // REPLY_CREATED for any of them must not bump again — and the list IS
+        // the whole thread (flat fetch), so the parent's label becomes exact.
+        ;(list || []).forEach(r => seenC.current.add(r.id))
+        setRepliesMap(m => ({ ...m, [cid]: list || [] }))
+        setComments(cs => cs.map(c => c.id === cid ? { ...c, replyCount: (list || []).length } : c))
+      }
       catch { setRepliesMap(m => ({ ...m, [cid]: [] })) }
     }
   }
@@ -183,6 +318,7 @@ export function PostPage() {
   const delReply = async (cid, rid) => {
     const ok = await uiConfirm({ title:'Delete this reply?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
+    delC.current.add(rid)
     setRepliesMap(m => ({ ...m, [cid]: (m[cid] || []).filter(r => r.id !== rid) }))
     setComments(cs => cs.map(c => c.id === cid ? { ...c, replyCount: Math.max(0, (c.replyCount || 0) - 1) } : c))
     setPost(p => p ? { ...p, comments: Math.max(0, (p.comments || 0) - 1) } : p)
