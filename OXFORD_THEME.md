@@ -64,6 +64,28 @@ removed. **New code should prefer `--ox-*`.**
 --like                         → #B3453E               /* hearts keep their red */
 ```
 
+### ⚠️ The `--gold` trap
+
+`--gold` **is a dark blue.** The alias survived the migration; its value did
+not. Any rule written before 2026-07-30 in the shape
+
+```css
+background: var(--gold);   color: var(--navy);      /* was gold + navy ink */
+```
+
+silently became **dark ink on a dark blue plate** (1.87:1) the day the token
+was re-pointed — nothing in the rule changed, so nothing flagged it. Three
+shipped that way and are now fixed (`.lv-sup-rank.r1`, `.lv-ovl-go`,
+`.cn-mine-dot`).
+
+Put **white** on a dark plate. Never pair two tokens from the `--navy` /
+`--gold` / `--rubric` / `--emerald` families as background and ink: since the
+migration they all resolve to dark blues.
+
+A static checker for this lives in the scratchpad
+(`audit-pairs.mjs`): it resolves the custom-property graph and reports every
+rule whose own `background` + `color` fall below 4.5:1.
+
 ## 3 · Light palette (default)
 
 - **Body:** `#FFFFFF`. **Cards/surfaces:** `#FFFFFF` with `#D9D8D6` borders

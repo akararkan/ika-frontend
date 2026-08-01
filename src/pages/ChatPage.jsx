@@ -49,10 +49,20 @@ const LIST_TABS = [['inbox', 'Inbox'], ['requests', 'Requests'], ['archived', 'A
 
 /* The chat shell can host exactly ONE end-edge panel at a time: on desktop
    they all occupy the same third column, and on mobile they are all
-   full-bleed sheets. Modelling that as one state instead of five booleans is
+   full-bleed sheets. Modelling that as one state instead of six booleans is
    what makes the exclusivity structural rather than something every toggle
-   has to remember to enforce. */
-const PANELS = { INFO: 'info', SEARCH: 'search', STARRED: 'starred', SCHEDULED: 'scheduled', PREFS: 'prefs' }
+   has to remember to enforce.
+
+   SEARCH and SEARCH_ALL render the SAME component from two entry points —
+   the thread header ("this chat") and the messages-list header ("all
+   chats"). They are two values rather than one value plus a scope flag so
+   that `togglePanel` keeps working verbatim for both: each button reports
+   its own `aria-pressed`, re-clicking the one you opened closes the panel,
+   and clicking the *other* one switches scope instead of dismissing. */
+const PANELS = {
+  INFO: 'info', SEARCH: 'search', SEARCH_ALL: 'search-all',
+  STARRED: 'starred', SCHEDULED: 'scheduled', PREFS: 'prefs',
+}
 
 /** "last seen 3h ago" from a presence record, or null while online/unknown. */
 function lastSeenLabel(p) {
@@ -524,6 +534,27 @@ export function ChatPage() {
       .catch(() => setPendingJump(messageId))
   }, [id, navigate, thread])
 
+  /* Deep link INTO a message: `/chat/{conversationId}?m={messageId}`.
+     The home feed's channel cards are the reason this exists — a CHANNEL_POST
+     has no page of its own, so "open it" means the channel timeline scrolled
+     to that message (FEED guide §2). Anything else that can produce a link to
+     a message (a share, a notification) gets it for free.
+
+     It routes through `deferredJump` rather than calling `thread.jumpTo`
+     directly, because the thread for this conversation has usually not
+     finished loading on the render where the URL first carries the param —
+     that consume effect below already waits for exactly that.
+
+     The param is stripped immediately (replace, so Back still leaves the
+     chat): it has been consumed, and leaving it in the URL would re-fire the
+     jump on every later re-render and fight the reader's own scrolling. */
+  const jumpParam = React.useMemo(() => new URLSearchParams(location.search).get('m'), [location.search])
+  React.useEffect(() => {
+    if (!jumpParam || !id) return
+    setDeferredJump({ conversationId: id, messageId: jumpParam })
+    navigate(`/chat/${id}`, { replace: true })
+  }, [jumpParam, id, navigate])
+
   /* Which conversation the thread store has actually FINISHED loading.
      `thread.loading` alone is not enough: on the first render after
      navigate() it still holds the previous conversation's settled `false`,
@@ -600,6 +631,9 @@ export function ChatPage() {
   }, [])
   const toggleInfo = React.useCallback(() => togglePanel(PANELS.INFO), [togglePanel])
   const toggleSearch = React.useCallback(() => togglePanel(PANELS.SEARCH), [togglePanel])
+  /* The list surface's own entry: message search that does NOT require a
+     conversation to be open. Same machinery, different opening scope. */
+  const toggleSearchAll = React.useCallback(() => togglePanel(PANELS.SEARCH_ALL), [togglePanel])
   const toggleStarred = React.useCallback(() => togglePanel(PANELS.STARRED), [togglePanel])
   const toggleScheduled = React.useCallback(() => togglePanel(PANELS.SCHEDULED), [togglePanel])
   const togglePrefs = React.useCallback(() => togglePanel(PANELS.PREFS), [togglePanel])
@@ -735,10 +769,30 @@ export function ChatPage() {
               </button>
             </div>
           </div>
+          {/* This field filters conversation TITLES on the client and nothing
+              else. Message text is not reachable from anywhere else in the
+              app either — chat is excluded from the site-wide /search
+              endpoint because it is membership-scoped — so the trailing
+              button is the product's only door to cross-conversation message
+              search, and the only one that does not require a conversation to
+              already be open.
+
+              It rides inside the pill rather than joining .ch-list-tools
+              because that row is calibrated for exactly five 32px controls
+              against the masthead (chat-extras.css §4): a sixth pushes
+              "Messages" out of its box on the narrower rail below 1180px.
+              `.ch-search-clear` is borrowed for its GEOMETRY — it is the
+              vocabulary's only 26px trailing-button metric — not for its
+              "clear" meaning. */}
           <div className="ch-list-search">
             <Icon name="search" className="sm"/>
             <input className="field" value={query} onChange={e => setQuery(e.target.value)}
               placeholder="Search conversations…" aria-label="Search conversations"/>
+            <button className="icon-btn ch-search-clear" onClick={toggleSearchAll}
+              aria-label="Search all messages" title="Search all messages"
+              aria-pressed={panel === PANELS.SEARCH_ALL}>
+              <Icon name="message" className="sm"/>
+            </button>
           </div>
           <div className="tabs ch-list-tabs" role="tablist">
             {LIST_TABS.map(([key, label]) => (
@@ -963,9 +1017,23 @@ export function ChatPage() {
         />
       )}
 
-      {panel === PANELS.SEARCH && (
+      {(panel === PANELS.SEARCH || panel === PANELS.SEARCH_ALL) && (
         <ChatSearchPanel
+          /* The entry point IS the opening scope, and the panel only SEEDS
+             its scope from the prop. Both branches render the same component
+             in the same slot, so without a key React would keep the mounted
+             element and the seed would be ignored — walking from the header
+             button to the rail button would leave you on "This chat". */
+          key={panel}
+          /* Still passed for SEARCH_ALL: with a thread open behind the panel
+             the "This chat" tab stays meaningful, and with none open the
+             panel's own `canScopeLocal` branch drops the tabs entirely. */
           convo={convo}
+          initialScope={panel === PANELS.SEARCH_ALL ? 'global' : 'local'}
+          /* Hand over whatever is in the rail filter. That field matches
+             titles only, so the moment it comes up short is exactly when the
+             same words want running against message bodies. */
+          initialQuery={panel === PANELS.SEARCH_ALL ? query : ''}
           onClose={() => setPanel(null)}
           onJump={onJump}
         />

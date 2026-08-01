@@ -9,6 +9,8 @@ import { ProfileDetails } from '../components/ProfileDetails.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { FollowListModal } from '../components/FollowListModal.jsx'
+import { useImageViewer } from '../components/ImageLightbox.jsx'
+import { useImageRatio, coverStyle } from '../lib/useImageRatio.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -25,6 +27,8 @@ export function UserProfilePage() {
   const [stats, setStats] = React.useState(null)   // §9.14
   const [followList, setFollowList] = React.useState(null)   // {mode} → followers/following list modal
   const [loading, setLoading] = React.useState(true)
+  const { openable, viewer } = useImageViewer()   // cover + portrait open full-screen
+  const coverAr = useImageRatio(u?.coverImage)    // the plate takes the cover's own shape
 
   const isMe = me?.id === id
 
@@ -88,12 +92,16 @@ export function UserProfilePage() {
       <div className="col-main">
         <button className="back-btn" onClick={() => navigate(-1)}><Icon name="chevleft" className="sm"/>Back</button>
 
-        <div className="prof-cover">
-          <div className="prof-cover-grad" style={u.coverImage ? { background:`center/cover no-repeat url("${u.coverImage}")` } : undefined}/>
+        {/* The photo and its shape ride on the PLATE (as custom properties), so
+            the stylesheet owns how a cover is fitted — see warm/user.css. */}
+        <div className={'prof-cover' + (u.coverImage ? ' has-img' : '')} style={coverStyle(u.coverImage, coverAr)}>
+          <div {...openable(u.coverImage, { className:'prof-cover-grad', label:`Cover photo of ${u.full || u.handle}` })}/>
           {!u.coverImage && <div className="prof-cover-pattern"/>}
         </div>
         <div className="prof-head">
-          <span className="t-ring"><Avatar initials={u.initials} color={u.avc} size={132} className="prof-avatar" src={u.profileImage}/></span>
+          <span {...openable(u.profileImage, { className:'t-ring', label:`Profile photo of ${u.full || u.handle}` })}>
+            <Avatar initials={u.initials} color={u.avc} size={132} className="prof-avatar" src={u.profileImage}/>
+          </span>
           <div className="prof-actions">
             {blockedByThem ? (
               <span className="btn btn-secondary" style={{ cursor:'default' }}><Icon name="block" className="sm"/>Unavailable</span>
@@ -142,6 +150,7 @@ export function UserProfilePage() {
         ))}</div> : <EmptyState icon="research" title="No research yet"/>)}
       </div>
       {followList && <FollowListModal userId={id} mode={followList.mode} onClose={() => setFollowList(null)}/>}
+      {viewer}
     </div>
   )
 }

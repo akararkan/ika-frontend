@@ -32,7 +32,7 @@ import { AddSourceForm, SOURCE_LABEL } from './SourceForm.jsx'
 import { RichTextEditor } from './RichTextEditor.jsx'
 import { TagInput } from './TagInput.jsx'
 import { renderMarkdown, renderPlain } from '../lib/richtext.js'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useAuth, hasRole } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 import { normalizeTags } from '../api/tags.js'
 
@@ -124,7 +124,7 @@ function ContributorsField({ value, onChange, meId }) {
     if (term.length < 2) { setResults([]); setLoading(false); return }
     let alive = true; setLoading(true)
     const t = setTimeout(() => {
-      api.users.search(term, { eligibleContributor: true, size: 8 })   // RESEARCHER / SCHOLAR only
+      api.users.searchList(term, { eligibleContributor: true, size: 8 })   // RESEARCHER / SCHOLAR only
         .then(list => { if (alive) setResults(list || []) })
         .catch(() => { if (alive) setResults([]) })
         .finally(() => { if (alive) setLoading(false) })
@@ -259,7 +259,7 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   /* ---- cover image ---- */
   // The cover endpoint (and media/video) is gated to scholars/researchers; a plain
   // USER gets a 403. Guard up-front so we never push an op that silently 403s.
-  const canCover = ['SCHOLAR', 'RESEARCHER', 'ADMIN', 'SUPER_ADMIN'].includes(String(user?.role || '').toUpperCase())
+  const canCover = hasRole(user, 'SCHOLAR', 'RESEARCHER', 'ADMIN', 'SUPER_ADMIN')
   const [coverFile, setCoverFile] = React.useState(null)
   const [coverRemoved, setCoverRemoved] = React.useState(false)
   const coverRef = React.useRef(null)

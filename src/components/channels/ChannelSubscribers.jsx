@@ -59,7 +59,7 @@ function AddSubscribers({ channel, existingIds, onAdded, onClose }) {
     let alive = true
     setSearching(true)
     const t = setTimeout(() => {
-      api.users.search(needle, { size: 20 })
+      api.users.searchList(needle, { size: 20 })
         .then(rows => { if (alive) setResults(rows || []) })
         .catch(() => { if (alive) setResults([]) })
         .finally(() => { if (alive) setSearching(false) })

@@ -189,7 +189,12 @@
 /* top chips + play → warm-framed glass */
 .rd-page .rd-hero-id,
 .rd-page .rd-hero-status{background:rgba(14,22,36,.5);border-color:rgba(185,214,242,.35)}
-.rd-page .rd-hero-play{background:rgba(255,255,255,.92);border-color:rgba(255,255,255,.85);color:var(--navy)}
+/* Watch the promo, on the dark masthead — the on-dark rule: the action is the
+   BRIGHT thing in Oxford cerulean, carrying Oxford Blue (7.2:1). It was a
+   near-white disc, which reads as chrome on a photographic hero rather than as
+   the one thing to press. */
+.rd-page .rd-hero-play{background:var(--ox-cerulean);border-color:rgba(255,255,255,.7);color:var(--ox-blue)}
+.rd-page .rd-hero-play:hover{background:var(--ox-cerulean-lift)}
 .rd-page .rd-hero-play .ico{fill:var(--navy);stroke:none}
 .rd-page .rd-hero-follow{border-radius:999px;color:var(--navy)}
 /* facts → elegant glass chips: gold seal + serif numeral */

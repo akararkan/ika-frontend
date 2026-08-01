@@ -127,6 +127,16 @@
 
 /* ================= 5 · Answers ================= */
 .qd-page .answer{border:1.5px solid var(--line);border-radius:15px;padding:20px 22px;box-shadow:none}
+/* Arriving from a search hit (#answer-<id>): say WHICH answer was meant, then
+   get out of the way. Same gesture the chat bubble uses for a jumped-to message. */
+.qd-page .answer.flash{animation:qdFlash 1.6s ease-out}
+@keyframes qdFlash{
+  0%,20%{box-shadow:0 0 0 3px var(--ox-sky,#b9d6f2);border-color:var(--blue)}
+  100%{box-shadow:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .qd-page .answer.flash{animation:none;border-color:var(--blue)}
+}
 /* THE accepted moment — gold border, no red inset bar, no gradients */
 .qd-page .answer.accepted{background:var(--card);border-color:#b9d6f2;box-shadow:none}
 .qd-page .ans-banner.accepted{

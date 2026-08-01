@@ -16,6 +16,11 @@ export {
   rightsFrom, rightsTo, can as canRight,
   RIGHT_KEYS, RIGHT_LABELS, JOIN_SOURCE_LABELS,
 } from './channels.js'
+export {
+  taxonomyRowFrom, taxonomyName, taxonomyDir, taxonomyFilter, specializationsTo,
+} from './taxonomy.js'
+export { SEARCH_TYPES, CURSOR_HEAD, hitHref } from './search.js'
+export { REINDEX_CORPORA } from './admin.js'
 export * as adapters from './adapters.js'
 
 import { auth } from './auth.js'
@@ -33,10 +38,16 @@ import { mentions } from './mentions.js'
 import { notifications } from './notifications.js'
 import { chat } from './chat.js'
 import { channels } from './channels.js'
+import { topics, madhhabs } from './taxonomy.js'
+import { admin } from './admin.js'
 
 export const api = {
   auth, users, posts, reels, stories, closeFriends, closeCircle, highlights, sounds,
   qna, research, search, tags, activity, mentions, notifications, chat,
+  // Knowledge taxonomy (TAXONOMY_API) — public reads, session-cached.
+  topics, madhhabs,
+  // Search-index maintenance (ROLE_ADMIN only).
+  admin,
   // Same object as `api.chat.channels` — both names are load-bearing: the chat
   // surface reaches it through `chat`, the channel pages import it directly.
   channels,

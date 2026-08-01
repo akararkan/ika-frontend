@@ -22,6 +22,7 @@ import { api } from '../../api/index.js'
 import { Icon, Avatar, Verify, showToast } from '../ui.jsx'
 import { Loader } from '../states.jsx'
 import { uiConfirm, uiPrompt } from '../Dialog.jsx'
+import { useImageViewer } from '../ImageLightbox.jsx'
 import { useChat } from '../../context/ChatContext.jsx'
 import { Popover } from './Popover.jsx'
 import { Switch } from './Switch.jsx'
@@ -269,6 +270,7 @@ export function ConversationInfo({
   const [savingSettings, setSavingSettings] = React.useState(false)
   const [savingTtl, setSavingTtl] = React.useState(false)
   const [showAllMembers, setShowAllMembers] = React.useState(false)
+  const { openable, viewer } = useImageViewer()   // the hero photo opens full-screen
 
   /* Call history for this thread. `useCallStats` re-reads on every write to
      the log, so ending a call updates the panel behind the overlay. */
@@ -481,7 +483,10 @@ export function ConversationInfo({
       <div className="ci-body">
         {/* ----- hero ----- */}
         <div className="ci-hero">
-          <div className="ci-hero-av">
+          <div {...openable(isGroup ? convo.avatarUrl : peer?.profileImage, {
+            className: 'ci-hero-av',
+            label: isGroup ? 'View the group photo' : `Profile photo of ${convo.displayTitle}`,
+          })}>
             {isGroup ? (
               <span className="ci-medallion">
                 {convo.avatarUrl ? <img src={convo.avatarUrl} alt=""/> : <Icon name="users"/>}
@@ -885,6 +890,7 @@ export function ConversationInfo({
           )}
         </div>
       </div>
+      {viewer}
     </aside>
   )
 }

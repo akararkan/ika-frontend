@@ -67,3 +67,45 @@ export function RequireAuth({ children }) {
   if (!signedIn) return <Navigate to="/login" state={{ from: loc }} replace/>
   return children
 }
+
+/* -------------------------------------------------------------
+   PLATFORM roles. Not to be confused with a conversation role
+   (OWNER/ADMIN/MEMBER inside one channel) — that one is per-room
+   and lives on the conversation object.
+
+   One helper, because the two hand-rolled gates in the app had
+   already drifted apart: one of them omitted SUPER_ADMIN, so a
+   super-admin lost an affordance a plain admin had. Compare
+   case-insensitively — the role arrives from two places (the
+   login response and /users/me) and only one of them is ours.
+   ------------------------------------------------------------- */
+export const PLATFORM_ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN']
+
+export function hasRole(user, ...roles) {
+  const mine = String(user?.role || '').toUpperCase()
+  return roles.flat().some(r => String(r).toUpperCase() === mine)
+}
+
+export const isPlatformAdmin = (user) => hasRole(user, PLATFORM_ADMIN_ROLES)
+
+/** Role gate for a route. A rights refusal is FINAL — it renders the refusal
+ *  in place rather than redirecting (a redirect reads as "wrong address" when
+ *  the truth is "not your door"), and offers no Retry, matching how every
+ *  admin-only channel panel already answers a 403. */
+export function RequireRole({ roles, children }) {
+  const { user, ready } = useAuth()
+  if (!ready) return <div style={{ display:'grid', placeItems:'center', minHeight:'100vh', color:'var(--muted)' }}>Loading…</div>
+  if (!hasRole(user, roles)) {
+    return (
+      <div className="main center"><div className="col-main">
+        <div className="t-error" style={{ paddingTop:64 }}>
+          <p>This area is for platform administrators.</p>
+          <p className="muted text-sm" style={{ marginTop:8 }}>
+            Your account doesn’t have that role. Nothing to retry — ask an administrator if you need access.
+          </p>
+        </div>
+      </div></div>
+    )
+  }
+  return children
+}

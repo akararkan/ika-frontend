@@ -7,7 +7,10 @@
    attachments. Empty sections are omitted. Non-public links /
    contacts are already filtered server-side on public profiles.
    ========================================================= */
+import React from 'react'
 import { Icon, fmt } from './ui.jsx'
+import { useTaxonomyLang } from './Taxonomy.jsx'
+import { api, taxonomyName } from '../api/index.js'
 
 const fmtBytes = (n) => {
   if (!n || n < 0) return ''
@@ -18,11 +21,30 @@ const fmtBytes = (n) => {
 }
 const hostOf = (url) => url.replace(/^https?:\/\//, '').replace(/\/$/, '')
 
+/* The profile carries the madhhab's ENGLISH name only; the Arabic and Kurdish
+   ones live in the vocabulary, which TAXONOMY §3.2 tells clients to resolve
+   against GET /madhhabs (cheap, cached for the session). English readers never
+   pay for the lookup — and if it fails, the English name still shows. */
+function useMadhhabLabel(u, lang) {
+  const [row, setRow] = React.useState(null)
+  const id = u?.madhhabId ?? null
+  React.useEffect(() => {
+    setRow(null)
+    if (id === null || id === undefined || lang === 'EN') return
+    let alive = true
+    api.madhhabs.byId(id).then(r => { if (alive) setRow(r) }).catch(() => {})
+    return () => { alive = false }
+  }, [id, lang])
+  return (row && taxonomyName(row, lang)) || u?.madhhab || ''
+}
+
 export function ProfileDetails({ u }) {
+  const lang = useTaxonomyLang()
+  const madhhab = useMadhhabLabel(u, lang)
   const facts = [
     u.academicTitle && { icon: 'scholar', text: u.academicTitle },
     u.institution   && { icon: 'users',   text: u.institution },
-    u.madhhab       && { icon: 'book',    text: u.madhhab },
+    madhhab         && { icon: 'book',    text: madhhab },
     u.location      && { icon: 'pin',     text: u.location },
     u.joinedAt      && { icon: 'star',    text: `Joined ${u.joinedAt}` },
     (u.profileViews > 0) && { icon: 'eye', text: `${fmt(u.profileViews)} profile views` },
@@ -48,7 +70,12 @@ export function ProfileDetails({ u }) {
       {specs.length > 0 && (
         <div className="pa-block">
           <h4 className="pa-h">Specializations</h4>
-          <div className="pa-chips">{specs.map(s => <span key={s.id} className="pa-chip">{s.name}</span>)}</div>
+          {/* Order is the author's (displayOrder, already sorted by the
+              adapter); the name is the reader's language, with dir="auto" so
+              an Arabic or Kurdish term is not laid out as English. */}
+          <div className="pa-chips">
+            {specs.map(s => <span key={s.id} className="pa-chip" dir="auto">{taxonomyName(s, lang)}</span>)}
+          </div>
         </div>
       )}
 

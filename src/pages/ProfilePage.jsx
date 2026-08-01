@@ -9,6 +9,8 @@ import { uiConfirm, uiPrompt } from '../components/Dialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { HighlightViewer } from '../components/HighlightViewer.jsx'
 import { FollowListModal } from '../components/FollowListModal.jsx'
+import { useImageViewer } from '../components/ImageLightbox.jsx'
+import { useImageRatio, coverStyle } from '../lib/useImageRatio.js'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { openComposeEdit } from '../lib/openCompose.js'
@@ -32,6 +34,8 @@ export function ProfilePage() {
   const [highlights, setHighlights] = React.useState([])
   const [stats, setStats] = React.useState(null)   // §9.14 live cross-store counts
   const [loading, setLoading] = React.useState(true)
+  const { openable, viewer } = useImageViewer()   // cover + portrait open full-screen
+  const coverAr = useImageRatio(me.coverImage)    // the plate takes the cover's own shape
 
   React.useEffect(() => {
     if (!me.id) return
@@ -102,8 +106,10 @@ export function ProfilePage() {
   return (
     <div className="main center">
       <div className="col-main">
-        <div className="prof-cover">
-          <div className="prof-cover-grad" style={me.coverImage ? { background:`center/cover no-repeat url("${me.coverImage}")` } : undefined}/>
+        {/* The photo and its shape ride on the PLATE (as custom properties), so
+            the stylesheet owns how a cover is fitted — see warm/user.css. */}
+        <div className={'prof-cover' + (me.coverImage ? ' has-img' : '')} style={coverStyle(me.coverImage, coverAr)}>
+          <div {...openable(me.coverImage, { className:'prof-cover-grad', label:'View your cover photo' })}/>
           {!me.coverImage && <div className="prof-cover-pattern"/>}
           <input ref={coverRef} type="file" hidden accept="image/*" onChange={pickCover}/>
           <button className="prof-cover-edit" onClick={() => coverRef.current?.click()} title="Change cover photo">
@@ -111,7 +117,9 @@ export function ProfilePage() {
           </button>
         </div>
         <div className="prof-head">
-          <span className="t-ring"><Avatar initials={me.initials} color={me.avc} size={132} className="prof-avatar" src={me.profileImage}/></span>
+          <span {...openable(me.profileImage, { className:'t-ring', label:'View your profile photo' })}>
+            <Avatar initials={me.initials} color={me.avc} size={132} className="prof-avatar" src={me.profileImage}/>
+          </span>
           <div className="prof-actions">
             <button className="btn btn-secondary" onClick={() => navigate('/activity')}><Icon name="list" className="sm"/>Activity</button>
             <button className="btn btn-secondary" onClick={() => navigate('/settings')}><Icon name="settings" className="sm"/>Edit profile</button>
@@ -189,6 +197,7 @@ export function ProfilePage() {
       </div>
       {hlOpen && <HighlightViewer highlight={hlOpen} author={me} owner onClose={() => setHlOpen(null)}/>}
       {followList && <FollowListModal userId={me.id} mode={followList.mode} onClose={() => setFollowList(null)}/>}
+      {viewer}
     </div>
   )
 }

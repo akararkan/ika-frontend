@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, linkify, fmt, showToast } from './ui.jsx'
 import { openShare } from './ShareSheet.jsx'
 import { uiPrompt } from './Dialog.jsx'
-import { OrbitVoice } from './OrbitVoice.jsx'
+import OrbitPlayer from './OrbitPlayer.jsx'
 import { PlayableVideo } from './PlayableVideo.jsx'
 import { authorOf } from '../lib/userView.js'
 import { api } from '../api/index.js'
@@ -192,13 +192,35 @@ function RepostEmbed({ post }) {
   )
 }
 
+/* Voice post → the user's OrbitPlayer, VERBATIM (see OrbitPlayer.jsx). This
+   wrapper only supplies what the call site owes it: feed items arrive without
+   the audio URL, so it is resolved on mount (OrbitPlayer fetches+decodes its
+   src up front), and the fixed-width mock card (size+100) is centered in the
+   post. `title=""` keeps the mock's card top-padding without an "Untitled"
+   heading — the post header above already names the author. */
+function VoicePostOrbit({ post }) {
+  const [url, setUrl] = React.useState(post.audioUrl || null)
+  React.useEffect(() => {
+    if (post.audioUrl) { setUrl(post.audioUrl); return undefined }
+    let alive = true
+    api.posts.get(post.id).then(p => { if (alive && p?.audioUrl) setUrl(p.audioUrl) }).catch(() => {})
+    return () => { alive = false }
+  }, [post.id, post.audioUrl])
+  return (
+    <div style={{ margin: '0 16px 14px' }}>
+      {url
+        // flush: the player IS part of the post — no inner card border, full
+        // width, times at the post edges (the user's original mock layout).
+        ? <OrbitPlayer src={url} title="" size={300} flush/>
+        // Same footprint while the URL resolves, so the card doesn't jump.
+        : <div style={{ height: 345 }}/>}
+    </div>
+  )
+}
+
 function PostMedia({ post, onOpenReel, onOpenImage }) {
   if (post.type === 'VOICE_POST') {
-    // The Orbit ring — same props contract as the old bar player (lazy
-    // resolveSrc for feed items that arrive without the audio URL). Seeded by
-    // the post id so the at-rest ring and the post-resolve ring match.
-    return <OrbitVoice src={post.audioUrl} duration={post.media?.[0]?.duration} seed={String(post.id)}
-      resolveSrc={post.audioUrl ? null : () => api.posts.get(post.id).then(p => p?.audioUrl || null)}/>
+    return <VoicePostOrbit post={post}/>
   }
   if (post.type === 'REPOST') {
     return <RepostEmbed post={post}/>
@@ -241,6 +263,41 @@ function PostMedia({ post, onOpenReel, onOpenImage }) {
     )
   }
   return null
+}
+
+/* "Suggested for you" — the ranked feed's EXPLORE slice (guide §2).
+   These are the ~5-10% of the page from authors the viewer does NOT follow, so
+   the caption is not decoration: without it the row reads as "someone I
+   follow posted this", which is the one thing it is not. The Follow button is
+   the whole point of the slice, so it lives on the caption rather than making
+   the reader walk to the profile.
+
+   Follow state starts at false BY CONSTRUCTION — an EXPLORE candidate is
+   filtered server-side to non-followed authors — so nothing is fetched to seed
+   it, and a failed call rolls the button back rather than lying. */
+function ExploreCaption({ authorId, authorName }) {
+  const [following, setFollowing] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+  if (!authorId) return null
+  const toggle = (e) => {
+    e.stopPropagation()
+    if (busy) return
+    const next = !following
+    setFollowing(next); setBusy(true)
+    ;(next ? api.users.follow(authorId) : api.users.unfollow(authorId))
+      .then(() => showToast(next ? `Following ${authorName}` : `Unfollowed ${authorName}`))
+      .catch(() => { setFollowing(!next); showToast('Could not update following') })
+      .finally(() => setBusy(false))
+  }
+  return (
+    <div className="pc-src">
+      <Icon name="trending" className="xs"/>
+      <span>Suggested for you</span>
+      <button className={'btn btn-sm ' + (following ? 'btn-secondary' : 'btn-primary')} disabled={busy} onClick={toggle}>
+        {following ? 'Following' : 'Follow'}
+      </button>
+    </div>
+  )
 }
 
 export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true }) {
@@ -303,7 +360,8 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
   }
 
   return (
-    <article ref={cardRef} className="post-card rise" style={{ animationDelay: `${index * 60}ms` }}>
+    <article ref={cardRef} className={'post-card rise' + (post.source === 'EXPLORE' ? ' is-explore' : '')} style={{ animationDelay: `${index * 60}ms` }}>
+      {post.source === 'EXPLORE' && <ExploreCaption authorId={post.author} authorName={u.full}/>}
       <header className="pc-head">
         <span role="button" onClick={goAuthor} style={{ cursor:'pointer' }}>
           <Avatar initials={u.initials} color={u.avc} size={40} src={u.profileImage}/>

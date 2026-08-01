@@ -213,12 +213,63 @@
 .toast{box-shadow:0 14px 34px -12px rgba(15,21,32,.5)}
 .toast .ico{color:#b9d6f2}
 
+/* ---------------- Topbar typeahead (SearchTypeahead.jsx) ----------------
+   Anchored to `.tb-search` (already position:relative). It sits above every
+   page surface but BELOW the lightbox and the dialogs — a dropdown must never
+   outrank a modal. Logical properties throughout so an RTL shell mirrors it. */
+.tb-pop{
+  position:absolute;z-index:60;inset-inline:0;top:calc(100% + 6px);
+  max-height:min(70vh,460px);overflow:auto;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 20px 44px -20px rgba(15,21,32,.45);
+  padding:6px;
+}
+.tb-pop-all,.tb-pop-row{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 10px;border:0;border-radius:10px;background:transparent;
+  text-align:start;cursor:pointer;color:var(--ink);
+}
+.tb-pop-all{font-size:13px;color:var(--ink-soft);border-bottom:1px solid var(--line);border-radius:10px 10px 0 0;margin-bottom:4px}
+.tb-pop-all b{color:var(--ink)}
+.tb-pop-all.on,.tb-pop-row.on{background:var(--blue-wash)}
+.tb-pop-ic{
+  width:26px;height:26px;flex:none;border-radius:8px;display:grid;place-items:center;
+  background:var(--card-2);color:var(--muted);
+}
+/* `.tb-search .ico` pins THE MAGNIFIER to the left of the field — absolutely,
+   by descendant selector, so every icon inside this dropdown inherited the
+   pin and piled up on top of it, leaving each row with an empty plate. The
+   popup's icons opt back out. */
+.tb-pop .ico{position:static;transform:none;width:14px;height:14px;color:inherit}
+.tb-pop-row.on .tb-pop-ic{background:#fff;color:var(--blue)}
+.tb-pop-tx{display:flex;flex-direction:column;min-width:0;flex:1}
+.tb-pop-tx b{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-pop-tx small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-pop-kind{
+  flex:none;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted);
+}
+.tb-pop-note{padding:12px 10px}
+.tb-pop-busy{
+  width:12px;height:12px;flex:none;margin-inline-start:auto;border-radius:50%;
+  border:2px solid var(--line);border-top-color:var(--blue);
+  animation:tbSpin .7s linear infinite;
+}
+@keyframes tbSpin{to{transform:rotate(360deg)}}
+
 /* ---------------- Lightbox ---------------- */
 .lightbox{background:rgba(8,14,22,.93)}
 .lb-img{border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .lb-close,.lb-nav{background:rgba(255,255,255,.14);color:#dce9f6;transition:background .15s ease}
 .lb-close:hover,.lb-nav:hover{background:rgba(255,255,255,.26)}
-.lb-count{background:rgba(8,14,22,.6);color:#dce9f6}
+.lb-count{background:rgba(8,14,22,.6);color:#dce9f6;max-width:min(76vw,640px);text-align:center}
+
+/* Portraits and covers that open in the viewer (see ImageLightbox.jsx). The
+   WHOLE plate is the hit area, so the cue is the cursor rather than a badge in
+   one corner — and NOT a filter/transform hover, which would spawn a stacking
+   context on plates the avatar and the scrim are deliberately layered over.
+   The global :focus-visible ring already covers the keyboard path. */
+.img-openable{cursor:zoom-in}
 
 /* ---------------- Reduced motion ---------------- */
 @media (prefers-reduced-motion:reduce){

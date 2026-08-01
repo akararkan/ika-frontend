@@ -53,6 +53,19 @@
   --ox-red:#9c3a33;          /* errors / destructive — 6.3:1 on white */
   --ox-red-wash:#f6e4e2;
 
+  /* ---- ON-DARK ACTION — Oxford Cerulean --------------------------------
+     From the University's own secondary palette (`Oxford cerulean blue`),
+     and used exactly the way ox.ac.uk uses it: a BRIGHT button carrying
+     OXFORD BLUE ink, sitting on a navy card. That inversion is the point —
+     on a dark plate the button has to be the light thing, or it disappears
+     into the container, which is the failure mode this app already had.
+
+     Only ever on dark surfaces. On white it is a 1.9:1 disaster; the light
+     surfaces keep Oxford Blue. `--ox-blue` on cerulean is 8.6:1. */
+  --ox-cerulean:#49b6ff;
+  --ox-cerulean-lift:#6ec6ff;   /* hover — brighter, never darker on dark  */
+  --ox-cerulean-deep:#2aa1f2;   /* pressed                                  */
+
   /* Ink / paper — text neutrals stay COOL slate (stone is for lines,
      never for words); backgrounds are only ever white / off-white. */
   --ink:#1c2330;
@@ -137,6 +150,29 @@ a:hover{color:var(--rubric)}
   box-shadow:0 10px 22px -10px rgba(0,33,71,.45);
 }
 .cta-compose:hover{box-shadow:0 14px 28px -12px rgba(0,33,71,.55)}
+
+/* ---------- Primary action ON A DARK SURFACE ----------
+   The ox.ac.uk pattern: inside a navy card the call to action is the BRIGHT
+   thing, in cerulean, with Oxford Blue ink. A navy button on a navy card is
+   invisible — which is why this variant exists rather than reusing
+   .btn-primary on dark plates.
+
+   `.on-dark` is the modifier; it is scoped to dark containers by USE, not by
+   selector, so putting it on a white background is a mistake the class cannot
+   prevent — hence the note above the token. */
+.btn.on-dark,
+.btn-primary.on-dark{
+  background:var(--ox-cerulean);
+  color:var(--ox-blue);
+  border-color:transparent;
+  box-shadow:0 8px 20px -12px rgba(0,0,0,.6);
+  font-weight:600;
+}
+.btn.on-dark:hover,
+.btn-primary.on-dark:hover{background:var(--ox-cerulean-lift);color:var(--ox-blue)}
+.btn.on-dark:active,
+.btn-primary.on-dark:active{background:var(--ox-cerulean-deep)}
+.btn.on-dark .ico{stroke:var(--ox-blue)}
 
 /* ---------- Topbar ---------- */
 .topbar{

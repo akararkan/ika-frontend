@@ -95,6 +95,22 @@ export function QuestionPage() {
   const loadAnswers = React.useCallback(() => {
     api.qna.answers(id).then(list => { seenAns.current = new Set((list || []).map(a => a.id)); setAnswers(list || []) }).catch(() => {})
   }, [id])
+
+  /* Unified search deep-links an ANSWER hit as /qna/<questionId>#answer-<id>:
+     an answer is not a page, so the hit opens its question and has to land on
+     the right card. The scroll waits for the answers to be IN the DOM — on a
+     cold load the hash is present long before the list is. */
+  const answerCount = answers.length
+  React.useEffect(() => {
+    const hash = window.location.hash
+    if (!hash.startsWith('#answer-') || !answerCount) return
+    const el = document.getElementById(hash.slice(1))
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('flash')
+    const t = setTimeout(() => el.classList.remove('flash'), 1600)
+    return () => clearTimeout(t)
+  }, [answerCount])
   // Add an answer exactly once. Returns true when genuinely new (so the caller
   // bumps the count once), false when it's an echo/duplicate (patched in place).
   const upsertAnswer = (a) => {
@@ -485,8 +501,11 @@ export function QuestionPage() {
           const au = authorOf(a)
           const own = !!(user && a.author === user.id)
           const editing = editAid === a.id
+          /* The `id` below is the anchor a search hit deep-links to: an ANSWER
+             has no page of its own, so unified search sends the reader to this
+             question with #answer-<id>, and the effect above scrolls to it. */
           return (
-            <div key={a.id} className={'card card-pad answer ' + (a.accepted ? 'accepted' : '')}>
+            <div key={a.id} id={`answer-${a.id}`} className={'card card-pad answer ' + (a.accepted ? 'accepted' : '')}>
               {a.accepted && <div className="ans-banner accepted"><Icon name="check" className="xs"/>Accepted by the author</div>}
               <header>
                 <span role="button" style={{ cursor:'pointer' }} onClick={() => navigate(`/u/${a.author}`)}><Avatar initials={au.initials} color={au.avc} size={40} src={au.profileImage}/></span>

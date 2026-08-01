@@ -104,40 +104,6 @@
 }
 .pm-play .ico{width:24px;height:24px;fill:#fff;stroke:none}
 
-/* Orbit voice-POST player — the ring (canvas draws the waveform circle; this
-   sheet is only the card, the center button, the rate pill and the footer).
-   White card per the Orbit mock; Q&A/research keep the compact .vnp below. */
-.ovp{position:relative;margin:0 16px 14px;border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden}
-/* SQUARE ring area, centered — the mock's proportions (a 300px square inside
-   the card); a full-width rectangle floated the ring in dead space. */
-.ovp-stage{position:relative;width:min(100%,340px);aspect-ratio:1/1;margin:0 auto}
-/* pan-y, NOT none: a vertical flick anywhere on the card must still scroll
-   the feed — the component only captures pointers that land on the ring band */
-.ovp-ring{position:absolute;inset:0;cursor:pointer;touch-action:pan-y;border-radius:16px}
-.ovp-ring:focus-visible{outline:2px solid var(--blue);outline-offset:-4px}
-.ovp-canvas{width:100%;height:100%;display:block}
-.ovp-play{
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;
-  background:#13233d;   /* the mock's exact center-button navy */
-  color:#fff;display:grid;place-items:center;
-  box-shadow:0 6px 20px rgba(19,35,61,.3);transition:transform .12s ease;
-}
-.ovp-play:hover{transform:translate(-50%,-50%) scale(1.04)}
-.ovp-play:active{transform:translate(-50%,-50%) scale(.96)}
-.ovp-play:disabled{opacity:.6;cursor:default}
-.ovp-play .ico{width:24px;height:24px}
-.ovp-rate{
-  position:absolute;top:12px;inset-inline-end:12px;z-index:1;
-  padding:4px 10px;border-radius:999px;border:1px solid var(--line);
-  background:var(--card);font:600 12px ui-monospace,monospace;color:var(--ink-soft);cursor:pointer;
-}
-.ovp-rate.on{background:var(--ox-sky-wash,#DCE9F6);border-color:var(--ox-sky,#B9D6F2);color:var(--navy)}
-.ovp-foot{display:flex;align-items:center;gap:12px;padding:0 22px 16px}
-.ovp-time{font:600 13px ui-monospace,monospace;color:var(--ink)}
-.ovp-time.is-total{color:var(--muted)}
-.ovp-hint{flex:1;text-align:center;font-size:10.5px;font-weight:500;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase}
-
 /* voice note player */
 .vnp{
   position:relative;margin:0 16px 14px;border-radius:20px;padding:18px 20px;

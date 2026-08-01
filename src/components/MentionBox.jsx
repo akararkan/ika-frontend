@@ -52,7 +52,7 @@ export const MentionBox = React.forwardRef(function MentionBox(
        search filters none of that and stays only as the fallback for a
        deploy without the mentions API. */
     api.mentions.suggest(q, 6)
-      .catch(() => api.users.search(q, { size: 6 }))
+      .catch(() => api.users.searchList(q, { size: 6 }))
       .then(list => {
         if (mine !== seq.current) return
         const rows = (list || []).slice(0, 6)

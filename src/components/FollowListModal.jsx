@@ -25,10 +25,13 @@ export function FollowListModal({ userId, mode = 'followers', title, onClose }) 
   React.useEffect(() => {
     let alive = true
     const fetch = mode === 'following' ? api.users.following : api.users.followers
+    /* followers/following answer the PAGE envelope ({items,total,hasMore}),
+       not a bare array — reading it as one made `.map` throw into the catch
+       below, so both lists silently rendered as "no one here". */
     fetch(userId, { size: 50 })
-      .then(list => {
+      .then(res => {
         if (!alive) return
-        const arr = list || []
+        const arr = res?.items || []
         setRows(arr)
         setFollows(Object.fromEntries(arr.map(u => [u.id, u.isFollowing])))
       })

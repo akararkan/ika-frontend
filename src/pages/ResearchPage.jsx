@@ -12,7 +12,7 @@ import { Loader, EmptyState } from '../components/states.jsx'
 import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
 import { authorOf } from '../lib/userView.js'
 import { useViewMode } from '../lib/useViewMode.js'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useAuth, hasRole } from '../context/AuthContext.jsx'
 import { api, adapters } from '../api/index.js'
 
 // Filter chip metadata (icon + contextual subtitle for the hint card)
@@ -30,7 +30,9 @@ export function ResearchPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const meId = user?.id
-  const canPublish = ['SCHOLAR','RESEARCHER','ADMIN'].includes(user?.role)
+  // Shared helper: this list used to omit SUPER_ADMIN (and compared raw), so a
+  // super-admin saw no publish affordance at all while a plain admin did.
+  const canPublish = hasRole(user, 'SCHOLAR', 'RESEARCHER', 'ADMIN', 'SUPER_ADMIN')
   const [view, setView] = useViewMode('research')
   const [tab, setTab] = React.useState('DISCOVER')
   const [filter, setFilter] = React.useState('ALL')

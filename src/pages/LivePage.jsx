@@ -25,7 +25,8 @@
    ========================================================= */
 import React from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Icon, Avatar, showToast } from '../components/ui.jsx'
+import { Icon, Avatar, Verify, showToast } from '../components/ui.jsx'
+import { FollowButton } from '../components/FollowButton.jsx'
 import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
@@ -401,6 +402,42 @@ function GoLive({ onClose, onStarted }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* The host's plate on the watch page: avatar, name, @handle, Follow.
+   Everything but the follow state rides on the stream payload
+   (`hostDisplayName` / `hostHandle` / `hostAvatarUrl`), so this costs exactly
+   one request — the social-status read inside <FollowButton> — and renders
+   nothing extra for your own broadcast (FollowButton self-checks). */
+function HostBar({ stream, myId, navigate }) {
+  const u = React.useMemo(() => authorFrom({
+    id: stream.hostId,
+    username: stream.hostUsername,
+    fullName: stream.hostDisplayName,
+    profileImage: stream.hostAvatarUrl,
+  }, stream.hostId), [stream.hostId, stream.hostUsername, stream.hostDisplayName, stream.hostAvatarUrl])
+
+  if (!stream.hostId) return null
+  const open = () => navigate(`/u/${stream.hostId}`)
+  const isMe = !!myId && String(stream.hostId) === String(myId)
+  return (
+    <div className="lv-host">
+      <button className="lv-host-plate" onClick={open} aria-label={`View ${u.full}'s profile`}>
+        <Avatar initials={u.initials} color={u.avc} size={40} src={u.profileImage}/>
+      </button>
+      <div className="lv-host-who">
+        <button className="lv-host-name" onClick={open}>
+          <b dir="auto">{u.full}</b>
+          {u.verified && <Verify scholar={u.role === 'SCHOLAR'}/>}
+        </button>
+        {/* `hostHandle` is bare — the @ is ours to render, as everywhere else. */}
+        <span className="lv-host-sub" dir="auto">
+          @{stream.hostHandle || u.handle}{isMe && ' · you’re the host'}
+        </span>
+      </div>
+      <FollowButton userId={stream.hostId} meId={myId} className="lv-host-follow"/>
     </div>
   )
 }
@@ -1496,6 +1533,13 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
               <span><Icon name="eye" className="xs"/>{stream.viewerCount.toLocaleString()} watching</span>
               {stream.startedAt && <span><Icon name="clock" className="xs"/>started {clockOf(stream.startedAt)}</span>}
             </div>
+            {/* Who is broadcasting. The rail and the grid have always named the
+                host, but the WATCH page — the one screen where you decide
+                whether you want more of this person — did not, so there was
+                nowhere to follow them from. Everything rendered here already
+                arrived on the stream payload; nothing is fetched but the
+                follow state itself. */}
+            <HostBar stream={stream} myId={myId} navigate={navigate}/>
           </div>
           <div className="lv-meta-acts">
             <button className="btn" onClick={onExit}><Icon name="chevleft" className="xs"/>All streams</button>

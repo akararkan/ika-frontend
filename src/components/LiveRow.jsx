@@ -10,11 +10,23 @@
    `hostDisplayName` — so the rail never fans out a user fetch per cell
    and never touches the `watchUsers` directory.
 
-   `followingLive()` and `live()` return the identical card shape, so
-   ONE cell renders both rows:
+   `followingLive()`, `live()` and the home feed's own `liveNow()`
+   return the identical card shape, so ONE cell renders all three
+   rows:
 
      source="following" → people you follow, newest-live-first
      source="live"      → everyone live, most-watched-first
+     source="feed"      → the HOME FEED rail (FEED_API §1.3):
+                          followed hosts first, topped up to 10 with
+                          the most-watched public streams, blocked
+                          hosts removed — one server-composed list
+                          rather than two client-merged ones.
+
+   The feed rail arrives ALREADY LOADED: `/feed/home` returns
+   `liveNow` beside the items, so passing it as `seed` renders the
+   first paint with no second request. Everything after that — the
+   socket fold and the reconcile beat — is identical, and the
+   reconcile re-reads the cheap dedicated `/feed/live-now`.
 
    Host-only secrets (`whipUrl`, `ingestUrl`) are null for viewers and
    are never read here — the rail must never be able to leak a stream
@@ -121,6 +133,7 @@ export function LiveRow({
   title = 'Live now',
   sub = '',
   onCount,
+  seed = null,
 }) {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -128,23 +141,37 @@ export function LiveRow({
   const myId = user?.id || null
   const following = source === 'following'
 
-  const [cards, setCards] = React.useState([])
+  const [cards, setCards] = React.useState(() => seed || [])
   /* Nothing renders until the first response lands. A rail that flashes a
      skeleton and then collapses to nothing (the common case — most people
      follow nobody who is live) is worse than one that simply arrives. */
-  const [ready, setReady] = React.useState(false)
+  const [ready, setReady] = React.useState(!!seed)
   // Re-seed trigger: bumped on socket (re)connect and on the reconcile beat.
   const [epoch, setEpoch] = React.useState(0)
 
+  /* A rail that was handed its first page (the feed's `liveNow`) must not also
+     fetch it. Consumed once: every LATER epoch — reconnect, reconcile — still
+     re-reads from the server, because a seed ages exactly like a response. */
+  const seededRef = React.useRef(!!seed)
+
+  // A fresh seed (the feed reloaded) replaces the rail wholesale — it is a
+  // newer answer to the same question, not a patch.
+  React.useEffect(() => { if (seed) { setCards(seed); setReady(true) } }, [seed])
+
   React.useEffect(() => {
+    if (seededRef.current) { seededRef.current = false; return undefined }
     let alive = true
-    const req = following ? api.chat.streams.followingLive() : api.chat.streams.live()
+    const req = source === 'feed' ? api.posts.liveNow()
+      : following ? api.chat.streams.followingLive()
+      : api.chat.streams.live()
     req
       .then(rows => {
         if (!alive) return
         /* You cannot follow yourself, so a self-hosted card in this row would
            be a backend slip — but it reads as a lie to the one person who can
-           tell, so drop it rather than trust it. */
+           tell, so drop it rather than trust it. The feed rail is NOT filtered:
+           it is topped up from the public most-watched list, where your own
+           broadcast legitimately belongs. */
         setCards(following && myId
           ? (rows || []).filter(r => String(r.hostId) !== String(myId))
           : (rows || []))
@@ -155,7 +182,7 @@ export function LiveRow({
          banner over the page it garnishes, so a dead call renders as nothing. */
       .catch(() => { if (alive) { setCards([]); setReady(true) } })
     return () => { alive = false }
-  }, [following, myId, epoch])
+  }, [source, following, myId, epoch])
 
   React.useEffect(() => subscribe((evt) => {
     if (!evt?.type) return

@@ -9,8 +9,9 @@ import { ToastHost, Loader } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
 import { ShareHost } from './ShareSheet.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
+import { SearchTypeahead } from './SearchTypeahead.jsx'
 import { CallOverlay } from './chat/CallOverlay.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useAuth, isPlatformAdmin } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { initChime, playChime } from '../lib/chime.js'
 import { api } from '../api/index.js'
@@ -18,6 +19,7 @@ import { api } from '../api/index.js'
 const NAV = [
   { to:'/',              icon:'home',      label:'Home', end:true },
   { to:'/explore',       icon:'search',    label:'Explore' },
+  { to:'/people',        icon:'users',     label:'People' },
   { to:'/reels',         icon:'reels',     label:'Reels' },
   { to:'/qna',           icon:'qna',       label:'Q&A' },
   { to:'/research',      icon:'research',  label:'Research' },
@@ -30,6 +32,9 @@ const NAV = [
   { to:'/profile',       icon:'user',      label:'Profile' },
   { to:'/settings',      icon:'settings',  label:'Settings' },
 ]
+
+/* Shown only to ROLE_ADMIN / SUPER_ADMIN (search-index maintenance). */
+const ADMIN_NAV = { to:'/admin/search', icon:'shield', label:'Search admin' }
 
 /* Main pages → bottom tab bar; every page (incl. these) → the sidebar drawer.
    Messages is a first-class tab here, not just a topbar icon: on a phone the
@@ -57,7 +62,6 @@ export function Layout() {
   const me = user
   const [composeType, setComposeType] = React.useState(null)
   const [editPost, setEditPost] = React.useState(null)
-  const [search, setSearch] = React.useState('')
   const [unread, setUnread] = React.useState(0)
   const [navOpen, setNavOpen] = React.useState(false)
   const [desktopNavOpen, setDesktopNavOpen] = React.useState(() => {
@@ -123,9 +127,6 @@ export function Layout() {
     })
   }, [])
 
-  const onSearch = (e) => {
-    if (e.key === 'Enter' && search.trim()) navigate('/explore?q=' + encodeURIComponent(search.trim()))
-  }
   const onPublished = (post) => {
     window.dispatchEvent(new CustomEvent('ika:post-created', { detail: post }))
     navigate('/')
@@ -150,11 +151,10 @@ export function Layout() {
           <div className="word">IKA<b> ·</b> Archive</div>
         </div>
 
-        <div className="tb-search">
-          <Icon name="search"/>
-          <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={onSearch}
-            placeholder="Search posts, research, scholars, sounds…"/>
-        </div>
+        {/* The field owns its own state and its own network life-cycle — the
+            shell renders on every route, so a search box that fetched from
+            here would fetch everywhere. See SearchTypeahead. */}
+        <SearchTypeahead/>
 
         <div className="tb-actions">
           <button className="icon-btn" style={{ position:'relative' }} onClick={() => navigate('/chat')}
@@ -191,7 +191,9 @@ export function Layout() {
           <button className="icon-btn" aria-label="Close menu" onClick={() => setNavOpen(false)}><Icon name="close"/></button>
         </div>
         <nav className="nav">
-          {NAV.map(n => (
+          {/* Platform admins get one extra entry. Appended to the sidebar only —
+              the bottom tab bar is a curated four and stays that way. */}
+          {(isPlatformAdmin(me) ? [...NAV, ADMIN_NAV] : NAV).map(n => (
             <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setNavOpen(false)}
               className={({ isActive }) => 'nav-item ' + (isActive ? 'active' : '')}>
               <Icon name={n.icon}/><span>{n.label}</span>

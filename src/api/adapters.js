@@ -124,7 +124,10 @@ export function meFrom(u) {
     selfDescriber: p.selfDescriber || '',
     academicTitle: p.academicTitle || '',
     institution: p.institutionName || '',
+    // The profile carries the ENGLISH madhhab name only; `madhhabId` is what a
+    // reader resolves against GET /madhhabs for Arabic / Kurdish (TAXONOMY §3.2).
     madhhab: p.madhhabName || '',
+    madhhabId: p.madhhabId ?? null,
     location: p.location || '',
     website: p.websiteUrl || u.websiteUrl || '',
     orcid: u.orcidId || u.orcid || '',
@@ -133,9 +136,21 @@ export function meFrom(u) {
     contentLanguage: p.contentLanguage || u.preferredLanguage || '',
     profileViews: p.profileViews ?? 0,
     joinedAt: monthYear(u.createdAt),
+    /* A specialization IS a topic row (TAXONOMY §3.1 renders TopicDto), so all
+       three names are kept — a reader on an Arabic or Kurdish UI must not be
+       shown the English one just because the adapter flattened it. `name`
+       stays as the English default for callers that never localise. */
     specializations: (p.specializations || [])
-      .map(s => ({ id: s.topicId ?? s.id, name: s.topicName || s.nameEn || s.name || '', order: s.displayOrder ?? 0 }))
-      .filter(s => s.name).sort((a, b) => a.order - b.order),
+      .map(s => ({
+        id: s.topicId ?? s.id,
+        name: s.topicName || s.nameEn || s.name || '',
+        nameEn: s.nameEn || s.topicName || s.name || '',
+        nameAr: s.nameAr || '',
+        nameCkb: s.nameCkb || '',
+        order: s.displayOrder ?? 0,
+      }))
+      .filter(s => s.id != null && (s.nameEn || s.nameAr || s.nameCkb))
+      .sort((a, b) => a.order - b.order),
     links: (p.links || [])
       .map(l => ({ id: l.id, platform: l.platform || 'OTHER', url: l.url || '', label: l.description || platformLabel(l.platform), order: l.displayOrder ?? 0 }))
       .filter(l => l.url).sort((a, b) => a.order - b.order),
@@ -189,6 +204,58 @@ export function followSuggestionFrom(dto) {
   }
 }
 
+/** SuggestionResponse (`/posts/suggestions/detailed`) → view row for
+ *  "People you may know".
+ *
+ *  Two things the raw `/suggestions` rows can't give a card, and the reason
+ *  this endpoint is the canonical one:
+ *
+ *  · `candidate` is join-fetched, so the avatar is real rather than a
+ *    placeholder waiting on a second request per row;
+ *  · `score` is the true double here. The legacy rows carry the STORED value,
+ *    which is `round(score × 10)` fixed-point because the Cassandra clustering
+ *    column is an int — 287 means 28.7. Nothing but a debug readout should
+ *    care, but a card that printed the raw int would be off by 10×.
+ *
+ *  `reason` arrives pre-joined with " · " ("4 mutual follows · in your
+ *  contacts"); it is also split into `reasons[]` so a card can render the
+ *  signals as separate chips without re-deriving the label. */
+export function suggestionFrom(dto) {
+  if (!dto) return null
+  const a = authorFrom(dto.candidate, dto.candidateId)
+  const reason = dto.reason || ''
+  return {
+    id: dto.candidateId || a.id,
+    candidateId: dto.candidateId || a.id,
+    _author: a,
+    full: a.full, handle: a.handle, initials: a.initials, avc: a.avc,
+    profileImage: a.profileImage, verified: a.verified, role: a.role,
+    score: typeof dto.score === 'number' ? dto.score : 0,
+    reason,
+    reasons: reason.split('·').map(s => s.trim()).filter(Boolean),
+    computedAt: dto.computedAt || null,
+    time: timeAgo(dto.computedAt),
+    isFollowing: false,   // a suggestion is by construction someone you don't follow
+  }
+}
+
+/** Raw `friend_suggestions_by_user` row (legacy `/posts/suggestions`) → view
+ *  row. Identity is NOT hydrated here — only `candidateId` — so this shape is
+ *  for debugging and back-compat; render from `suggestionFrom`. The ×10
+ *  fixed-point store is undone so both shapes report the same number. */
+export function rawSuggestionFrom(dto) {
+  if (!dto) return null
+  return {
+    id: dto.candidateId,
+    candidateId: dto.candidateId,
+    userId: dto.userId || null,
+    score: (dto.score ?? 0) / 10,
+    storedScore: dto.score ?? 0,
+    reason: dto.reason || '',
+    computedAt: dto.computedAt || null,
+  }
+}
+
 export function timeAgo(iso) {
   if (!iso) return ''
   const then = new Date(iso).getTime()
@@ -214,6 +281,26 @@ function mediaFromUrls(urls = [], types = []) {
 
 const VIS_MAP = { FOLLOWERS_ONLY: 'FOLLOWERS', PUBLIC: 'PUBLIC', ONLY_ME: 'ONLY_ME' }
 
+/* ---- Ranking provenance (FEED_API §2) --------------------------------------
+   The ranked home feed adds four nullable fields to every FeedItemResponse.
+   Two of them are per-row metadata that EVERY entity type carries, so they are
+   mixed in from one place rather than copy-pasted into four adapters:
+
+     source     FOLLOWING | SELF | CHANNEL | EXPLORE | null
+                — drives UI chrome ("Suggested for you", channel card).
+     rankScore  the server's score. DEBUG/TELEMETRY ONLY: ordering is already
+                applied server-side, so nothing may ever re-sort on it (that
+                would fight the diversity re-ranker and break pagination).
+
+   A pre-ranking backend, or `?ranked=false`, sends neither → both are null and
+   every card falls back to its ordinary chrome. */
+function rankMeta(dto) {
+  return {
+    source: dto?.source || null,
+    rankScore: typeof dto?.rankScore === 'number' ? dto.rankScore : null,
+  }
+}
+
 /** FeedItemResponse → view post (light list shape). */
 export function postFromFeedItem(dto) {
   const a = authorFrom(dto.author, dto.authorId)
@@ -232,6 +319,7 @@ export function postFromFeedItem(dto) {
     media = mediaFromUrls([dto.mediaUrl], ['IMAGE'])
   }
   return {
+    ...rankMeta(dto),
     id: dto.id,
     author: a.id,
     _author: a,
@@ -258,16 +346,24 @@ export function postFromFeedItem(dto) {
 }
 
 /* ---- Mixed home feed (HOME_FEED_FRONTEND_GUIDE) ----------------------------
-   GET /api/v1/posts/feed now returns POST, RESEARCH and QUESTION rows in one
-   chronological stream, each carrying an `entityType` discriminator. Counters
-   are POST-only (zeroed on research/Q&A — the detail page is the truth); the
+   The home feed returns POST, RESEARCH, QUESTION and CHANNEL_POST rows in one
+   RANKED stream, each carrying an `entityType` discriminator. Counters are
+   POST/CHANNEL_POST-only (zeroed on research/Q&A at feed-read time — the
+   detail page is the truth, and FeedCards hydrates them lazily on screen); the
    light cards carry just title (textPreview), cover (mediaUrl), author + time,
-   and the raw createdAt that drives cursor pagination. */
+   and the raw createdAt.
+
+   createdAt no longer drives pagination on the composite endpoint: a ranked
+   page is NOT in chronological order, so `/feed/home` returns an explicit
+   `nextCursor` computed from the raw timeline window. Only the legacy bare
+   array at `/feed` is still cursor-derivable from the last element — which is
+   exactly why the server tail-pins its oldest timeline row. */
 
 /** FeedItemResponse (RESEARCH) → light research feed-card object. */
 export function researchFromFeedItem(dto) {
   const a = authorFrom(dto.author, dto.authorId)
   return {
+    ...rankMeta(dto),
     kind: 'RESEARCH',
     id: dto.id,
     author: a.id,
@@ -286,6 +382,7 @@ export function researchFromFeedItem(dto) {
 export function questionFromFeedItem(dto) {
   const a = authorFrom(dto.author, dto.authorId)
   return {
+    ...rankMeta(dto),
     kind: 'QUESTION',
     id: dto.id,
     author: a.id,
@@ -296,14 +393,77 @@ export function questionFromFeedItem(dto) {
   }
 }
 
+/** FeedItemResponse.channel → the channel chip a CHANNEL_POST is signed with.
+ *  Same fields as ChannelResponse's identity subset, adapted the same way
+ *  (bare handle, absolute avatar) so a feed chip and a channel page agree. */
+export function feedChannelFrom(c) {
+  if (!c) return null
+  return {
+    id: c.id,
+    handle: String(c.handle || '').replace(/^@/, ''),
+    title: c.title || 'Channel',
+    avatarUrl: assetUrl(c.avatarUrl || null),
+    verified: !!c.verified,
+    subscriberCount: c.subscriberCount ?? 0,
+  }
+}
+
+/** FeedItemResponse (CHANNEL_POST) → view channel-broadcast card.
+ *
+ *  Three traps live in this one row (FEED_API §2, guide §2):
+ *
+ *  · `author` is NULL — the CHANNEL signs the post. Nothing here may fall back
+ *    to an author plate, or every channel card would render as "Member".
+ *  · `id` is a SYNTHETIC uuid, good for list keys and nothing else. The real
+ *    message id is `channelPostId`, a snowflake that does not survive a JS
+ *    double — it is kept as a STRING and never parsed as a number (http.js
+ *    already quotes big integers on the wire; String() covers the rest).
+ *  · the counters are re-pointed: viewCount = views, shareCount = FORWARDS,
+ *    commentCount = discussion-group comments. There are no likes or saves —
+ *    channels react inside the channel screen.
+ */
+export function channelPostFromFeedItem(dto) {
+  /* `videoUrl` is REEL-only on the wire and is always null here, so the media
+     type has to be read off the URL. The server picks the cover as
+     "thumbnail if there is one, else the file itself" — which means a video
+     posted WITHOUT a generated thumbnail arrives in `mediaUrl`, and rendering
+     that blind as an <img> is a guaranteed broken plate. */
+  const raw = dto.mediaUrl || null
+  const isVideoUrl = !!raw && /\.(mp4|webm|mov|m4v|ogv|mkv|m3u8)(\?|#|$)/i.test(raw)
+  const video = dto.videoUrl ? assetUrl(dto.videoUrl) : (isVideoUrl ? assetUrl(raw) : null)
+  const cover = raw && !isVideoUrl ? assetUrl(raw) : null
+  const media = video
+    ? [{ type: 'VIDEO', url: video, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#1a2836,#0b131d)', ratio: '16/10' }]
+    : cover ? mediaFromUrls([raw], ['IMAGE']) : []
+  return {
+    ...rankMeta(dto),
+    kind: 'CHANNEL_POST',
+    id: dto.id,                                                         // list key only
+    channelPostId: dto.channelPostId != null ? String(dto.channelPostId) : null,
+    channel: feedChannelFrom(dto.channel),
+    author: null,
+    _author: null,
+    body: dto.textPreview || '',
+    media,
+    videoUrl: video,
+    cover,
+    views: dto.viewCount || 0,
+    shares: dto.shareCount || 0,      // forwards
+    comments: dto.commentCount || 0,  // discussion-group comments
+    time: timeAgo(dto.createdAt),
+    createdAt: dto.createdAt || null,
+  }
+}
+
 /** Mixed home-feed dispatcher — branch on `entityType` FIRST (guide §2). A null/
  *  unknown type is treated as POST (pre-migration rows read entity_type=null). */
 export function feedItemFrom(dto) {
   switch (dto?.entityType) {
-    case 'RESEARCH': return researchFromFeedItem(dto)
-    case 'QUESTION': return questionFromFeedItem(dto)
+    case 'RESEARCH':     return researchFromFeedItem(dto)
+    case 'QUESTION':     return questionFromFeedItem(dto)
+    case 'CHANNEL_POST': return channelPostFromFeedItem(dto)
     case 'POST':
-    default:         return { ...postFromFeedItem(dto), kind: 'POST' }
+    default:             return { ...postFromFeedItem(dto), kind: 'POST' }
   }
 }
 
@@ -611,12 +771,43 @@ export function searchHit(dto) {
     type: contentType,                           // back-compat shorthand for existing callers
     id: contentId,
     contentType, contentId,
+    /* ANSWER hits only, and ALWAYS present on them: the owning question.
+       An answer has no page of its own, so this is not a preview nicety —
+       it is the only way a hit can be opened at all. */
+    parentId: dto?.parentId || null,
     score: dto?.score ?? 0,
     titlePreview: dto?.titlePreview || '',       // brief render data (no extra GET needed)
+    /* Per type: content author's handle — except USER (the account's own
+       username) and CHANNEL (the channel @handle). authorName is the display
+       name, except SOUND where it is the ARTIST. */
     authorUsername: dto?.authorUsername || '',
     authorName: dto?.authorName || '',
     createdAt: dto?.createdAt || null,
     time: timeAgo(dto?.createdAt),
+  }
+}
+
+/** SoundEntity → view row. One shape for both ways into the library — search
+ *  rows key the id as `id`, the Cassandra browse rows as `soundId` — so a
+ *  picker can put a searched sound and a browsed sound in the same list.
+ *  Media URLs are absolutised here: they come back relative. */
+export function soundFrom(dto) {
+  if (!dto) return null
+  return {
+    id: dto.id || dto.soundId || '',
+    title: dto.title || '',
+    artist: dto.artistName || '',
+    artistName: dto.artistName || '',
+    audioUrl: assetUrl(dto.audioUrl || null),
+    cover: assetUrl(dto.coverArtUrl || null),
+    coverArtUrl: assetUrl(dto.coverArtUrl || null),
+    duration: dto.durationSeconds ?? null,
+    durationSeconds: dto.durationSeconds ?? null,
+    category: dto.category || '',
+    status: dto.status || '',                    // APPROVED on every searchable row
+    useCount: dto.useCount ?? 0,                 // the ranking signal, worth showing
+    uploaderId: dto.uploaderId || null,
+    createdAt: dto.createdAt || null,
   }
 }
 

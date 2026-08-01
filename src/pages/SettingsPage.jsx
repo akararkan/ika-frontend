@@ -7,6 +7,8 @@ import React from 'react'
 import { Icon, Avatar, showToast } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { EmptyState, Loader } from '../components/states.jsx'
+import { useImageViewer } from '../components/ImageLightbox.jsx'
+import { SpecializationPicker, MadhhabSelect } from '../components/Taxonomy.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -30,11 +32,33 @@ function ProfilePanel({ me }) {
   const [lang, setLang] = React.useState(me.contentLanguage || 'EN')
   const [forHire, setForHire] = React.useState(!!me.isForHire)
   const [priv, setPriv] = React.useState(!!me.profileLocked)
+  // Knowledge taxonomy (TAXONOMY_API §3): an ORDERED topic list + one school.
+  const [specs, setSpecs] = React.useState(() => me.specializations || [])
+  const [madhhabId, setMadhhabId] = React.useState(me.madhhabId ?? null)
   const [busy, setBusy] = React.useState(false)
   const avatarRef = React.useRef(null); const coverRef = React.useRef(null)
+  const { openable, viewer } = useImageViewer()   // the thumbnails here open full-size too
 
   const pickAvatar = (e) => { const f = e.target.files?.[0]; e.target.value=''; if (!f) return; api.users.uploadAvatar(f).then(() => { showToast('Photo updated'); refreshUser() }).catch(() => showToast('Could not upload photo')) }   // §10.4
   const pickCover  = (e) => { const f = e.target.files?.[0]; e.target.value=''; if (!f) return; api.users.uploadCover(f).then(() => { showToast('Cover updated'); refreshUser() }).catch(() => showToast('Could not upload cover')) }   // §10.6
+
+  // Ids in order — the list is ordered, so a reorder IS a change (§3.1).
+  const specKey = (list) => (list || []).map(s => s.id).join(',')
+  const specsChanged = specKey(specs) !== specKey(me.specializations)
+
+  /* Sign-in caches the user WITHOUT a profile, so `me.specializations` can
+     arrive a beat after this panel mounts. Every other field here would just
+     re-save the same string, but this one saves with REPLACE-ALL semantics —
+     a stale empty copy would wipe the list. So keep it in step with the
+     profile until the person actually edits it. */
+  const taxonomyTouched = React.useRef(false)
+  React.useEffect(() => {
+    if (taxonomyTouched.current) return
+    setSpecs(me.specializations || [])
+    setMadhhabId(me.madhhabId ?? null)
+  }, [me.specializations, me.madhhabId])
+  const editSpecs = (next) => { taxonomyTouched.current = true; setSpecs(next) }
+  const editMadhhab = (next) => { taxonomyTouched.current = true; setMadhhabId(next) }
 
   const save = async () => {
     setBusy(true)
@@ -53,7 +77,21 @@ function ProfilePanel({ me }) {
         academicTitle: field, institutionName: institution, location,
         websiteUrl: website.trim(), contentLanguage: lang,
         isForHire: forHire, isProfileLocked: priv,
+        madhhabId,                                                                                  // TAXONOMY §3.2 — null clears it
+      }).catch(e => {
+        // The madhhab is the one field here validated against a vocabulary.
+        if (e?.status === 404) { api.madhhabs.forget(); throw new Error('That school is no longer in the list — pick another.') }
+        throw e
       })
+      /* Specializations are their own REPLACE-ALL endpoint (TAXONOMY §3.1) and
+         are audit-logged, so they are only written when the list actually
+         changed — reordering counts, which is why ids are compared in order. */
+      if (specsChanged) {
+        await api.users.updateSpecializations(specs).catch(e => {
+          if (e?.status === 404) { api.topics.forget(); throw new Error('One of those topics no longer exists — reopen the list and pick again.') }
+          throw e
+        })
+      }
       await refreshUser()
       showToast('Profile saved')
     } catch (e) {
@@ -65,7 +103,9 @@ function ProfilePanel({ me }) {
     <div className="card card-pad">
       <h3 className="title">Public profile</h3>
       <div className="set-avatar-row">
-        <Avatar initials={me.initials} color={me.avc} size={72} src={me.profileImage}/>
+        <span {...openable(me.profileImage, { className:'flex', label:'View your profile photo' })}>
+          <Avatar initials={me.initials} color={me.avc} size={72} src={me.profileImage}/>
+        </span>
         <div><b className="text-md">Profile picture</b><p className="muted text-xs">JPG, PNG or WebP. Square images work best.</p></div>
         <input ref={avatarRef} type="file" hidden accept="image/*" onChange={pickAvatar}/>
         <input ref={coverRef} type="file" hidden accept="image/*" onChange={pickCover}/>
@@ -81,10 +121,19 @@ function ProfilePanel({ me }) {
         <div style={{gridColumn:'1/-1'}}><label className="field-label">Bio</label><textarea className="field" value={bio} onChange={e => setBio(e.target.value)}/></div>
         <div><label className="field-label">Academic title</label><input className="field" value={field} onChange={e => setField(e.target.value)} placeholder="e.g. Professor of Fiqh"/></div>
         <div><label className="field-label">Institution</label><input className="field" value={institution} onChange={e => setInstitution(e.target.value)} placeholder="e.g. Salahaddin University"/></div>
+        {/* Madhhab — chosen from the platform's fixed vocabulary, not typed
+            (TAXONOMY §2 / §3.2). Saved as `madhhabId`; "Not specified" sends null. */}
+        <div><label className="field-label">School of jurisprudence</label><MadhhabSelect value={madhhabId} onChange={editMadhhab} disabled={busy}/></div>
         <div><label className="field-label">Location</label><input className="field" placeholder="City, Country" value={location} onChange={e => setLocation(e.target.value)}/></div>
         <div><label className="field-label">Content language</label><select className="field" value={lang} onChange={e => setLang(e.target.value)}>{LANGUAGES.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></div>
         <div><label className="field-label">Website</label><input className="field" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://…"/></div>
         <div><label className="field-label">ORCID iD</label><input className="field" value={orcid} onChange={e => setOrcid(e.target.value)} placeholder="0000-0002-1825-0097"/></div>
+        {/* Specializations — the ordered topic list shown on the profile
+            (TAXONOMY §3.1). Replace-all: what is here IS the new list. */}
+        <div style={{gridColumn:'1/-1'}}>
+          <label className="field-label">Specializations</label>
+          <SpecializationPicker value={specs} onChange={editSpecs} disabled={busy}/>
+        </div>
       </div>
       <div className="set-toggle" style={{ marginTop:14 }}>
         <div><b>Available for hire</b><small className="muted">Show an “Available for hire” badge on your profile.</small></div>
@@ -97,6 +146,7 @@ function ProfilePanel({ me }) {
       <div className="set-actions">
         <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
       </div>
+      {viewer}
     </div>
   )
 }
@@ -191,7 +241,7 @@ function CloseFriendsPanel() {
   const [results, setResults] = React.useState([])
   const ids = new Set(list.map(u => u.id))
   React.useEffect(() => { api.closeFriends.list().then(r => setList(r || [])).catch(() => {}) }, [])
-  const searchUsers = (term) => { setQ(term); if (term.trim()) api.users.search(term, { size: 6 }).then(setResults).catch(() => {}); else setResults([]) }
+  const searchUsers = (term) => { setQ(term); if (term.trim()) api.users.searchList(term, { size: 6 }).then(setResults).catch(() => {}); else setResults([]) }
   const add = (u) => { setList(l => [...l, u]); api.closeFriends.add(u.id).then(() => showToast(`Added ${u.full.split(' ')[0]}`)).catch(() => showToast('They must be following you first')) }
   const remove = (u) => { setList(l => l.filter(x => x.id !== u.id)); api.closeFriends.remove(u.id).catch(() => {}); showToast('Removed') }
   return (
@@ -322,7 +372,7 @@ function SecurityPanel() {
     catch (e) { showToast(e?.code === 'INVALID_CREDENTIALS' ? 'Current password is wrong' : (e?.message || 'Could not update password')) }
     finally { setBusy(false) }
   }
-  const logoutAll = async () => {                                                                  // §8.5
+  const logoutAll = async () => {                                                                  // §8.5 — see ContactMatchingPanel below for the other destructive privacy op
     const ok = await uiConfirm({ title:'Sign out everywhere?', message:'Your active sessions on every other browser, phone, and tablet will end immediately. You stay signed in here.', confirmLabel:'Sign out everywhere', icon:'logout' })
     if (ok) logoutEverywhere()
   }
@@ -337,6 +387,54 @@ function SecurityPanel() {
       <div className="set-toggle" style={{ marginTop:8 }}>
         <div><b>Log out everywhere</b><small className="muted">Revoke every active session on all devices.</small></div>
         <button className="btn btn-secondary btn-sm" onClick={logoutAll}><Icon name="logout" className="xs"/>Log out all</button>
+      </div>
+    </div>
+  )
+}
+
+/* Contact matching — the PRIVACY half of the friend-suggestion CONTACTS
+   signal. Deliberately NOT the same thing as the "Contacts" card in the
+   Profile tab: that one publishes contact methods ON your profile
+   (/users/me/contacts), this one is the hashed address book you uploaded to
+   find people (/users/contacts). The copy says so, because the two words are
+   identical and the consequences are opposite.
+
+   Uploading lives on /people, where the matches it produces are visible.
+   What lives HERE is the control someone comes to settings looking for: the
+   delete. It is unconditional — there is no "do you have any?" read endpoint,
+   and gating a privacy erase behind a status check would make it fail closed
+   for exactly the user who most wants it. */
+function ContactMatchingPanel() {
+  const [busy, setBusy] = React.useState(false)
+  const wipe = async () => {
+    const ok = await uiConfirm({
+      title: 'Delete uploaded contacts?',
+      message: 'Every contact hash you uploaded is erased from the server and your suggestions are rebuilt without them. Your own profile and contact methods are untouched.',
+      confirmLabel: 'Delete', danger: true, icon: 'trash',
+    })
+    if (!ok) return
+    setBusy(true)
+    try { await api.users.contacts.clear(); showToast('Uploaded contacts deleted') }
+    catch { showToast('Could not delete uploaded contacts') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="card card-pad">
+      <h3 className="title"><Icon name="users" className="sm"/>Contact matching</h3>
+      <p className="muted text-sm" style={{ marginTop:2 }}>
+        If you upload your address book on the People page, it is hashed on your device with SHA-256
+        before it is sent — the server stores one-way hashes and never sees a name, an email address
+        or a phone number. They are used only to suggest people you may already know.
+      </p>
+      <p className="muted text-xs" style={{ marginTop:6 }}>
+        This is separate from the <b>Contacts</b> card in the Profile tab, which lists contact
+        methods you choose to show on your public profile.
+      </p>
+      <div className="set-toggle" style={{ marginTop:10 }}>
+        <div><b>Delete uploaded contacts</b><small className="muted">Erase every hash you have uploaded and rebuild suggestions without them.</small></div>
+        <button className="btn btn-secondary btn-sm" disabled={busy} onClick={wipe}>
+          <Icon name="trash" className="xs"/>{busy ? 'Deleting…' : 'Delete'}
+        </button>
       </div>
     </div>
   )
@@ -366,6 +464,7 @@ export function SettingsPage() {
               ['NOTIFICATIONS','bell','Emails'],
               ['BLOCKED','block','Blocked users'],
               ['RESTRICTED','eye','Restricted'],
+              ['CONTACT_MATCH','at','Contact matching'],
               ['SECURITY','shield','Security'],
             ].map(([k,ic,lab]) => (
               <button key={k} className={'set-item ' + (tab===k?'on':'')} onClick={() => setTab(k)}><Icon name={ic} className="sm"/>{lab}</button>
@@ -384,6 +483,7 @@ export function SettingsPage() {
             {tab==='NOTIFICATIONS' && <EmailPrefsPanel/>}
             {tab==='BLOCKED' && <BlockedPanel/>}
             {tab==='RESTRICTED' && <RestrictedPanel/>}
+            {tab==='CONTACT_MATCH' && <ContactMatchingPanel/>}
             {tab==='SECURITY' && <SecurityPanel/>}
           </div>
         </div>

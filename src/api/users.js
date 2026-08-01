@@ -6,6 +6,7 @@
    ========================================================= */
 import { http } from './http.js'
 import { userFrom, followSuggestionFrom, userStatsFrom } from './adapters.js'
+import { specializationsTo } from './taxonomy.js'
 
 const page = (res, map) => ({
   items: (res?.content || res || []).map(map),
@@ -18,10 +19,22 @@ export const users = {
   async get(id)            { return userFrom(await http.get(`/api/v1/users/${id}`)) },                                  // §9.2
   async getByUsername(un)  { return userFrom(await http.get(`/api/v1/users/username/${un}`)) },                         // §9.3
   async getByEmail(email)  { return userFrom(await http.get(`/api/v1/users/email/${encodeURIComponent(email)}`)) },    // §9.4
-  async search(q, { page: p = 0, size = 20, eligibleContributor } = {}) {                                              // §9.6
-    const res = await http.get('/api/v1/users/search', { q, page: p, size, eligibleContributor: eligibleContributor || undefined })
-    return (res?.content || res || []).map(userFrom)
+  /* §9.6 / SEARCH: users.md — the DEDICATED people picker, on Postgres FTS
+     (GIN tsvector, ts_rank_cd, top-200 cap) with a pg_trgm fuzzy fallback and
+     a <3-char prefix path. Kept alongside global `types=USER` because this one
+     is transactionally fresh (zero indexing lag), can filter by role, and
+     hydrates a full Page<UserResponse>. Blank `q` lists all active users.
+     Returns the PAGE envelope — a picker that throws away `total`/`hasMore`
+     can't page, and this endpoint is the only people surface that can. */
+  async search(q, { page: p = 0, size = 20, eligibleContributor, signal } = {}) {
+    const res = await http.get('/api/v1/users/search', {
+      q: q || undefined, page: p, size,
+      eligibleContributor: eligibleContributor || undefined,   // → RESEARCHER | SCHOLAR only
+    }, { signal })                                             // live-typing pickers must cancel
+    return page(res, userFrom)
   },
+  /** The historical array-only shape, for callers that never paged. */
+  async searchList(q, opts) { return (await this.search(q, opts)).items },
   async updateIdentity(body){ return userFrom(await http.patch('/api/v1/users/me', body)) },                           // §9.5
   deleteAccount()           { return http.del('/api/v1/users/me') },                                                    // §9.13 (soft)
   async stats(id)           { return userStatsFrom(await http.get(`/api/v1/users/${id}/stats`)) },                      // §9.14
@@ -33,8 +46,17 @@ export const users = {
   removeAvatar()     { return http.del('/api/v1/users/me/profile/avatar') },                                            // §10.5
   uploadCover(file)  { const fd = new FormData(); fd.append('image', file); return http.upload('/api/v1/users/me/profile/cover', fd) },   // §10.6
   removeCover()      { return http.del('/api/v1/users/me/profile/cover') },                                             // §10.7
-  // §10.8 — replaces the whole list: [{ topicId, displayOrder }]
-  async updateSpecializations(specializations) { return userFrom(await http.patch('/api/v1/users/me/profile/specializations', { specializations })) },
+  /* §10.8 / TAXONOMY §3.1 — REPLACE-ALL: the body is the complete new list and
+     anything missing from it is removed; `[]` clears. Position is the
+     displayOrder, so callers hand over an ordered list of topic ids (or topic
+     rows) and never hand-number anything. Transactional server-side: one
+     unknown topicId 404s the whole request and nothing is applied. */
+  async updateSpecializations(specializations) {
+    const body = { specializations: specializationsTo(specializations) }
+    return userFrom(await http.patch('/api/v1/users/me/profile/specializations', body))
+  },
+  /** Clear every specialization (the documented `[]` case), spelled out. */
+  async clearSpecializations() { return this.updateSpecializations([]) },
 
   /* ---- profile links (§9.7-9.9) ---- */
   addLink(body)            { return http.post('/api/v1/users/me/links', body) },               // { platform, description, url, isPublic, displayOrder }
@@ -64,10 +86,39 @@ export const users = {
     const rows = await http.get('/api/v1/users/me/suggestions', { limit })
     return (rows || []).map(followSuggestionFrom)
   },
+  /* The who-to-follow surface's dismiss. It now persists a dismissal row like
+     the canonical `posts.dismissSuggestion` does (it used to be delete-only,
+     so dismissed people came straight back on the next recompute). Both are
+     permanent; use whichever surface the row came from. */
   dismissSuggestion(candidateId) { return http.del(`/api/v1/users/me/suggestions/${candidateId}`) },             // §11.13
   async whoToFollow({ limit = 20 } = {}) {                                                      // §11.14 (auth optional)
     const rows = await http.get('/api/v1/users/who-to-follow', { limit })
     return (rows || []).map(followSuggestionFrom)
+  },
+
+  /* ---- contact matching (friend-suggestion CONTACTS signal) --------------
+     The strongest cold-start signal there is, and the most sensitive: the
+     server must never receive an address book, so it receives only SHA-256
+     hashes (see lib/contactHash.js for the normalisation contract — get it
+     wrong and every hash silently matches nothing).
+
+     Three properties worth knowing at the call site:
+       · each sync REPLACES the previous upload — it is a snapshot, not a
+         delta, so a partial list quietly discards what came before;
+       · ≤5000 hashes per call (the helper caps and reports the overflow);
+       · sync and clear both trigger an async suggestion recompute, so the
+         caller re-reads suggestions after a beat rather than expecting them
+         in the response. */
+  contacts: {
+    /** @param hashes hex SHA-256 strings from lib/contactHash → { stored, matched } */
+    async sync(hashes) {
+      const res = await http.post('/api/v1/users/contacts/sync', { hashes: hashes || [] })
+      return { stored: res?.stored ?? 0, matched: res?.matched ?? 0 }
+    },
+    /** Privacy op: wipe every uploaded hash. The caller's own IDENTITY row
+     *  stays — it holds no contact data, only the hash of their own email,
+     *  which is what makes THEM findable by other people's syncs. */
+    clear() { return http.del('/api/v1/users/contacts') },   // 204
   },
 
   /* ---- email preferences (§16) ---- */

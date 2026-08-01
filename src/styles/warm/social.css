@@ -153,6 +153,36 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 .x-note{background:var(--gold-wash);border:1px solid #b9d6f2;border-radius:11px}
 .x-empty{border:1px dashed #c2c1bf;border-radius:14px;background:var(--paper-2)}
 
+/* ---- Explore: eight entity types in one merged list ----
+   Three of the eight are not authored content, so their rows carry their own
+   affordances (a crest instead of an avatar, a play button instead of a link).
+   Everything else reuses the Q&A card wholesale. */
+.x-hit{cursor:pointer}
+.x-hit-sound{cursor:default}
+.x-hit-kind{display:inline-flex;align-items:center;gap:5px}
+.x-hit-note{display:inline-flex;align-items:center;gap:5px;margin-top:8px}
+.x-hit .hit-type-pill{margin-inline-start:auto;background:transparent;font-weight:700}
+.x-hit-crest{
+  width:40px;height:40px;flex:none;border-radius:12px;display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--navy),var(--navy-deep));color:#f2f0f0;
+}
+.x-hit-crest.is-sound{background:linear-gradient(140deg,#3e5570,#00172f)}
+.x-empty-ic{
+  display:grid;place-items:center;margin:0 auto 10px;width:48px;height:48px;
+  border-radius:50%;background:var(--card-2);color:var(--muted);
+}
+/* Nine tabs do not fit a phone: let the row scroll instead of wrapping into
+   a second line that pushes results below the fold. */
+.x-tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.x-tabs::-webkit-scrollbar{display:none}
+.x-tabs .tab{white-space:nowrap;flex:none}
+.x-tagrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.x-people-opt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.x-sound-card{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.x-skel{opacity:.55}
+.x-skel-av{background:var(--card-2)}
+.x-skel-bar{height:14px;background:var(--card-2);border-radius:4px}
+
 /* per-type group headers over the hit lists (serif navy + count chip) */
 .section-label{
   font-family:var(--serif);font-size:19px;font-weight:600;
@@ -261,3 +291,218 @@ button.kbd:hover{border-color:var(--blue);color:var(--navy)}
 .mention-opt.on,.mention-opt:hover{background:var(--blue-wash)}
 .mention-meta b{font-size:13.5px;color:var(--ink)}
 .mention-meta small{color:var(--muted)}
+
+/* =============================================================
+   N · People You May Know
+   -------------------------------------------------------------
+   The friend-suggestion engine's surfaces: the feed carousel,
+   the right-rail list and the /people grid — one card design at
+   two densities.
+
+   The rule that shapes all of it: the REASON line is the
+   product. A suggestion without a why is indistinguishable from
+   a random account, so the reason always gets its own line, in
+   full width, and is never sacrificed for the handle.
+   ============================================================= */
+
+/* ---------- shared: name, reason, buttons ---------- */
+.pymk-name{
+  display:flex;align-items:center;gap:5px;
+  background:none;border:0;padding:0;
+  font-size:13.5px;color:var(--ink);text-align:start;cursor:pointer;
+  max-width:100%;
+}
+.pymk-name b{
+  font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.pymk-name:hover b{color:var(--navy);text-decoration:underline;text-underline-offset:2px}
+
+.pymk-why{
+  display:block;margin-top:2px;
+  font-size:12px;line-height:1.35;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+}
+
+.pymk-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  width:100%;padding:7px 10px;border-radius:8px;
+  border:1px solid var(--line);background:var(--card-2);
+  color:var(--ink-2);font-size:13px;font-weight:600;cursor:pointer;
+  transition:background-color .14s,color .14s,border-color .14s;
+}
+.pymk-btn:hover{background:var(--wash);color:var(--ink)}
+.pymk-btn:disabled{opacity:.6;cursor:default}
+.pymk-btn.is-primary{
+  background:var(--emerald);border-color:var(--emerald);color:#fff;
+}
+.pymk-btn.is-primary:hover{background:var(--emerald-deep);border-color:var(--emerald-deep);color:#fff}
+.pymk-btn.is-done{background:var(--card-2);border-color:var(--emerald);color:var(--navy)}
+.pymk-btn .ico{width:14px;height:14px}
+
+/* ---------- the card ---------- */
+.pymk-card{
+  position:relative;display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  overflow:hidden;box-shadow:var(--shadow-sm);
+  transition:box-shadow .18s,border-color .18s;
+}
+.pymk-card:hover{box-shadow:var(--shadow);border-color:#c2c1bf}
+
+/* Square photo plate — a suggestion is a person to look at, so the face gets
+   the space and the chrome gets none. */
+.pymk-photo{
+  position:relative;display:block;width:100%;aspect-ratio:1/1;
+  padding:0;border:0;background:var(--card-2);cursor:pointer;overflow:hidden;
+}
+.pymk-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s cubic-bezier(.2,.7,.2,1)}
+.pymk-card:hover .pymk-photo img{transform:scale(1.04)}
+.pymk-photo-fb{
+  position:absolute;inset:0;display:grid;place-items:center;
+  color:#fff;font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:1px;
+}
+
+.pymk-x{
+  position:absolute;top:8px;inset-inline-end:8px;z-index:2;
+  width:26px;height:26px;border-radius:50%;
+  display:grid;place-items:center;
+  background:rgba(6,12,20,.55);color:#fff;border:0;cursor:pointer;
+  backdrop-filter:blur(4px);opacity:0;transition:opacity .15s,background-color .15s;
+}
+.pymk-card:hover .pymk-x,.pymk-x:focus-visible{opacity:1}
+.pymk-x:hover{background:var(--danger)}
+
+.pymk-body{padding:10px 12px 0;min-height:54px}
+.pymk-acts{display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px;margin-top:auto}
+
+/* ---------- feed carousel ---------- */
+.pymk{
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow-sm);padding:14px 14px 6px;
+}
+.pymk-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pymk-head h3{
+  margin:0;font-family:var(--serif);font-size:16px;font-weight:600;color:var(--navy);
+}
+.pymk-all{
+  margin-inline-start:auto;background:none;border:0;padding:0;cursor:pointer;
+  font-size:13px;font-weight:600;color:var(--blue);
+}
+.pymk-all:hover{text-decoration:underline;text-underline-offset:2px}
+/* "Hide for now" — quiet by default, because dismissing the strip is a
+   secondary action next to "See all", and it starts the same cooldown. */
+.pymk-hide{
+  flex:none;width:26px;height:26px;border-radius:50%;
+  display:grid;place-items:center;
+  background:none;border:0;color:var(--muted);cursor:pointer;
+  transition:background-color .14s,color .14s;
+}
+.pymk-hide:hover{background:var(--card-2);color:var(--ink)}
+
+.pymk-strip-wrap{position:relative}
+.pymk-strip{
+  display:flex;gap:10px;overflow-x:auto;padding:2px 2px 12px;
+  scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.pymk-strip::-webkit-scrollbar{display:none}
+.pymk-strip .pymk-card{flex:none;width:160px;scroll-snap-align:start}
+
+.pymk-nav{
+  position:absolute;top:calc(50% - 8px);transform:translateY(-50%);z-index:2;
+  width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
+  background:var(--card);color:var(--ink-2);
+  border:1px solid var(--line);box-shadow:var(--shadow-sm);
+  cursor:pointer;opacity:0;transition:opacity .15s,background-color .15s;
+}
+.pymk-nav.prev{inset-inline-start:-8px}
+.pymk-nav.next{inset-inline-end:-8px}
+.pymk-strip-wrap:hover .pymk-nav{opacity:1}
+.pymk-nav:hover{background:var(--card-2)}
+@media(hover:none){ .pymk-nav{display:none} }
+
+/* ---------- right-rail list ---------- */
+.pymk-rail{display:flex;flex-direction:column}
+.pymk-row{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:12px 0;border-top:1px solid var(--line-soft);
+}
+.pymk-row:first-child{border-top:none;padding-top:2px}
+.pymk-row-plate{background:none;border:0;padding:0;cursor:pointer;flex:none}
+.pymk-row-body{flex:1;min-width:0}
+.pymk-row-acts{display:flex;gap:6px;margin-top:8px}
+.pymk-row-acts .pymk-btn{width:auto;flex:1;padding:6px 8px;font-size:12.5px}
+
+/* ---------- /people page ---------- */
+.ppl-head{
+  display:flex;align-items:flex-start;gap:16px;
+  padding:4px 2px 16px;
+}
+.ppl-head h1{
+  margin:0 0 4px;font-family:var(--serif);font-size:26px;font-weight:600;
+  letter-spacing:-.3px;color:var(--navy);
+}
+.ppl-head p{margin:0;font-size:13.5px;max-width:62ch}
+.ppl-head .btn{flex:none;margin-inline-start:auto}
+
+.pymk-grid{
+  display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+}
+.pymk-card.is-skeleton{
+  aspect-ratio:3/4;border-style:dashed;box-shadow:none;
+  background:linear-gradient(100deg,var(--card-2),var(--card),var(--card-2));
+  background-size:200% 100%;animation:pymk-shimmer 1.4s linear infinite;
+}
+@keyframes pymk-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+.pymk-empty{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:44px 24px;text-align:center;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+}
+.pymk-empty .ico{color:var(--muted);opacity:.7}
+.pymk-empty b{font-family:var(--serif);font-size:17px;color:var(--navy)}
+.pymk-empty p{margin:0;max-width:46ch;font-size:13.5px}
+
+/* ---------- contact sync ---------- */
+.csync{padding:16px 18px;margin-bottom:18px}
+.csync-head{display:flex;align-items:flex-start;gap:13px}
+.csync-ic{
+  width:40px;height:40px;flex:none;border-radius:11px;display:grid;place-items:center;
+  background:var(--blue-wash);color:var(--navy);
+}
+.csync-hd{flex:1;min-width:0}
+.csync-hd h3{margin:0 0 3px;font-family:var(--serif);font-size:16px;font-weight:600;color:var(--navy)}
+.csync-hd p{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted);max-width:64ch}
+.csync-head .btn{flex:none}
+
+.csync-body{margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)}
+.csync-warn{
+  display:flex;align-items:center;gap:7px;margin:0 0 12px;
+  padding:9px 12px;border-radius:9px;
+  background:var(--warn-wash,#fdf6e7);color:var(--warn,#8a6a1f);
+  font-size:12.5px;font-weight:500;
+}
+.csync-drop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.csync-area{width:100%;min-height:110px;font-size:13.5px;line-height:1.6;resize:vertical}
+.csync-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.csync-btns{display:flex;gap:8px;margin-inline-start:auto}
+.csync-result{
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  margin:12px 0 0;padding:10px 12px;border-radius:9px;
+  background:var(--good-wash,#eaf5ef);color:var(--good,#2f6b4f);
+  font-size:13px;
+}
+.csync-result .ico{stroke:currentColor}
+
+@media(max-width:720px){
+  .ppl-head{flex-direction:column;gap:10px}
+  .ppl-head .btn{margin-inline-start:0}
+  .ppl-head h1{font-size:22px}
+  .pymk-grid{grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+  .pymk-strip .pymk-card{width:148px}
+  .pymk{padding:12px 12px 4px;border-radius:12px}
+  .csync-btns{margin-inline-start:0;width:100%}
+  .csync-btns .btn{flex:1}
+}

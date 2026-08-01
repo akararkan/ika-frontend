@@ -11,7 +11,7 @@
    ========================================================= */
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, RequireAuth } from './context/AuthContext.jsx'
+import { AuthProvider, RequireAuth, RequireRole, PLATFORM_ADMIN_ROLES } from './context/AuthContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
 import { CallProvider } from './context/CallContext.jsx'
 import { Layout } from './components/Layout.jsx'
@@ -33,6 +33,7 @@ const ActivityPage       = named(() => import('./pages/ActivityPage.jsx'), 'Acti
 const SavedPage          = named(() => import('./pages/SavedPage.jsx'), 'SavedPage')
 const ProfilePage        = named(() => import('./pages/ProfilePage.jsx'), 'ProfilePage')
 const UserProfilePage    = named(() => import('./pages/UserProfilePage.jsx'), 'UserProfilePage')
+const PeoplePage         = named(() => import('./pages/PeoplePage.jsx'), 'PeoplePage')
 const SettingsPage       = named(() => import('./pages/SettingsPage.jsx'), 'SettingsPage')
 const TagPage            = named(() => import('./pages/TagPage.jsx'), 'TagPage')
 const ChatPage           = named(() => import('./pages/ChatPage.jsx'), 'ChatPage')
@@ -41,6 +42,7 @@ const ChannelsPage       = named(() => import('./pages/ChannelsPage.jsx'), 'Chan
 const ChannelPage        = named(() => import('./pages/ChannelPage.jsx'), 'ChannelPage')
 const ChannelLinkPage    = named(() => import('./pages/ChannelLinkPage.jsx'), 'ChannelLinkPage')
 const LivePage           = named(() => import('./pages/LivePage.jsx'), 'LivePage')
+const AdminSearchPage    = named(() => import('./pages/AdminSearchPage.jsx'), 'AdminSearchPage')
 
 const fullScreenLoader = <div className="main center"><div className="col-main"><Loader label="Loading…"/></div></div>
 
@@ -108,7 +110,13 @@ export default function App() {
               <Route path="saved" element={<SavedPage/>}/>
               <Route path="profile" element={<ProfilePage/>}/>
               <Route path="u/:id" element={<UserProfilePage/>}/>
+              <Route path="people" element={<PeoplePage/>}/>
               <Route path="settings" element={<SettingsPage/>}/>
+              {/* Platform-admin only. The gate renders the refusal in place
+                  rather than redirecting — see RequireRole. */}
+              <Route path="admin/search" element={
+                <RequireRole roles={PLATFORM_ADMIN_ROLES}><AdminSearchPage/></RequireRole>
+              }/>
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace/>}/>

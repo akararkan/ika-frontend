@@ -38,6 +38,8 @@ import { ChannelSubscribers } from './ChannelSubscribers.jsx'
 import { ChannelInvites } from './ChannelInvites.jsx'
 import { ChannelStats } from './ChannelStats.jsx'
 import { tintOf, crestOf } from './channelArt.js'
+import { useImageViewer } from '../ImageLightbox.jsx'
+import { useImageRatio, coverStyle } from '../../lib/useImageRatio.js'
 
 const HANDLE_RE = /^[a-z0-9_]{3,32}$/
 
@@ -58,6 +60,8 @@ function InfoTab({ channel, onChanged }) {
   const [isPublic, setIsPublic] = React.useState(channel.publicChannel)
   const [busy, setBusy] = React.useState(false)
   const [uploading, setUploading] = React.useState(null)   // 'photo' | 'cover'
+  const { open, viewer } = useImageViewer()   // tapping the art shows it full-size; the chips still edit it
+  const coverAr = useImageRatio(channel.coverUrl)   // the preview takes the cover's own shape
 
   const cleanHandle = handle.trim().replace(/^@/, '').toLowerCase()
   const handleBad = isPublic && !!cleanHandle && !HANDLE_RE.test(cleanHandle)
@@ -123,7 +127,14 @@ function InfoTab({ channel, onChanged }) {
           and the discovery card wear, editable in place. */}
       <div className={'cm-art tint-' + tintOf(channel.id)}>
         <div className={'cm-art-cover' + (channel.coverUrl ? ' has-img' : '')}
-          style={channel.coverUrl ? { '--cover': `url("${encodeURI(channel.coverUrl)}")` } : undefined}>
+          style={coverStyle(channel.coverUrl, coverAr)}>
+          {/* The whole plate opens the picture, as its own button UNDER the
+              edit chips (z-index) — a hit area that covers the controls would
+              nest one control inside another and swallow them for a reader. */}
+          {channel.coverUrl && (
+            <button type="button" className="cm-art-open" onClick={() => open(channel.coverUrl)}
+              aria-label="View the cover full size" title="View the cover full size"/>
+          )}
           <div className="cm-art-acts">
             <label className="cm-art-btn">
               {uploading === 'cover'
@@ -146,6 +157,10 @@ function InfoTab({ channel, onChanged }) {
             {channel.avatarUrl
               ? <img src={channel.avatarUrl} alt=""/>
               : <span className="cm-art-crest" aria-hidden="true">{crestOf(channel)}</span>}
+            {channel.avatarUrl && (
+              <button type="button" className="cm-art-open" onClick={() => open(channel.avatarUrl)}
+                aria-label="View the photo full size" title="View the photo full size"/>
+            )}
             <label className="cm-art-cam" title={channel.avatarUrl ? 'Replace the photo' : 'Add a photo'}>
               {uploading === 'photo'
                 ? <span className="cm-art-spin" aria-hidden="true"/>
@@ -225,6 +240,7 @@ function InfoTab({ channel, onChanged }) {
           {busy ? 'Saving…' : 'Save changes'}
         </button>
       </div>
+      {viewer}
     </div>
   )
 }

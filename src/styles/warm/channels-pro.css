@@ -36,7 +36,21 @@
 
 .cp-page .col-main{ padding-bottom:48px; }
 
-.cp-hero{ margin:0 0 18px; }
+/* THE CHARTER CARD.
+   The whole masthead is ONE plate — cover, identity, description, policy
+   badges, and a ledger foot with the three figures every visitor came to
+   check. One bordered card instead of pieces floating on the body: the page
+   opens the way the app's research heroes do, and everything below it
+   (request note, empty state, the About index) is clearly commentary ON the
+   card, not more of it. */
+.cp-hero{
+  margin:0 0 22px;
+  border:1px solid var(--line);
+  border-radius:var(--r-xl);
+  background:var(--card);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
 
 /* THE COVER.
    The uploaded photo is a background LAYER over the derived gradient, never a
@@ -52,11 +66,11 @@
    from the corner the avatar occupies, and the same concentric broadcast rings
    the discovery card wears — so a channel with no photo still has a masthead
    that is unmistakably ITS masthead (the tint is keyed to the id), and the
-   profile and the card read as one identity. */
+   profile and the card read as one identity. Square-cornered now: the card
+   owns the radius. */
 .cp-cover{
   position:relative;
-  height:200px;
-  border-radius:var(--r-lg);
+  height:212px;
   background-color:var(--navy-deep);
   background-image:
     radial-gradient(90% 130% at 12% 108%, rgba(255,255,255,.14) 0%, transparent 55%),
@@ -67,9 +81,7 @@
   background-repeat:no-repeat;
   display:grid;place-items:center;
   overflow:hidden;
-  /* Hairline seats the cover on the paper; the long soft shadow lifts it the
-     way the app's other mastheads sit. */
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07), var(--shadow-sm);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);
 }
 /* The broadcast rings, centred where the avatar will overlap the bottom edge —
    the crest rises out of its own signal. Pure ornament, so `aria` never sees
@@ -84,8 +96,37 @@
     transparent 58%, rgba(255,255,255,.08) 59%, transparent 62%,
     transparent 74%, rgba(255,255,255,.05) 75%, transparent 78%);
 }
+/* The sky ribbon on the seam — the Oxford signature line where cover meets
+   paper, fading toward the inline end. The one place the secondary colour
+   appears at full strength on this page. */
+.cp-cover::after{
+  content:"";position:absolute;pointer-events:none;
+  inset-inline:0;inset-block-end:0;height:3px;
+  background:linear-gradient(90deg,var(--ox-sky) 0%,rgba(185,214,242,.28) 100%);
+}
+[dir="rtl"] .cp-cover::after{
+  background:linear-gradient(-90deg,var(--ox-sky) 0%,rgba(185,214,242,.28) 100%);
+}
+/* A FLEXIBLE plate, not a fixed strip: it takes the picture's own proportions
+   (`--cover-ar`, measured from the decoded image — see lib/useImageRatio.js)
+   and CONTAINS it, so an uploaded cover is shown whole instead of being cropped
+   to a letterbox. Two clamps keep it a masthead rather than a page: a portrait
+   photo cannot swallow the screen, a panorama cannot collapse to a stripe. When
+   a clamp binds, the band left over is filled by the channel's own gradient —
+   the same art that stands in when there is no photo at all. The ratio is
+   absent for the first frame, so the fallback is the shape this plate has
+   always had. */
 .cp-cover.has-img{
   background-image:var(--cover),linear-gradient(135deg,var(--t,var(--navy)) 0%,var(--navy-deep) 100%);
+  /* width:100% is not decoration — without it, a height clamp makes the box
+     shrink sideways to keep the ratio and the masthead pulls away from the
+     card's edge. The plate always spans; only its HEIGHT follows the picture. */
+  width:100%;
+  height:auto;
+  aspect-ratio:var(--cover-ar,1000/212);
+  min-height:150px;
+  max-height:min(56vh,520px);       /* same ceiling as the profile masthead */
+  background-size:contain,cover;
 }
 .cp-cover.has-img::before{ display:none; }
 .cp-cover-mark{ width:52px;height:52px;color:rgba(255,255,255,.22); }
@@ -94,7 +135,7 @@
    — there is nothing there to be illegible against. */
 .cp-cover-scrim{
   position:absolute;inset:0;
-  background:linear-gradient(to bottom,rgba(0,23,47,0) 40%,rgba(0,23,47,.38) 100%);
+  background:linear-gradient(to bottom,rgba(0,23,47,0) 42%,rgba(0,23,47,.12) 66%,rgba(0,23,47,.42) 100%);
 }
 .cp-cover:not(.has-img) .cp-cover-scrim{ display:none; }
 
@@ -106,25 +147,25 @@
    cover's edge. */
 .cp-ident{
   display:flex;align-items:flex-start;gap:18px;
-  margin:0 20px;position:relative;
+  padding:0 24px;position:relative;
   flex-wrap:wrap;
 }
 
 .cp-avatar{
   flex:0 0 auto;
-  margin-top:-46px;
-  width:96px;height:96px;border-radius:24px;
+  margin-top:-48px;
+  width:104px;height:104px;border-radius:26px;
   background:var(--card);
   box-shadow:0 0 0 4px var(--card),var(--shadow);
   display:grid;place-items:center;overflow:hidden;
 }
-.cp-avatar .avatar{ border-radius:20px; }
+.cp-avatar .avatar{ border-radius:22px; }
 .cp-crest{
   position:relative;
   width:100%;height:100%;
   display:grid;place-items:center;
   background:linear-gradient(140deg,var(--t,var(--navy)),var(--navy-deep));
-  color:#fff;font-family:var(--serif);font-size:42px;font-weight:600;
+  color:#fff;font-family:var(--serif);font-size:44px;font-weight:600;
   text-shadow:0 1px 2px rgba(0,23,47,.4);
 }
 /* A soft top-light across the crest — the same glass the app's medallions
@@ -134,32 +175,55 @@
   background:linear-gradient(165deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.05) 38%,transparent 55%);
 }
 
-.cp-ident-body{ flex:1;min-width:220px;padding-top:12px; }
+.cp-ident-body{ flex:1;min-width:220px;padding-top:14px; }
 
+/* fit-content, NOT full width: with dir handled by the inner <bdi>, an RTL
+   title stays anchored at the inline start under the avatar instead of
+   stranding against the action buttons (the header-strand trap). */
 .cp-title{
-  margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  font-family:var(--serif);font-size:clamp(22px,2.6vw,28px);font-weight:600;line-height:1.2;
+  margin:0;width:fit-content;max-width:100%;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-family:var(--serif);font-size:clamp(23px,2.8vw,30px);font-weight:600;line-height:1.2;
   letter-spacing:-.01em;
   color:var(--navy-deep);
 }
-.cp-sub{ display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px; }
-.cp-handle{ font-size:14px;color:var(--gold-deep);font-weight:600; }
-.cp-handle.muted{ color:var(--muted);display:inline-flex;align-items:center;gap:4px; }
+.cp-sub{ display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:5px; }
+.cp-handle{ font-family:var(--mono);font-size:13px;color:var(--ox-blue-mid);font-weight:600; }
+.cp-handle.muted{ font-family:var(--sans);color:var(--muted);display:inline-flex;align-items:center;gap:4px; }
+/* The category wears the sky wash — a quiet secondary chip that is still
+   obviously a door back to the directory. */
 .cp-cat{
-  border:1px solid var(--line);background:var(--paper-2);color:var(--ink-soft);
-  border-radius:999px;padding:2px 10px;font-size:11.5px;cursor:pointer;
-  text-transform:lowercase;letter-spacing:.02em;
+  display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--ox-sky);background:var(--ox-sky-wash);color:var(--ox-blue-mid);
+  border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:background .14s ease,color .14s ease;
 }
-.cp-cat:hover{ border-color:var(--gold);color:var(--gold-deep); }
+.cp-cat .ico{ width:11px;height:11px;opacity:.7; }
+.cp-cat:hover{ background:var(--ox-sky);color:var(--ox-blue); }
+.cp-cat:focus-visible{ outline:2px solid var(--blue);outline-offset:2px; }
 
+/* The ledger foot: three figures on a quiet wash, divided by hairlines —
+   serif numerals in the identity blue, small-caps labels beneath. */
 .cp-stats{
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  margin-top:8px;font-size:13px;color:var(--ink-soft);
+  display:flex;align-items:stretch;
+  margin-top:20px;
+  border-top:1px solid var(--line-soft);
+  background:var(--paper-2);
 }
-.cp-stats b{ color:var(--navy-deep);font-weight:650; }
-.cp-dot{ color:var(--line); }
+.cp-stat{ flex:1;min-width:0;display:grid;gap:3px;padding:14px 24px; }
+.cp-stat + .cp-stat{ border-inline-start:1px solid var(--line-soft); }
+.cp-stat b{
+  font-family:var(--serif);font-size:21px;font-weight:600;line-height:1.15;
+  color:var(--ox-blue);font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cp-stat-l{
+  font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);
+}
+.cp-dot{ color:var(--line); }   /* still worn by the invite-link meta rows */
 
-.cp-acts{ display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:14px; }
+.cp-acts{ display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:18px; }
 /* The subscribed button swaps its label on hover — a control that still says
    "Subscribed" while clicking it unsubscribes you is the oldest trap in this
    pattern. Same mechanism as the discovery card's .cn-btn.on. */
@@ -180,20 +244,23 @@
 }
 .cp-note b{ color:var(--gold-deep); }
 
+/* Inside the card now, so the card's gutters do the framing. fit-content
+   keeps a one-line RTL description snug at the inline start instead of
+   drifting across the full column. */
 .cp-desc{
-  margin:16px 0 0;font-size:15px;line-height:1.65;color:var(--ink-soft);
-  max-width:68ch;
+  margin:16px 24px 0;font-size:15px;line-height:1.7;color:var(--ink-soft);
+  max-width:68ch;width:fit-content;
 }
 
-.cp-badges{ display:flex;flex-wrap:wrap;gap:6px;margin-top:14px; }
+.cp-badges{ display:flex;flex-wrap:wrap;gap:6px;margin:14px 24px 0; }
 .cp-badge{
   display:inline-flex;align-items:center;gap:5px;
-  border:1px solid var(--line);background:var(--card);
+  border:1px solid var(--line-soft);background:var(--paper-2);
   border-radius:999px;padding:4px 11px;font-size:11.5px;color:var(--ink-soft);
 }
-/* The icon carries the brass, the words stay in ink — a full gold chip per
+/* The icon carries the accent, the words stay in ink — a full sky chip per
    policy would shout six times over for settings that are merely facts. */
-.cp-badge .ico{ color:var(--gold-deep);width:13px;height:13px; }
+.cp-badge .ico{ color:var(--ox-blue-link);width:13px;height:13px; }
 
 /* Section heads carry an editorial rule — the serif title, then a hairline
    running to the actions, the way the app's other mastheads close a heading.
@@ -207,6 +274,9 @@
   content:"";flex:1;order:1;height:1px;
   background:linear-gradient(90deg,var(--line) 0%,var(--line-soft) 70%,transparent 100%);
 }
+[dir="rtl"] .cp-section-head::after{
+  background:linear-gradient(-90deg,var(--line) 0%,var(--line-soft) 70%,transparent 100%);
+}
 .cp-head-acts{ order:2;display:flex;gap:6px; }
 .cp-h2{
   margin:0;font-family:var(--serif);font-size:18px;font-weight:600;color:var(--navy-deep);
@@ -218,28 +288,48 @@
   font-variant-numeric:tabular-nums;
 }
 
-.cp-about{ margin-top:32px; }
-/* Index-style facts: small-caps keys, a dotted leader running to the value —
-   the reference-book idiom the Warm Archive is built around. The leader is a
-   bordered flex spacer, so RTL and long keys both just work. */
-.cp-facts{ margin:14px 0 0;display:grid;gap:0; }
+.cp-about{ margin-top:30px; }
+/* Index-style facts on a proper plate: iconed small-caps keys, a DOTTED
+   LEADER running to the value — the reference-book idiom the archive is
+   built around. The leader is the row's ::before flex-ordered between key
+   and value (order 0 · 1 · 2), so RTL and long keys both just work, and no
+   extra markup is spent on ornament. */
+.cp-facts{
+  margin:14px 0 0;display:grid;gap:0;
+  border:1px solid var(--line-soft);border-radius:var(--r-lg);
+  background:var(--card);box-shadow:var(--shadow-sm);
+  overflow:hidden;
+}
 .cp-facts > div{
-  display:flex;gap:12px;align-items:baseline;
-  padding:9px 2px;font-size:13.5px;
+  display:flex;align-items:baseline;
+  padding:12px 16px;font-size:13.5px;
 }
 .cp-facts > div + div{ border-top:1px solid var(--line-soft); }
+.cp-facts > div::before{
+  content:"";order:1;flex:1;min-width:28px;
+  border-block-end:1px dotted var(--ox-stone-strong);
+  align-self:center;margin-inline:12px;transform:translateY(2px);
+}
 .cp-facts dt{
-  flex:0 0 auto;color:var(--muted);
+  order:0;flex:0 0 auto;
+  display:inline-flex;align-items:center;gap:7px;
+  color:var(--muted);
   font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;
 }
+/* keys align with each other even though icons vary — the icon is a fixed slot */
+.cp-facts dt .ico{ width:14px;height:14px;flex:0 0 auto;color:var(--ox-blue-link); }
 .cp-facts dd{
-  flex:1;margin:0;color:var(--ink-soft);text-align:end;
+  order:2;flex:0 1 auto;margin:0;
+  color:var(--ink);font-weight:500;text-align:end;
   overflow-wrap:anywhere;
 }
 .cp-link{
   border:0;background:transparent;padding:0;cursor:pointer;
-  color:var(--gold-deep);font:inherit;text-decoration:underline;text-underline-offset:2px;
+  color:var(--ox-blue-link);font:inherit;font-weight:600;
+  text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--ox-sky);
+  transition:color .14s ease;
 }
+.cp-link:hover{ color:var(--ox-blue);text-decoration-color:currentColor; }
 .cp-open{ margin-top:18px; }
 
 /* =========================================================
@@ -418,12 +508,27 @@
 /* Layered, not replaced — see the note on `.cp-cover`. In this panel it also
    means the buttons keep a legible backdrop while a freshly picked image is
    still uploading. */
+/* Same flexible plate as the profile masthead, on a shorter leash — this one
+   lives inside a panel, so the preview shows the whole picture without the
+   modal turning into a scroll. */
 .cm-art-cover.has-img{
   background-image:var(--cover),linear-gradient(135deg,var(--t,var(--navy)) 0%,var(--navy-deep) 100%);
+  width:100%;
+  height:auto;
+  aspect-ratio:var(--cover-ar,600/128);
+  min-height:110px;
+  max-height:340px;
+  background-size:contain,cover;
 }
 .cm-art-cover.has-img::before{ display:none; }
 
-.cm-art-acts{ display:flex;gap:6px; }
+.cm-art-acts{ display:flex;gap:6px;position:relative;z-index:1; }
+/* the whole plate is a hit area for "show me this picture", laid UNDER the
+   edit chips and the camera seal so those keep their own clicks */
+.cm-art-open{
+  position:absolute;inset:0;z-index:0;
+  border:0;background:transparent;cursor:zoom-in;border-radius:inherit;
+}
 /* glass chips over the cover — legible on the gradient AND on any photo */
 .cm-art-btn{
   display:inline-flex;align-items:center;gap:6px;
@@ -467,7 +572,7 @@
 }
 /* the camera seal on the avatar's corner — the one obvious "change me" */
 .cm-art-cam{
-  position:absolute;inset-block-end:-6px;inset-inline-end:-6px;
+  position:absolute;z-index:1;inset-block-end:-6px;inset-inline-end:-6px;
   width:28px;height:28px;border-radius:50%;cursor:pointer;
   display:grid;place-items:center;
   background:var(--navy);color:#f2f0f0;
@@ -1243,21 +1348,27 @@
 }
 
 @media(max-width:720px){
-  .cp-cover{ height:150px;border-radius:var(--r); }
+  .cp-hero{ border-radius:var(--r-lg); }
+  .cp-cover{ height:156px; }
   /* Same rule as desktop: the negative offset rides the AVATAR, never the
      row — the title must stay off the cover at every width. */
-  .cp-ident{ margin:0 12px;gap:12px; }
-  .cp-avatar{ width:76px;height:76px;border-radius:18px;margin-top:-36px; }
+  .cp-ident{ padding:0 14px;gap:12px; }
+  .cp-avatar{ width:84px;height:84px;border-radius:20px;margin-top:-38px; }
+  .cp-avatar .avatar{ border-radius:16px; }
   .cp-ident-body{ padding-top:10px; }
-  .cp-acts{ padding-top:6px; }
-  .cp-crest{ font-size:32px; }
-  .cp-title{ font-size:21px; }
-  .cp-acts{ width:100%;padding-top:4px; }
+  .cp-crest{ font-size:34px; }
+  .cp-title{ font-size:22px; }
+  .cp-acts{ width:100%;padding-top:8px; }
   .cp-acts .btn{ flex:1; }
+  .cp-desc{ margin:14px 14px 0; }
+  .cp-badges{ margin:12px 14px 0; }
+  .cp-stats{ margin-top:16px; }
+  .cp-stat{ padding:11px 14px; }
+  .cp-stat b{ font-size:17px; }
   /* Stacked, the pair reads as a definition list — key above, value below,
-     BOTH start-aligned. Keeping the desktop's end-aligned value while stacked
-     left the two lines ragged against each other. */
-  .cp-facts > div{ display:grid;gap:3px; }
+     BOTH start-aligned; the dotted leader has nothing to bridge and goes. */
+  .cp-facts > div{ display:grid;gap:4px;padding:11px 14px; }
+  .cp-facts > div::before{ content:none; }
   .cp-facts dt{ flex:none; }
   .cp-facts dd{ text-align:start; }
 

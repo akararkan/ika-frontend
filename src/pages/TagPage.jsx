@@ -49,7 +49,10 @@ export function TagPage() {
         if (!alive) return
         setRows(items)
         setCursor(nextCursor || '')
-        setHasMore(!!nextCursor || items.length >= PAGE_SIZE)
+        /* Trust the CURSOR, never the page length. A full page with an empty
+           cursor is the last page — guessing "more" from `length >= PAGE_SIZE`
+           makes Load more re-request the same head page and append duplicates. */
+        setHasMore(!!nextCursor)
       })
       .catch(() => { if (alive) setRows([]) })
       .finally(() => { if (alive) setLoading(false) })
@@ -59,13 +62,13 @@ export function TagPage() {
   }, [tag])
 
   const loadMore = async () => {
-    if (more || !hasMore) return
+    if (more || !hasMore || !cursor) return
     setMore(true)
     try {
-      const { items, nextCursor } = await api.tags.content(tag, { pageSize: PAGE_SIZE, cursor: cursor || undefined })
+      const { items, nextCursor } = await api.tags.content(tag, { pageSize: PAGE_SIZE, cursor })
       setRows(prev => [...prev, ...items])
       setCursor(nextCursor || '')
-      setHasMore(!!nextCursor || items.length >= PAGE_SIZE)
+      setHasMore(!!nextCursor)
     } catch { /* ignore */ }
     finally { setMore(false) }
   }

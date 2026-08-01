@@ -14,6 +14,28 @@
   border:1px solid var(--line);
 }
 .prof-cover-grad{background:linear-gradient(120deg,#00172f,#002147 55%,#1f4e7e)}
+/* With a photo the plate becomes FLEXIBLE: it takes the picture's own
+   proportions (`--cover-ar`, measured from the decoded image — see
+   lib/useImageRatio.js) and contains it, so an upload is shown whole instead of
+   cropped to a strip. Clamped at both ends so a portrait cannot take over the
+   page and a panorama cannot collapse; whatever band a clamp leaves is filled
+   by the navy gradient LAYERED BEHIND the photo — which is also what stands in
+   if the image never loads. */
+.prof-cover.has-img{
+  /* width:100% — without it a bound max-height would shrink the box sideways to
+     keep the ratio, and the cover would pull away from the column's edge. */
+  width:100%;
+  height:auto;
+  aspect-ratio:var(--cover-ar,1000/148);
+  min-height:120px;
+  max-height:min(56vh,520px);
+}
+.prof-cover.has-img .prof-cover-grad{
+  background-image:var(--cover),linear-gradient(120deg,#00172f,#002147 55%,#1f4e7e);
+  background-size:contain,cover;
+  background-position:center;
+  background-repeat:no-repeat;
+}
 /* default (no photo): navy gradient + faint gold diagonal stripes */
 .prof-cover-pattern{
   background:
@@ -156,6 +178,67 @@ a.pa-fact:hover{color:var(--navy)}
 .set-item.on .ico{color:#b9d6f2}
 
 .set-avatar-row{border:1px dashed #c2c1bf;border-radius:12px;background:var(--paper-2)}
+
+/* ---------- knowledge taxonomy pickers (Taxonomy.jsx) ----------
+   Chips carry the profile's ORDER, so the ordinal is part of the chip rather
+   than a tooltip: replace-all means what you see here is what the profile
+   becomes. Logical properties throughout — an Arabic or Kurdish vocabulary
+   renders right-to-left inside the same widget. */
+.tx-pick{position:relative}
+.tx-chips{
+  display:flex;flex-wrap:wrap;gap:8px;
+  list-style:none;margin:0 0 10px;padding:0;
+}
+.tx-chip{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:5px 6px 5px 10px;border-radius:999px;
+  background:var(--blue-wash);border:1px solid #d7e2ee;color:var(--blue);
+  font-size:12.5px;font-weight:500;cursor:grab;
+  transition:border-color .14s ease,background .14s ease;
+}
+[dir="rtl"] .tx-chip{padding:5px 10px 5px 6px}
+.tx-chip:hover{border-color:var(--blue)}
+.tx-chip:active{cursor:grabbing}
+.tx-ord{
+  min-width:17px;height:17px;border-radius:50%;
+  display:inline-grid;place-items:center;
+  background:var(--navy);color:#f2f0f0;
+  font:600 10px/1 var(--sans);font-variant-numeric:tabular-nums;
+}
+.tx-x{
+  display:inline-flex;padding:3px;border:0;border-radius:50%;
+  background:transparent;color:inherit;cursor:pointer;
+}
+.tx-x:hover{background:rgba(0,33,71,.12)}
+.tx-x:disabled{opacity:.45;cursor:default}
+
+.tx-field{
+  display:flex;align-items:center;gap:8px;
+  padding:0 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--card);color:var(--muted);
+}
+.tx-field:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
+.tx-input{
+  flex:1;min-width:0;height:40px;
+  border:0;background:transparent;color:var(--ink);font:400 13.5px var(--sans);
+}
+.tx-input:focus{outline:none}
+
+.tx-menu{
+  position:absolute;z-index:40;inset-inline:0;
+  margin-top:6px;max-height:264px;overflow:auto;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 18px 40px -18px rgba(15,21,32,.4);
+}
+.tx-opt{
+  display:flex;align-items:baseline;gap:10px;width:100%;
+  padding:9px 12px;border:0;background:transparent;cursor:pointer;
+  text-align:start;font-size:13.5px;color:var(--ink);
+}
+.tx-opt:hover,.tx-opt:focus-visible{background:var(--blue-wash)}
+.tx-opt small{margin-inline-start:auto;font-size:11.5px;text-align:end}
+.tx-note{padding:12px;color:var(--muted);font-size:12.5px}
+.tx-hint{margin-top:7px}
 
 /* toggles → prototype .tgl: navy on-track, 42×24 */
 .sw{width:42px;height:24px;background:#c2c1bf;transition:background .16s ease,box-shadow .16s ease}

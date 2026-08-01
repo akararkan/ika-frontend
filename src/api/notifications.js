@@ -170,7 +170,9 @@ export const notifications = {
    · `notification` re-delivers aggregated rows under the SAME id —
      upsert, never append; `read`/`deleted` carry {ids, allRead,
      deleted} for cross-tab sync (purge-read = deleted with EMPTY ids
-     + allRead:true → drop every read row).
+     + allRead:true → drop every read row);
+   · `onFeedNewPost` is the home feed's own tap on this socket
+     (FEED_API §5) — see the FEED_NEW_POST note in sharedConnect.
    ========================================================= */
 
 const sharedSubs = new Set()
@@ -197,6 +199,23 @@ function sharedConnect() {
   es.addEventListener('connected', (e) => { beat(); fan('onConnected', parse(e)) })
   es.addEventListener('heartbeat', beat)
   es.addEventListener('notification', (e) => { beat(); fan('onNotification', notifFrom(parse(e))) })
+  /* FEED_NEW_POST — the home feed's prepend HINT, multiplexed onto this same
+     socket (FeedRealtimeSubscriber bridges the per-user `irc:feed:*` Redis
+     channel onto the notification emitter and forwards the payload under its
+     own event NAME). So it is a named SSE event, not a `notification` row:
+
+       event: FEED_NEW_POST
+       data:  { event, postId, authorId }
+
+     A real inbox row is still delivered separately for the same post (the
+     POST_NEW notification kind) — which is exactly why this must NOT be fanned
+     to `onNotification` as well, or every new post would be counted twice and
+     chimed twice. The feed takes it here and shows a quiet "New posts" pill. */
+  es.addEventListener('FEED_NEW_POST', (e) => {
+    beat()
+    const d = parse(e)
+    fan('onFeedNewPost', { postId: d?.postId || null, authorId: d?.authorId || null })
+  })
   es.addEventListener('unread-count', (e) => { beat(); fan('onUnreadCount', parse(e).count ?? 0) })
   es.addEventListener('read', (e) => { beat(); fan('onRead', parse(e)) })
   es.addEventListener('deleted', (e) => { beat(); fan('onDeleted', parse(e)) })

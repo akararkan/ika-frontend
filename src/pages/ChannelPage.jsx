@@ -29,6 +29,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Icon, Avatar, showToast, Verify } from '../components/ui.jsx'
 import { Loader, ErrorState, EmptyState } from '../components/states.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
+import { useImageViewer } from '../components/ImageLightbox.jsx'
+import { useImageRatio, coverStyle } from '../lib/useImageRatio.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
@@ -70,6 +72,8 @@ export function ChannelPage() {
   const [busy, setBusy] = React.useState(false)
   const [managing, setManaging] = React.useState(false)
   const [reload, setReload] = React.useState(0)
+  const { openable, viewer } = useImageViewer()   // cover + channel photo open full-screen
+  const coverAr = useImageRatio(ch?.coverUrl)     // the plate takes the cover's own shape
 
   React.useEffect(() => {
     let alive = true
@@ -184,22 +188,27 @@ export function ChannelPage() {
               — the stylesheet layers it over the derived gradient, so a cover
               that fails to load degrades to the channel's own art instead of a
               bare box. See the note on `.cp-cover`. */}
-          <div className={'cp-cover' + (ch.coverUrl ? ' has-img' : '')}
-            style={ch.coverUrl ? { '--cover': `url("${encodeURI(ch.coverUrl)}")` } : undefined}>
+          <div {...openable(ch.coverUrl, { className: 'cp-cover' + (ch.coverUrl ? ' has-img' : ''), label: `Cover art of ${ch.title}` })}
+            style={coverStyle(ch.coverUrl, coverAr)}>
             {!ch.coverUrl && <Icon name="broadcast" className="cp-cover-mark"/>}
             <div className="cp-cover-scrim" aria-hidden="true"/>
           </div>
 
           <div className="cp-ident">
-            <div className="cp-avatar">
+            <div {...openable(ch.avatarUrl, { className:'cp-avatar', label:`Photo of ${ch.title}` })}>
               {ch.avatarUrl
                 ? <Avatar size={96} src={ch.avatarUrl} initials={crestOf(ch)}/>
                 : <span className="cp-crest" aria-hidden="true">{crestOf(ch)}</span>}
             </div>
 
             <div className="cp-ident-body">
-              <h1 className="cp-title" dir="auto">
-                {ch.title}
+              {/* NO dir="auto" on the h1 — it is a flex row (title + verify
+                  seal) and dir on a flex row strands an RTL title against the
+                  action buttons at the far edge (the documented header-strand
+                  trap). The <bdi> gives the TEXT its own direction; the box
+                  stays fit-content at the inline start, under the avatar. */}
+              <h1 className="cp-title">
+                <bdi>{ch.title}</bdi>
                 {/* Platform-granted, never owner-settable — so it is rendered
                     with the same component the rest of the app uses for a
                     verified person, not a channel-only lookalike. */}
@@ -207,20 +216,13 @@ export function ChannelPage() {
               </h1>
               <div className="cp-sub">
                 {ch.handle
-                  ? <span className="cp-handle">@{ch.handle}</span>
+                  ? <span className="cp-handle"><bdi dir="ltr">@{ch.handle}</bdi></span>
                   : <span className="cp-handle muted"><Icon name="lock" className="xs"/>Private channel</span>}
                 {ch.category && (
                   <button className="cp-cat" onClick={() => navigate(`/channels?category=${encodeURIComponent(ch.category)}`)}>
-                    {ch.category}
+                    <Icon name="hash" className="xs"/><bdi>{ch.category}</bdi>
                   </button>
                 )}
-              </div>
-
-              <div className="cp-stats">
-                <span><b>{nfmt(ch.subscriberCount)}</b> {ch.subscriberCount === 1 ? 'subscriber' : 'subscribers'}</span>
-                <span className="cp-dot">·</span>
-                <span><b>{nfmt(ch.postCount)}</b> {ch.postCount === 1 ? 'post' : 'posts'}</span>
-                {ch.createdAt && <><span className="cp-dot">·</span><span>since {dateLabel(ch.createdAt)}</span></>}
               </div>
             </div>
 
@@ -256,6 +258,30 @@ export function ChannelPage() {
               )}
             </div>
           </div>
+
+          {ch.description && <p className="cp-desc" dir="auto">{ch.description}</p>}
+          <SettingBadges ch={ch}/>
+
+          {/* The ledger foot: the three numbers every visitor came to check,
+              set as an indexed strip rather than a murmured inline row. Value
+              first, then the small-caps label — a screen reader announces
+              "2, subscribers" in that order too. */}
+          <div className="cp-stats">
+            <div className="cp-stat">
+              <b>{nfmt(ch.subscriberCount)}</b>
+              <span className="cp-stat-l">{ch.subscriberCount === 1 ? 'subscriber' : 'subscribers'}</span>
+            </div>
+            <div className="cp-stat">
+              <b>{nfmt(ch.postCount)}</b>
+              <span className="cp-stat-l">{ch.postCount === 1 ? 'post' : 'posts'}</span>
+            </div>
+            {ch.createdAt && (
+              <div className="cp-stat">
+                <b>{dateLabel(ch.createdAt)}</b>
+                <span className="cp-stat-l">since</span>
+              </div>
+            )}
+          </div>
         </header>
 
         {ch.pendingJoinRequest && (
@@ -267,9 +293,6 @@ export function ChannelPage() {
             </div>
           </div>
         )}
-
-        {ch.description && <p className="cp-desc" dir="auto">{ch.description}</p>}
-        <SettingBadges ch={ch}/>
 
         {/* ---------- what a non-member is being offered ---------- */}
         {!isMember && (
@@ -292,6 +315,7 @@ export function ChannelPage() {
           onChanged={(next) => setCh(next)}
         />
       )}
+      {viewer}
     </div>
   )
 }
@@ -302,18 +326,31 @@ function ChannelAbout({ ch, onOpen }) {
   const navigate = useNavigate()
   return (
     <section className="cp-about">
-      <h2 className="cp-h2">About this channel</h2>
+      <div className="cp-section-head">
+        <h2 className="cp-h2">About this channel</h2>
+      </div>
+      {/* Subscriber and post counts are NOT repeated here — the hero's ledger
+          foot already carries them a hand-span above; this index holds only
+          the facts a post can't show. */}
       <dl className="cp-facts">
-        <div><dt>Visibility</dt><dd>{ch.publicChannel ? 'Public — anyone can find and subscribe' : 'Private — invite only'}</dd></div>
-        {ch.category && <div><dt>Category</dt><dd>{ch.category}</dd></div>}
-        {ch.settings?.language && <div><dt>Language</dt><dd>{ch.settings.language}</dd></div>}
-        {/* The KEY already says "Subscribers" — repeating the word in the value
-            ("Subscribers … 1.3k subscribers") read like a stutter. The value is
-            just the figure. */}
-        <div><dt>Subscribers</dt><dd>{nfmt(ch.subscriberCount)}</dd></div>
-        <div><dt>Posts</dt><dd>{nfmt(ch.postCount)}</dd></div>
         <div>
-          <dt>Comments</dt>
+          <dt><Icon name={ch.publicChannel ? 'globe' : 'lock'} className="xs"/>Visibility</dt>
+          <dd>{ch.publicChannel ? 'Public — anyone can find and subscribe' : 'Private — invite only'}</dd>
+        </div>
+        {ch.category && (
+          <div>
+            <dt><Icon name="hash" className="xs"/>Category</dt>
+            <dd><bdi>{ch.category}</bdi></dd>
+          </div>
+        )}
+        {ch.settings?.language && (
+          <div>
+            <dt><Icon name="quote2" className="xs"/>Language</dt>
+            <dd>{ch.settings.language}</dd>
+          </div>
+        )}
+        <div>
+          <dt><Icon name="comment" className="xs"/>Comments</dt>
           <dd>
             {ch.linkedGroupId
               ? <button className="cp-link" onClick={() => navigate(`/chat/${ch.linkedGroupId}`)}>

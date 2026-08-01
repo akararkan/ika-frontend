@@ -90,13 +90,16 @@
   border-radius:16px;
   color:#f2f0f0;box-shadow:none;
 }
+/* The action on the dark plate is the BRIGHT thing — Oxford cerulean carrying
+   Oxford Blue, the way ox.ac.uk puts its button inside a navy card. It was a
+   white disc, which reads as chrome rather than as the thing to press. */
 .vnp-play{
   width:48px;height:48px;
-  background:linear-gradient(160deg,#ffffff,#dce9f6);color:#00172f;
+  background:var(--ox-cerulean);color:var(--ox-blue);
   box-shadow:0 8px 18px -8px rgba(0,0,0,.5);
 }
-.vnp-play:hover{transform:scale(1.05)}
-.vnp-play .ico{width:20px;height:20px;fill:#00172f}
+.vnp-play:hover{transform:scale(1.05);background:var(--ox-cerulean-lift)}
+.vnp-play .ico{width:20px;height:20px;fill:var(--ox-blue)}
 .vnp-play.playing{animation:wf-voice-pulse 2s ease-out infinite}
 .vnp-wave{height:44px}
 .vnp-wave i{background:rgba(185,214,242,.30)}        /* rest bars — ghost sky  */
@@ -247,8 +250,9 @@
 .cm-voice{background:linear-gradient(165deg,var(--navy-deep),var(--navy));border:1px solid var(--navy-deep);border-radius:14px;color:#dce9f6}
 .cv-pill{background:rgba(255,255,255,.14);color:#dce9f6}
 .cv-rec{background:#f0a9a2}
-.cv-btn{background:var(--card);color:var(--navy);box-shadow:0 8px 20px -8px rgba(10,16,26,.5)}
-.cv-btn:hover{background:var(--paper-2)}
+/* record/stop, on the navy recorder panel — same on-dark rule as .vnp-play */
+.cv-btn{background:var(--ox-cerulean);color:var(--ox-blue);box-shadow:0 8px 20px -8px rgba(10,16,26,.5)}
+.cv-btn:hover{background:var(--ox-cerulean-lift)}
 /* footer */
 .cm-publish{border-radius:999px;padding:0 20px}
 .cm-footbar{border-top:1px solid var(--line-soft);background:var(--paper-2)}
@@ -314,11 +318,134 @@
 .share-sheet .dlg-ic{background:var(--blue-wash);color:var(--navy)}   /* base hard-codes a red wash */
 .share-sheet .share-act:hover{background:var(--card-2);border-color:var(--blue);transform:translateY(-1px)}
 
+/* =============================================================
+   RANKED FEED — the surfaces the recommendation pipeline added
+   -------------------------------------------------------------
+   Three new things can appear in the home timeline, and each one
+   has to be legible as ITSELF or the ranking reads as a bug:
+
+     · a CHANNEL_POST card   — signed by a channel, not a person
+     · a "Suggested for you" caption on an EXPLORE post
+     · the "New posts" pill  — a ranked feed cannot prepend
+
+   These classes are new to the app, so unlike the rest of this
+   sheet they carry their own structure as well as their colour.
+   ============================================================= */
+
+/* ---------- Channel broadcast card ---------- */
+/* Deliberately quieter than a post card: no lift, no rubric hairline. A
+   broadcast is an artefact of a channel you already chose to subscribe to,
+   and the ranker damps it (×0.90) precisely so it cannot shout over the
+   social graph — the card should not undo that in pixels. */
+.fch-card{
+  position:relative;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:16px 18px;
+  box-shadow:var(--shadow-sm);cursor:pointer;
+  transition:border-color .2s ease;
+}
+.fch-card:hover{border-color:var(--blue)}
+.fch-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+.fch-head{display:flex;align-items:center;gap:11px}
+/* The crest wears the channel's own `tint-N` (--t ink, --tw wash) so the same
+   channel looks identical here, on the channels grid and in manage. */
+.fch-crest{
+  width:40px;height:40px;flex:none;border-radius:11px;
+  display:grid;place-items:center;overflow:hidden;
+  border:1px solid var(--line-soft);
+  background:var(--tw,var(--blue-wash));color:var(--t,var(--navy));
+  font-family:var(--serif);font-size:18px;font-weight:600;line-height:1;
+}
+.fch-crest img{width:100%;height:100%;object-fit:cover;display:block}
+.fch-who{flex:1;min-width:0}
+.fch-name{display:flex;align-items:center;gap:6px;font-size:14.5px;color:var(--ink);flex-wrap:wrap}
+.fch-name b{font-weight:600;transition:color .14s}
+.fch-name.lk:hover b{color:var(--navy)}
+.fch-sub{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px;
+  font-size:12px;font-weight:500;color:var(--muted);
+}
+.fch-dot{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.55;flex:none}
+
+.fch-body{
+  margin-top:12px;
+  font-family:var(--sans);font-size:15px;line-height:1.65;color:var(--ink-2);
+  overflow-wrap:anywhere;
+}
+.fch-body:dir(rtl){font-family:var(--arabic);font-size:18px;line-height:1.8}
+
+.fch-media{
+  margin-top:12px;overflow:hidden;
+  border:1px solid var(--line);border-radius:11px;background:var(--card-2);
+}
+.fch-media img{width:100%;height:100%;object-fit:cover;display:block}
+
+.fch-foot{
+  display:flex;align-items:center;gap:16px;
+  margin-top:14px;padding-top:11px;border-top:1px solid var(--line-soft);
+  font-size:12.5px;font-weight:500;color:var(--muted);
+  font-variant-numeric:tabular-nums;
+}
+.fch-foot span{display:inline-flex;align-items:center;gap:5px}
+.fch-foot .ico{stroke:var(--muted);opacity:.85}
+/* the base .fx-cta pins itself with margin-left — restate it logically */
+.fch-foot .fx-cta{margin-left:0;margin-inline-start:auto}
+
+/* the third kind badge, beside .research and .question */
+.fx-badge.channel{
+  color:var(--navy);background:var(--blue-wash);
+  border:1px solid rgba(0,33,71,.22);
+  margin-inline-start:auto;flex:none;
+}
+
+/* ---------- "Suggested for you" — the EXPLORE slice ---------- */
+/* Sits INSIDE the post card, above its header, so the label can never drift
+   away from the post it qualifies while the list re-ranks around it. */
+.pc-src{
+  display:flex;align-items:center;gap:8px;
+  padding:11px 16px 0;
+  font-size:12px;font-weight:600;letter-spacing:.2px;color:var(--gold-deep);
+}
+.pc-src .ico{stroke:var(--gold)}
+.pc-src .btn{margin-inline-start:auto;padding-inline:14px}
+.post-card.is-explore{border-color:var(--line)}
+.post-card.is-explore .pc-head{padding-top:8px}
+
+/* ---------- "New posts" pill ---------- */
+/* Centred over the list rather than pinned to the viewport: the feed only
+   learns about new posts, it does not receive them, so this is an invitation
+   to refetch — not a live counter that has to stay on screen. */
+/* On --emerald, NOT --navy: `--navy` inverts to Sky on the dark theme (it
+   means "the accent", not "a dark blue"), which would put near-white text on
+   a near-white pill. --emerald is the token that stays button-capable in both
+   themes — the same one .btn-primary rides. */
+.feed-fresh{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  width:max-content;max-width:100%;margin:2px auto 0;
+  padding:8px 18px;border-radius:999px;
+  border:1px solid var(--emerald);background:var(--emerald);color:#fff;
+  font-size:13px;font-weight:600;letter-spacing:.2px;cursor:pointer;
+  box-shadow:0 10px 22px -12px rgba(0,33,71,.7);
+  transition:background-color .15s,transform .15s;
+}
+.feed-fresh:hover{background:var(--emerald-deep);border-color:var(--emerald-deep);transform:translateY(-1px)}
+.feed-fresh .ico{stroke:currentColor}
+@media(prefers-reduced-motion:reduce){
+  .feed-fresh:hover{transform:none}
+}
+
 /* =============== Mobile guard (base breakpoint) =============== */
 /* keep the compose textarea ≥16px on phones so iOS doesn't zoom on focus
    (the base's own ≤720px rule is order-beaten by our top-level override) */
 @media(max-width:720px){
   .cm-area{font-size:16.5px;line-height:1.6}
+  /* the ranked-feed surfaces tighten with the rest of the timeline */
+  .fch-card{padding:14px 14px;border-radius:12px}
+  .fch-body{font-size:14.5px}
+  .fch-foot{gap:12px;font-size:12px}
+  .pc-src{padding:10px 12px 0;font-size:11.5px}
+  .feed-fresh{font-size:12.5px;padding:7px 15px}
 }
 
 /* =============== Motion guard =============== */

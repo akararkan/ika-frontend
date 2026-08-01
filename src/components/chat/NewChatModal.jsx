@@ -95,7 +95,7 @@ export function NewChatModal({ onClose, onCreated, mode = 'new', conversation })
     let alive = true
     setSearching(true)
     const t = setTimeout(() => {
-      const run = needle ? api.users.search(needle, { size: 20 }) : api.users.suggestions({ limit: 20 })
+      const run = needle ? api.users.searchList(needle, { size: 20 }) : api.users.suggestions({ limit: 20 })
       Promise.resolve(run)
         .then(rows => { if (alive) setResults(rows || []) })
         .catch(() => { if (alive) setResults([]) })
