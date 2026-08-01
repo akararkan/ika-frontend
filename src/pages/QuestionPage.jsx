@@ -10,6 +10,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, fmt, linkify, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
+import { openReport } from '../components/ReportDialog.jsx'
 import { uiPrompt, uiConfirm } from '../components/Dialog.jsx'
 import { SourceRow } from '../components/Source.jsx'
 import { AddSourceForm } from '../components/SourceForm.jsx'
@@ -486,6 +487,7 @@ export function QuestionPage() {
             <button className={'btn btn-sm ' + (q.saved ? 'btn-primary' : 'btn-secondary')} onClick={save}><Icon name="bookmark" className="xs"/>{q.saved ? 'Saved' : 'Save'}</button>
             <button className="btn btn-secondary btn-sm" title="Save to a collection" onClick={saveToCollection}><Icon name="pin" className="xs"/>Collection</button>
             <button className="btn btn-secondary btn-sm" onClick={share}><Icon name="share" className="xs"/>Share</button>
+            {!isAuthor && <button className="btn btn-secondary btn-sm" onClick={() => openReport({ targetType:'QUESTION', targetId:id, targetLabel:'this question' })}><Icon name="flag" className="xs"/>Report</button>}
             {isAuthor && !editingQ && <>
               <button className="btn btn-secondary btn-sm" onClick={startEditQ}><Icon name="compose" className="xs"/>Edit</button>
               <button className="btn btn-secondary btn-sm" onClick={toggleLock}><Icon name="lock" className="xs"/>{q.answersLocked ? 'Unlock' : 'Lock'}</button>
@@ -561,6 +563,7 @@ export function QuestionPage() {
                 {own && !editing && <button className="btn btn-secondary btn-sm" onClick={() => startEditA(a)}><Icon name="compose" className="xs"/>Edit</button>}
                 {own && <button className={'btn btn-secondary btn-sm ' + (openManage[a.id] ? 'on-brass' : '')} onClick={() => toggleManage(a)}><Icon name="book" className="xs"/>Sources &amp; files</button>}
                 {own && <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={() => deleteA(a)}><Icon name="close" className="xs"/>Delete</button>}
+                {!own && <button className="btn btn-secondary btn-sm" onClick={() => openReport({ targetType:'ANSWER', targetId:a.id, targetLabel:'this answer' })}><Icon name="flag" className="xs"/>Report</button>}
                 {isAuthor && (
                   <button className={'btn btn-sm ans-accept ' + (a.accepted ? 'btn-secondary' : 'btn-primary')} onClick={() => accept(a)}>
                     <Icon name="check" className="xs"/>{a.accepted ? 'Accepted' : 'Accept'}

@@ -1,9 +1,17 @@
 /* =========================================================
-   Settings page — /settings
-   Profile / Account / Privacy / Close friends (live) /
-   Notifications / Blocked / Security / Verification.
+   Settings — /settings/:tab (deep-linkable)
+   The full settings surface over the backend Settings module:
+   profile & cosmetics, the privacy resolver, audiences, muted
+   & keywords, presence, discovery/QR, the notification matrix
+   + DND, messages & media cosmetics, storage, security (2FA,
+   sessions, login history), data export & deletion, the
+   Safety Center, and app policies. The side nav is grouped;
+   each tab is a stack of cards. Panels for the new module
+   live in ../components/settings/*; the pre-module panels
+   (profile, close friends, email prefs…) remain below.
    ========================================================= */
 import React from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Icon, Avatar, showToast } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { EmptyState, Loader } from '../components/states.jsx'
@@ -11,6 +19,21 @@ import { useImageViewer } from '../components/ImageLightbox.jsx'
 import { SpecializationPicker, MadhhabSelect } from '../components/Taxonomy.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
+import { AppearancePanel, AccessibilityPanel } from '../components/settings/AppearancePanel.jsx'
+import { PrivacyPanel } from '../components/settings/PrivacyPanel.jsx'
+import { AudiencePanel } from '../components/settings/AudiencePanel.jsx'
+import { MutedPanel, KeywordsPanel } from '../components/settings/MutedPanel.jsx'
+import { PresencePanel, DiscoveryPanel } from '../components/settings/PresencePanel.jsx'
+import { NotificationsMatrixPanel, DndPanel, PushTokensPanel } from '../components/settings/NotificationsPanel.jsx'
+import { MessagesPanel } from '../components/settings/MessagesPanel.jsx'
+import { MediaPanel, StoragePanel } from '../components/settings/MediaStoragePanel.jsx'
+import { TwoFactorPanel, PhonePanel, SecurityScorePanel } from '../components/settings/SecurityExtraPanel.jsx'
+import { SessionsPanel, LoginHistoryPanel } from '../components/settings/SessionsPanel.jsx'
+import { DataExportPanel, DangerZonePanel } from '../components/settings/DataPanel.jsx'
+import { SafetyReportsPanel, StrikesPanel } from '../components/settings/SafetyPanel.jsx'
+import { AboutPanel } from '../components/settings/AboutPanel.jsx'
+import { ConsentPanel } from '../components/settings/ConsentPanel.jsx'
+import { MediaLabPanel } from '../components/settings/MediaLabPanel.jsx'
 
 /* Platform enums (USER_API §5.3-5.4) + a label helper shared by the link/contact editors. */
 const LINK_PLATFORMS = ['PERSONAL_WEBSITE','TWITTER','GITHUB','LINKEDIN','ORCID','GOOGLE_SCHOLAR','RESEARCHGATE','YOUTUBE','FACEBOOK','INSTAGRAM','TELEGRAM','OTHER']
@@ -406,6 +429,17 @@ function SecurityPanel() {
    for exactly the user who most wants it. */
 function ContactMatchingPanel() {
   const [busy, setBusy] = React.useState(false)
+  /* The consent ledger's answer for this scope (§14). It is evidence, not a
+     gate — the delete below stays unconditional either way. */
+  const [granted, setGranted] = React.useState(null)
+  React.useEffect(() => {
+    let alive = true
+    api.settings.consent.state('CONTACTS')
+      .then(s => { if (alive) setGranted(!!s?.granted) })
+      .catch(() => { if (alive) setGranted(null) })
+    return () => { alive = false }
+  }, [])
+
   const wipe = async () => {
     const ok = await uiConfirm({
       title: 'Delete uploaded contacts?',
@@ -414,7 +448,10 @@ function ContactMatchingPanel() {
     })
     if (!ok) return
     setBusy(true)
-    try { await api.users.contacts.clear(); showToast('Uploaded contacts deleted') }
+    /* The spec-named alias (DELETE /api/v1/contacts/sync) — same purge as the
+       older /users/contacts route, but it also writes the consent-withdrawal
+       event, which is the whole point of having a consent ledger. */
+    try { await api.settings.contactsSync.clear(); setGranted(false); showToast('Uploaded contacts deleted') }
     catch { showToast('Could not delete uploaded contacts') }
     finally { setBusy(false) }
   }
@@ -430,6 +467,14 @@ function ContactMatchingPanel() {
         This is separate from the <b>Contacts</b> card in the Profile tab, which lists contact
         methods you choose to show on your public profile.
       </p>
+      {granted !== null && (
+        <div className="stx-row" style={{ marginTop:8 }}>
+          <div><b>Consent on record</b><small>What the server has logged for contact matching.</small></div>
+          <span className={'stx-chip ' + (granted ? 'ok' : 'plain')}>
+            <Icon name={granted ? 'check' : 'close'}/>{granted ? 'Granted' : 'Not granted'}
+          </span>
+        </div>
+      )}
       <div className="set-toggle" style={{ marginTop:10 }}>
         <div><b>Delete uploaded contacts</b><small className="muted">Erase every hash you have uploaded and rebuild suggestions without them.</small></div>
         <button className="btn btn-secondary btn-sm" disabled={busy} onClick={wipe}>
@@ -440,16 +485,75 @@ function ContactMatchingPanel() {
   )
 }
 
+/* ---------- the grouped, routed shell ---------- */
+
+const NAV = [
+  { group: 'Account', items: [
+    ['profile', 'user', 'Profile'],
+    ['appearance', 'sparkle', 'Appearance'],
+  ]},
+  { group: 'Privacy', items: [
+    ['privacy', 'lock', 'Privacy'],
+    ['audience', 'users', 'Audiences'],
+    ['muted', 'mute', 'Muted & hidden'],
+    ['blocked', 'block', 'Blocked'],
+    ['presence', 'eye', 'Presence'],
+    ['discovery', 'globe', 'Discovery'],
+    ['consent', 'checks', 'Permissions'],
+  ]},
+  { group: 'Notifications', items: [
+    ['notifications', 'bell', 'Notifications'],
+    ['emails', 'mail', 'Emails'],
+  ]},
+  { group: 'Chat & media', items: [
+    ['messages', 'message', 'Messages'],
+    ['media', 'image', 'Media & storage'],
+  ]},
+  { group: 'Security', items: [
+    ['security', 'shield', 'Security'],
+    ['sessions', 'clock', 'Sessions'],
+  ]},
+  { group: 'Data & support', items: [
+    ['data', 'download', 'Your data'],
+    ['safety', 'flag', 'Safety Center'],
+    ['about', 'info', 'About'],
+  ]},
+]
+const SLUGS = new Set(NAV.flatMap(g => g.items.map(([slug]) => slug)))
+
 export function SettingsPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const { tab: rawTab } = useParams()
+  const tab = SLUGS.has(rawTab) ? rawTab : 'profile'
   // Hook-phase placeholder only — the render below is guarded on `user`.
   const me = user || { initials:'', avc:'' }
-  const [tab, setTab] = React.useState('PROFILE')
 
   // No invented "@you" identity on the corrupt-cache race — loader instead.
   if (!user) {
     return <div className="main center"><div className="col-main"><Loader label="Loading settings…"/></div></div>
   }
+
+  const body = {
+    profile: <div className="set-stack"><ProfilePanel me={me}/><LinksPanel me={me}/><ContactsPanel me={me}/></div>,
+    appearance: <div className="set-stack"><AppearancePanel/><AccessibilityPanel/></div>,
+    privacy: <PrivacyPanel/>,
+    audience: <div className="set-stack"><CloseFriendsPanel/><AudiencePanel/></div>,
+    muted: <div className="set-stack"><MutedPanel/><KeywordsPanel/><RestrictedPanel/></div>,
+    blocked: <BlockedPanel/>,
+    presence: <PresencePanel/>,
+    discovery: <div className="set-stack"><DiscoveryPanel/><ContactMatchingPanel/></div>,
+    consent: <ConsentPanel/>,
+    notifications: <div className="set-stack"><NotificationsMatrixPanel/><DndPanel/><PushTokensPanel/></div>,
+    emails: <EmailPrefsPanel/>,
+    messages: <MessagesPanel/>,
+    media: <div className="set-stack"><MediaPanel/><MediaLabPanel/><StoragePanel/></div>,
+    security: <div className="set-stack"><SecurityScorePanel/><TwoFactorPanel/><SecurityPanel/><PhonePanel/></div>,
+    sessions: <div className="set-stack"><SessionsPanel/><LoginHistoryPanel/></div>,
+    data: <div className="set-stack"><DataExportPanel/><DangerZonePanel/></div>,
+    safety: <div className="set-stack"><SafetyReportsPanel/><StrikesPanel/></div>,
+    about: <AboutPanel/>,
+  }[tab]
 
   return (
     <div className="main center">
@@ -458,34 +562,20 @@ export function SettingsPage() {
 
         <div className="settings-shell">
           <aside className="set-side">
-            {[
-              ['PROFILE','user','Profile'],
-              ['CLOSE_FRIENDS','users','Close friends'],
-              ['NOTIFICATIONS','bell','Emails'],
-              ['BLOCKED','block','Blocked users'],
-              ['RESTRICTED','eye','Restricted'],
-              ['CONTACT_MATCH','at','Contact matching'],
-              ['SECURITY','shield','Security'],
-            ].map(([k,ic,lab]) => (
-              <button key={k} className={'set-item ' + (tab===k?'on':'')} onClick={() => setTab(k)}><Icon name={ic} className="sm"/>{lab}</button>
+            {NAV.map(({ group, items }) => (
+              <React.Fragment key={group}>
+                <div className="set-group">{group}</div>
+                {items.map(([slug, ic, lab]) => (
+                  <button key={slug} className={'set-item ' + (tab === slug ? 'on' : '')}
+                    onClick={() => navigate(`/settings/${slug}`)}>
+                    <Icon name={ic} className="sm"/>{lab}
+                  </button>
+                ))}
+              </React.Fragment>
             ))}
           </aside>
 
-          <div>
-            {tab==='PROFILE' && (
-              <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-                <ProfilePanel me={me}/>
-                <LinksPanel me={me}/>
-                <ContactsPanel me={me}/>
-              </div>
-            )}
-            {tab==='CLOSE_FRIENDS' && <CloseFriendsPanel/>}
-            {tab==='NOTIFICATIONS' && <EmailPrefsPanel/>}
-            {tab==='BLOCKED' && <BlockedPanel/>}
-            {tab==='RESTRICTED' && <RestrictedPanel/>}
-            {tab==='CONTACT_MATCH' && <ContactMatchingPanel/>}
-            {tab==='SECURITY' && <SecurityPanel/>}
-          </div>
+          <div>{body}</div>
         </div>
       </div>
     </div>

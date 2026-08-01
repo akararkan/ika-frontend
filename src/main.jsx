@@ -20,6 +20,9 @@ import './styles/warm/research.css'
 import './styles/warm/feed.css'
 import './styles/warm/reels.css'
 import './styles/warm/user.css'
+/* Settings v2 widget vocabulary (stx-*) — extends the set-* shell that
+   user.css skins, so it sits right after it and before responsive.css. */
+import './styles/warm/settings.css'
 import './styles/warm/social.css'
 import './styles/warm/chat.css'
 /* chat-extras carries the surfaces chat.css predates — calls, channels, live,
@@ -39,8 +42,19 @@ import './styles/warm/ika-messages-theme.css'
    responsive.css, which keeps the last word on layout. */
 import './styles/warm/channels-pro.css'
 import './styles/warm/responsive.css'
+/* LAST in the warm layer: the client-owned preference appliers (font scale,
+   density, reduced motion, high contrast). Every default state is a no-op, so
+   a user on defaults renders byte-identically — it only bites once someone
+   changes a setting, and it must be able to override everything above. */
+import './styles/warm/prefs.css'
 
 import App from './App.jsx'
+import { applyCachedPrefs } from './lib/prefs.js'
+
+/* Apply the last-known appearance/accessibility choices BEFORE the first
+   paint, so a reload doesn't flash default sizing and then jump. The live
+   values are re-fetched from the server once the session is up (Layout). */
+applyCachedPrefs()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

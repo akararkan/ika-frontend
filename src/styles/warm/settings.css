@@ -1,0 +1,162 @@
+/* =========================================================
+   Settings v2 — the widget vocabulary for the full settings
+   surface (privacy resolver, notification matrix, security,
+   sessions, media/storage, data & safety, about).
+   Prefix: `stx-` (settings-extended). Oxford tokens only —
+   see OXFORD_THEME.md. Reuses the existing `set-*` shell
+   (side nav, grids, toggles) and `.sw` switches from the
+   user styles; everything new lives here.
+   ========================================================= */
+
+/* ---------- side nav: group labels ---------- */
+.set-group{margin:14px 10px 4px;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.set-group:first-child{margin-top:6px}
+
+/* ---------- a tab's vertical card stack ---------- */
+.set-stack{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- section intro line under a card title ---------- */
+.stx-sub{margin:2px 0 14px;font-size:13.5px;color:var(--muted);line-height:1.5;max-width:560px}
+
+/* ---------- segmented pill control (single-choice) ---------- */
+.stx-seg{display:inline-flex;gap:4px;padding:4px;background:var(--ox-off-white);border:1px solid var(--ox-stone-soft);border-radius:999px;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.stx-seg::-webkit-scrollbar{display:none}
+.stx-seg-btn{border:0;background:transparent;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;white-space:nowrap;transition:background .15s ease,color .15s ease}
+.stx-seg-btn:hover{color:var(--ink)}
+.stx-seg-btn.on{background:var(--ox-blue);color:var(--ox-off-white)}
+.stx-seg-btn:disabled{opacity:.5;cursor:default}
+
+/* a labelled setting row whose control is a segmented pill / select */
+.stx-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+.stx-row:first-of-type{border-top:none}
+.stx-row b{display:block;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.stx-row small{display:block;font-size:12.5px;color:var(--muted);line-height:1.4;max-width:420px}
+.stx-row .field{width:auto;min-width:170px}
+
+/* ---------- generic scroll guard for wide content ---------- */
+.stx-scroll{overflow-x:auto;max-width:100%}
+
+/* ---------- notification matrix ---------- */
+.stx-matrix{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+.stx-matrix th{background:var(--ox-off-white);color:var(--ink-soft);font-weight:600;text-align:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;letter-spacing:.02em}
+.stx-matrix th:first-child{text-align:left;border-top-left-radius:8px}
+.stx-matrix th:last-child{border-top-right-radius:8px}
+.stx-matrix td{padding:7px 10px;border-bottom:1px solid var(--line-soft);text-align:center}
+.stx-matrix td:first-child{text-align:left;color:var(--ink);font-weight:500;max-width:280px}
+.stx-matrix td:first-child small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+.stx-matrix tr:hover td{background:var(--ox-wash)}
+.stx-matrix .stx-mgroup td{background:var(--paper-2);color:var(--navy);font-family:var(--serif);font-size:13.5px;font-weight:700;text-align:left;padding-top:12px}
+/* compact checkbox for matrix cells */
+.stx-tick{appearance:none;width:19px;height:19px;border:1.5px solid var(--ox-stone-strong);border-radius:6px;background:#fff;cursor:pointer;position:relative;vertical-align:middle;transition:background .12s ease,border-color .12s ease}
+.stx-tick:checked{background:var(--ox-blue);border-color:var(--ox-blue)}
+.stx-tick:checked::after{content:"";position:absolute;left:5.5px;top:2px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.stx-tick:disabled{opacity:.45;cursor:default}
+.stx-tick:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+
+/* ---------- status chips ---------- */
+.stx-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;line-height:1.5;border:1px solid transparent}
+.stx-chip .ico{width:12px;height:12px}
+.stx-chip.ok{color:var(--ox-green);background:var(--ox-green-wash)}
+.stx-chip.warn{color:var(--ox-amber);background:var(--ox-amber-wash)}
+.stx-chip.err{color:var(--ox-red);background:var(--ox-red-wash)}
+.stx-chip.info{color:var(--ox-blue-mid);background:var(--ox-sky-wash)}
+.stx-chip.plain{color:var(--ink-soft);background:var(--ox-off-white);border-color:var(--ox-stone-soft)}
+
+/* ---------- sessions & devices ---------- */
+.stx-sess{display:flex;align-items:center;gap:13px;padding:12px 0;border-top:1px solid var(--line-soft)}
+.stx-sess:first-of-type{border-top:none}
+.stx-sess-ic{flex:none;width:40px;height:40px;border-radius:12px;background:var(--ox-off-white);border:1px solid var(--ox-stone-soft);display:flex;align-items:center;justify-content:center;color:var(--ox-blue-link)}
+.stx-sess-ic .ico{width:19px;height:19px}
+.stx-sess-info{flex:1;min-width:0}
+.stx-sess-info b{font-size:14px;color:var(--ink)}
+.stx-sess-info small{display:block;font-size:12px;color:var(--muted);line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stx-sess.current .stx-sess-ic{background:var(--ox-sky-wash);border-color:var(--ox-steel)}
+
+/* ---------- simple data table (login history, consent log) ---------- */
+.stx-table{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
+.stx-table th{background:var(--ox-off-white);color:var(--ink-soft);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px}
+.stx-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);color:var(--ink);vertical-align:top}
+.stx-table td .muted{font-size:12px}
+.stx-table tr:hover td{background:var(--ox-wash)}
+
+/* ---------- secret / token plates (2FA secret, QR URI) ---------- */
+.stx-plate{display:flex;align-items:center;gap:10px;margin-top:8px;padding:11px 14px;background:var(--paper-2);border:1px dashed var(--ox-stone-strong);border-radius:10px}
+.stx-plate code{flex:1;font-size:13px;color:var(--ink);word-break:break-all;letter-spacing:.04em;background:none;padding:0}
+.stx-plate .btn{flex:none}
+
+/* ---------- recovery codes ---------- */
+.stx-codes{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px}
+.stx-code{padding:9px 10px;text-align:center;background:var(--paper-2);border:1px solid var(--ox-stone-soft);border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;letter-spacing:.08em;color:var(--ink);user-select:all}
+
+/* ---------- QR block ---------- */
+.stx-qr{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.stx-qr-box{flex:none;width:168px;height:168px;border-radius:14px;border:1px solid var(--ox-stone);background:#fff;display:flex;align-items:center;justify-content:center;padding:10px}
+.stx-qr-box canvas,.stx-qr-box svg,.stx-qr-box img{width:100%;height:100%;image-rendering:pixelated}
+.stx-qr-side{flex:1;min-width:220px}
+
+/* ---------- security score ---------- */
+.stx-score{display:flex;align-items:center;gap:18px;margin:6px 0 12px;flex-wrap:wrap}
+.stx-score-num{flex:none;width:86px;height:86px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:
+  conic-gradient(var(--ox-blue) calc(var(--pct,0)*1%), var(--ox-stone-soft) 0)}
+.stx-score-num i{width:72px;height:72px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal}
+.stx-score-num b{font-size:22px;color:var(--navy);line-height:1}
+.stx-score-num small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.stx-check{display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-top:1px solid var(--line-soft)}
+.stx-check:first-of-type{border-top:none}
+.stx-check-ic{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.stx-check-ic .ico{width:14px;height:14px}
+.stx-check.pass .stx-check-ic{background:var(--ox-green-wash);color:var(--ox-green)}
+.stx-check.fail .stx-check-ic{background:var(--ox-amber-wash);color:var(--ox-amber)}
+.stx-check b{font-size:13.5px;color:var(--ink);display:block}
+.stx-check small{font-size:12.5px;color:var(--muted);display:block;line-height:1.4}
+
+/* ---------- storage usage bar ---------- */
+.stx-bar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:var(--ox-stone-soft);margin:12px 0 10px}
+.stx-bar i{display:block;height:100%}
+.stx-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--ink-soft)}
+.stx-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+/* series colors follow the theme's chart order */
+.stx-c0{background:var(--ox-blue)} .stx-c1{background:var(--ox-steel)} .stx-c2{background:var(--ox-sky)}
+.stx-c3{background:#8A4A5B} .stx-c4{background:#6B5B8A} .stx-c5{background:#2F6B72}
+
+/* ---------- day-of-week chips (DND) ---------- */
+.stx-days{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.stx-day{width:38px;height:32px;border-radius:9px;border:1px solid var(--ox-stone);background:#fff;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
+.stx-day:hover{border-color:var(--ox-blue-link);color:var(--ox-blue)}
+.stx-day.on{background:var(--ox-blue);border-color:var(--ox-blue);color:var(--ox-off-white)}
+
+/* ---------- danger zone ---------- */
+.stx-danger{border:1px solid #E5C4C0;background:linear-gradient(0deg,rgba(246,228,226,.35),rgba(246,228,226,.35)),#fff}
+.stx-danger h3.title{color:var(--ox-red)}
+.stx-danger h3.title .ico{color:var(--ox-red)}
+.btn-danger{background:var(--ox-red);border:1px solid var(--ox-red);color:#fff}
+.btn-danger:hover{background:#82302B;border-color:#82302B;color:#fff}
+.btn-danger:disabled{opacity:.55}
+
+/* ---------- inline notices (info / warn banners inside cards) ---------- */
+.stx-note{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:11px 13px;border-radius:10px;font-size:13px;line-height:1.5}
+.stx-note .ico{flex:none;width:15px;height:15px;margin-top:2px}
+.stx-note.info{background:var(--ox-sky-wash);color:var(--ox-blue-mid)}
+.stx-note.warn{background:var(--ox-amber-wash);color:var(--ox-amber)}
+.stx-note.err{background:var(--ox-red-wash);color:var(--ox-red)}
+.stx-note.ok{background:var(--ox-green-wash);color:var(--ox-green)}
+
+/* ---------- policy / about ---------- */
+.stx-kv{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:13.5px;margin-top:10px}
+.stx-kv dt{color:var(--muted)}
+.stx-kv dd{color:var(--ink);margin:0;font-weight:500}
+.stx-policy-body{margin-top:12px;max-height:420px;overflow-y:auto;padding:16px 18px;background:var(--paper-2);border:1px solid var(--ox-stone-soft);border-radius:12px}
+
+/* ---------- upload progress (media pipeline) ---------- */
+.stx-prog{height:8px;border-radius:999px;background:var(--ox-stone-soft);overflow:hidden;margin-top:8px}
+.stx-prog i{display:block;height:100%;background:var(--ox-blue);border-radius:999px;transition:width .2s ease}
+
+/* ---------- mobile ---------- */
+@media(max-width:780px){
+  .set-group{display:none}                        /* the side nav flattens to pills */
+  .stx-row{align-items:flex-start;flex-direction:column;gap:8px}
+  .stx-row .field{width:100%}
+  .stx-score{gap:14px}
+  .stx-qr{justify-content:center}
+  .stx-codes{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+}

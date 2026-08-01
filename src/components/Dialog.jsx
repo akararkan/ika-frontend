@@ -49,7 +49,7 @@ export function DialogHost() {
 }
 
 function DialogModal({ dlg, onClose }) {
-  const { type, title, message, label, initial, confirmLabel, cancelLabel, danger, icon, placeholder, multiline } = dlg
+  const { type, title, message, label, initial, confirmLabel, cancelLabel, danger, icon, placeholder, multiline, inputType } = dlg
   const [value, setValue] = React.useState(initial != null ? String(initial) : '')
   const inputRef = React.useRef(null)
 
@@ -99,6 +99,7 @@ function DialogModal({ dlg, onClose }) {
                 <input
                   ref={inputRef}
                   className="field lg"
+                  type={inputType || 'text'}
                   value={value}
                   onChange={e => setValue(e.target.value)}
                   placeholder={placeholder || ''}

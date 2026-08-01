@@ -27,6 +27,10 @@ import { PymkGrid } from '../components/PeopleYouMayKnow.jsx'
 import { hashContacts, parseContactBlob, canHashContacts, MAX_HASHES_PER_SYNC } from '../lib/contactHash.js'
 import { api } from '../api/index.js'
 
+/* Stamped onto the consent event the sync records, so a withdrawal dispute can
+   be answered with "which build asked". */
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0'
+
 function ContactSync({ onSynced }) {
   const [open, setOpen] = React.useState(false)
   const [text, setText] = React.useState('')
@@ -50,7 +54,11 @@ function ContactSync({ onSynced }) {
     try {
       const { hashes, skipped } = await hashContacts(entries)
       if (!hashes.length) { showToast('Nothing in that list looked like an email or phone number'); return }
-      const res = await api.users.contacts.sync(hashes)
+      /* The spec-named alias (POST /api/v1/contacts/sync): same hash-join as
+         the older /users/contacts/sync, but it also records the CONTACTS
+         consent event and enforces the 3-per-24h limit that stops the upload
+         path being used to enumerate the user base. */
+      const res = await api.settings.contactsSync.sync(hashes, APP_VERSION)
       setResult({ ...res, skipped })
       setText('')                                   // the raw list has done its job — drop it
       /* The recompute is async server-side, so re-reading immediately would
@@ -60,6 +68,8 @@ function ContactSync({ onSynced }) {
     } catch (e) {
       showToast(e?.name === 'InsecureContextError'
         ? 'Contact matching needs a secure (https) connection'
+        // 429 already toasts globally with the server's cooldown — don't double up.
+        : e?.status === 429 ? 'Contact sync is limited to three uploads a day'
         : 'Could not sync contacts')
     } finally {
       setBusy(false)
@@ -74,7 +84,7 @@ function ContactSync({ onSynced }) {
     })
     if (!ok) return
     try {
-      await api.users.contacts.clear()
+      await api.settings.contactsSync.clear()   // also writes the consent withdrawal (§14)
       setResult(null)
       showToast('Uploaded contacts deleted')
       setTimeout(() => onSynced?.(), 1500)

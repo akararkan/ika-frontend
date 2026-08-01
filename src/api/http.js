@@ -46,8 +46,11 @@ export class ApiError extends Error {
     this.payload = payload || null    // full parsed body when present
     this.fieldErrors = payload?.fieldErrors || null
     this.traceId = payload?.traceId || null
-    this.retryAfterSeconds = payload?.retryAfterSeconds ?? null   // 429 rate-limit (REALTIME guide §10)
-    this.action = payload?.action ?? null                         // which write path was throttled
+    /* 429 rate-limit hints. Older modules put them at the envelope top level
+       (REALTIME guide §10); the Settings module nests them under `details`
+       (ApiErrorResponse.details = {action, retryAfterSeconds}). Read both. */
+    this.retryAfterSeconds = payload?.retryAfterSeconds ?? payload?.details?.retryAfterSeconds ?? null
+    this.action = payload?.action ?? payload?.details?.action ?? null
   }
 }
 
@@ -93,7 +96,9 @@ async function parseError(res) {
   // regardless of who throttled the request (REALTIME guide §10).
   if (res.status === 429) {
     const hdr = parseInt(res.headers.get('Retry-After') || '', 10)
+    const nested = body?.details?.retryAfterSeconds            // Settings module nests the hint
     const retry = (body && typeof body.retryAfterSeconds === 'number') ? body.retryAfterSeconds
+      : (typeof nested === 'number') ? nested
       : (Number.isFinite(hdr) ? hdr : null)
     const message = (body && body.message) || `Slow down — try again in ${retry ?? 5}s`
     const err = new ApiError(429, (body && (body.errorCode || body.error)) || 'RATE_LIMITED', message, body)

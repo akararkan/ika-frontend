@@ -5,15 +5,24 @@
    Notifications / Explore / Messages surfaces from the old
    tadhhib/user.css are owned by other warm/ area files. */
 
-/* ===================== PROFILE — header card ===================== */
+/* ===================== PROFILE — header card (2026-08 redesign) ===================== */
 
-/* Cover: 120px navy gradient, radius 18, avatar pulled up over it */
+/* Cover: taller, richer navy gradient, radius 18, avatar pulled up over it */
 .prof-cover{
-  height:120px;margin-bottom:-46px;
+  height:196px;margin-bottom:-52px;
   border-radius:var(--r-xl);
   border:1px solid var(--line);
+  box-shadow:var(--shadow);
 }
-.prof-cover-grad{background:linear-gradient(120deg,#00172f,#002147 55%,#1f4e7e)}
+.prof-cover-grad{
+  background:
+    radial-gradient(700px 220px at 88% -20%,rgba(185,214,242,.16),transparent 60%),
+    linear-gradient(120deg,#00172f,#002147 55%,#1f4e7e);
+}
+/* edit affordance fades in on hover/focus instead of sitting on the photo permanently */
+.prof-cover-edit{opacity:0;transform:translateY(2px);transition:opacity .16s ease,transform .16s ease,background .15s ease,border-color .15s ease}
+.prof-cover:hover .prof-cover-edit,.prof-cover:focus-within .prof-cover-edit{opacity:1;transform:none}
+@media(hover:none){.prof-cover-edit{opacity:1;transform:none}}   /* touch: always reachable */
 /* With a photo the plate becomes FLEXIBLE: it takes the picture's own
    proportions (`--cover-ar`, measured from the decoded image — see
    lib/useImageRatio.js) and contains it, so an upload is shown whole instead of
@@ -51,26 +60,52 @@
 }
 .prof-cover-edit:hover{background:rgba(0,23,47,.75);border-color:rgba(185,214,242,.5)}
 
-/* avatar wrapper kept from markup; no ornament ring in Warm Archive */
+/* avatar wrapper kept from markup; profile header gets a soft Oxford ring */
 .t-ring{position:relative;display:inline-flex;flex:none;border-radius:50%}
+.prof-head .t-ring{border-radius:50%;transition:transform .18s cubic-bezier(.22,1,.36,1)}
+.prof-head .t-ring::before{
+  content:"";position:absolute;inset:-4px;border-radius:50%;z-index:-1;
+  background:conic-gradient(from 220deg,var(--ox-sky),var(--ox-blue-link),var(--ox-sky));
+  opacity:.9;
+}
+.prof-head .t-ring:hover{transform:translateY(-2px)}
 /* !important needed: Avatar renders inline width/height (size prop = 132)
    and base/responsive .prof-avatar already use !important */
 .prof-avatar{
-  width:92px!important;height:92px!important;
+  width:96px!important;height:96px!important;
   border:4px solid var(--card)!important;
-  font-size:32px!important;
-  box-shadow:0 0 0 1px var(--line),0 10px 24px -12px rgba(23,31,45,.3);
+  font-size:33px!important;
+  box-shadow:0 0 0 1px var(--line),0 14px 28px -12px rgba(23,31,45,.38);
 }
 
-/* action row: quiet outline pills; Follow stays a navy filled pill */
+/* action row: Edit profile / Follow is the one filled CTA; everything else is
+   a quiet icon-only circle. Two things this buys over the old 4-equal-pill
+   row: (1) it reads at a glance instead of four same-weight labels, and
+   (2) it's ~160px narrower, which matters because of the hard rule below. */
+.prof-head{position:relative}
+/* NEVER let this row wrap. `.prof-head` bottom-aligns it against the avatar
+   (align-items:flex-end), so a wrapped 2nd line grows UPWARD off the row's
+   bottom edge — straight into the cover photo above. Capping it to one line
+   and letting it scroll instead is the only way to rule that out at every
+   viewport width, independent of how many actions end up in here. */
+/* height is pinned, not left to content: `overflow-x:auto` forces overflow-y
+   to compute as 'auto' too (CSS overflow spec), and Chrome then reserves a
+   horizontal-scrollbar gutter on the CROSS axis even with nothing to scroll —
+   quietly growing this box ~10px taller than its own buttons. Pin it. */
+.prof-actions{flex-wrap:nowrap!important;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;max-width:100%;height:37px}
+.prof-actions::-webkit-scrollbar{display:none}
 .prof-actions .btn{
-  height:36px;padding:0 16px;border-radius:999px;
-  font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;
+  flex:none;height:37px;padding:0 16px;border-radius:999px;
+  font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;white-space:nowrap;
+  transition:background .15s ease,border-color .15s ease,color .15s ease,transform .12s ease;
 }
+.prof-actions .btn:active{transform:scale(.96)}
 .prof-actions .btn .ico{width:16px;height:16px}
+.prof-actions .btn.icon-only{width:37px;padding:0;justify-content:center}
 .prof-actions .btn-secondary{background:var(--card);border-color:var(--line);color:var(--ink-soft)}
 .prof-actions .btn-secondary:hover{background:var(--card-2);border-color:var(--blue);color:var(--ink)}
-.prof-actions .btn-primary{background:var(--navy);color:#f2f0f0;box-shadow:none}
+.prof-actions .btn-primary{background:var(--navy);color:#f2f0f0;box-shadow:0 8px 18px -10px rgba(0,33,71,.5)}
+.prof-actions .btn-primary:hover{background:var(--navy-deep);transform:translateY(-1px)}
 
 /* Follow ↔ Following (profile header + follow-list modal rows) */
 .btn.is-following{background:var(--card);border-color:#b9c9dc;color:var(--navy)}
@@ -101,17 +136,32 @@
 .prof-tagline{color:var(--ink-2)}
 .prof-bio{color:var(--ink-soft)}
 
-/* stats row: bold serif counts + muted labels (RTL-safe separators) */
-.prof-counts{border-top-color:var(--line);border-bottom-color:var(--line)}
-.prof-counts button{
-  padding:12px 0;padding-inline-end:18px;
-  margin-right:0;margin-inline-end:18px;
-  border-right:0;border-inline-end:1px solid var(--line-soft);
-  text-align:start;
+/* stats row → a single elevated card, six equal segments, icon-led.
+   Replaces the old plain underlined text row with something that reads as
+   one cohesive unit and gives every count a hover/pressed affordance. */
+.prof-counts{
+  display:flex;gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  overflow-x:auto;margin-top:18px;scrollbar-width:none;box-shadow:var(--shadow-sm);
 }
-.prof-counts button:last-child{border-inline-end:0;margin-inline-end:0}
-.prof-counts b{color:var(--ink)}
-.prof-counts small{color:var(--muted)}
+.prof-counts::-webkit-scrollbar{display:none}
+.prof-counts button{
+  flex:1 1 88px;min-width:88px;
+  padding:14px 10px;margin:0;
+  border-right:0;border-inline-end:1px solid var(--line-soft);
+  display:flex;flex-direction:column;align-items:flex-start;gap:5px;
+  text-align:start;border-radius:0;transition:background .14s ease;
+}
+.prof-counts button:first-child{border-start-start-radius:var(--r-lg);border-end-start-radius:var(--r-lg)}
+.prof-counts button:last-child{border-inline-end:0;border-start-end-radius:var(--r-lg);border-end-end-radius:var(--r-lg)}
+.prof-counts button:hover{background:var(--ox-wash)}
+.prof-counts button:active{background:var(--ox-sky-wash)}
+.prof-counts button.active{background:var(--ox-wash)}
+.prof-counts button.active b,.prof-counts button.active small{color:var(--navy)}
+.prof-counts .ico{width:15px;height:15px;color:var(--muted);transition:color .14s ease}
+.prof-counts button:hover .ico,.prof-counts button.active .ico{color:var(--blue)}
+.prof-counts b{color:var(--ink);display:block;font-size:19px}
+.prof-counts small{color:var(--muted);display:block;font-size:11px;font-weight:600;letter-spacing:.3px}
+@media(max-width:520px){.prof-counts button{min-width:76px;padding:12px 8px}}
 
 /* ---------- Highlights rail: 58px gold rings ---------- */
 .prof-meta .stories{gap:14px;padding:6px 2px 10px}
@@ -140,6 +190,29 @@
 }
 .prof-meta ~ .tabs .tab:hover{border-color:var(--blue);color:var(--navy)}
 .prof-meta ~ .tabs .tab.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
+
+/* ---------- Own-profile tabs: same pill track, sliding navy indicator ----------
+   `.has-indicator` opts a tab row into a JS-measured pill that glides between
+   icon+label buttons (ProfilePage only — UserProfilePage keeps the plain
+   filled-on-click pills above, no measurement available there). */
+.prof-meta ~ .tabs.has-indicator{position:relative;gap:6px;background:var(--card-2);padding:5px;border-radius:999px;border:1px solid var(--line-soft);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.prof-meta ~ .tabs.has-indicator::-webkit-scrollbar{display:none}
+.tabs.has-indicator .tab-indicator{
+  position:absolute;top:5px;bottom:5px;left:0;z-index:0;
+  border-radius:999px;background:var(--navy);
+  box-shadow:0 6px 14px -8px rgba(0,33,71,.5);
+  transition:transform .3s cubic-bezier(.22,1,.36,1),width .3s cubic-bezier(.22,1,.36,1);
+}
+.tabs.has-indicator .tab{
+  position:relative;z-index:1;flex:none;
+  display:inline-flex;align-items:center;gap:7px;
+  border:0;background:transparent;color:var(--ink-soft);
+}
+.tabs.has-indicator .tab .ico{width:15px;height:15px;opacity:.75;transition:opacity .2s ease}
+.tabs.has-indicator .tab:hover{color:var(--navy);border-color:transparent;background:transparent}
+.tabs.has-indicator .tab.on{background:transparent;border-color:transparent;color:#f2f0f0}
+.tabs.has-indicator .tab.on .ico{opacity:1}
+@media(max-width:520px){.tabs.has-indicator .tab span{display:none}.tabs.has-indicator .tab{padding:9px}.tabs.has-indicator .tab .ico{width:17px;height:17px}}
 
 /* ---------- ProfileDetails panel ---------- */
 .prof-about{margin-top:18px}
@@ -408,8 +481,8 @@ a.pa-fact:hover{color:var(--navy)}
 /* This file imports after styles-responsive.css — restore the mobile
    values our full-width rules would otherwise stomp. */
 @media(max-width:720px){
-  .prof-cover{margin-inline:-14px;border-radius:0}         /* full-bleed cover strip */
-  .prof-counts button{padding:10px 0;padding-inline-end:14px;margin-inline-end:14px}
+  .prof-cover{margin-inline:-14px;border-radius:0;height:150px}   /* full-bleed cover strip */
+  .prof-counts{border-radius:var(--r);margin-inline:0}
   .prof-actions .btn{padding:0 14px}
   .settings-shell .card-pad{padding:18px 16px}
 }

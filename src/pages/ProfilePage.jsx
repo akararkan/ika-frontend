@@ -16,6 +16,14 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { openComposeEdit } from '../lib/openCompose.js'
 import { api, assetUrl } from '../api/index.js'
 
+const TABS = [
+  { key:'POSTS',     label:'Posts',     icon:'feed' },
+  { key:'RESEARCH',  label:'Research',  icon:'research' },
+  { key:'QUESTIONS', label:'Questions', icon:'qna' },
+  { key:'REELS',     label:'Reels',     icon:'reels' },
+  { key:'SAVED',     label:'Saved',     icon:'bookmark' },
+]
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()
@@ -36,6 +44,20 @@ export function ProfilePage() {
   const [loading, setLoading] = React.useState(true)
   const { openable, viewer } = useImageViewer()   // cover + portrait open full-screen
   const coverAr = useImageRatio(me.coverImage)    // the plate takes the cover's own shape
+
+  // Sliding tab-pill indicator: measured off the active button so it glides
+  // to unequal-width labels instead of the old plain filled/unfilled toggle.
+  const tabRefs = React.useRef({})
+  const [indicator, setIndicator] = React.useState({ left:0, width:0 })
+  React.useLayoutEffect(() => {
+    const el = tabRefs.current[tab]
+    if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth })
+  }, [tab, loading])
+  React.useEffect(() => {
+    const onResize = () => { const el = tabRefs.current[tab]; if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth }) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [tab])
 
   React.useEffect(() => {
     if (!me.id) return
@@ -121,9 +143,10 @@ export function ProfilePage() {
             <Avatar initials={me.initials} color={me.avc} size={132} className="prof-avatar" src={me.profileImage}/>
           </span>
           <div className="prof-actions">
-            <button className="btn btn-secondary" onClick={() => navigate('/activity')}><Icon name="list" className="sm"/>Activity</button>
-            <button className="btn btn-secondary" onClick={() => navigate('/settings')}><Icon name="settings" className="sm"/>Edit profile</button>
-            <button className="btn btn-secondary"><Icon name="share" className="sm"/>Share</button>
+            <button className="btn btn-secondary icon-only" onClick={() => navigate('/activity')} title="Activity" aria-label="Activity"><Icon name="list" className="sm"/></button>
+            <button className="btn btn-secondary icon-only" onClick={() => navigate('/saved')} title="Saved" aria-label="Saved"><Icon name="bookmark" className="sm"/></button>
+            <button className="btn btn-secondary icon-only" title="Share" aria-label="Share"><Icon name="share" className="sm"/></button>
+            <button className="btn btn-primary" onClick={() => navigate('/settings')}><Icon name="settings" className="sm"/>Edit profile</button>
           </div>
         </div>
         <div className="prof-meta">
@@ -132,12 +155,12 @@ export function ProfilePage() {
           {me.selfDescriber && <p className="prof-tagline">{me.selfDescriber}</p>}
           {me.bio && <p className="prof-bio">{me.bio}</p>}
           <div className="prof-counts">
-            <button onClick={() => setTab('POSTS')}><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>POSTS</small></button>
-            <button onClick={() => setTab('REELS')}><b>{fmt(stats?.reels ?? reels.length)}</b><small>REELS</small></button>
-            <button onClick={() => setTab('RESEARCH')}><b>{fmt(stats?.research ?? research.length)}</b><small>RESEARCH</small></button>
-            <button onClick={() => setTab('QUESTIONS')}><b>{fmt(stats?.questions ?? questions.length)}</b><small>QUESTIONS</small></button>
-            <button onClick={() => setFollowList({ mode:'followers' })}><b>{fmt(stats?.followers ?? me.followers ?? 0)}</b><small>FOLLOWERS</small></button>
-            <button onClick={() => setFollowList({ mode:'following' })}><b>{fmt(stats?.following ?? me.following ?? 0)}</b><small>FOLLOWING</small></button>
+            <button className={tab==='POSTS' ? 'active' : ''} onClick={() => setTab('POSTS')}><Icon name="feed"/><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>Posts</small></button>
+            <button className={tab==='REELS' ? 'active' : ''} onClick={() => setTab('REELS')}><Icon name="reels"/><b>{fmt(stats?.reels ?? reels.length)}</b><small>Reels</small></button>
+            <button className={tab==='RESEARCH' ? 'active' : ''} onClick={() => setTab('RESEARCH')}><Icon name="research"/><b>{fmt(stats?.research ?? research.length)}</b><small>Research</small></button>
+            <button className={tab==='QUESTIONS' ? 'active' : ''} onClick={() => setTab('QUESTIONS')}><Icon name="qna"/><b>{fmt(stats?.questions ?? questions.length)}</b><small>Questions</small></button>
+            <button onClick={() => setFollowList({ mode:'followers' })}><Icon name="users"/><b>{fmt(stats?.followers ?? me.followers ?? 0)}</b><small>Followers</small></button>
+            <button onClick={() => setFollowList({ mode:'following' })}><Icon name="users"/><b>{fmt(stats?.following ?? me.following ?? 0)}</b><small>Following</small></button>
           </div>
 
           <section className="stories" style={{ marginTop:18 }}>
@@ -166,14 +189,17 @@ export function ProfilePage() {
 
         <ProfileDetails u={me}/>
 
-        <div className="tabs">
-          {['POSTS','RESEARCH','QUESTIONS','REELS','SAVED'].map(t => (
-            <button key={t} className={'tab ' + (tab===t ? 'on' : '')} onClick={() => setTab(t)}>{t[0]+t.slice(1).toLowerCase()}</button>
+        <div className="tabs has-indicator">
+          <div className="tab-indicator" style={{ transform:`translateX(${indicator.left}px)`, width:indicator.width }}/>
+          {TABS.map(t => (
+            <button key={t.key} ref={el => { tabRefs.current[t.key] = el }} className={'tab ' + (tab===t.key ? 'on' : '')} onClick={() => setTab(t.key)}>
+              <Icon name={t.icon}/><span>{t.label}</span>
+            </button>
           ))}
         </div>
 
         {loading ? <Loader/> : (
-          <>
+          <div key={tab} className="t-stagger">
             {tab==='POSTS' && (onlyPosts.length ? <div className="feed-list">{onlyPosts.map((p,i)=><PostCard key={p.id} post={p} index={i} onOpenComments={() => navigate(`/posts/${p.id}`)} {...cardOwnership(p)}/>)}</div> : <EmptyState icon="feed" title="No posts yet"/>)}
             {tab==='RESEARCH' && (research.length ? <div className="r-list">{research.map(r => (
               <article key={r.id} className="r-card" onClick={() => navigate(`/research/${r.id}`)}>
@@ -191,8 +217,8 @@ export function ProfilePage() {
             {tab==='REELS' && (reels.length
               ? <div className="feed-list">{reels.map((p,i)=><PostCard key={p.id} post={p} index={i} onOpenComments={() => navigate(`/posts/${p.id}`)} {...cardOwnership(p)}/>)}</div>
               : <EmptyState icon="reels" title="No reels yet" sub="Share a 60-second reflection."/>)}
-            {tab==='SAVED' && (posts.filter(p=>p.saved).length ? <div className="feed-list">{posts.filter(p=>p.saved).map((p,i)=><PostCard key={p.id} post={p} index={i} onOpenComments={() => navigate(`/posts/${p.id}`)} {...cardOwnership(p)}/>)}</div> : <EmptyState icon="bookmark" title="Nothing saved here" sub="Open Saved from the menu to see all bookmarks."/>)}
-          </>
+            {tab==='SAVED' && (posts.filter(p=>p.saved).length ? <div className="feed-list">{posts.filter(p=>p.saved).map((p,i)=><PostCard key={p.id} post={p} index={i} onOpenComments={() => navigate(`/posts/${p.id}`)} {...cardOwnership(p)}/>)}</div> : <EmptyState icon="bookmark" title="Nothing saved here" sub="Use the Saved button above to see all bookmarks."/>)}
+          </div>
         )}
       </div>
       {hlOpen && <HighlightViewer highlight={hlOpen} author={me} owner onClose={() => setHlOpen(null)}/>}

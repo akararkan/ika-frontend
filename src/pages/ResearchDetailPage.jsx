@@ -7,6 +7,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, fmt, linkify, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
+import { openReport } from '../components/ReportDialog.jsx'
 import { uiPrompt, uiConfirm } from '../components/Dialog.jsx'
 import { SourceRow } from '../components/Source.jsx'
 import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
@@ -510,6 +511,11 @@ export function ResearchDetailPage() {
               <button onClick={() => openShare({ kind:'research', id, title:r.title })} title="Share">
                 <Icon name="share" className="sm"/>
               </button>
+              {!isAuthor && (
+                <button onClick={() => openReport({ targetType:'RESEARCH', targetId:id, targetLabel:'this research' })} title="Report" aria-label="Report">
+                  <Icon name="flag" className="sm"/>
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Icon, Verify, Avatar, linkify, fmt, showToast } from './ui.jsx'
 import { openShare } from './ShareSheet.jsx'
+import { openReport } from './ReportDialog.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import OrbitPlayer from './OrbitPlayer.jsx'
 import { PlayableVideo } from './PlayableVideo.jsx'
@@ -35,7 +36,7 @@ function PostMenu({ post, owner, onEdit, onDelete }) {
   const btnRef = React.useRef(null)
   const item = { display:'flex', alignItems:'center', gap:10, width:'100%', padding:'9px 12px', borderRadius:9, background:'transparent', color:'var(--ink)', fontSize:14, textAlign:'left', cursor:'pointer', border:0 }
 
-  const itemCount = 2 + (owner && onEdit ? 1 : 0) + (owner && onDelete ? 1 : 0)
+  const itemCount = 2 + (owner ? 0 : 1) + (owner && onEdit ? 1 : 0) + (owner && onDelete ? 1 : 0)
   const ESTIMATED_H = 8 + 36 * itemCount   // padding + row count
 
   const place = () => {
@@ -88,6 +89,7 @@ function PostMenu({ post, owner, onEdit, onDelete }) {
           }}>
             <button style={item} onClick={copyLink}><Icon name="link" className="sm"/>Copy link</button>
             <button style={item} onClick={() => { close(); doRepost(post) }}><Icon name="repost" className="sm"/>Repost</button>
+            {!owner && <button style={item} onClick={() => { close(); openReport({ targetType:'POST', targetId:post.id, targetLabel:'this post' }) }}><Icon name="flag" className="sm"/>Report post</button>}
             {owner && onEdit && <button style={item} onClick={() => { close(); onEdit(post.id) }}><Icon name="compose" className="sm"/>Edit post</button>}
             {owner && onDelete && <button style={{ ...item, color:'var(--rose, #b3453e)' }} onClick={() => { close(); onDelete(post.id) }}><Icon name="close" className="sm"/>Delete post</button>}
           </div>

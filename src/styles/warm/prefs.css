@@ -1,0 +1,65 @@
+/* =========================================================
+   Preference rules — the CSS half of lib/prefs.js.
+   IMPORT LAST in the warm layer (after responsive.css): these
+   rules exist to override the base sheets, including the mobile
+   media queries, so anything loaded after them wins by accident.
+
+   Everything here is keyed off an attribute or a custom property
+   that prefs.js only sets when the user is OFF the default. On
+   defaults the attributes are absent and --ui-font-scale is
+   removed, so the calcs below resolve to the exact values the
+   base stylesheets already declare — byte-identical rendering.
+
+   Tokens only (Oxford ramp from theme.css); no raw hexes here.
+   ========================================================= */
+
+/* ---------- interface & font scale ---------- */
+/* <html> declares no font-size of its own (browser default 16px) and the app
+   is px-based — styles.css sets `body{font-size:15px}`, which is the real
+   inherited anchor. Both are restated through the multiplier so rem units and
+   inherited text move together; at scale 1 the calcs are 16px / 15px, i.e.
+   the current values unchanged. Explicit px rules elsewhere are untouched by
+   design — this scales body copy, not the chrome. */
+html{font-size:calc(16px * var(--ui-font-scale,1))}
+body{font-size:calc(15px * var(--ui-font-scale,1))}
+
+/* ---------- density ---------- */
+/* theme.css defines radii and colour tokens but no spacing scale, so compact
+   mode tightens the high-traffic containers directly — modest cuts (~25%) on
+   vertical rhythm only; nothing reflows. */
+:root[data-density="compact"] .card-pad{padding:14px 16px}
+:root[data-density="compact"] .settings-shell .card-pad{padding:16px 18px}
+:root[data-density="compact"] .rail-row{padding:7px 0}
+:root[data-density="compact"] .set-toggle{padding:9px 0}
+:root[data-density="compact"] .stx-row{padding:9px 0}
+
+/* ---------- reduced motion ---------- */
+/* The app opts into smooth scrolling globally (styles.css) — :root itself is
+   not a descendant of :root, so it needs its own rule. */
+:root[data-reduced-motion="on"]{scroll-behavior:auto!important}
+:root[data-reduced-motion="on"] *,
+:root[data-reduced-motion="on"] *::before,
+:root[data-reduced-motion="on"] *::after{
+  animation-duration:.001ms!important;
+  animation-iteration-count:1!important;
+  transition-duration:.001ms!important;
+  scroll-behavior:auto!important;
+}
+
+/* ---------- high contrast ---------- */
+/* Borders get pronounced and secondary text stops being muted. Backgrounds
+   are deliberately left alone — the surface palette stays the surface
+   palette; only the separations and the quiet ink change. */
+:root[data-contrast="high"]{
+  --line:var(--ox-stone-strong);
+  --line-soft:var(--ox-stone);
+  --muted:var(--ink-soft);
+}
+/* Dark mode remaps --line to a hairline blue; stone would read as a light
+   border on a dark surface, so the dark arm strengthens with the on-dark
+   accents instead. Higher specificity than the theme's dark block. */
+:root[data-theme="dark"][data-contrast="high"]{
+  --line:var(--ox-steel);
+  --line-soft:var(--ox-blue-glow);
+  --muted:var(--ink-soft);
+}

@@ -43,6 +43,7 @@ const ChannelPage        = named(() => import('./pages/ChannelPage.jsx'), 'Chann
 const ChannelLinkPage    = named(() => import('./pages/ChannelLinkPage.jsx'), 'ChannelLinkPage')
 const LivePage           = named(() => import('./pages/LivePage.jsx'), 'LivePage')
 const AdminSearchPage    = named(() => import('./pages/AdminSearchPage.jsx'), 'AdminSearchPage')
+const QrResolvePage      = named(() => import('./pages/QrResolvePage.jsx'), 'QrResolvePage')
 
 const fullScreenLoader = <div className="main center"><div className="col-main"><Loader label="Loading…"/></div></div>
 
@@ -111,7 +112,15 @@ export default function App() {
               <Route path="profile" element={<ProfilePage/>}/>
               <Route path="u/:id" element={<UserProfilePage/>}/>
               <Route path="people" element={<PeoplePage/>}/>
+              {/* Settings is deep-linkable per section: /settings/security,
+                  /settings/privacy… Bare /settings falls back to the first
+                  section inside the page. */}
               <Route path="settings" element={<SettingsPage/>}/>
+              <Route path="settings/:tab" element={<SettingsPage/>}/>
+              {/* Where a scanned IKA QR code lands. The token is opaque and
+                  rotatable, so this resolves it server-side rather than
+                  carrying a user id in the code itself. */}
+              <Route path="qr/:opaque" element={<QrResolvePage/>}/>
               {/* Platform-admin only. The gate renders the refusal in place
                   rather than redirecting — see RequireRole. */}
               <Route path="admin/search" element={

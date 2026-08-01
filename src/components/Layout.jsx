@@ -8,12 +8,15 @@ import { Icon, Avatar, BrandMark } from './ui.jsx'
 import { ToastHost, Loader } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
 import { ShareHost } from './ShareSheet.jsx'
+import { ReportHost } from './ReportDialog.jsx'
+import { VersionGate } from './VersionGate.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
 import { SearchTypeahead } from './SearchTypeahead.jsx'
 import { CallOverlay } from './chat/CallOverlay.jsx'
 import { useAuth, isPlatformAdmin } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { initChime, playChime } from '../lib/chime.js'
+import { loadAndApplyPrefs, PREFS_EVENT } from '../lib/prefs.js'
 import { api } from '../api/index.js'
 
 const NAV = [
@@ -27,8 +30,6 @@ const NAV = [
   { to:'/chat',          icon:'chat',      label:'Messages' },
   { to:'/channels',      icon:'broadcast', label:'Channels' },
   { to:'/live',          icon:'megaphone', label:'Live' },
-  { to:'/activity',      icon:'list',      label:'Activity' },
-  { to:'/saved',         icon:'bookmark',  label:'Saved' },
   { to:'/profile',       icon:'user',      label:'Profile' },
   { to:'/settings',      icon:'settings',  label:'Settings' },
 ]
@@ -73,6 +74,17 @@ export function Layout() {
     try { window.localStorage.setItem('ika:sidebar', desktopNavOpen ? 'open' : 'closed') }
     catch { /* storage may be unavailable in private contexts */ }
   }, [desktopNavOpen])
+
+  /* Cosmetic settings are stored server-side and applied HERE — the backend
+     never interprets them. main.jsx already applied the cached copy before
+     first paint; this refreshes from the server once the session exists, and
+     re-runs whenever a settings panel writes one of those blocks. */
+  React.useEffect(() => {
+    loadAndApplyPrefs()
+    const rerun = () => { loadAndApplyPrefs() }
+    window.addEventListener(PREFS_EVENT, rerun)
+    return () => window.removeEventListener(PREFS_EVENT, rerun)
+  }, [])
 
   // On mobile the full sidebar slides in as a left drawer (the topbar hamburger
   // opens it); the bottom bar carries the main pages.
@@ -273,6 +285,13 @@ export function Layout() {
       <ToastHost/>
       <DialogHost/>
       <ShareHost/>
+      {/* Reporting is reachable from every content surface, so its host lives
+          with the other app-wide overlays rather than on any one page. */}
+      <ReportHost/>
+      {/* The client version gate (§19) + policy re-consent prompt. Renders
+          nothing unless the server says this build is out of date or a policy
+          moved on since the person accepted it. */}
+      <VersionGate/>
     </div>
   )
 }

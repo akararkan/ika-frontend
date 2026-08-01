@@ -9,6 +9,7 @@ import { ProfileDetails } from '../components/ProfileDetails.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { FollowListModal } from '../components/FollowListModal.jsx'
+import { openReport } from '../components/ReportDialog.jsx'
 import { useImageViewer } from '../components/ImageLightbox.jsx'
 import { useImageRatio, coverStyle } from '../lib/useImageRatio.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -79,6 +80,7 @@ export function UserProfilePage() {
       })
   }
   const block = () => { api.users.block(id).then(() => { showToast('User blocked'); navigate(-1) }).catch(() => {}) }
+  const report = () => openReport({ targetType:'USER', targetId:id, targetLabel:'@' + u.handle })
   const restricting = status?.isRestricting
   const toggleRestrict = () => {
     setStatus(s => ({ ...s, isRestricting: !restricting }))
@@ -111,12 +113,13 @@ export function UserProfilePage() {
               </button>
             )}
             {!blockedByThem && (
-              <button className="btn btn-secondary" onClick={message} title="Send a direct message">
-                <Icon name="chat" className="sm"/>Message
+              <button className="btn btn-secondary icon-only" onClick={message} title="Send a direct message" aria-label="Message">
+                <Icon name="chat" className="sm"/>
               </button>
             )}
-            <button className={'btn btn-secondary' + (restricting ? ' on-brass' : '')} onClick={toggleRestrict} title="Restrict — their comments show only to them"><Icon name="eye" className="sm"/>{restricting ? 'Restricted' : 'Restrict'}</button>
-            <button className="btn btn-secondary" onClick={block}><Icon name="block" className="sm"/>Block</button>
+            <button className={'btn btn-secondary icon-only' + (restricting ? ' on-brass' : '')} onClick={toggleRestrict} title={restricting ? 'Restricted — tap to remove' : 'Restrict — their comments show only to them'} aria-label="Restrict"><Icon name="eye" className="sm"/></button>
+            <button className="btn btn-secondary icon-only" onClick={block} title="Block" aria-label="Block"><Icon name="block" className="sm"/></button>
+            {!isMe && <button className="btn btn-secondary icon-only" onClick={report} title="Report this account" aria-label="Report"><Icon name="flag" className="sm"/></button>}
           </div>
         </div>
         <div className="prof-meta">
@@ -125,12 +128,12 @@ export function UserProfilePage() {
           {u.selfDescriber && <p className="prof-tagline">{u.selfDescriber}</p>}
           {u.bio && <p className="prof-bio">{u.bio}</p>}
           <div className="prof-counts">
-            <button onClick={() => setTab('POSTS')}><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>POSTS</small></button>
-            <button onClick={() => setTab('REELS')}><b>{fmt(stats?.reels ?? reels.length)}</b><small>REELS</small></button>
-            <button onClick={() => setTab('RESEARCH')}><b>{fmt(stats?.research ?? research.length)}</b><small>RESEARCH</small></button>
-            <button><b>{fmt(stats?.questions ?? 0)}</b><small>QUESTIONS</small></button>
-            <button onClick={() => setFollowList({ mode:'followers' })}><b>{fmt(status?.followerCount ?? stats?.followers ?? u.followers)}</b><small>FOLLOWERS</small></button>
-            <button onClick={() => setFollowList({ mode:'following' })}><b>{fmt(stats?.following ?? u.following)}</b><small>FOLLOWING</small></button>
+            <button className={tab==='POSTS' ? 'active' : ''} onClick={() => setTab('POSTS')}><Icon name="feed"/><b>{fmt(stats?.posts ?? onlyPosts.length)}</b><small>Posts</small></button>
+            <button className={tab==='REELS' ? 'active' : ''} onClick={() => setTab('REELS')}><Icon name="reels"/><b>{fmt(stats?.reels ?? reels.length)}</b><small>Reels</small></button>
+            <button className={tab==='RESEARCH' ? 'active' : ''} onClick={() => setTab('RESEARCH')}><Icon name="research"/><b>{fmt(stats?.research ?? research.length)}</b><small>Research</small></button>
+            <button><Icon name="qna"/><b>{fmt(stats?.questions ?? 0)}</b><small>Questions</small></button>
+            <button onClick={() => setFollowList({ mode:'followers' })}><Icon name="users"/><b>{fmt(status?.followerCount ?? stats?.followers ?? u.followers)}</b><small>Followers</small></button>
+            <button onClick={() => setFollowList({ mode:'following' })}><Icon name="users"/><b>{fmt(stats?.following ?? u.following)}</b><small>Following</small></button>
           </div>
         </div>
 
