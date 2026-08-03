@@ -745,7 +745,13 @@
 .prose li,.prose blockquote,.prose td,.prose th,.prose pre,.prose dd,.prose dt{
   unicode-bidi:plaintext;            /* each block resolves its OWN direction… */
   text-align:start;                  /* …and aligns to that direction's start edge */
-  overflow-wrap:anywhere;
+  /* NOTE: must be `break-word`, not `anywhere` — combined with unicode-bidi:plaintext,
+     `overflow-wrap:anywhere` makes Chromium mis-align every wrapped line after the
+     first back to the block's base (LTR) direction instead of the resolved RTL start
+     edge. `break-word` wraps long words just as well without that bug. Do NOT pair
+     this with `word-break:break-word` either — that legacy value computes to
+     `overflow-wrap:anywhere` under the hood and reintroduces the same bug. */
+  overflow-wrap:break-word;
 }
 
 /* Comments & replies stay LEFT-aligned like English (Facebook style) — they

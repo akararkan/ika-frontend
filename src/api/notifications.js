@@ -26,6 +26,7 @@ import { http } from './http.js'
 import { API_BASE, session } from './config.js'
 import { auth } from './auth.js'
 import { timeAgo, authorFrom } from './adapters.js'
+import { mockEnabled } from '../mock/flag.js'
 
 /* ---------------------------------------------------------
    Deep links. The server's `deepLink` uses API-side resource
@@ -234,6 +235,17 @@ function sharedConnect() {
 /** Fan-out subscription to the single shared stream. Returns an unsubscribe
  *  fn; the socket opens with the first consumer and closes with the last. */
 export function subscribeNotifications(handlers = {}) {
+  /* Mock mode: an EventSource does not pass through request(), so there is
+     nothing for the fixture layer to intercept — opening one would just
+     retry-loop against a server that is not there. Hand this subscriber a
+     small scripted replay instead, so the badge and the chime still have
+     something to do during a demo. */
+  if (mockEnabled()) {
+    let stop = () => {}
+    import('../mock/index.js').then(m => { stop = m.mockStream(handlers) }).catch(() => {})
+    return () => stop()
+  }
+
   sharedSubs.add(handlers)
   if (sharedSubs.size === 1) {
     sharedOpen = true

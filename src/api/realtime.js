@@ -17,6 +17,7 @@
    - QnA / RESEARCH wrap an authoritative `data` payload.
    ========================================================= */
 import { API_BASE, session } from './config.js'
+import { mockEnabled } from '../mock/flag.js'
 
 /* All event names we subscribe to, per domain (named SSE events). */
 const POST_EVENTS = [
@@ -60,6 +61,15 @@ const DOMAIN = {
 export function openStream(domain, id, handlers = {}) {
   const cfg = DOMAIN[domain]
   if (!cfg || !id) return () => {}
+
+  /* Mock mode: an EventSource never passes through request(), so there is
+     nothing for the fixture layer to intercept — opening one only produces a
+     reconnect loop against a server that is not running. Report connected (so
+     any "live" affordance settles) and send nothing. */
+  if (mockEnabled()) {
+    const t = setTimeout(() => handlers.onConnected?.({ mock: true }), 0)
+    return () => clearTimeout(t)
+  }
 
   const parse = (e) => { try { return JSON.parse(e.data) } catch { return { raw: e.data } } }
 

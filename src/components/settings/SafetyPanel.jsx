@@ -7,19 +7,51 @@
    expires 90 days after issue) or a good-standing note.
    ========================================================= */
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { Icon, showToast } from '../ui.jsx'
 import { uiConfirm } from '../Dialog.jsx'
-import { EmptyState, ErrorState } from '../states.jsx'
+import { EmptyState, ErrorState, Loader } from '../states.jsx'
 import { api, REPORT_REASONS, REPORT_OUTCOME_LABELS } from '../../api/index.js'
-import { SetCard, fmtWhen, fmtDate } from './shared.jsx'
+import { SetCard, Skeleton, fmtWhen, fmtDate } from './shared.jsx'
 
 const PAGE_SIZE = 15
 const REASON_LABELS = Object.fromEntries(REPORT_REASONS)
 const OUTCOME_CHIP = { UNDER_REVIEW: 'info', ACTION_TAKEN: 'ok', NO_ACTION: 'plain', APPEAL_UNDER_REVIEW: 'warn' }
 const APPEALABLE_STATES = new Set(['ACTIONED', 'DISMISSED'])
 
+/* ReportResponse gives back targetType + targetId, so a report can point at
+   what it was about. Only the types that have a page of their own get a link
+   (routes checked against App.jsx); COMMENT / ANSWER / MESSAGE / STORY have no
+   standalone route, so they stay a plain word rather than a dead one. */
+const TARGET_ROUTE = {
+  POST: '/posts/', RESEARCH: '/research/', QUESTION: '/qna/',
+  USER: '/u/', CHANNEL: '/channels/',
+}
+
 /* 'HATE_SPEECH' → 'Hate speech' for values outside the label maps. */
 const humanise = (s) => !s ? '—' : String(s).toLowerCase().replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+
+/* Nothing in the stylesheet reaches a link inside .stx-sess-info b — the only
+   rule that applies is the global `a{color:inherit;text-decoration:none}` — so
+   without this the link reads as ordinary bold text. Underlined as well as
+   coloured, because state must never be carried by colour alone. */
+const TARGET_LINK = { color: 'var(--ox-blue-link)', textDecoration: 'underline' }
+
+/** What a report was about — a link back to the item where one exists.
+ *  Deleted targets still resolve to a route; the page's own not-found state
+ *  handles that better than hiding the link would. */
+function TargetRef({ row }) {
+  const word = (row.targetType || '').toLowerCase() || 'item'
+  const route = TARGET_ROUTE[row.targetType]
+  if (!route || !row.targetId) return <>{word}</>
+  /* The visible word is just "post" / "account"; the accessible name says what
+     following it does, since a screen reader may read the link out of context. */
+  return (
+    <Link to={route + row.targetId} style={TARGET_LINK} aria-label={`Open the reported ${word}`}>
+      {word}
+    </Link>
+  )
+}
 
 export function SafetyReportsPanel() {
   const [items, setItems] = React.useState(null)
@@ -45,7 +77,7 @@ export function SafetyReportsPanel() {
     const next = pageRef.current + 1
     api.settings.safety.myReports({ page: next, size: PAGE_SIZE })
       .then(r => { pageRef.current = next; setItems(cur => [...cur, ...r.items]); setHasMore(r.hasMore) })
-      .catch(() => showToast('Could not load more reports'))
+      .catch(() => showToast('Could not load more reports', 'err'))
       .finally(() => setBusy(false))
   }
 
@@ -64,10 +96,10 @@ export function SafetyReportsPanel() {
       showToast('Appeal submitted')
     } catch (e) {
       if (e?.code === 'REPORT_NOT_APPEALABLE' || e?.status === 409) {
-        showToast('This report can no longer be appealed')
+        showToast('This report can no longer be appealed', 'warn')
         loadFirst()
       } else {
-        showToast('Could not submit the appeal')
+        showToast('Could not submit the appeal', 'err')
       }
     } finally {
       setAppealingId(null)
@@ -78,13 +110,13 @@ export function SafetyReportsPanel() {
 
   if (items === null) {
     return (
-      <SetCard icon="flag" title="Your reports" sub={sub}>
-        <p className="muted text-sm">Loading…</p>
+      <SetCard id="reports" icon="flag" title="Your reports" sub={sub}>
+        <Skeleton rows={3}/>
       </SetCard>
     )
   }
   return (
-    <SetCard icon="flag" title="Your reports" sub={sub}>
+    <SetCard id="reports" icon="flag" title="Your reports" sub={sub}>
       {error ? (
         <ErrorState message="Could not load your reports" onRetry={loadFirst}/>
       ) : items.length === 0 ? (
@@ -97,7 +129,7 @@ export function SafetyReportsPanel() {
               <div key={row.id} className="stx-sess">
                 <div className="stx-sess-ic"><Icon name="flag"/></div>
                 <div className="stx-sess-info">
-                  <b>{(REASON_LABELS[row.reason] || humanise(row.reason)) + ' · ' + (row.targetType || '').toLowerCase()}</b>
+                  <b>{(REASON_LABELS[row.reason] || humanise(row.reason)) + ' · '}<TargetRef row={row}/></b>
                   <small>{fmtWhen(row.createdAt)}</small>
                 </div>
                 <div className="flex gap-8" style={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -146,13 +178,13 @@ export function StrikesPanel() {
 
   if (rows === null) {
     return (
-      <SetCard icon="alert" title="Account standing" sub={sub}>
-        <p className="muted text-sm">Loading…</p>
+      <SetCard id="strikes" icon="alert" title="Account standing" sub={sub}>
+        <Loader/>
       </SetCard>
     )
   }
   return (
-    <SetCard icon="alert" title="Account standing" sub={sub}>
+    <SetCard id="strikes" icon="alert" title="Account standing" sub={sub}>
       {error ? (
         <ErrorState message="Could not load your account standing" onRetry={load}/>
       ) : rows.length === 0 ? (

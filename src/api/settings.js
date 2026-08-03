@@ -62,8 +62,11 @@ export const NOTIFICATION_CHANNELS = ['PUSH', 'IN_APP', 'EMAIL', 'SMS', 'DESKTOP
 export const CHANNEL_LABELS = { PUSH: 'Push', IN_APP: 'In-app', EMAIL: 'Email', SMS: 'SMS', DESKTOP: 'Desktop' }
 
 /* The 42 NotificationType rows, grouped for a readable matrix. ACCOUNT_WARNING
-   is delivery-bypassed server-side (always sent) — render it locked-on.
-   POST_MENTIONED is legacy (superseded by USER_MENTIONED) and hidden. */
+   is the only one of the three BYPASS_ALL keys that is a real NotificationType
+   (SECURITY_ALERT/LOGIN_ALERT are not in the enum) — render it locked-on.
+   The grouping only ORDERS the response: anything the server returns that no
+   group claims still gets a row (see GROUPED_NOTIFICATION_TYPES below), so a
+   type added server-side is never silently untoggleable. */
 export const NOTIFICATION_GROUPS = [
   { label: 'Social', rows: [
     ['NEW_FOLLOWER', 'New follower'], ['CONNECTION_REQUEST', 'Connection request'],
@@ -102,9 +105,20 @@ export const NOTIFICATION_GROUPS = [
     ['SOUND_APPROVED', 'Sound approved'], ['TRENDING_DIGEST', 'Trending digest'],
     ['ACCOUNT_WARNING', 'Account warnings'],
   ]},
-  /* Rows kept out of the UI on purpose (still valid server-side): UNFOLLOWED,
-     BLOCKED, UNBLOCKED, RESTRICTED, POST_MENTIONED. */
+  /* Left out of the curated groups: UNFOLLOWED, BLOCKED, UNBLOCKED, RESTRICTED,
+     POST_MENTIONED. Valid enum values that nothing in the backend dispatches
+     today (the only producer, NotificationServiceImpl.sendUnblockNotification,
+     has no callers). resolvedMatrix walks the WHOLE enum, so the response
+     always carries them and they DO render — under "Other", where the panel
+     says out loud that some of that section is not sent by anything yet. That
+     is deliberate: hiding a row the server returns is how the five became
+     untoggleable in the first place. */
 ]
+/* Every type some group already claims — the matrix panel diffs the response
+   against this to catch types the backend added after this list was written. */
+export const GROUPED_NOTIFICATION_TYPES = new Set(
+  NOTIFICATION_GROUPS.flatMap(g => g.rows.map(([type]) => type))
+)
 export const LOCKED_NOTIFICATION_TYPES = new Set(['ACCOUNT_WARNING'])   // BYPASS_ALL: always delivered
 
 /* DND daysMask: bit 0 (1) = Monday … bit 6 (64) = Sunday. 0 = every day. */
@@ -131,6 +145,14 @@ export const MEDIA_TIERS = [
 export const POLICY_KEYS = [['privacy', 'Privacy Policy'], ['terms', 'Terms of Service'], ['guidelines', 'Community Guidelines']]
 
 /* ---------- the API surface ---------- */
+
+/* Delivery-decision cache (see notifications.prefs below). Module-level, so it
+   is shared by every consumer of `api` in the tab. */
+const PREFS_TTL = 5 * 60_000
+let prefsCache = null      // { at, value: {matrix, dnd} }
+let prefsInflight = null
+let prefsGen = 0           // bumped on every write, so a read that started before it can't publish
+const dropPrefsCache = () => { prefsCache = null; prefsInflight = null; prefsGen++ }
 
 export const settings = {
   /* ---- cosmetic core (/api/v1/settings) — sections sync verbatim ---- */
@@ -221,11 +243,40 @@ export const settings = {
     matrix() { return http.get('/api/v1/settings/notifications') },                // {TYPE:{PUSH:bool,…}} — all 42 rows
     setPref(eventType, channel, enabled) {
       return http.put(`/api/v1/settings/notifications/${eventType}/${channel}`, { enabled })   // 204
+        .finally(dropPrefsCache)
     },
     dnd() { return http.get('/api/v1/settings/notifications/dnd') },               // {enabled,timezone,startTime,endTime,daysMask,muteUntil}
     /** Patch semantics — only non-null fields applied. Trap: omitting `enabled`
      *  re-derives it from the window, so always send it explicitly. */
-    updateDnd(body) { return http.put('/api/v1/settings/notifications/dnd', body) },
+    updateDnd(body) { return http.put('/api/v1/settings/notifications/dnd', body).finally(dropPrefsCache) },
+    /** The two documents every DELIVERY decision needs — the resolved matrix and
+     *  the DND window — read through a small cache. Client-side delivery (the
+     *  chime, desktop notifications) asks on every SSE frame, and without this
+     *  each frame would cost two GETs.
+     *
+     *  Never rejects: an unreachable server yields nulls so callers can decide
+     *  for themselves, and nothing here is a privacy gate (it only decides
+     *  whether a sound plays or a tray notification appears). Writes above drop
+     *  the cache; the TTL covers edits made in another tab. */
+    prefs({ force = false } = {}) {
+      if (!force && prefsCache && Date.now() - prefsCache.at < PREFS_TTL) return Promise.resolve(prefsCache.value)
+      if (!force && prefsInflight) return prefsInflight                            // coalesce a burst of frames
+      const gen = prefsGen
+      const p = Promise.all([
+        http.get('/api/v1/settings/notifications').catch(() => null),
+        http.get('/api/v1/settings/notifications/dnd').catch(() => null),
+      ]).then(([matrix, dnd]) => {
+        const value = { matrix, dnd }
+        if (gen === prefsGen) prefsCache = { at: Date.now(), value }               // a write landed mid-read → don't cache
+        if (prefsInflight === p) prefsInflight = null
+        return value
+      })
+      prefsInflight = p
+      return p
+    },
+    /** Forget the cached matrix/DND — call after any write this module doesn't
+     *  own (e.g. a DND change made from the inbox). */
+    invalidatePrefs: dropPrefsCache,
     pushTokens() { return http.get('/api/v1/settings/notifications/push-tokens') },       // [{id,provider,platform,lastSeenAt}]
     registerPushToken(body) { return http.post('/api/v1/settings/notifications/push-tokens', body) },  // {provider,token,platform,sid}
     deletePushToken(id) { return http.del(`/api/v1/settings/notifications/push-tokens/${id}`) },       // 204 always

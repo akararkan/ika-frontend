@@ -313,12 +313,19 @@ a.pa-fact:hover{color:var(--navy)}
 .tx-note{padding:12px;color:var(--muted);font-size:12.5px}
 .tx-hint{margin-top:7px}
 
-/* toggles → prototype .tgl: navy on-track, 42×24 */
-.sw{width:42px;height:24px;background:#c2c1bf;transition:background .16s ease,box-shadow .16s ease}
-.sw::after{top:3px;left:3px;width:18px;height:18px;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .16s ease}
-.sw:hover{box-shadow:0 0 0 3px rgba(31,78,126,.12)}
-.sw.on{background:var(--navy)}
+/* toggles → prototype .tgl: navy on-track, 42×24.
+   The OFF track is stone (1.8:1 on a white card) which fails WCAG 1.4.11 for
+   a control boundary, so the track carries an inset slate hairline (--muted,
+   5.2:1) and the knob a matching ring. Disabled is 50% opacity per theme §6
+   — never a colour swap, or "off" and "locked" become indistinguishable. */
+.sw{width:42px;height:24px;background:var(--ox-stone-strong);box-shadow:inset 0 0 0 1px var(--muted);transition:background .16s ease,box-shadow .16s ease}
+.sw::after{top:3px;left:3px;width:18px;height:18px;box-shadow:0 1px 3px rgba(0,0,0,.25),0 0 0 1px rgba(28,35,48,.22);transition:left .16s ease}
+.sw:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--muted),0 0 0 3px rgba(31,78,126,.12)}
+.sw:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+.sw.on{background:var(--ox-blue);box-shadow:inset 0 0 0 1px var(--ox-blue)}
 .sw.on::after{left:21px}
+.sw:disabled{opacity:.5;cursor:default}
+.sw[aria-busy="true"]{opacity:.65}
 
 /* ===================== AUTH — split layout (enhanced) ===================== */
 @keyframes auth-drift{from{background-position:0 0}to{background-position:96px 192px}}

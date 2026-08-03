@@ -36,11 +36,17 @@ export function ErrorState({ message = 'Something went wrong', onRetry }) {
   )
 }
 
-/** Toast host — driven by showToast() in ui.jsx. Mount once in the layout. */
+/** Toast host — driven by showToast() in ui.jsx. Mount once in the layout.
+ *  All three glyphs are rendered and CSS reveals the one matching the tone
+ *  class, so a failure never ships with a checkmark. The node is only
+ *  opacity-0 (never display:none), so it stays in the accessibility tree and
+ *  the text swap is what fires the live-region announcement. */
 export function ToastHost() {
   return (
-    <div id="toast" className="toast">
-      <Icon name="check" className="sm"/>
+    <div id="toast" className="toast" role="status" aria-live="polite" aria-atomic="true">
+      <span className="tic ok" aria-hidden="true"><Icon name="check" className="sm"/></span>
+      <span className="tic warn" aria-hidden="true"><Icon name="alert" className="sm"/></span>
+      <span className="tic err" aria-hidden="true"><Icon name="close" className="sm"/></span>
       <span className="tmsg"/>
     </div>
   )

@@ -9,11 +9,19 @@
    styles/warm/prefs.css turns those into actual rendering.
 
    The contract with the stylesheet (do not widen it casually):
+     data-theme="dark"             appearance.theme (SYSTEM resolves live)
      data-density="compact"        appearance.density
      data-contrast="high"          accessibility.highContrast
      data-reduced-motion="on"      appearance|accessibility.reducedMotion
      --ui-font-scale:<number>      fontSize × largeText × interfaceScale
      --user-accent:#rrggbb         appearance.accentColor
+
+   Two accessibility toggles are read by JS rather than CSS, and have their
+   own tiny readers below so callers never re-parse the block:
+     prefersHaptics()              accessibility.hapticFeedback → vibrate()
+     prefersCaptions()             accessibility.closedCaptions → <video>
+   Both answer from the same cache the applier writes, so they are synchronous
+   and safe to call on a render path.
 
    Every default resolves to "attribute absent / property removed",
    so a user on defaults gets the untouched stylesheet — no rule in
@@ -50,6 +58,53 @@ function clampScale(n) {
 
 const round4 = (n) => Math.round(n * 1e4) / 1e4
 
+/* ---------- theme ----------
+   LIGHT is the untouched base (attribute absent), so a user on defaults gets
+   the stylesheet exactly as authored. SYSTEM follows the OS and has to keep
+   following it: one MediaQueryList listener is registered lazily and re-runs
+   the resolve whenever the OS flips — without it, "System" would only be
+   correct at the moment the page loaded. */
+let themeChoice = 'SYSTEM'
+let darkMql = null
+
+function osPrefersDark() {
+  try { return !!window.matchMedia?.('(prefers-color-scheme: dark)')?.matches } catch { return false }
+}
+
+function paintTheme(choice) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  const dark = choice === 'DARK' || (choice !== 'LIGHT' && osPrefersDark())
+  if (dark) root.setAttribute('data-theme', 'dark')
+  else root.removeAttribute('data-theme')
+  /* Keep the browser chrome (address bar, form controls) in step. */
+  root.style.colorScheme = dark ? 'dark' : 'light'
+}
+
+function watchSystemTheme() {
+  if (darkMql || typeof window === 'undefined' || !window.matchMedia) return
+  darkMql = window.matchMedia('(prefers-color-scheme: dark)')
+  const onChange = () => { if (themeChoice === 'SYSTEM') paintTheme('SYSTEM') }
+  if (darkMql.addEventListener) darkMql.addEventListener('change', onChange)
+  else darkMql.addListener?.(onChange)                       // Safari < 14
+}
+
+/* ---------- toggles other modules read ---------- */
+let hapticsOn = true          // the OS default is "vibration allowed"
+let captionsOn = false
+
+/** accessibility.hapticFeedback — false means the app must not vibrate. */
+export function prefersHaptics() { return hapticsOn }
+/** accessibility.closedCaptions — true means request/show captions by default. */
+export function prefersCaptions() { return captionsOn }
+
+/** Vibrate, but only if the user has not turned haptics off. Safe everywhere:
+ *  desktop browsers and iOS Safari have no navigator.vibrate at all. */
+export function haptic(pattern = 12) {
+  if (!hapticsOn) return false
+  try { return !!navigator.vibrate?.(pattern) } catch { return false }
+}
+
 /** Apply one settings object ({appearance, accessibility, …}) to <html>.
  *  Any part may be missing; unknown values degrade to the default. */
 export function applyPrefs(settings) {
@@ -57,6 +112,17 @@ export function applyPrefs(settings) {
   const root = document.documentElement
   const app = settings?.appearance || {}
   const acc = settings?.accessibility || {}
+
+  /* theme */
+  themeChoice = String(app.theme || 'SYSTEM').toUpperCase()
+  if (themeChoice !== 'DARK' && themeChoice !== 'LIGHT') themeChoice = 'SYSTEM'
+  paintTheme(themeChoice)
+  if (themeChoice === 'SYSTEM') watchSystemTheme()
+
+  /* JS-read accessibility toggles — absent (Jackson NON_NULL drops it) keeps
+     the platform default rather than flipping to false. */
+  hapticsOn = acc.hapticFeedback !== false
+  captionsOn = !!acc.closedCaptions
 
   /* density */
   if (String(app.density || '').toUpperCase() === 'COMPACT') root.setAttribute('data-density', 'compact')
@@ -114,6 +180,10 @@ export async function loadAndApplyPrefs() {
     if (mine !== seq) return res            // a newer load already applied
     applyPrefs(res)
     try {
+      /* `appearance` already carries `theme`, and `accessibility` carries the
+         haptics/captions flags, so caching the two blocks verbatim is what
+         lets applyCachedPrefs() paint the right surface before the first
+         network round trip (no light flash on a dark-mode reload). */
       localStorage.setItem(CACHE_KEY, JSON.stringify({
         appearance: res.appearance || null,
         accessibility: res.accessibility || null,

@@ -35,8 +35,22 @@ function PostMenu({ post, owner, onEdit, onDelete }) {
   const [pos, setPos] = React.useState(null)   // { top, right } in viewport coords
   const btnRef = React.useRef(null)
   const item = { display:'flex', alignItems:'center', gap:10, width:'100%', padding:'9px 12px', borderRadius:9, background:'transparent', color:'var(--ink)', fontSize:14, textAlign:'left', cursor:'pointer', border:0 }
+  const author = authorOf(post)
+  const canMute = !owner && !!post.author
 
-  const itemCount = 2 + (owner ? 0 : 1) + (owner && onEdit ? 1 : 0) + (owner && onDelete ? 1 : 0)
+  /* Mute only — never unmute. The menu has no cheap way to know the current
+     state (the list is a separate GET and SocialStatusResponse has no mute
+     flag), and POST /settings/privacy/muted/{id} is idempotent, so the row
+     always tells the truth. Undoing lives on the profile and in Settings.
+     What it promises is deliberately narrow — see UserProfilePage: the server
+     keeps the muted LIST but nothing reads it at feed assembly yet. */
+  const mute = () => {
+    api.settings.privacy.muted.mute(post.author)
+      .then(() => showToast(`Muted @${author.handle} — they are never told`))
+      .catch(() => showToast('Could not mute', 'err'))
+  }
+
+  const itemCount = 2 + (owner ? 0 : 1) + (canMute ? 1 : 0) + (owner && onEdit ? 1 : 0) + (owner && onDelete ? 1 : 0)
   const ESTIMATED_H = 8 + 36 * itemCount   // padding + row count
 
   const place = () => {
@@ -89,6 +103,7 @@ function PostMenu({ post, owner, onEdit, onDelete }) {
           }}>
             <button style={item} onClick={copyLink}><Icon name="link" className="sm"/>Copy link</button>
             <button style={item} onClick={() => { close(); doRepost(post) }}><Icon name="repost" className="sm"/>Repost</button>
+            {canMute && <button style={item} title="Adds them to your muted list. Silent and one-way — they are never told, and nothing is unfollowed or blocked." onClick={() => { close(); mute() }}><Icon name="mute" className="sm"/>Mute @{author.handle}</button>}
             {!owner && <button style={item} onClick={() => { close(); openReport({ targetType:'POST', targetId:post.id, targetLabel:'this post' }) }}><Icon name="flag" className="sm"/>Report post</button>}
             {owner && onEdit && <button style={item} onClick={() => { close(); onEdit(post.id) }}><Icon name="compose" className="sm"/>Edit post</button>}
             {owner && onDelete && <button style={{ ...item, color:'var(--rose, #b3453e)' }} onClick={() => { close(); onDelete(post.id) }}><Icon name="close" className="sm"/>Delete post</button>}
@@ -270,14 +285,27 @@ function PostMedia({ post, onOpenReel, onOpenImage }) {
 /* "Suggested for you" — the ranked feed's EXPLORE slice (guide §2).
    These are the ~5-10% of the page from authors the viewer does NOT follow, so
    the caption is not decoration: without it the row reads as "someone I
-   follow posted this", which is the one thing it is not. The Follow button is
-   the whole point of the slice, so it lives on the caption rather than making
-   the reader walk to the profile.
+   follow posted this", which is the one thing it is not. Just the label —
+   the Follow button itself renders on the author row (ExploreFollowBtn),
+   same line as the avatar/name, not up here. */
+function ExploreCaption() {
+  return (
+    <div className="pc-src">
+      <Icon name="trending" className="xs"/>
+      <span>Suggested for you</span>
+    </div>
+  )
+}
+
+/* The EXPLORE slice's Follow button, rendered inline on the author row
+   (.pc-head) next to the avatar/name — not on the "Suggested for you"
+   caption above it, so the action sits on the same line as the profile
+   it acts on.
 
    Follow state starts at false BY CONSTRUCTION — an EXPLORE candidate is
    filtered server-side to non-followed authors — so nothing is fetched to seed
    it, and a failed call rolls the button back rather than lying. */
-function ExploreCaption({ authorId, authorName }) {
+function ExploreFollowBtn({ authorId, authorName }) {
   const [following, setFollowing] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   if (!authorId) return null
@@ -292,17 +320,21 @@ function ExploreCaption({ authorId, authorName }) {
       .finally(() => setBusy(false))
   }
   return (
-    <div className="pc-src">
-      <Icon name="trending" className="xs"/>
-      <span>Suggested for you</span>
-      <button className={'btn btn-sm ' + (following ? 'btn-secondary' : 'btn-primary')} disabled={busy} onClick={toggle}>
-        {following ? 'Following' : 'Follow'}
-      </button>
-    </div>
+    <button className={'btn btn-sm pc-follow ' + (following ? 'btn-secondary' : 'btn-primary')} disabled={busy} onClick={toggle}>
+      {following ? 'Following' : 'Follow'}
+    </button>
   )
 }
 
-export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true }) {
+/**
+ * @param {boolean} [inlineComments=true] — whether the comment button expands
+ *   this card's OWN thread. False on a surface that already renders the full
+ *   thread below the card (the post detail page): there, expanding would put a
+ *   second comment list and a second composer on screen, and a reply typed in
+ *   the wrong one silently lands in a list the reader is not looking at. With
+ *   it off the button becomes a jump to the real thread via `onOpenComments`.
+ */
+export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true, inlineComments = true }) {
   const [shares, setShares] = React.useState(post.shares)
   const u = authorOf(post)
   const navigate = useNavigate()
@@ -345,6 +377,8 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
   const [cCount, setCCount] = React.useState(post.comments || 0)
   React.useEffect(() => { setCCount(post.comments || 0) }, [post.comments])
   const toggleComments = () => {
+    /* The page owns the thread — hand off instead of growing a second one. */
+    if (!inlineComments) { onOpenComments?.(post.id); return }
     setShowC(s => !s)
     if (comments == null) api.posts.comments(post.id, { pageSize: 20 }).then(r => setComments(r || [])).catch(() => setComments([]))
   }
@@ -363,7 +397,7 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
 
   return (
     <article ref={cardRef} className={'post-card rise' + (post.source === 'EXPLORE' ? ' is-explore' : '')} style={{ animationDelay: `${index * 60}ms` }}>
-      {post.source === 'EXPLORE' && <ExploreCaption authorId={post.author} authorName={u.full}/>}
+      {post.source === 'EXPLORE' && <ExploreCaption/>}
       <header className="pc-head">
         <span role="button" onClick={goAuthor} style={{ cursor:'pointer' }}>
           <Avatar initials={u.initials} color={u.avc} size={40} src={u.profileImage}/>
@@ -379,6 +413,7 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
             <span className="pc-handle" role="button" onClick={goAuthor} style={{ cursor:'pointer' }}>@{u.handle}</span>
           </div>
         </div>
+        {post.source === 'EXPLORE' && <ExploreFollowBtn authorId={post.author} authorName={u.full}/>}
         <div className="pc-side">
           <span className="pc-time">{post.time}</span>
           <Icon name={post.visibility === 'PUBLIC' ? 'globe' : post.visibility === 'FOLLOWERS' ? 'users' : 'lock'} className="xs"/>

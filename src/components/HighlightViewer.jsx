@@ -6,11 +6,13 @@
 import React from 'react'
 import { Icon, Avatar, showToast } from './ui.jsx'
 import { uiConfirm } from './Dialog.jsx'
+import { openReport } from './ReportDialog.jsx'
 import { api, adapters, assetUrl } from '../api/index.js'
 
 export function HighlightViewer({ highlight, author, owner, onClose }) {
   const [items, setItems] = React.useState(null)
   const [idx, setIdx] = React.useState(0)
+  const [reporting, setReporting] = React.useState(false)   // holds the auto-advance while the report dialog is up
   const u = author || { full: 'Member', handle: 'member', initials: '··', avc: 'linear-gradient(160deg,#3e5570,#1f4e7e)' }
 
   React.useEffect(() => {
@@ -29,11 +31,11 @@ export function HighlightViewer({ highlight, author, owner, onClose }) {
   const item = items?.[idx]
   // Auto-advance through the archive.
   React.useEffect(() => {
-    if (!item) return
+    if (!item || reporting) return
     const t = setTimeout(() => { if (idx + 1 >= items.length) onClose(); else setIdx(idx + 1) }, 6000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, items])
+  }, [idx, items, reporting])
 
   if (items == null) return <div className="reels-view is-story" style={{ display:'grid', placeItems:'center', color:'#fff' }}>Loading…<button className="rv-close" onClick={onClose} style={{ position:'absolute', top:18, right:22 }}><Icon name="close"/></button></div>
   if (!items.length) { onClose(); return null }
@@ -60,6 +62,18 @@ export function HighlightViewer({ highlight, author, owner, onClose }) {
           </div>
         </div>
         {owner && <button className="rv-close" style={{ marginLeft:'auto' }} onClick={removeCurrent} title="Remove from highlight"><Icon name="trash"/></button>}
+        {/* item.id is the archived STORY's id (set from r.storyId above), which is
+            what the moderators resolve — the highlight is only its shelf. */}
+        {!owner && item.id && (
+          <button className="rv-close" style={{ marginLeft:'auto' }} title="Report story" aria-label="Report story"
+            onClick={async () => {
+              setReporting(true)
+              try { await openReport({ targetType:'STORY', targetId:item.id, targetLabel:'this story' }) }
+              finally { setReporting(false) }
+            }}>
+            <Icon name="flag"/>
+          </button>
+        )}
         <button className="rv-close" onClick={onClose}><Icon name="close"/></button>
       </div>
 

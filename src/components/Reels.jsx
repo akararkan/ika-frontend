@@ -9,6 +9,7 @@ import React from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { Icon, Avatar, Verify, linkify, fmt, showToast } from './ui.jsx'
 import { openShare } from './ShareSheet.jsx'
+import { openReport } from './ReportDialog.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import { authorOf } from '../lib/userView.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -247,6 +248,14 @@ export function Reels({ onClose, initialId }) {
     api.posts.create({ postType: 'REPOST', visibility: 'PUBLIC', sharedPostId: reel.id, textContent: caption || '', mediaUrls: [], mediaTypes: [] })
       .then(() => showToast('Reposted to your profile'))
       .catch(() => showToast('Could not repost'))
+  }
+  /* The rail is a reel's only action surface — there is no ⋯ menu here — and a
+     reel IS a post, so it reports as one. Pause first: a reel talking over the
+     report form is exactly what the viewer is trying to get away from. */
+  const report = () => {
+    const v = videoRef.current
+    if (v && !v.paused) { v.pause(); setPlaying(false) }
+    openReport({ targetType: 'POST', targetId: reel.id, targetLabel: 'this reel' })
   }
   // Reflect the REAL follow state for the current reel's author (so the button
   // reads "Following" when you already follow them, "Follow" otherwise).
@@ -582,6 +591,11 @@ export function Reels({ onClose, initialId }) {
               <button className="rvr" onClick={share}>
                 <span><Icon name="share" className="lg"/></span><small className="font-mono">{fmt(reel.shares)}</small>
               </button>
+              {!isSelf && (
+                <button className="rvr" onClick={report} aria-label="Report this reel">
+                  <span><Icon name="flag" className="lg"/></span><small>Report</small>
+                </button>
+              )}
             </div>
 
             {/* playback timeline — drag to scrub, pinned to the bottom of the reel */}
@@ -635,7 +649,18 @@ export function Reels({ onClose, initialId }) {
                           <Avatar initials={cu.initials} color={cu.avc} size={30} src={cu.profileImage}/>
                         </span>
                         <div className="rvc-col">
-                          <div className="rvc-name"><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}<i>{c.time}</i></div>
+                          <div className="rvc-name"><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}<i>{c.time}</i>
+                            {/* Same synthesized-row caveat as the avatar above: without an
+                                author id we cannot tell whose comment it is, and a live row
+                                may carry no server id for moderators to resolve. */}
+                            {c.id && c.author && c.author !== user?.id && (
+                              <button type="button" title="Report comment" aria-label="Report comment"
+                                onClick={() => openReport({ targetType:'COMMENT', targetId:c.id, targetLabel:'this comment', subject:c.body })}
+                                style={{ marginInlineStart:'auto', background:'none', border:0, padding:2, color:'var(--muted)', cursor:'pointer' }}>
+                                <Icon name="flag" className="xs"/>
+                              </button>
+                            )}
+                          </div>
                           <p dir="auto">{linkify(c.body)}</p>
                         </div>
                       </div>

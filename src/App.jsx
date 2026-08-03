@@ -15,6 +15,7 @@ import { AuthProvider, RequireAuth, RequireRole, PLATFORM_ADMIN_ROLES } from './
 import { ChatProvider } from './context/ChatContext.jsx'
 import { CallProvider } from './context/CallContext.jsx'
 import { Layout } from './components/Layout.jsx'
+import { VersionGate } from './components/VersionGate.jsx'
 import { Loader } from './components/states.jsx'
 
 const named = (p, key) => lazy(() => p().then(m => ({ default: m[key] })))
@@ -44,6 +45,7 @@ const ChannelLinkPage    = named(() => import('./pages/ChannelLinkPage.jsx'), 'C
 const LivePage           = named(() => import('./pages/LivePage.jsx'), 'LivePage')
 const AdminSearchPage    = named(() => import('./pages/AdminSearchPage.jsx'), 'AdminSearchPage')
 const QrResolvePage      = named(() => import('./pages/QrResolvePage.jsx'), 'QrResolvePage')
+const PolicyPage         = named(() => import('./pages/PolicyPage.jsx'), 'PolicyPage')
 
 const fullScreenLoader = <div className="main center"><div className="col-main"><Loader label="Loading…"/></div></div>
 
@@ -51,11 +53,20 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Outside <Routes> so the build gate runs on EVERY route, including
+            /login and /register — GET /app/config is permitAll exactly so a
+            client with a defect is retired before anyone signs in. Inside the
+            router because it navigates. Signed out it issues that one public
+            call and, if it fails, renders nothing (fail open). */}
+        <VersionGate/>
         <Suspense fallback={fullScreenLoader}>
           <Routes>
             {/* public auth routes */}
             <Route path="/login" element={<AuthPage mode="SIGN_IN"/>}/>
             <Route path="/register" element={<AuthPage mode="SIGN_UP"/>}/>
+            {/* Policy documents are permitAll and are linked from the signup
+                consent line, so they must render without a session. */}
+            <Route path="/policies/:key" element={<PolicyPage/>}/>
 
             {/* protected app shell */}
             {/* ChatProvider wraps the shell (not just the chat route) so the ONE

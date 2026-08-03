@@ -8,6 +8,12 @@
    when the short-lived marker isn't armed. Arm it with
    security.stepUp({password}) or ({code}), then retry —
    `withStepUp` below packages that dance for the panels.
+
+   What this surface does NOT do yet, so no caller promises it:
+   login never challenges for a TOTP code (AuthServiceImpl.login
+   goes authenticate → issueTokenPair and never reads the 2FA
+   flag), nothing redeems a recovery code, and nothing writes a
+   login-history row. 2FA is real as a STEP-UP factor only.
    ========================================================= */
 import { http } from './http.js'
 
@@ -20,11 +26,15 @@ const page = (res, map = (x) => x) => ({
 export const OTP_PURPOSES = ['LOGIN', 'PHONE_VERIFY', 'PHONE_CHANGE', 'EMAIL_CHANGE', 'PASSWORD_RESET', 'STEP_UP']
 
 export const security = {
-  /* ---- sessions (Active Sessions = refresh_tokens) ---- */
+  /* ---- sessions (Active Sessions = refresh_tokens) ----
+     The login path persists only user/token/expiresAt, so of the seven
+     SessionResponse fields only `createdAt` and `trusted` arrive populated —
+     sid included. Callers must not key rows on sid, and must not offer the two
+     sid-addressed actions when it is missing. */
   sessions: {
-    list() { return http.get('/api/v1/security/sessions') },                    // [{sid,deviceName,platform,ip,lastSeenAt,createdAt,trusted}]
+    list() { return http.get('/api/v1/security/sessions') },                    // [{sid,deviceName,platform,ip,lastSeenAt,createdAt,trusted}] — see above
     revoke(sid) { return http.del(`/api/v1/security/sessions/${sid}`) },        // 204; 404 SESSION_NOT_FOUND (incl. not-yours)
-    trust(sid, days = 30) { return http.post(`/api/v1/security/sessions/${sid}/trust`, { days }) },  // 204, clamps 1..90
+    trust(sid, days = 30) { return http.post(`/api/v1/security/sessions/${sid}/trust`, { days }) },  // 204, clamps 1..90; trusted_until is written but read by no auth path
   },
 
   /* ---- two-factor (RFC 6238 TOTP) ---- */
@@ -33,10 +43,12 @@ export const security = {
     verify(code) { return http.post('/api/v1/security/2fa/verify', { code }) }, // {codes:[…10]} on first enable, [] on re-verify
     disable() { return http.post('/api/v1/security/2fa/disable') },             // 204 — STEP-UP REQUIRED
     status() { return http.get('/api/v1/security/2fa/status') },                // {enabled, recoveryCodesRemaining}
-    regenerateRecovery() { return http.post('/api/v1/security/recovery-codes/regenerate') },  // {codes} — STEP-UP REQUIRED
+    regenerateRecovery() { return http.post('/api/v1/security/recovery-codes/regenerate') },  // {codes} — STEP-UP REQUIRED; nothing redeems a code yet
   },
 
-  /* ---- login history (Spring Page, ts DESC) ---- */
+  /* ---- login history (Spring Page, ts DESC) ----
+     Read-only in practice: LoginEventService.record() has no caller, so the
+     page is empty even straight after a sign-in. */
   async loginHistory(opts) {
     return page(await http.get('/api/v1/security/login-history', opts))         // [{ip,userAgent,method,outcome,ts}]
   },
@@ -64,7 +76,10 @@ export const security = {
     }
   },
 
-  /* ---- phone binding (logged-in) ---- */
+  /* ---- phone binding (logged-in) ----
+     Write-only: verify stores phoneE164/phoneVerifiedAt on the User, but no
+     response DTO exposes them and there is no GET here — a bound number cannot
+     be read back, so panels can only show what they verified this session. */
   phone: {
     request(phone) { return http.post('/api/v1/security/phone/request', { phone }) },          // 202; 400 PHONE_INVALID; 429
     verify(phone, code) { return http.post('/api/v1/security/phone/verify', { phone, code }) },// {verified:true, phone:E.164}; 400 OTP_INVALID

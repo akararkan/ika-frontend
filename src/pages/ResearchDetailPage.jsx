@@ -4,7 +4,7 @@
    ========================================================= */
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Icon, Verify, Avatar, fmt, linkify, showToast } from '../components/ui.jsx'
+import { Icon, Verify, Avatar, fmt, linkify, bidiIsolate, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
 import { openReport } from '../components/ReportDialog.jsx'
@@ -613,7 +613,7 @@ export function ResearchDetailPage() {
                         {m.url ? <img src={m.url} alt={m.altText || m.caption || ''} loading="lazy"/> : <div className="rd-figure-fallback"/>}
                         <span className="rd-figure-num">Fig. {i + 1}</span>
                       </div>
-                      {(m.caption || m.altText) && <figcaption dir="auto"><b>Fig. {i + 1}.</b> {m.caption || m.altText}</figcaption>}
+                      {(m.caption || m.altText) && <figcaption dir="auto"><span dir="ltr" className="rd-figure-label"><b>Fig. {i + 1}.</b></span> {m.caption || m.altText}</figcaption>}
                     </figure>
                   ))}
                 </div>
@@ -727,6 +727,8 @@ export function ResearchDetailPage() {
                     <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>Reply</button>
                     {own && <button onClick={() => editComment(c)}>Edit</button>}
                     {own && <button onClick={() => deleteComment(c)} style={{ color:'var(--rose)' }}>Delete</button>}
+                    {/* `subject` shows the comment's own text on the dialog's plate — see PostPage */}
+                    {!own && c.id && <button onClick={() => openReport({ targetType:'COMMENT', targetId:c.id, targetLabel:'this comment', subject:c.body })}>Report</button>}
                     <span>{c.time}</span>
                   </div>
 
@@ -753,6 +755,7 @@ export function ResearchDetailPage() {
                             <button onClick={() => reactComment(rr, c.id)} style={rr.liked ? { color:'var(--rose)' } : undefined}><Icon name="heart" className="xs"/>{rr.likes || 0}</button>
                             {rown && <button onClick={() => editComment(rr, c.id)}>Edit</button>}
                             {rown && <button onClick={() => deleteComment(rr, c.id)} style={{ color:'var(--rose)' }}>Delete</button>}
+                            {!rown && rr.id && <button onClick={() => openReport({ targetType:'COMMENT', targetId:rr.id, targetLabel:'this reply', subject:rr.body })}>Report</button>}
                             <span>{rr.time}</span>
                           </div>
                         </div>
@@ -811,7 +814,7 @@ export function ResearchDetailPage() {
             {r.citation && (
               <div className="card rd-panel">
                 <h5 className="rd-panel-h">Cite this work</h5>
-                <div className="cite-box font-serif" dir="auto">{r.citation}</div>
+                <div className="cite-box font-serif" dir="auto">{bidiIsolate(r.citation)}</div>
                 <div className="rd-cite-actions">
                   <button onClick={copyCite}><Icon name="cite" className="xs"/>Copy citation</button>
                   <button onClick={cite}><Icon name="check" className="xs"/>I cited this</button>
@@ -860,7 +863,7 @@ export function ResearchDetailPage() {
             {imgs.length > 1 && <button className="lb-nav lb-next" onClick={next} aria-label="Next"><Icon name="chevright"/></button>}
             <img className="lb-img" src={m.url} alt={m.altText || m.caption || ''}/>
             {(m.caption || m.altText) && (
-              <div className="lb-count" dir="auto"><b>Fig. {lightbox + 1}.</b> {m.caption || m.altText}</div>
+              <div className="lb-count" dir="auto"><span dir="ltr" className="rd-figure-label"><b>Fig. {lightbox + 1}.</b></span> {m.caption || m.altText}</div>
             )}
           </div>
         )

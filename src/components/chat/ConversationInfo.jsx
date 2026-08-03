@@ -22,6 +22,7 @@ import { api } from '../../api/index.js'
 import { Icon, Avatar, Verify, showToast } from '../ui.jsx'
 import { Loader } from '../states.jsx'
 import { uiConfirm, uiPrompt } from '../Dialog.jsx'
+import { openReport } from '../ReportDialog.jsx'
 import { useImageViewer } from '../ImageLightbox.jsx'
 import { useChat } from '../../context/ChatContext.jsx'
 import { Popover } from './Popover.jsx'
@@ -869,6 +870,27 @@ export function ConversationInfo({
 
         {/* ----- danger zone ----- */}
         <div className="ci-section">
+          {/* A single message is reported from its own menu; this reports the
+              PERSON, which is what someone being harassed across a whole thread
+              actually needs. Groups have no reportable target type, so the row
+              is DM-only. */}
+          {!isGroup && peer?.id && (
+            <button type="button" className="ci-row click"
+              onClick={() => openReport({
+                targetType: 'USER', targetId: peer.id,
+                targetLabel: peer.handle ? '@' + peer.handle : 'this account',
+              })}>
+              <Icon name="flag"/>
+              <div className="ci-row-body">
+                <div className="ci-row-title">Report {peer.handle ? '@' + peer.handle : 'this account'}</div>
+                {/* Same promise the dialog makes, worded the same way: the
+                    REPORTED person never learns who filed it. Moderators do —
+                    ReportService stores reporterId — so "nobody is told" would
+                    be a claim the server does not keep. */}
+                <div className="ci-row-sub">Moderators review it. Your name is never shown to the person you report.</div>
+              </div>
+            </button>
+          )}
           {isGroup ? (
             <button type="button" className="ci-row click danger" onClick={onLeave}>
               <Icon name="logout"/>

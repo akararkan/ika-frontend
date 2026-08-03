@@ -209,9 +209,20 @@
 .t-error{text-align:center;padding:32px 20px}
 .t-error p{color:var(--danger);font-weight:600;font-size:13.5px}
 
-/* Toast — warm ink pill (theme.css sets bg/radius; add depth + gold glint) */
+/* Toast — warm ink pill (theme.css sets bg/radius; add depth + sky glint).
+   Three tones: the default ink pill for confirmations, and the theme's
+   wash+deep pairs for warnings and failures. The host renders all three
+   glyphs; only the one matching the tone class is shown, so a failure can
+   never ship with a checkmark. */
 .toast{box-shadow:0 14px 34px -12px rgba(15,21,32,.5)}
 .toast .ico{color:#b9d6f2}
+.toast .tic{display:none;align-items:center}
+.toast.t-ok .tic.ok,.toast.t-warn .tic.warn,.toast.t-err .tic.err{display:flex}
+.toast:not(.t-ok):not(.t-warn):not(.t-err) .tic.ok{display:flex}   /* legacy single-arg calls */
+.toast.t-warn{background:var(--ox-amber-wash);color:var(--ox-amber)}
+.toast.t-warn .ico{color:var(--ox-amber)}
+.toast.t-err{background:var(--ox-red-wash);color:var(--ox-red)}
+.toast.t-err .ico{color:var(--ox-red)}
 
 /* ---------------- Topbar typeahead (SearchTypeahead.jsx) ----------------
    Anchored to `.tb-search` (already position:relative). It sits above every

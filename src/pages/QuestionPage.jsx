@@ -667,6 +667,9 @@ export function QuestionPage() {
                         {!isTmp && <button onClick={() => replyToReply(a, r)}><Icon name="reply" className="xs"/>Reply</button>}
                         {rOwn && !rEditing && <button onClick={() => startEditReply(r)}>Edit</button>}
                         {rOwn && <button onClick={() => deleteReply(a.id, r)} style={{ color:'var(--rose)' }}>Delete</button>}
+                        {/* A reply to an answer IS an answer (replyToAnswerId), so it
+                            reports as ANSWER — there is no reply target type. */}
+                        {!rOwn && !isTmp && <button onClick={() => openReport({ targetType:'ANSWER', targetId:r.id, targetLabel:'this reply', subject:r.body })}>Report</button>}
                         <span>{r.time}</span>
                       </div>
                     </div>

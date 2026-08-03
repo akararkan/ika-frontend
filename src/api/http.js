@@ -168,8 +168,41 @@ function filenameFrom(disposition) {
   return plain ? plain[1].trim() : ''
 }
 
+/* ---- mock mode ----------------------------------------------------------
+   One switch (VITE_USE_MOCK, or localStorage.ika_mock) serves the whole app
+   from src/mock/data.json. It is intercepted HERE, at the single funnel every
+   REST call passes through, so the fixture still travels the real path —
+   adapters, defensive parsing, error envelopes. A miss falls through to the
+   network, so a partial fixture degrades to the live API rather than to a
+   blank screen. When the flag is off the mock module is never imported. */
+/* Statically false in a production build with the flag unset, so the bundler
+   drops the dynamic import and the fixture never ships. */
+const MOCK_BUILD = String(import.meta.env?.VITE_USE_MOCK ?? '').toLowerCase() !== 'never'
+
+/** `{hit:false}` | `{hit:true, value}` — a plain object rather than a shared
+ *  Symbol, so nothing has to be imported just to recognise a miss. */
+async function tryMock(method, path, opts) {
+  const mock = await import('../mock/index.js')
+  if (!mock.mockEnabled()) return { hit: false }
+  return mock.resolveMock(method, path, opts)
+}
+
 export async function request(method, path, opts = {}) {
   const { body, query, headers = {}, multipart = false, signal, keepalive = false, as = 'json', _retried = false } = opts
+
+  if (MOCK_BUILD) {
+    let mocked
+    try {
+      mocked = await tryMock(method, path, { ...opts, query })
+    } catch (e) {
+      /* A handler that threw mockError() is a deliberate failure path — surface
+         it as the real client would. Anything else is a broken fixture, and a
+         broken fixture must not silently turn into a live request. */
+      if (e?.__mockStatus) throw new ApiError(e.__mockStatus, e.__mockBody?.errorCode, e.__mockBody?.message, e.__mockBody)
+      throw e
+    }
+    if (mocked.hit) return mocked.value
+  }
 
   /* `as: 'blob'` is for authed BINARY downloads (the live-stream recording).
      It must go through this function rather than an <a href> or a bare fetch:
@@ -241,13 +274,46 @@ export async function request(method, path, opts = {}) {
   throw err
 }
 
+/* ---- upload quality ----------------------------------------------------
+   MediaSettings.uploadQuality is documented server-side as "a hint that saves
+   the user's bandwidth — the client may pre-compress to it". Every multipart
+   upload in the app funnels through http.upload, so honouring the setting
+   here is what makes one preference cover avatars, covers, chat attachments,
+   post and research media at once, instead of each call site remembering.
+
+   Only oversized raster images are touched (mediaTier skips GIF/SVG/video and
+   never upscales), and every failure path returns the original FormData — a
+   compression helper must never be why an upload cannot happen. */
+async function withTierApplied(formData) {
+  if (typeof FormData === 'undefined' || !(formData instanceof FormData)) return formData
+  try {
+    const { prepareUpload } = await import('../lib/mediaTier.js')
+    let touched = false
+    const out = new FormData()
+    for (const [key, value] of formData.entries()) {
+      if (typeof File !== 'undefined' && value instanceof File && value.type?.startsWith('image/')) {
+        const next = await prepareUpload(value)
+        if (next !== value) touched = true
+        out.append(key, next, next.name)
+      } else {
+        out.append(key, value)
+      }
+    }
+    return touched ? out : formData
+  } catch {
+    return formData
+  }
+}
+
 export const http = {
   get:   (path, query, opts)        => request('GET', path, { query, ...opts }),
   post:  (path, body, opts)         => request('POST', path, { body, ...opts }),
   patch: (path, body, opts)         => request('PATCH', path, { body, ...opts }),
   put:   (path, body, opts)         => request('PUT', path, { body, ...opts }),
   del:   (path, opts)               => request('DELETE', path, opts),
-  upload:(path, formData, opts)     => request('POST', path, { body: formData, multipart: true, ...opts }),
+  async upload(path, formData, opts) {
+    return request('POST', path, { body: await withTierApplied(formData), multipart: true, ...opts })
+  },
   /** Authed binary GET → `{ blob, filename, type }`. See the `as: 'blob'` note
    *  in `request`; use `saveBlob` below to actually put it on disk. */
   download:(path, query, opts)      => request('GET', path, { query, as: 'blob', ...opts }),

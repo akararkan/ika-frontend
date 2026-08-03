@@ -1,6 +1,9 @@
 /* =========================================================
    VersionGate — the client build gate and policy re-consent
-   prompt (§19). Mounted once inside the app shell.
+   prompt (§19). Mounted at the ROUTER ROOT (App.jsx) so it also
+   covers /login and /register: GET /app/config is permitAll
+   precisely so a defective build is retired BEFORE anyone signs
+   in. Signed out it only issues that one public call.
    Three outcomes, cheapest first:
      1. too old (below minSupportedVersion, or behind
         latestVersion while forceUpdate is on) → a blocking
@@ -9,40 +12,59 @@
         banner (dismissal lasts the tab session);
      3. a policy document published a version the account has
         not accepted → the same banner, pointing at
-        /settings/about.
+        /settings/about (or the public /policies/:key when the
+        session has lapsed since — /settings is auth-gated).
+   Outcomes 1 and 2 need a version to compare; an unstamped
+   build (0.0.0) is skipped rather than treated as ancient.
    Wire: app.config()/app.policy() are permitAll; accepted() is
    a bare array keyed `policyKey` (the doc says `key`). Every
    request is individually caught — a settings outage must
-   never wedge the app, so any failure renders nothing.
+   never wedge the app, so any failure renders nothing (fail
+   open: a network blip must not lock anyone out).
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from './ui.jsx'
 import { api, session, POLICY_KEYS } from '../api/index.js'
+import { CLIENT_VERSION, compareVersions as cmp } from '../lib/version.js'
 
-const CLIENT_VERSION = import.meta.env?.VITE_APP_VERSION || '1.0.0'
 const UPDATE_KEY = 'ika_update_dismissed'
 const POLICY_KEY = 'ika_policy_prompt_dismissed'
 
-/* ---------- version compare ---------- */
+/* A build with no injected version reports 0.0.0 — that is "unknown", not
+   "ancient". Comparing it would put every browser behind the server's default
+   minSupportedVersion (1.0.0) and hard-block the app the moment a pipeline
+   forgets to stamp package.json, so an unstamped build is never gated at all.
+   AboutPanel calls the same state a "Development build". */
+const UNSTAMPED = !CLIENT_VERSION || CLIENT_VERSION === '0.0.0'
 
-/** One dotted segment as a number; junk ('beta', '', undefined) counts as 0. */
-function seg(part) {
-  const n = parseInt(part, 10)
-  return Number.isFinite(n) ? n : 0
-}
+/* ---------- one live gate at a time ----------
+   The root mount covers the logged-out routes, but the shell (Layout) mounts
+   its own copy as well, and two live gates would stack two overlays and fire
+   two config calls. So instances queue: the first to mount owns the screen,
+   the rest render nothing and only take over if it goes away. */
+const parked = new Set()
+let holder = null
 
-/** Semver-ish compare: -1 / 0 / 1. Missing trailing parts are 0, so
- *  '1.2' === '1.2.0' and '1.2.0' < '1.2.1'. Never throws. */
-function cmp(a, b) {
-  const pa = String(a ?? '').split('.')
-  const pb = String(b ?? '').split('.')
-  const len = Math.max(pa.length, pb.length)
-  for (let i = 0; i < len; i++) {
-    const x = seg(pa[i]), y = seg(pb[i])
-    if (x !== y) return x < y ? -1 : 1
-  }
-  return 0
+function useGateLead() {
+  const [lead, setLead] = React.useState(false)
+  React.useEffect(() => {
+    const self = { take: () => setLead(true) }
+    if (holder) parked.add(self)
+    else { holder = self; setLead(true) }
+    return () => {
+      parked.delete(self)
+      if (holder !== self) return
+      /* Drop our own lead BEFORE handing it on — StrictMode runs this cleanup
+         between the two mount passes, and a stale `true` here would leave two
+         instances rendering. */
+      setLead(false)
+      holder = null
+      const next = parked.values().next().value
+      if (next) { parked.delete(next); holder = next; next.take() }
+    }
+  }, [])
+  return lead
 }
 
 /* ---------- session-scoped dismissal (storage can throw) ---------- */
@@ -56,17 +78,14 @@ function remember(key) {
 
 /* ---------- the slim bottom banner ---------- */
 
+/* Positioning lives in settings.css (.vg-banner) rather than inline, because it
+   has to clear the mobile bottom nav — a fixed `bottom:16px` planted this
+   directly on top of the tab bar, covering it. */
 function Banner({ icon, text, actionLabel, onAction, onDismiss }) {
   return (
-    <div className="card" role="status"
-      style={{
-        position: 'fixed', left: 16, right: 16, bottom: 16,
-        maxWidth: 520, margin: '0 auto', zIndex: 3000,
-        padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
-        boxShadow: '0 18px 40px -18px rgba(13,21,32,.45)',
-      }}>
+    <div className="card vg-banner" role="status">
       <Icon name={icon} className="sm"/>
-      <span className="text-sm" style={{ flex: 1, lineHeight: 1.4 }}>{text}</span>
+      <span className="text-sm vg-banner-txt">{text}</span>
       <button type="button" className="btn btn-primary btn-sm" onClick={onAction}>{actionLabel}</button>
       <button type="button" className="icon-btn" aria-label="Dismiss" onClick={onDismiss}>
         <Icon name="close" className="sm"/>
@@ -79,13 +98,15 @@ function Banner({ icon, text, actionLabel, onAction, onDismiss }) {
 
 export function VersionGate() {
   const navigate = useNavigate()
+  const lead = useGateLead()
   const [gate, setGate] = React.useState(null)          // 'block' | 'update' | null
   const [latest, setLatest] = React.useState('')
-  const [policyText, setPolicyText] = React.useState('')
+  const [policy, setPolicy] = React.useState(null)      // {text, key} once a doc is stale
   const [updateOff, setUpdateOff] = React.useState(() => wasDismissed(UPDATE_KEY))
   const [policyOff, setPolicyOff] = React.useState(() => wasDismissed(POLICY_KEY))
 
   React.useEffect(() => {
+    if (!lead) return undefined
     let alive = true
 
     const run = async () => {
@@ -94,9 +115,9 @@ export function VersionGate() {
 
       const min = cfg.minSupportedVersion || ''
       const newest = cfg.latestVersion || ''
-      const blocking = (!!min && cmp(CLIENT_VERSION, min) < 0) ||
-        (!!cfg.forceUpdate && !!newest && cmp(CLIENT_VERSION, newest) < 0)
-      const behind = !blocking && !!newest && cmp(CLIENT_VERSION, newest) < 0
+      const blocking = !UNSTAMPED && ((!!min && cmp(CLIENT_VERSION, min) < 0) ||
+        (!!cfg.forceUpdate && !!newest && cmp(CLIENT_VERSION, newest) < 0))
+      const behind = !UNSTAMPED && !blocking && !!newest && cmp(CLIENT_VERSION, newest) < 0
 
       setLatest(newest)
       setGate(blocking ? 'block' : behind ? 'update' : null)
@@ -120,12 +141,17 @@ export function VersionGate() {
 
       const known = POLICY_KEYS.find(([k]) => k === stale[0].key)
       const title = stale[0].title || (known ? known[1] : 'policy')
-      setPolicyText(stale.length > 1 ? 'Please review our policies' : `Our ${title} has been updated`)
+      setPolicy({
+        key: stale[0].key,
+        text: stale.length > 1 ? 'Please review our policies' : `Our ${title} has been updated`,
+      })
     }
 
     run().catch(() => { /* never block the app on a settings failure */ })
     return () => { alive = false }
-  }, [])
+  }, [lead])
+
+  if (!lead) return null
 
   /* 1 — hard gate. No dismiss control: that is the point. */
   if (gate === 'block') {
@@ -173,14 +199,19 @@ export function VersionGate() {
     )
   }
 
-  /* 3 — policy re-consent. */
-  if (policyText && !policyOff) {
+  /* 3 — policy re-consent. Only ever reached with a session (the acceptance
+     list needs one), but /settings/about is auth-gated and a token can lapse
+     between the fetch and the click — the public document is the safe landing. */
+  if (policy && !policyOff) {
     return (
       <Banner
         icon="doc"
-        text={policyText}
+        text={policy.text}
         actionLabel="Review"
-        onAction={() => { remember(POLICY_KEY); setPolicyOff(true); navigate('/settings/about') }}
+        onAction={() => {
+          remember(POLICY_KEY); setPolicyOff(true)
+          navigate(session.isAuthed() ? '/settings/about' : `/policies/${policy.key}`)
+        }}
         onDismiss={() => { remember(POLICY_KEY); setPolicyOff(true) }}
       />
     )

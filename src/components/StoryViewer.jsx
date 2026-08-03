@@ -7,6 +7,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, showToast } from './ui.jsx'
 import { uiConfirm, uiPrompt } from './Dialog.jsx'
+import { openReport } from './ReportDialog.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api, adapters, assetUrl } from '../api/index.js'
 
@@ -209,6 +210,7 @@ export function StoryViewer({ authorId, author, onClose }) {
   React.useEffect(() => () => clearTimeout(seenT.current), [])
   const pollRef = React.useRef(null)                  // current poll, for handlers that must name it without re-subscribing
   const [addHl, setAddHl] = React.useState(false)
+  const [reporting, setReporting] = React.useState(false)   // holds the auto-advance while the report dialog is up
   const [loading, setLoading] = React.useState(true)
   const u = author || { full: 'Member', handle: 'member', initials: '··', avc: gradientFor(authorId) }
 
@@ -255,16 +257,18 @@ export function StoryViewer({ authorId, author, onClose }) {
   }, [item?.id])
 
   // Auto-advance like a real story tray (6s, synced with the .rv-progress bar).
-  // Poll stories don't auto-advance so viewers have time to vote.
+  // Poll stories don't auto-advance so viewers have time to vote — and neither
+  // does a story being reported: 6s is nowhere near long enough to pick a reason,
+  // and advancing would pull the story out from under the open dialog.
   React.useEffect(() => {
-    if (!item || poll) return
+    if (!item || poll || reporting) return
     const t = setTimeout(() => {
       if (idx + 1 >= items.length) onClose()
       else setIdx(idx + 1)
     }, 6000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, items.length, poll])
+  }, [idx, items.length, poll, reporting])
 
   React.useEffect(() => { pollRef.current = poll }, [poll])
 
@@ -360,6 +364,16 @@ export function StoryViewer({ authorId, author, onClose }) {
         </div>
         {isOwner && <button className="rv-close" style={{ marginLeft:'auto' }} onClick={() => setAddHl(true)} title="Add to highlight" aria-label="Add to highlight"><Icon name="star"/></button>}
         {isOwner && <button className="rv-close" onClick={removeCurrent} title="Delete story" aria-label="Delete story"><Icon name="trash"/></button>}
+        {!isOwner && item?.id && (
+          <button className="rv-close" style={{ marginLeft:'auto' }} title="Report story" aria-label="Report story"
+            onClick={async () => {
+              setReporting(true)
+              try { await openReport({ targetType:'STORY', targetId:item.id, targetLabel:'this story' }) }
+              finally { setReporting(false) }
+            }}>
+            <Icon name="flag"/>
+          </button>
+        )}
         <button className="rv-close" onClick={onClose}><Icon name="close"/></button>
       </div>
       {addHl && <AddToHighlightSheet storyId={item.id} authorId={authorId} onClose={() => setAddHl(false)}/>}

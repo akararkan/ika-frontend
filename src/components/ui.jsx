@@ -260,15 +260,24 @@ export function BrandMark() {
   )
 }
 
-/* ----- Toast ----- */
+/* ----- Toast -----
+   showToast(msg)            → the neutral/confirmation pill (unchanged)
+   showToast(msg, 'err')     → error wash + ✕ glyph, announced assertively
+   showToast(msg, 'warn')    → amber wash + ! glyph
+   The host (states.jsx) is an aria-live region, so the text swap is what
+   announces — which is why the class is set BEFORE the textContent. */
 let toastTimer
-export function showToast(msg) {
+const TOAST_TONES = new Set(['ok', 'warn', 'err'])
+export function showToast(msg, tone = 'ok') {
   const el = document.getElementById('toast')
   if (!el) return
+  const t = TOAST_TONES.has(tone) ? tone : 'ok'
+  el.className = 'toast show t-' + t
+  // Failures interrupt; confirmations wait their turn.
+  el.setAttribute('aria-live', t === 'ok' ? 'polite' : 'assertive')
   el.querySelector('.tmsg').textContent = msg
-  el.classList.add('show')
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200)
+  toastTimer = setTimeout(() => el.classList.remove('show'), t === 'ok' ? 2200 : 3600)
 }
 
 /* ----- Format helper ----- */
@@ -284,7 +293,7 @@ export function TagLink({ tag }) {
   const slug = tag.replace(/^#/, '')
   return (
     <a className="tk-tag" role="button" tabIndex={0}
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/tags/${encodeURIComponent(slug)}`) }}>{tag}</a>
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/tags/${encodeURIComponent(slug)}`) }}><bdi dir="ltr">{tag}</bdi></a>
   )
 }
 
@@ -299,8 +308,18 @@ export function MentionLink({ handle }) {
   }
   return (
     <a className="tk-mention" role="button" tabIndex={0} onClick={go}
-      onKeyDown={(e) => { if (e.key === 'Enter') go(e) }}>{handle}</a>
+      onKeyDown={(e) => { if (e.key === 'Enter') go(e) }}><bdi dir="ltr">{handle}</bdi></a>
   )
+}
+
+/* ----- Isolate embedded Latin/digit runs (IDs, DOIs, page ranges) inside
+   RTL text so they don't get bidi-reordered relative to their own punctuation
+   (e.g. a trailing "IRC-2026-000114." flipping to ".IRC-2026-000114" inside
+   an Arabic/Kurdish sentence). Safe to apply to any locale's text. ----- */
+export function bidiIsolate(text) {
+  if (!text) return null
+  const parts = text.split(/([\w.,&()/-]*[A-Za-z][\w.,&()/-]*)/g)
+  return parts.map((p, i) => (p && /[A-Za-z]/.test(p) ? <bdi key={i} dir="ltr">{p}</bdi> : <React.Fragment key={i}>{p}</React.Fragment>))
 }
 
 /* ----- Linkify body text (clickable hashtags + mentions) ----- */

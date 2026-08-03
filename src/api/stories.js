@@ -2,6 +2,7 @@
    Stories service — /api/v1/stories (24h ephemeral) + Close Friends
    ========================================================= */
 import { http } from './http.js'
+import { mockEnabled } from '../mock/flag.js'
 import { API_BASE, session } from './config.js'
 
 // Author-scoped story-tray live stream. The backend pushes StoryTrayEvents here
@@ -22,6 +23,14 @@ const TRAY_PATH = '/api/v1/stories/tray/stream'
    auto-reconnect 401s and the EventSource dies CLOSED with no retry; the
    onerror heal below re-dials with a fresh token. Returns an unsubscribe fn. */
 function hardenedStoryStream(path, eventNames, route, onError) {
+
+  /* Mock mode: EventSource does not pass through request(), so nothing can
+     intercept it — opening one only retry-loops against a server that is not
+     running. Report connected and stay silent. */
+  if (mockEnabled()) {
+    const t = setTimeout(() => onError?.({ mock: true }), 0)
+    return () => clearTimeout(t)
+  }
   const parse = (e) => { try { return JSON.parse(e.data) } catch { return {} } }
   let es = null
   let lastBeat = Date.now()

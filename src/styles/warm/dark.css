@@ -1,0 +1,963 @@
+/* =============================================================
+   IKA — DARK MODE REPAIR LAYER            (2026-08-02)
+   Every rule in this file is scoped under :root[data-theme="dark"],
+   so the file is completely inert in the light theme. Nothing here
+   may be copied out of that scope.
+
+   WHY THIS FILE EXISTS
+   theme.css already carries the dark TOKEN remap (OXFORD_THEME.md §4)
+   and everything that reads --card / --ink / --line follows it. What
+   did NOT follow were the rules across styles/*.css and warm/*.css
+   that hard-code a colour literal in place. Dark mode therefore
+   rendered as a mixed page: white cards on a night-blue body, dark
+   ink on dark plates, invisible headings. This layer repairs those,
+   and only those.
+
+   -----------------------------------------------------------------
+   THE CLASSIFICATION (the sweep that produced this file; extend it
+   the same way — grep a literal, then ask which bucket it is in)
+   -----------------------------------------------------------------
+   (a) LIGHT-SURFACE LITERALS — MUST FLIP.  Repaired below.
+       #ffffff/#fff, #f7f6f5, #f2f0f0, #f0efee, #e9e8e6 as a card /
+       rail / field / table-header / studio background; #d9d8d6,
+       #c2c1bf, #cfcecc as a border; #edf3fa, #e1ebf6, #f2f6fc,
+       #dce6f2, #dce9f6 as a hover/selected wash; #232b3a and
+       #163e66 as body/accent ink; rgba(255,255,255,.86–.96) as a
+       translucent chrome plate (topbar, botnav, hero panels).
+       Also in this bucket, and easy to miss:
+         · SCOPED TOKEN BLOCKS that re-pin the whole palette inside a
+           subtree — `.rd-page` (twice), `.rm-app{--studio}`, the
+           `--mx-*` family in ika-messages-theme.css. One override of
+           the block fixes the entire surface; see §1.
+         · TOKENS THAT INVERT. --navy/--rubric/--gold/--brass all
+           resolve to LIGHT blues in dark mode (that is deliberate:
+           they carry headings and links). Any rule that used one as
+           a filled PLATE and paired it with #fff/#f2f0f0 ink becomes
+           light-on-light. Fixed by re-plating in --emerald /
+           --emerald-deep (theme.css keeps those two button-capable
+           on dark), never by bleaching the ink. See §3.
+         · The mirror image: --emerald/--emerald-deep and the fixed
+           --ox-blue* ramp stay DARK, so every rule that used one as
+           accent TEXT goes dark-on-dark. Lifted to --rubric (Sky) or
+           --blue in §6.
+
+   (b) DARK BY DESIGN — MUST NOT FLIP (OXFORD_THEME.md §3).
+       reels (.reels-view, .rv-*, .rvm-*), story viewer + editor
+       (.sv-*, .se-*, .story-editor), media lightbox (.lightbox, .lb-*,
+       .ch-lightbox-*), the auth split pane (.auth-left and the .auth-*
+       inside it), dark video chrome (.rd-vp-*, .vp-*, .media-video-
+       shell), calls + live + the broadcast stage (.cl-*, .lv-stage,
+       .stg-*), channel cover art (.cp-cover, .cm-art-cover,
+       .cn-card-cover), code blocks (.prose pre), own-message bubbles.
+       These already read correctly on a dark page and are left
+       alone — EXCEPT where they were painted with an inverting token
+       (var(--navy)/var(--navy-deep)), which would have turned them
+       LIGHT. Those are pinned back to the fixed blue-black ramp
+       in §2. Never "fix" a rule in this bucket by lightening it.
+
+   (c) SEMANTIC CONTENT COLOUR — MUST NOT FLIP (theme.css §8.8,
+       "user content colours are sacred"). Not touched anywhere:
+       the rich-text highlight palette (.prose mark, .hl-yellow/
+       -green/-blue/-orange/-cream) and text-colour classes
+       (.prose .tc-*), the discipline spine --d-* categoricals, the
+       chart series .stx-c0..c5, file-type colours, the like/heart
+       rose, presence green #3d9a5f, the live red --live, the
+       per-channel tint --t (set inline from data — only its
+       FALLBACK is repaired), and .stx-qr-box, which must stay white
+       with black modules or the QR stops scanning.
+
+   Contrast budget used below (against --card #101c2c / --paper
+   #0a121c): --ink 15.5:1 · --ink-soft 9.4:1 · --muted 5.4:1 ·
+   --blue 8.1:1 · --rubric 11.7:1 · #f2f0f0 on --emerald 8.1:1 ·
+   --ox-blue on Sky 10.8:1. --line (#22344a) is only 1.9:1 on a card,
+   which is fine for a decorative hairline but fails the 3:1 floor
+   for a control boundary — hence --dk-edge below.
+   ============================================================= */
+
+:root[data-theme="dark"]{
+  /* Control boundary. --line is tuned to separate a CARD from the
+     BODY (3.5:1 there); an input or a switch sits ON the card, where
+     it measures 1.9:1. --dk-edge is the same family lifted to 3.3:1
+     on --card so form controls keep a legible outline. */
+  --dk-edge:#55708f;
+  /* theme.css ships --good-wash and --warn-wash but no red wash —
+     --ox-red-wash is a light pink and cannot be reused here. */
+  --dk-red-wash:#2c1614;
+  /* Translucent chrome (topbar / bottom nav / floating panels). The
+     light layer used rgba(255,255,255,.86–.96); this is the same
+     device on the night ramp so backdrop-filter still shows through. */
+  --dk-veil:rgba(10,18,28,.92);
+}
+
+/* =========================================================
+   1 · SCOPED TOKEN BLOCKS
+   Surfaces that re-declare the whole palette locally. Repairing
+   the block repairs every rule inside the subtree, so these come
+   first and do the most work per line.
+   ========================================================= */
+
+/* The research reader re-pins paper/card/line/ink twice (base
+   styles-content.css §Research Reader, then warm/research.css §3).
+   Left alone, the entire reading view stays a white sheet. */
+:root[data-theme="dark"] .rd-page{
+  --paper:#0a121c; --paper-2:#0e1826;
+  --card:#101c2c;  --card-2:#162436;
+  --line:#22344a;  --line-soft:#1a2a3d;
+  --ink:#e8edf3; --ink-2:#dce4ec; --ink-soft:#a9b8c8; --muted:#7f92a6;
+  --rubric:#b9d6f2; --wash:#152a42;
+  /* emerald* drive the reader's accent TEXT (section heads, refs,
+     cite actions) as well as a couple of plates — on dark they must
+     read as accents, so they lift into the Sky family here. */
+  --emerald:#8fb8e0; --emerald-deep:#b9d6f2;
+  --emerald-bright:#8fb8e0; --emerald-glow:#a9cbe8;
+  --accent-bg:#152a42;
+  --brass:#8fb8e0; --brass-soft:#2e4a68; --brass-tint:#152a42;
+  --rose:#d98078;
+}
+
+/* Research studio (the composer overlay) — one local surface token. */
+:root[data-theme="dark"] .rm-app{--studio:#0e1826}
+
+/* Messages interaction family: row hover / row active / control
+   hover / thread canvas. All four were paper derivatives; --mx-active
+   marks the SELECTED conversation and has to sit one step above
+   --mx-hover or the open thread stops being findable in the rail. */
+:root[data-theme="dark"]{
+  --mx-hover:#152a42;
+  --mx-active:#1d3554;
+  --mx-soft:#152a42;
+  --mx-canvas:#0c1521;
+}
+
+/* =========================================================
+   2 · DARK-BY-DESIGN SURFACES PAINTED WITH AN INVERTING TOKEN
+   Bucket (b), but authored as var(--navy)/var(--navy-deep) — which
+   go LIGHT on dark and would have bleached a surface whose whole
+   content is white. Pinned back to the fixed Oxford blue-black.
+   --t is the per-channel tint (bucket c) and is preserved; only its
+   fallback changes.
+   ========================================================= */
+:root[data-theme="dark"] .cl-frame,
+:root[data-theme="dark"] .cl-pill{background:var(--ox-blue-deep)}
+:root[data-theme="dark"] .cl-pill{
+  background:
+    radial-gradient(120% 150% at 80% -20%, rgba(31,78,126,.5) 0%, rgba(31,78,126,0) 60%),
+    var(--ox-blue-deep);
+}
+:root[data-theme="dark"] .cp-cover{
+  background-color:var(--ox-blue-deep);
+  background-image:
+    radial-gradient(90% 130% at 12% 108%, rgba(255,255,255,.14) 0%, transparent 55%),
+    radial-gradient(70% 110% at 88% -20%, rgba(255,255,255,.10) 0%, transparent 60%),
+    linear-gradient(135deg, var(--t,var(--ox-blue)) 0%, var(--ox-blue-deep) 88%);
+}
+:root[data-theme="dark"] .cp-cover.has-img,
+:root[data-theme="dark"] .cm-art-cover.has-img{
+  background-image:var(--cover),linear-gradient(135deg,var(--t,var(--ox-blue)) 0%,var(--ox-blue-deep) 100%);
+}
+:root[data-theme="dark"] .cm-art-cover{
+  background-color:var(--ox-blue-deep);
+  background-image:
+    radial-gradient(90% 130% at 12% 108%,rgba(255,255,255,.14) 0%,transparent 55%),
+    linear-gradient(135deg,var(--t,var(--ox-blue)) 0%,var(--ox-blue-deep) 88%);
+}
+:root[data-theme="dark"] .cp-crest,
+:root[data-theme="dark"] .cm-head-mark,
+:root[data-theme="dark"] .cm-art-crest{
+  background:linear-gradient(140deg,var(--t,var(--ox-blue)),var(--ox-blue-deep));
+}
+:root[data-theme="dark"] .cn-mine-crest,
+:root[data-theme="dark"] .cn-card-crest{background:var(--t,var(--ox-blue))}
+:root[data-theme="dark"] .cn-card-cover{
+  background:
+    linear-gradient(150deg, rgba(0,0,0,.30) 0%, rgba(255,255,255,.10) 100%),
+    var(--t,var(--ox-blue));
+}
+:root[data-theme="dark"] .lv-card-thumb{
+  background:linear-gradient(135deg,var(--ox-blue),var(--ox-blue-deep));
+}
+:root[data-theme="dark"] .cm-voice{
+  background:linear-gradient(165deg,var(--ox-blue-deep),var(--ox-blue));
+  border-color:var(--ox-blue-deep);
+}
+:root[data-theme="dark"] .cm-prev-audio-ic{background:var(--ox-blue)}
+:root[data-theme="dark"] .prof-meta .st-cover{background-color:var(--ox-blue)}
+:root[data-theme="dark"] .x-hit-crest{
+  background:linear-gradient(140deg,var(--ox-blue),var(--ox-blue-deep));
+}
+/* Statistics tooltip — a floating dark plate with white text. */
+:root[data-theme="dark"] .cst-col-tip{background:var(--ox-blue-deep)}
+
+/* Own-message bubbles stay a filled blue with off-white ink: every
+   child (quotes, files, waveform, polls, location, contact cards,
+   mentions, ticks) hard-codes light ink against them across four
+   stylesheets. Re-plating the bubble in --emerald keeps all of that
+   correct in one rule; bleaching the bubble to Sky would have needed
+   ~60 ink overrides and would glare on a night thread. */
+:root[data-theme="dark"] .ch-row.mine .ch-bubble{
+  background:linear-gradient(180deg,var(--emerald),var(--ox-blue));
+  border-color:var(--emerald);
+}
+
+/* =========================================================
+   3 · FILLED PLATES THAT INVERTED
+   Rules that painted a plate with --navy / --navy-deep / --rubric /
+   --gold and set #fff / #f2f0f0 ink. On dark the plate goes light
+   and the ink disappears. Re-plate, never re-ink: --emerald (#1f4e7e)
+   and --emerald-deep (#2e6094) are the two button-capable blues the
+   dark contract keeps, and #f2f0f0 holds 8.1:1 on the first.
+   ========================================================= */
+:root[data-theme="dark"] .icon-btn.tint,
+:root[data-theme="dark"] .cta-compose,
+:root[data-theme="dark"] .tab.on,
+:root[data-theme="dark"] .tab.on:hover,
+:root[data-theme="dark"] .qna-page .tab.on,
+/* NOT the profile tabs: `.tabs.has-indicator .tab` is transparent BY DESIGN —
+   the fill is a separate sliding `.tab-indicator` behind it. Plating the tab
+   here covered the indicator (and killed the slide). It is re-plated in §14. */
+:root[data-theme="dark"] .chip.on,
+:root[data-theme="dark"] .vseg.on,
+:root[data-theme="dark"] .seg.feed-seg button.on,
+:root[data-theme="dark"] .cm-tab.on,
+:root[data-theme="dark"] .avatar,
+:root[data-theme="dark"] .botnav a.mid .plus,
+:root[data-theme="dark"] .rv-mtabbar a.mid .plus,
+:root[data-theme="dark"] .set-item.on,
+:root[data-theme="dark"] .tx-ord,
+:root[data-theme="dark"] .prof-actions .btn-primary,
+:root[data-theme="dark"] .rte-fmt-pill.on,
+:root[data-theme="dark"] .rte-tab.on,
+:root[data-theme="dark"] .rte-img-btn.on,
+:root[data-theme="dark"] .rte-size-apply,
+:root[data-theme="dark"] .r-owner-bar button.primary,
+:root[data-theme="dark"] .rd-fmt-b.on,
+:root[data-theme="dark"] .rm-rail-ck,
+:root[data-theme="dark"] .rm-cta,
+/* switch ON tracks are NOT here — see §14: on dark the "on" track has to be
+   BRIGHTER than the off track, and --emerald is darker than --dk-edge. */
+:root[data-theme="dark"] .rm-step.done .rm-step-ic,
+:root[data-theme="dark"] .cm-step.done .cm-step-icon,
+:root[data-theme="dark"] .plate-reel .pr-play,
+:root[data-theme="dark"] .r-play,
+:root[data-theme="dark"] .rrow-play,
+:root[data-theme="dark"] .hr-play,
+:root[data-theme="dark"] .ps-heart,
+:root[data-theme="dark"] .pc-comments .cmt-box .icon-btn,
+:root[data-theme="dark"] .section-label i,
+:root[data-theme="dark"] .qd-page .section-label i,
+:root[data-theme="dark"] .att-ic,
+:root[data-theme="dark"] .sa-ic,
+:root[data-theme="dark"] .nav-item .badge,
+:root[data-theme="dark"] .nav-item.active .badge,
+:root[data-theme="dark"] .ntf-count,
+:root[data-theme="dark"] .ntf-tile,
+:root[data-theme="dark"] .icon-btn .count,
+:root[data-theme="dark"] .ch-list-tabs .tab .badge,
+:root[data-theme="dark"] .cv-kind,
+:root[data-theme="dark"] .cv-kind.channel,
+:root[data-theme="dark"] .cv-badge,
+:root[data-theme="dark"] .ch-jump-n,
+:root[data-theme="dark"] .ch-sched-n,
+:root[data-theme="dark"] .botnav-dot,
+:root[data-theme="dark"] .rq-btn.primary,
+:root[data-theme="dark"] .ch-send,
+:root[data-theme="dark"] .ch-voice-play,
+:root[data-theme="dark"] .ch-voice-rate.on,
+:root[data-theme="dark"] .cn-btn.primary,
+:root[data-theme="dark"] .cn-chip.on,
+:root[data-theme="dark"] .cn-chip.sm.on,
+:root[data-theme="dark"] .cn-mine-dot,
+:root[data-theme="dark"] .cn-card-flag.wait,
+:root[data-theme="dark"] .cm-tab-btn.on,
+:root[data-theme="dark"] .cm-art-cam,
+:root[data-theme="dark"] .cv-flw-cta,
+:root[data-theme="dark"] .lv-line-hosttag,
+:root[data-theme="dark"] .lv-ovl-go,
+:root[data-theme="dark"] .lv-sup-rank.r1,
+:root[data-theme="dark"] .cl-ctl.on,
+:root[data-theme="dark"] .ch-poll-opt.mine .ch-poll-mark,
+:root[data-theme="dark"] .rvc-send,
+:root[data-theme="dark"] .se-poll-fab.edit,
+:root[data-theme="dark"] .stx-seg-btn.on,
+:root[data-theme="dark"] .stx-tick:checked,
+:root[data-theme="dark"] .stx-day.on,
+:root[data-theme="dark"] .stx-prog i,
+:root[data-theme="dark"] .pymk-btn.is-primary{
+  background:var(--emerald);
+  border-color:var(--emerald);
+}
+/* Hover partners of the same family (they read --navy-deep, which
+   inverts one step brighter than --navy and breaks the same way). */
+:root[data-theme="dark"] .icon-btn.tint:hover,
+:root[data-theme="dark"] .cta-compose:hover,
+:root[data-theme="dark"] .tab.on:hover,
+:root[data-theme="dark"] .rail-row .icon-btn.tint:hover,
+:root[data-theme="dark"] .prof-actions .btn-primary:hover,
+:root[data-theme="dark"] .rte-size-apply:hover,
+:root[data-theme="dark"] .rte-img-btn.on:hover,
+:root[data-theme="dark"] .r-owner-bar button.primary:hover,
+:root[data-theme="dark"] .rd-fmt-b.on:hover:not(:disabled),
+:root[data-theme="dark"] .pc-comments .cmt-box .icon-btn:hover,
+:root[data-theme="dark"] .rq-btn.primary:hover,
+:root[data-theme="dark"] .ch-send:hover,
+:root[data-theme="dark"] .cn-btn.primary:hover,
+:root[data-theme="dark"] .cm-art-cam:hover,
+:root[data-theme="dark"] .cv-flw-row:hover .cv-flw-cta,
+:root[data-theme="dark"] .rvc-send:not(:disabled):hover,
+:root[data-theme="dark"] .se-poll-fab.edit:hover,
+:root[data-theme="dark"] .pymk-btn.is-primary:hover{
+  background:var(--emerald-deep);
+  border-color:var(--emerald-deep);
+}
+/* Two plates in the family are gradients rather than flat fills. */
+:root[data-theme="dark"] .cv-badge,
+:root[data-theme="dark"] .ch-jump-n,
+:root[data-theme="dark"] .icon-btn .count,
+:root[data-theme="dark"] .ch-sched-n,
+:root[data-theme="dark"] .botnav-dot,
+:root[data-theme="dark"] .ch-voice-rate.on,
+:root[data-theme="dark"] .cl-ctl.on{
+  background:linear-gradient(160deg,var(--emerald) 0%,var(--ox-blue) 130%);
+}
+/* Story-ring gradients read --brass-soft/--gold — both go light, which
+   is right for a ring, but the unseen ring must still out-contrast the
+   seen one against the night body. */
+:root[data-theme="dark"] .st-ring.unseen{
+  background:linear-gradient(135deg,var(--ox-steel),var(--ox-sky));
+}
+
+/* =========================================================
+   4 · APP SHELL — topbar / sidebar / bottom nav / drawer
+   ========================================================= */
+:root[data-theme="dark"] .topbar{background:var(--dk-veil)}
+:root[data-theme="dark"] .botnav{background:var(--dk-veil)}
+:root[data-theme="dark"] .sidebar{background:var(--paper-2)}
+:root[data-theme="dark"] .nav-item:hover{background:var(--wash)}
+:root[data-theme="dark"] .nav-item.active,
+:root[data-theme="dark"] .nav-item.active:hover{background:#1d3554}
+:root[data-theme="dark"] .brand .mark{background:linear-gradient(135deg,var(--card-2) 0%,var(--wash) 100%)}
+:root[data-theme="dark"] .brand .mark:has(.brand-img),
+:root[data-theme="dark"] .auth-mark:has(.brand-img){background:var(--card)}
+:root[data-theme="dark"] .nav-scrim,
+:root[data-theme="dark"] .overlay,
+:root[data-theme="dark"] .dlg-overlay{background:rgba(3,7,12,.72)}
+
+/* =========================================================
+   5 · FORMS & CONTROLS
+   Fields were an in-place white with a stone border. On dark they
+   become the card-inset surface with the lifted control edge, so the
+   boundary keeps ≥3:1 (§ head comment).
+   ========================================================= */
+:root[data-theme="dark"] .field,
+:root[data-theme="dark"] .tag-input .tag-chips,
+:root[data-theme="dark"] .rm-app .inp,
+:root[data-theme="dark"] .rm-search,
+:root[data-theme="dark"] .rvc-field,
+:root[data-theme="dark"] .share-url,
+:root[data-theme="dark"] .cn-handle{
+  background:var(--card-2);
+  border-color:var(--dk-edge);
+}
+:root[data-theme="dark"] .field{border-bottom-color:var(--dk-edge)}
+:root[data-theme="dark"] .cmt-field,
+:root[data-theme="dark"] .cmt-box .field{border-bottom-color:var(--dk-edge)}
+:root[data-theme="dark"] .rte-wysiwyg,
+:root[data-theme="dark"] .rte-area,
+:root[data-theme="dark"] .rte-tools select{background:var(--card-2)}
+/* Segmented tracks recess, their selected chip lifts. On the light
+   theme the track was a tint and the chip was white; inverted, the
+   track has to go BELOW the card or the active segment (an --emerald
+   pill from §3) reads as a hole rather than a raised control. */
+:root[data-theme="dark"] .rte-fmt,
+:root[data-theme="dark"] .rte-tabs,
+:root[data-theme="dark"] .auth-tabs{background:var(--paper-2)}
+:root[data-theme="dark"] .auth-thumb{background:var(--card-2);box-shadow:0 1px 3px rgba(0,0,0,.5)}
+:root[data-theme="dark"] .rte-tab:hover,
+:root[data-theme="dark"] .rte-tool:hover{background:var(--wash)}
+:root[data-theme="dark"] .rte-tool.on .rte-size-display{background:var(--card)}
+:root[data-theme="dark"] .rte-tool.on:hover,
+:root[data-theme="dark"] .cm-vis:hover,
+:root[data-theme="dark"] .rm-app .rte-tool.on:hover{background:#1d3554}
+/* Switches / toggles: the OFF track was stone, the knob white. */
+:root[data-theme="dark"] .sw,
+:root[data-theme="dark"] .rm-switch{background:var(--dk-edge)}
+:root[data-theme="dark"] .sw::after,
+:root[data-theme="dark"] .rm-switch-knob{background:var(--ink)}
+:root[data-theme="dark"] .stx-tick{background:var(--card-2);border-color:var(--dk-edge)}
+:root[data-theme="dark"] .stx-day{background:var(--card-2);border-color:var(--dk-edge)}
+/* Outline buttons + dashed drop zones read stone-strong. */
+:root[data-theme="dark"] .btn-secondary:hover,
+:root[data-theme="dark"] .share-act:hover,
+:root[data-theme="dark"] .qna-card:hover,
+:root[data-theme="dark"] a.src-row:hover,
+:root[data-theme="dark"] .r-card:hover,
+:root[data-theme="dark"] .qrow:hover,
+:root[data-theme="dark"] .rrow:hover,
+:root[data-theme="dark"] .rd-figure:hover,
+:root[data-theme="dark"] .pymk-card:hover,
+:root[data-theme="dark"] .cb-fake:hover,
+:root[data-theme="dark"] .rm-back:hover:not(:disabled),
+:root[data-theme="dark"] .rm-cancel:hover:not(:disabled),
+:root[data-theme="dark"] .rm-promo-btn:hover,
+:root[data-theme="dark"] .rd-page .rd-back:hover,
+:root[data-theme="dark"] .rd-page .rd-cite-actions button:hover{border-color:var(--dk-edge)}
+:root[data-theme="dark"] .st-ring.add,
+:root[data-theme="dark"] .prof-meta .st-ring.add,
+:root[data-theme="dark"] .cm-drop,
+:root[data-theme="dark"] .cm-prev-add,
+:root[data-theme="dark"] .rm-cover-empty,
+:root[data-theme="dark"] .rm-file-add,
+:root[data-theme="dark"] .rm-promo-thumb,
+:root[data-theme="dark"] .set-avatar-row,
+:root[data-theme="dark"] .x-empty,
+:root[data-theme="dark"] .stx-plate{border-color:var(--dk-edge)}
+:root[data-theme="dark"] .rm-cover-empty{
+  background:repeating-linear-gradient(135deg,var(--paper-2),var(--paper-2) 11px,var(--card-2) 11px,var(--card-2) 22px);
+}
+:root[data-theme="dark"] .rm-seg{background:var(--card-2)}
+:root[data-theme="dark"] .rm-sched-ring{border-color:var(--dk-edge)}
+:root[data-theme="dark"] .pw-bars i{background:var(--card-2)}
+
+/* Danger controls: the quiet outline button and its wash. */
+:root[data-theme="dark"] .btn-danger{border-color:#7a4b46}
+:root[data-theme="dark"] .btn-danger:hover,
+:root[data-theme="dark"] .dlg-ic.danger,
+:root[data-theme="dark"] .icon-btn.danger:hover,
+:root[data-theme="dark"] .cn-btn.on:hover,
+:root[data-theme="dark"] .cn-btn.on:focus-visible,
+:root[data-theme="dark"] .rq-btn.danger:hover,
+:root[data-theme="dark"] .ch-menu-item.danger:hover,
+:root[data-theme="dark"] .ci-row.danger:hover,
+:root[data-theme="dark"] .ch-bubble.failed,
+:root[data-theme="dark"] .ch-retry,
+:root[data-theme="dark"] .ch-rec,
+:root[data-theme="dark"] .ci-tag.restricted,
+:root[data-theme="dark"] .cn-tag.danger,
+:root[data-theme="dark"] .af.bad .field,
+:root[data-theme="dark"] .auth-alert{background:var(--dk-red-wash)}
+/* .cn-tag.danger keeps a fixed --ox-red ink (2.5:1 on the night wash). */
+:root[data-theme="dark"] .cn-tag.danger{color:var(--danger);border-color:var(--dk-red-wash)}
+:root[data-theme="dark"] .ch-retry,
+:root[data-theme="dark"] .ch-rec,
+:root[data-theme="dark"] .ci-tag.restricted,
+:root[data-theme="dark"] .rq-btn.danger,
+:root[data-theme="dark"] .af.bad .field,
+:root[data-theme="dark"] .auth-alert{border-color:#7a4b46}
+:root[data-theme="dark"] .auth-alert,
+:root[data-theme="dark"] .af-err,
+:root[data-theme="dark"] .auth-agree.bad,
+:root[data-theme="dark"] .af.bad .af-ico,
+:root[data-theme="dark"] .pw-meter.s1 small{color:var(--danger)}
+:root[data-theme="dark"] .pw-meter.s1 .pw-bars i.on{background:var(--danger)}
+:root[data-theme="dark"] .af-caps,
+:root[data-theme="dark"] .pw-meter.s2 small{color:var(--warn)}
+:root[data-theme="dark"] .pw-meter.s2 .pw-bars i.on{background:var(--warn)}
+
+/* =========================================================
+   6 · ACCENT TEXT THAT WENT DARK-ON-DARK
+   --emerald / --emerald-deep stay button blues on dark (theme.css),
+   and the --ox-blue* ramp is a fixed light-theme ramp. Every rule
+   that used one of them as accent TEXT needs lifting: headings and
+   figures to --rubric (Sky, 11.7:1), links and actions to --blue
+   (8.1:1). Nothing here changes a background.
+   ========================================================= */
+:root[data-theme="dark"] .section-label,
+:root[data-theme="dark"] .lg-head h2,
+:root[data-theme="dark"] .qna-card:hover h3,
+:root[data-theme="dark"] .r-card:hover h3,
+:root[data-theme="dark"] .qrow:hover .qrow-title,
+:root[data-theme="dark"] .rrow:hover .rrow-title,
+:root[data-theme="dark"] .rd-topics-head,
+:root[data-theme="dark"] .rd-back,
+:root[data-theme="dark"] .rd-refs > li::before,
+:root[data-theme="dark"] .prose h3,
+:root[data-theme="dark"] .cm-top h3,
+:root[data-theme="dark"] .cm-saving-head h4,
+:root[data-theme="dark"] .vseg:hover,
+:root[data-theme="dark"] .rd-owner-seg button:hover,
+:root[data-theme="dark"] .rd-toc-a:hover,
+:root[data-theme="dark"] .stx-figure,
+:root[data-theme="dark"] .stx-tabhead,
+:root[data-theme="dark"] .stx-tile-val,
+:root[data-theme="dark"] .stx-matrix .stx-mgroup td,
+:root[data-theme="dark"] .stx-day:hover,
+:root[data-theme="dark"] .stx-jump button:hover,
+:root[data-theme="dark"] .cp-stat b,
+:root[data-theme="dark"] .cp-link:hover{color:var(--rubric)}
+/* .cp-cat:hover is NOT in that list: its hover plate is a fixed Oxford Sky
+   fill, so Sky ink would be 1.7:1. Its pair is repaired whole in §14. */
+:root[data-theme="dark"] .prose a,
+:root[data-theme="dark"] .prose a:hover,
+:root[data-theme="dark"] .tk-tag,
+:root[data-theme="dark"] .pca.saved,
+:root[data-theme="dark"] .pca.active,
+:root[data-theme="dark"] .pc-viewall,
+:root[data-theme="dark"] .fx-cta,
+:root[data-theme="dark"] .trend-delta,
+:root[data-theme="dark"] .rail-q:hover p,
+:root[data-theme="dark"] .qna-card footer .qna-ans,
+:root[data-theme="dark"] .qrow-metrics .qna-ans,
+:root[data-theme="dark"] .ans-ref,
+:root[data-theme="dark"] .ans-banner.accepted,
+:root[data-theme="dark"] .contrib-role,
+:root[data-theme="dark"] .rd-cite-actions button,
+:root[data-theme="dark"] .rd-cite-actions button:hover,
+:root[data-theme="dark"] .rd-file-action,
+:root[data-theme="dark"] a.src-row:hover .src-action,
+:root[data-theme="dark"] .r-section-hint.published .ico-wrap,
+:root[data-theme="dark"] a.pa-fact,
+:root[data-theme="dark"] .pa-chip,
+:root[data-theme="dark"] .tag-pill i,
+:root[data-theme="dark"] .ntf-unread-toggle.on,
+:root[data-theme="dark"] .auth-switch a,
+:root[data-theme="dark"] .auth-agree a,
+:root[data-theme="dark"] .cm-drop:hover,
+:root[data-theme="dark"] .cm-drop .ico,
+:root[data-theme="dark"] .cm-step.running .cm-step-icon,
+:root[data-theme="dark"] .share-count,
+:root[data-theme="dark"] .dlg-ic,
+:root[data-theme="dark"] .rte-tool.on,
+:root[data-theme="dark"] .rte-size-row.on,
+:root[data-theme="dark"] .rte-size-row.on .rte-size-num,
+:root[data-theme="dark"] .rte-size-row.on .rte-size-hint,
+:root[data-theme="dark"] .rte-tool.on .rte-size-display,
+:root[data-theme="dark"] .status.resolved,
+:root[data-theme="dark"] .fx-badge.research,
+:root[data-theme="dark"] .stx-anchor:hover,
+:root[data-theme="dark"] .stx-seealso a,
+:root[data-theme="dark"] .stx-seealso a:hover,
+:root[data-theme="dark"] .stx-seealso .ico,
+:root[data-theme="dark"] .stx-mnote a,
+:root[data-theme="dark"] .stx-sess-ic,
+:root[data-theme="dark"] .stx-tile-top .ico,
+:root[data-theme="dark"] .stx-find-opt .ico,
+:root[data-theme="dark"] .cp-handle,
+:root[data-theme="dark"] .cp-cat,
+:root[data-theme="dark"] .cp-link,
+:root[data-theme="dark"] .cp-badge .ico,
+:root[data-theme="dark"] .cp-facts dt .ico,
+:root[data-theme="dark"] .ca-pick.on > .ico,
+:root[data-theme="dark"] .pw-meter.s4 small{color:var(--blue)}
+:root[data-theme="dark"] .pca.saved .ico{fill:var(--blue);stroke:var(--blue)}
+:root[data-theme="dark"] .pca.active .ico{stroke:var(--blue)}
+/* #163e66 (--ox-blue-mid) was the "emphasised accent on white" ink. */
+:root[data-theme="dark"] .btn.on-brass,
+:root[data-theme="dark"] .r-section-hint.draft .ico-wrap,
+:root[data-theme="dark"] .rd-banner.draft .rd-banner-ico,
+:root[data-theme="dark"] .rd-banner.draft b,
+:root[data-theme="dark"] .r-foot span:last-child,
+:root[data-theme="dark"] .phead-kicker,
+:root[data-theme="dark"] .fx-badge.question,
+:root[data-theme="dark"] .pill.scholar,
+:root[data-theme="dark"] .cm-save-err.partial .cm-save-err-ic,
+:root[data-theme="dark"] .cm-save-err.partial .cm-save-err-body b{color:var(--rubric)}
+/* Long-form body copy hard-coded #232b3a (near-black slate). */
+:root[data-theme="dark"] .qd-body,
+:root[data-theme="dark"] .ans-body,
+:root[data-theme="dark"] .pc-body,
+:root[data-theme="dark"] .cmt-bubble p,
+:root[data-theme="dark"] .rd-page .prose.rd-text{color:var(--ink-2)}
+/* `.prose .tc-light` is NOT repaired: it is a user content colour (bucket c)
+   and #c2c1bf already measures 9.5:1 on the night card — nothing to fix. */
+
+/* =========================================================
+   7 · CARDS, PANELS & PLATES stuck on a white literal
+   ========================================================= */
+:root[data-theme="dark"] .plate-reel,
+:root[data-theme="dark"] .r-hero,
+:root[data-theme="dark"] .hero-reel,
+:root[data-theme="dark"] .prof-media-grid > *{background:var(--card);border-color:var(--line)}
+:root[data-theme="dark"] .plate-reel .pr-dur{background:var(--card-2);border-color:var(--line)}
+:root[data-theme="dark"] .rh-panel,
+:root[data-theme="dark"] .r-hero .rh-panel{background:rgba(16,28,44,.94);border-color:var(--line)}
+:root[data-theme="dark"] .explore-reels .pr-strip{background:rgba(16,28,44,.94);border-color:var(--line)}
+:root[data-theme="dark"] .r-owner-bar{background:rgba(10,18,28,.6)}
+:root[data-theme="dark"] .rm-top{background:var(--dk-veil)}
+:root[data-theme="dark"] .rm-cv-btn{background:rgba(16,28,44,.94)}
+:root[data-theme="dark"] .ch-hd{background:rgba(14,24,38,.92)}
+:root[data-theme="dark"] .prof-avatar{box-shadow:0 0 0 1px var(--line),0 10px 24px -10px rgba(0,0,0,.6)}
+/* Draft / archived research cards were paper gradients. */
+:root[data-theme="dark"] .r-card.is-draft{background:linear-gradient(180deg,var(--card),var(--paper-2))}
+:root[data-theme="dark"] .r-card.is-archived{background:linear-gradient(180deg,var(--card-2),var(--paper-2));border-color:var(--line)}
+:root[data-theme="dark"] .rd-banner.archived{background:linear-gradient(135deg,var(--card-2),var(--paper-2));border-color:var(--line)}
+:root[data-theme="dark"] .rd-banner.archived .rd-banner-ico,
+:root[data-theme="dark"] .rd-banner.draft,
+:root[data-theme="dark"] .r-section-hint.archived .ico-wrap,
+:root[data-theme="dark"] .status.archived{background:var(--card-2)}
+/* #7b746a is a warm stone ink — 3.4:1 on the night card. */
+:root[data-theme="dark"] .rd-banner.archived .rd-banner-ico,
+:root[data-theme="dark"] .r-section-hint.archived .ico-wrap{color:var(--muted)}
+/* Research reader interior sheets (the scope block in §1 fixes the
+   tokens; these four rules bypassed them with literals). */
+:root[data-theme="dark"] .rd-page .prose.rd-abstract,
+:root[data-theme="dark"] .rd-page .cite-box,
+:root[data-theme="dark"] .rd-page .rd-figure-img,
+:root[data-theme="dark"] .rd-page .rd-figure-fallback{background:var(--card-2)}
+:root[data-theme="dark"] .rd-page .rd-file:hover:not(:disabled),
+:root[data-theme="dark"] .rd-page .rd-toolbar-actions button:hover,
+:root[data-theme="dark"] a.src-row:hover,
+:root[data-theme="dark"] .rm-file-add:hover,
+:root[data-theme="dark"] .rm-src-item:hover{background:var(--card-2)}
+:root[data-theme="dark"] .rd-toc-dot,
+:root[data-theme="dark"] .rd-page .rd-toc-dot,
+:root[data-theme="dark"] .rd-toc-a:not(.active) .rd-toc-n{background:var(--dk-edge)}
+/* Placeholder swatch — cool stripes, now on the night ramp. */
+:root[data-theme="dark"] .ph-bg{
+  background:repeating-linear-gradient(45deg,var(--card-2) 0 14px,var(--wash) 14px 28px);
+}
+:root[data-theme="dark"] .ph-bg::after{background:rgba(10,18,28,.85)}
+:root[data-theme="dark"] .rh-ph,
+:root[data-theme="dark"] .r-card.is-draft .r-cover{background:var(--wash)}
+:root[data-theme="dark"] .vnp-play{background:linear-gradient(160deg,var(--ox-cerulean),var(--ox-cerulean-deep))}
+
+/* =========================================================
+   8 · MENUS, DIALOGS, TOASTS, HOVER WASHES
+   ========================================================= */
+/* The toast pill is background:var(--ink) + #f2f0f0 ink — on dark
+   --ink is the LIGHT text colour, so the pill turned white-on-white.
+   Invert it: a raised card plate with body ink. */
+:root[data-theme="dark"] .toast{background:var(--card-2);color:var(--ink);box-shadow:0 14px 34px -12px rgba(0,0,0,.7)}
+:root[data-theme="dark"] .toast .ico{color:var(--rubric)}
+/* The warn/err tones are the one place core.css reaches straight for
+   the fixed --ox-*-wash pairs; both halves move together or the pill
+   stays a light slab with dark ink on a night page. */
+:root[data-theme="dark"] .toast.t-warn{background:var(--warn-wash);color:var(--warn)}
+:root[data-theme="dark"] .toast.t-warn .ico{color:var(--warn)}
+:root[data-theme="dark"] .toast.t-err{background:var(--dk-red-wash);color:var(--danger)}
+:root[data-theme="dark"] .toast.t-err .ico{color:var(--danger)}
+:root[data-theme="dark"] .mhead .x:hover,
+:root[data-theme="dark"] .ch-tool:hover,
+:root[data-theme="dark"] .stx-anchor:hover,
+:root[data-theme="dark"] .stx-tile:hover,
+:root[data-theme="dark"] .stx-jump button:hover,
+:root[data-theme="dark"] .stx-find-opt:hover,
+:root[data-theme="dark"] .stx-find-opt.on,
+:root[data-theme="dark"] .stx-matrix tr:hover td,
+:root[data-theme="dark"] .stx-matrix tr:focus-within td,
+:root[data-theme="dark"] .stx-table tr:hover td,
+:root[data-theme="dark"] .ca-pick.on,
+:root[data-theme="dark"] .prof-counts button:hover,
+:root[data-theme="dark"] .prof-counts button.active,
+:root[data-theme="dark"] .prof-counts button:active,
+:root[data-theme="dark"] .ntf-row.unread:hover,
+:root[data-theme="dark"] .qna-tags a:hover,
+:root[data-theme="dark"] .r-card .qna-tags a:hover,
+:root[data-theme="dark"] .rrow .qna-tags a:hover,
+:root[data-theme="dark"] .rd-page .qna-tags a:hover,
+:root[data-theme="dark"] .ch-pinbar:hover,
+:root[data-theme="dark"] .cv-row.active:hover{background:var(--wash)}
+:root[data-theme="dark"] .tb-pop-row.on .tb-pop-ic{background:var(--card)}
+:root[data-theme="dark"] .ntf-row.unread{background:var(--wash)}
+:root[data-theme="dark"] .ntf-row.unread .ntf-badge{border-color:var(--wash)}
+:root[data-theme="dark"] .ch-day span,
+:root[data-theme="dark"] .ch-system span{background:var(--card-2);border-color:var(--line);color:var(--ink-soft)}
+:root[data-theme="dark"] .answer.accepted{background:var(--wash)}
+:root[data-theme="dark"] .csync-warn{background:var(--warn-wash);color:var(--warn)}
+:root[data-theme="dark"] .csync-result{background:var(--good-wash);color:var(--good)}
+:root[data-theme="dark"] .ch-retry:hover{background:#3a1d1a}
+/* The reader scope re-states this hover one level deeper than the
+   bare `.rd-figure:hover` repaired in §5, so it needs its own rule. */
+:root[data-theme="dark"] .rd-page .rd-figure:hover{border-color:var(--dk-edge)}
+/* theme.css re-selects ::selection on dark, but the editor's own
+   `.rte-wysiwyg ::selection` is more specific and kept the light
+   highlight — with var(--ink) text, that is light-on-light. */
+:root[data-theme="dark"] ::selection,
+:root[data-theme="dark"] .rte-wysiwyg ::selection{background:#1f4e7e;color:#fff}
+
+/* =========================================================
+   9 · SETTINGS (stx-*) — the densest concentration of fixed
+   --ox-* light tokens in the app. Wash chips keep their meaning,
+   they just move onto the night washes.
+   ========================================================= */
+:root[data-theme="dark"] .stx-seg,
+:root[data-theme="dark"] .stx-matrix th,
+:root[data-theme="dark"] .stx-table th,
+:root[data-theme="dark"] .stx-chip.plain,
+:root[data-theme="dark"] .stx-sess-ic{background:var(--card-2);border-color:var(--line)}
+:root[data-theme="dark"] .stx-sess.current .stx-sess-ic,
+:root[data-theme="dark"] .stx-chip.info,
+:root[data-theme="dark"] .stx-note.info{background:var(--wash)}
+:root[data-theme="dark"] .stx-chip.info,
+:root[data-theme="dark"] .stx-note.info{color:var(--rubric)}
+:root[data-theme="dark"] .stx-chip.ok,
+:root[data-theme="dark"] .stx-check.pass .stx-check-ic,
+:root[data-theme="dark"] .stx-note.ok{background:var(--good-wash);color:var(--good)}
+:root[data-theme="dark"] .stx-chip.warn,
+:root[data-theme="dark"] .stx-check.fail .stx-check-ic,
+:root[data-theme="dark"] .stx-note.warn{background:var(--warn-wash);color:var(--warn)}
+:root[data-theme="dark"] .stx-chip.err,
+:root[data-theme="dark"] .stx-note.err{background:var(--dk-red-wash);color:var(--danger)}
+:root[data-theme="dark"] .settings-shell .card.stx-danger{background:var(--dk-red-wash);border-color:#7a4b46}
+:root[data-theme="dark"] .settings-shell .card.stx-danger h3.title,
+:root[data-theme="dark"] .settings-shell .card.stx-danger h3.title .ico{color:var(--danger)}
+:root[data-theme="dark"] .stx-danger .btn-danger,
+:root[data-theme="dark"] .stx-danger .btn-danger:hover{background:var(--ox-red);border-color:var(--ox-red);color:#fff}
+:root[data-theme="dark"] .stx-bar,
+:root[data-theme="dark"] .stx-prog,
+:root[data-theme="dark"] .stx-code,
+:root[data-theme="dark"] .stx-policy-body{background:var(--card-2);border-color:var(--line)}
+:root[data-theme="dark"] .stx-bar,
+:root[data-theme="dark"] .stx-prog{background:var(--line)}
+:root[data-theme="dark"] .stx-score-num{--ring:var(--rubric)}
+:root[data-theme="dark"] .stx-score-num[data-level="LOW"]{--ring:var(--danger)}
+:root[data-theme="dark"] .stx-score-num[data-level="MEDIUM"]{--ring:var(--warn)}
+:root[data-theme="dark"] .stx-score-num[data-level="HIGH"]{--ring:var(--rubric)}
+:root[data-theme="dark"] .stx-score-num[data-level="EXCELLENT"]{--ring:var(--good)}
+:root[data-theme="dark"] .stx-score-num{
+  background:conic-gradient(var(--ring) calc(var(--pct,0)*1%), var(--line) 0);
+}
+:root[data-theme="dark"] .stx-score-num i{background:var(--card)}
+:root[data-theme="dark"] .stx-skel-row{
+  background:linear-gradient(90deg,var(--card-2) 25%,var(--line) 37%,var(--card-2) 63%);
+  background-size:400% 100%;
+}
+/* .stx-qr-box keeps its white plate on purpose — bucket (c): a QR
+   inverted or tinted stops decoding on many scanners. */
+
+/* =========================================================
+   10 · CHAT / CHANNELS / NOTIFICATIONS odds and ends
+   ========================================================= */
+:root[data-theme="dark"] .cn-hero-art{
+  background:radial-gradient(circle at 50% 38%, rgba(185,214,242,.16), rgba(185,214,242,.04) 70%);
+  box-shadow:inset 0 1px 2px rgba(185,214,242,.14);
+}
+:root[data-theme="dark"] .cn-card-flag{background:rgba(16,28,44,.94);color:var(--ink)}
+:root[data-theme="dark"] .cn-hero .btn-primary{background:var(--emerald);color:#f2f0f0}
+:root[data-theme="dark"] .cn-hero .btn-primary:hover{background:var(--emerald-deep)}
+:root[data-theme="dark"] .ch-react.mine{border-color:var(--ox-steel)}
+:root[data-theme="dark"] .ci-tag.admin{border-color:var(--ox-steel)}
+:root[data-theme="dark"] .ntf-unread-toggle.on{border-color:var(--ox-steel)}
+:root[data-theme="dark"] .btn.is-following{border-color:var(--ox-steel)}
+:root[data-theme="dark"] .pa-chip,
+:root[data-theme="dark"] .tx-chip{border-color:var(--line)}
+:root[data-theme="dark"] .rvc-x:hover,
+:root[data-theme="dark"] .cm-attach-row button:hover{background:var(--card-2)}
+:root[data-theme="dark"] .rvc::before{background:var(--line)}
+/* The stage "casting" toggle inverts to a white chip on the (dark by
+   design) live stage — that is correct there and stays. */
+
+/* =========================================================
+   11 · WHITE PLATES THAT ARE *MEANT* TO BE WHITE
+   The mirror of §3, and the easiest failure to miss. A handful of
+   controls on the dark-by-design surfaces are deliberately a WHITE
+   chip — the "off" call control, the reels segment, the live-stage
+   cast toggle, the play button on an own-message bubble. Their plate
+   is correct on dark and must stay; it is their INK that reads
+   var(--navy) / var(--ink), both of which invert to a light value,
+   so the glyph disappears into its own chip. Pin the ink to the
+   fixed Oxford Blue — the plate never moves, so the literal is safe.
+   ========================================================= */
+:root[data-theme="dark"] .rv-segs .rv-tab.on,
+:root[data-theme="dark"] .cl-ctl.off,
+:root[data-theme="dark"] .cl-pill-ic.off,
+:root[data-theme="dark"] .stg-cast-btn[aria-pressed="true"]:not(.rec-on),
+:root[data-theme="dark"] .lv-stage .stg-cast-btn[aria-pressed="true"]:not(.rec-on),
+:root[data-theme="dark"] .ch-row.mine .ch-voice-play,
+:root[data-theme="dark"] .ch-row.mine .ch-voice-rate.on,
+:root[data-theme="dark"] .ch-row.mine .ch-poll-opt.mine .ch-poll-mark,
+:root[data-theme="dark"] .rd-page .rd-hero-follow:not(.on),
+:root[data-theme="dark"] .rd-hero-follow:not(.on){color:var(--ox-blue)}
+/* Those three sit INSIDE an own-message bubble, so §3 also matches
+   them at equal specificity and re-plates them in --emerald — which
+   would leave Oxford Blue ink on a mid-blue chip (1.9:1). Restore
+   the white chip here, above §3, and background-image:none because
+   two of the §3 fills are gradients that a background-color alone
+   would not clear. `.rd-hero-follow` needs the :not(.on) above for
+   the same reason in reverse: its "Following" state is a translucent
+   dark plate with white ink and must keep it. */
+:root[data-theme="dark"] .ch-row.mine .ch-voice-play{background:rgba(255,255,255,.94);background-image:none}
+:root[data-theme="dark"] .ch-row.mine .ch-voice-rate.on{background:#f2f0f0;background-image:none;border-color:transparent}
+:root[data-theme="dark"] .ch-row.mine .ch-poll-opt.mine .ch-poll-mark{background:rgba(255,255,255,.92);background-image:none}
+:root[data-theme="dark"] .rv-segs .rv-tab.on .ico,
+:root[data-theme="dark"] .cl-ctl.off .ico,
+:root[data-theme="dark"] .cl-pill-ic.off .ico,
+:root[data-theme="dark"] .ch-row.mine .ch-voice-play .ico{color:var(--ox-blue);stroke:var(--ox-blue)}
+
+/* =========================================================
+   12 · STATUS CHIPS & BANNERS still on a light wash
+   Meaning is carried by the wash + ink PAIR, so both move together
+   onto the night washes rather than one of them being recoloured.
+   ========================================================= */
+:root[data-theme="dark"] .status.published{background:var(--good-wash);color:var(--good)}
+:root[data-theme="dark"] .r-card .status.retracted,
+:root[data-theme="dark"] .rrow .status.retracted,
+:root[data-theme="dark"] .qd-page .btn.on-rose,
+:root[data-theme="dark"] .qd-page .ans-composer .icon-btn.on-rose{background:var(--dk-red-wash);color:var(--danger)}
+:root[data-theme="dark"] .qna-page .status.resolved,
+:root[data-theme="dark"] .qd-page .status.resolved,
+:root[data-theme="dark"] .qd-page .qd-head .pill.scholar,
+:root[data-theme="dark"] .qd-page .ans-banner.accepted,
+:root[data-theme="dark"] .qd-page .ans-accept.btn-secondary:hover,
+:root[data-theme="dark"] .cm-save-err.partial .cm-save-err-ic,
+:root[data-theme="dark"] .rd-page .rd-toolbar-actions button.active,
+:root[data-theme="dark"] .vnp-head{background:var(--wash)}
+:root[data-theme="dark"] .qna-page .status.resolved,
+:root[data-theme="dark"] .qd-page .status.resolved,
+:root[data-theme="dark"] .qd-page .qd-head .pill.scholar,
+:root[data-theme="dark"] .qd-page .ans-banner.accepted{color:var(--rubric)}
+
+/* =========================================================
+   13 · SCROLLBARS & MISC CHROME
+   ========================================================= */
+:root[data-theme="dark"] *{scrollbar-color:rgba(169,184,200,.35) transparent}
+:root[data-theme="dark"] *::-webkit-scrollbar-thumb{background:rgba(169,184,200,.28);background-clip:padding-box}
+:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover{background:rgba(169,184,200,.45);background-clip:padding-box}
+
+/* =========================================================
+   14 · SECOND-PASS REPAIRS (review 2026-08-02)
+   Found by instantiating every rule's selector in a dark document
+   and measuring the resulting ink/plate pair, so these are the
+   cases the first sweep could not see: states (.on, :hover, .mine)
+   that a stub-rendered page never paints, and rules that lost a
+   specificity fight with the dark layer itself.
+   ========================================================= */
+
+/* --- 14.1 · Controls the dark layer accidentally flattened -----------
+   `.sw` (the settings switch, everywhere) is the worst of these: §5
+   pins the OFF track to --dk-edge at (0,3,0), which outranks
+   `.sw.on{background:var(--ox-blue)}` at (0,2,0) — so ON and OFF
+   rendered IDENTICALLY and no toggle in Settings showed its state.
+   The dark analogue of "Oxford Blue track, white knob" (§5 of the
+   spec) has to invert: on a night page the ON track is the BRIGHT
+   thing (Sky), and the knob goes Oxford Blue on top of it (10.8:1). */
+:root[data-theme="dark"] .sw.on,
+:root[data-theme="dark"] .rm-switch.on,
+:root[data-theme="dark"] .ci-switch.on{
+  background:var(--rubric);
+  box-shadow:inset 0 0 0 1px var(--rubric);
+}
+:root[data-theme="dark"] .sw.on::after,
+:root[data-theme="dark"] .ci-switch.on::after,
+:root[data-theme="dark"] .rm-switch.on .rm-switch-knob{background:var(--ox-blue)}
+/* Progress fill: §5 of the spec says Oxford Blue on light, Sky on dark.
+   --emerald on the --line track is 1.9:1 — the bar looked empty. */
+:root[data-theme="dark"] .stx-prog i{background:var(--rubric)}
+
+/* Profile tabs: the fill belongs to the sliding indicator, not the tab
+   (see the note in §3). Off-white ink on --emerald is 8.1:1. */
+:root[data-theme="dark"] .tabs.has-indicator .tab-indicator{
+  background:var(--emerald);
+  box-shadow:0 6px 14px -8px rgba(0,0,0,.6);
+}
+:root[data-theme="dark"] .prof-meta ~ .tabs.has-indicator .tab.on,
+:root[data-theme="dark"] .tabs.has-indicator .tab.on{background:transparent;border-color:transparent}
+
+/* The tag-input chip is a wash pill with blue ink, not a filled pill;
+   §3's `.chip.on` matched it at equal specificity and won on order,
+   leaving --blue on --emerald (4.1:1). Restore the authored pair. */
+:root[data-theme="dark"] .tag-input .tag-chips .chip.on,
+:root[data-theme="dark"] .tag-input .tag-chips .chip.on:hover{
+  background:var(--blue-wash);
+  border-color:transparent;
+}
+/* The numeral pill in a section label keeps a filled plate from §3, so
+   it needs the light ink that goes with it (--muted was 2.9:1). */
+:root[data-theme="dark"] .section-label i,
+:root[data-theme="dark"] .qd-page .section-label i{color:#f2f0f0}
+/* The reader's TOC numerals are bare mono figures (`background:none`);
+   §7 painted the generic --dk-edge pill under them at higher
+   specificity, giving --muted on #55708f (1.6:1). */
+:root[data-theme="dark"] .rd-page .rd-toc-a:not(.active) .rd-toc-n{background:none}
+
+/* --- 14.2 · --brass-soft used as TEXT --------------------------------
+   On light it is Oxford Sky (an on-dark accent); the dark contract
+   re-points it to #2e4a68, a RING colour. Every rule that used it for
+   words or glyphs therefore went dark-on-dark (2.1:1 on the body,
+   ~1.3:1 inside an own-message bubble). Lift to Sky; the fill and
+   border uses of the token are correct and stay. */
+:root[data-theme="dark"] .rd-eyebrow,
+:root[data-theme="dark"] .rd-fact .ico,
+:root[data-theme="dark"] .rd-vp-fail .ico,
+:root[data-theme="dark"] .ch-row.mine .ch-quote-who,
+:root[data-theme="dark"] .ch-row.mine .ch-poll-act,
+:root[data-theme="dark"] .cn-hero-sep,
+:root[data-theme="dark"] .auth-name b,
+:root[data-theme="dark"] .auth-hero em,
+:root[data-theme="dark"] .set-item.on .ico,
+:root[data-theme="dark"] .rvr.sv > span .ico,
+:root[data-theme="dark"] .tab.on .ico{color:var(--ox-sky)}
+:root[data-theme="dark"] .rvr.sv > span .ico{fill:var(--ox-sky);stroke:var(--ox-sky)}
+/* Same token as a PLATE under fixed dark ink — the mirror failure. */
+:root[data-theme="dark"] .rd-vp-unmute{background:var(--ox-sky)}
+
+/* --- 14.3 · The research reader's local emerald remap ---------------
+   §1 lifts --emerald/--emerald-deep to Sky inside `.rd-page` so the
+   reader's accent TEXT reads. Three controls in that subtree use the
+   same tokens as a PLATE under white ink, so they inverted to white
+   on Sky (1.5:1). They take the fixed link blue instead. */
+:root[data-theme="dark"] .rd-page .rd-dlpdf,
+:root[data-theme="dark"] .rd-page .rd-fab{background:var(--ox-blue-link);color:#fff}
+:root[data-theme="dark"] .rd-page .rd-dlpdf:hover:not(:disabled),
+:root[data-theme="dark"] .rd-page .rd-fab:hover{background:var(--ox-blue-glow)}
+
+/* --- 14.4 · Light plates the first sweep missed ---------------------- */
+/* The topbar search goes white ON FOCUS (theme.css) — with --ink text
+   that is white-on-white the moment you click it. */
+:root[data-theme="dark"] .tb-search input:focus{background:var(--card-2)}
+/* Channel category chip: a fixed sky-wash plate. Its hover is a full Sky
+   fill and keeps Oxford Blue ink (10.8:1) rather than the §6 accent. */
+:root[data-theme="dark"] .cp-cat{background:var(--wash);border-color:var(--brass-soft)}
+:root[data-theme="dark"] .cp-cat:hover{background:var(--ox-sky);color:var(--ox-blue)}
+/* Trends rail: the hover plate is a fixed Sky literal while the glyph
+   follows --gold (Sky on dark) — Sky on Sky, 1.4:1. */
+:root[data-theme="dark"] .trends .trend-row:hover .trend-ico{color:var(--ox-blue)}
+/* Poll "correct" marker: --good is a LIGHT mint on dark, white ink on it
+   is 2.1:1. */
+:root[data-theme="dark"] .pc-correct.on{color:var(--ox-blue)}
+
+/* --- 14.5 · Fixed light-theme tokens still carrying dark text -------- */
+:root[data-theme="dark"] .stx-tabhead .ico{color:var(--rubric)}
+:root[data-theme="dark"] .stx-state.saved{color:var(--good)}
+:root[data-theme="dark"] .stx-state.failed{color:var(--danger)}
+:root[data-theme="dark"] .ch-system-ico{color:var(--ink-soft)}
+:root[data-theme="dark"] .cv-row.active .cv-time,
+:root[data-theme="dark"] .cv-row.active .cv-preview{color:var(--ink-soft)}
+/* The selected conversation must still LIFT on hover, not sink: §8's
+   generic wash is darker than --mx-active. */
+:root[data-theme="dark"] .cv-row.active:hover{background:#24406a}
+:root[data-theme="dark"] .ch-row.mine .ch-bubble.deleted,
+:root[data-theme="dark"] .ch-row.mine .ch-bubble.deleted .ch-meta{color:var(--ink-soft)}
+/* --live (#c2483d) on --live-soft (a 14% tint of itself) was 4.6:1 on the
+   light page and drops to 3.5:1 over a night surface. The indicator FILLS
+   keep the brand red (bucket c); only these text/glyph uses are lifted. */
+:root[data-theme="dark"] .ch-netbar.off,
+:root[data-theme="dark"] .ch-schedrow-tag.bad,
+:root[data-theme="dark"] .lv-cast-warn.bad,
+:root[data-theme="dark"] .lv-queue-full,
+:root[data-theme="dark"] .lv-ingest-warn,
+:root[data-theme="dark"] .ci-stat.warn b,
+:root[data-theme="dark"] .ci-callrow.tone-warn .ico,
+:root[data-theme="dark"] .ch-callcard.tone-warn .ch-callcard-t,
+:root[data-theme="dark"] .ch-callcard.tone-warn .ch-callcard-ico{color:var(--danger)}
+
+/* --- 14.6 · The rich-text highlight palette -------------------------
+   The BACKGROUNDS here are user content and are sacred (bucket c) — they
+   are deliberately not flipped. What is not the user's choice is the ink
+   on top of them: it is inherited theme ink, which on dark is #e8edf3, so
+   every highlighted phrase rendered at 1.0–1.9:1. Pinning the ink to the
+   light-theme body slate keeps the author's colour AND restores the pair
+   (#1c2330 on the palette: 14.9:1 yellow · 10.8:1 green · 9.6:1 blue ·
+   9.2:1 coral · 8.5:1 pink · 12.9:1 orange · 14.8:1 cream). */
+:root[data-theme="dark"] .prose mark,
+:root[data-theme="dark"] .prose .hl-yellow,
+:root[data-theme="dark"] .prose .hl-green,
+:root[data-theme="dark"] .prose .hl-blue,
+:root[data-theme="dark"] .prose .hl-coral,
+:root[data-theme="dark"] .prose .hl-pink,
+:root[data-theme="dark"] .prose .hl-cream,
+:root[data-theme="dark"] .prose .hl-orange{color:#1c2330}
+/* Note: if an author applied a highlight AND a text colour to the same
+   span, the highlight's ink wins here (the pair has to stay legible and
+   the .tc-* rules are only (0,2,0)). Light mode is untouched either way. */
+
+/* --- 14.7 · The unused on-dark trap ---------------------------------
+   `.btn.on-dark` is theme.css's cerulean button for navy plates. It is
+   (0,2,0); theme.css's own `:root[data-theme="dark"] .btn-primary` is
+   (0,3,0), so on dark the modifier lost its plate and kept its ink —
+   Oxford Blue on --emerald, 1.9:1. Nothing renders it today; this keeps
+   the trap from springing on whoever uses it first. */
+:root[data-theme="dark"] .btn.on-dark,
+:root[data-theme="dark"] .btn-primary.on-dark{background:var(--ox-cerulean);color:var(--ox-blue)}
+:root[data-theme="dark"] .btn.on-dark:hover,
+:root[data-theme="dark"] .btn-primary.on-dark:hover{background:var(--ox-cerulean-lift);color:var(--ox-blue)}
+

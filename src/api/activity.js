@@ -5,6 +5,7 @@
    (server-rendered `label` / `subtitle` / `timeAgo` + typed references).
    ========================================================= */
 import { http } from './http.js'
+import { mockEnabled } from '../mock/flag.js'
 import { API_BASE, session } from './config.js'
 import { timeAgo } from './adapters.js'
 
@@ -52,6 +53,14 @@ export const activity = {
       timeout, so a wedged socket would otherwise stay dead forever). Returns
       an unsubscribe fn. */
   stream({ onActivity, onError } = {}) {
+
+    /* Mock mode: EventSource does not pass through request(), so nothing can
+       intercept it — opening one only retry-loops against a server that is not
+       running. Report connected and stay silent. */
+    if (mockEnabled()) {
+      const t = setTimeout(() => onError?.({ mock: true }), 0)
+      return () => clearTimeout(t)
+    }
     let es = null
     let lastBeat = Date.now()
     let closed = false

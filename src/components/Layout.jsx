@@ -10,14 +10,16 @@ import { DialogHost } from './Dialog.jsx'
 import { ShareHost } from './ShareSheet.jsx'
 import { ReportHost } from './ReportDialog.jsx'
 import { VersionGate } from './VersionGate.jsx'
+import { MockBadge } from './MockBadge.jsx'
 import { ComposeModal } from './ComposeModal.jsx'
 import { SearchTypeahead } from './SearchTypeahead.jsx'
 import { CallOverlay } from './chat/CallOverlay.jsx'
 import { useAuth, isPlatformAdmin } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { initChime, playChime } from '../lib/chime.js'
+import { shouldDeliver, notify, inQuietHours, NAVIGATE_EVENT } from '../lib/desktopNotify.js'
 import { loadAndApplyPrefs, PREFS_EVENT } from '../lib/prefs.js'
-import { api } from '../api/index.js'
+import { api, LOCKED_NOTIFICATION_TYPES } from '../api/index.js'
 
 const NAV = [
   { to:'/',              icon:'home',      label:'Home', end:true },
@@ -36,6 +38,36 @@ const NAV = [
 
 /* Shown only to ROLE_ADMIN / SUPER_ADMIN (search-index maintenance). */
 const ADMIN_NAV = { to:'/admin/search', icon:'shield', label:'Search admin' }
+
+/* ---- delivering one live notification ----------------------------------
+   Two independent channels, each with its own column in the settings matrix:
+   the chime IS the IN_APP channel, the OS notification IS the DESKTOP one.
+   They are deliberately not exclusive — a background tab can do both, and
+   desktopNotify's own gate already declines while the tab is visible.
+
+   Anything in LOCKED_NOTIFICATION_TYPES is BYPASS_ALL server-side (account
+   warnings) and skips both the matrix and the quiet-hours check, exactly as
+   the backend's own fan-out does. */
+async function deliverInApp(n) {
+  const type = n?.type
+  const bypass = type ? LOCKED_NOTIFICATION_TYPES.has(type) : false
+
+  let prefs = null
+  try { prefs = await api.settings.notifications.prefs() } catch { /* fail open */ }
+
+  const inAppOff = !bypass && type && prefs?.matrix?.[type]?.IN_APP === false
+  const quiet = !bypass && !!prefs?.dnd && inQuietHours(prefs.dnd)
+  if (!inAppOff && !quiet) playChime('notification')
+
+  if (await shouldDeliver(type)) {
+    notify({
+      title: n.title || 'IKA',
+      body: n.body || undefined,
+      tag: n.id ? String(n.id) : undefined,
+      deepLink: n.deepLink || '/notifications',
+    })
+  }
+}
 
 /* Main pages → bottom tab bar; every page (incl. these) → the sidebar drawer.
    Messages is a first-class tab here, not just a topbar icon: on a phone the
@@ -134,10 +166,31 @@ export function Layout() {
     reseed()
     return api.notifications.subscribe({
       onUnreadCount: setUnread,
-      onNotification: (n) => { if (n?.unread) playChime('notification') },
+      /* Delivery obeys the user's own settings. The chime is the IN_APP channel
+         and the OS notification is the DESKTOP channel, so each is gated on its
+         own column of the matrix plus the quiet-hours window — a person who
+         turned reactions off in Settings should not be pinged by one, and
+         "quiet hours" that still chimes is not quiet.
+
+         Both gates fail OPEN (an unreachable settings endpoint plays the sound):
+         nothing here is a privacy decision, and a silent client is
+         indistinguishable from a broken one. Security alerts are BYPASS_ALL
+         server-side and stay audible either way. */
+      onNotification: (n) => {
+        if (!n?.unread) return
+        deliverInApp(n).catch(() => playChime('notification'))
+      },
       onConnected: reseed,
     })
   }, [])
+
+  /* A clicked OS notification must land inside the router, not reload the app.
+     desktopNotify dispatches this rather than touching window.location. */
+  React.useEffect(() => {
+    const h = (e) => { const to = e.detail; if (typeof to === 'string' && to) navigate(to) }
+    window.addEventListener(NAVIGATE_EVENT, h)
+    return () => window.removeEventListener(NAVIGATE_EVENT, h)
+  }, [navigate])
 
   const onPublished = (post) => {
     window.dispatchEvent(new CustomEvent('ika:post-created', { detail: post }))
@@ -292,6 +345,8 @@ export function Layout() {
           nothing unless the server says this build is out of date or a policy
           moved on since the person accepted it. */}
       <VersionGate/>
+      {/* Renders nothing unless mock mode is on — see components/MockBadge.jsx. */}
+      <MockBadge/>
     </div>
   )
 }

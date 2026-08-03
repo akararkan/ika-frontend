@@ -72,8 +72,7 @@
   /* Match the post body: preserve the asker's blank lines + spacing
      while still wrapping long lines / long URLs cleanly. */
   white-space:pre-wrap;
-  overflow-wrap:anywhere;
-  word-break:break-word;
+  overflow-wrap:break-word; /* `anywhere` breaks RTL multi-line alignment — see styles-richtext.css */
 }
 .qd-meta{
   display:flex;align-items:center;gap:16px;margin-top:16px;
@@ -89,7 +88,7 @@
 .ans-banner{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:12px}
 .ans-banner.accepted{color:var(--emerald)}
 .answer > header{display:flex;align-items:center;gap:11px;margin-bottom:11px}
-.ans-body{font-family:var(--serif);font-size:15px;color:#232b3a;line-height:1.7}
+.ans-body{font-family:var(--serif);font-size:15px;color:#232b3a;line-height:1.7;overflow-wrap:break-word}
 .ans-ref{color:var(--emerald);font-weight:600;font-style:normal}
 .ans-sources{margin-top:14px;border-top:1px solid var(--line-soft);padding-top:13px}
 .ans-sources h5{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
@@ -441,6 +440,7 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(31,78,126,.32
   padding:0 12px 12px;font-size:13px;line-height:1.5;color:var(--ink-soft);
 }
 .rd-figure figcaption b{color:var(--ink);font-weight:600}
+.rd-figure-label{unicode-bidi:isolate;display:inline-block}
 
 /* Video / audio blocks */
 .rd-media-block{margin-top:8px}
@@ -539,6 +539,7 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(31,78,126,.32
   background:var(--card-2);border:1px solid var(--line);
   border-left:3px solid var(--brass-soft);
   border-radius:11px;padding:11px 13px 11px 14px;
+  overflow-wrap:break-word;unicode-bidi:plaintext;
 }
 
 /* ---------- Reels (full screen, dark) ---------- */
@@ -833,7 +834,7 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(31,78,126,.32
 /* eyebrow re-inked for the dark image */
 .rd-eyebrow{display:inline-flex;align-items:center;gap:11px;color:var(--brass-soft);font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin-bottom:13px}
 .rd-eyebrow::before{content:"";width:30px;height:1.5px;background:var(--brass-soft)}
-.rd-hero-title{font-family:var(--serif);color:#fff;font-weight:600;font-size:clamp(30px,4.4vw,50px);line-height:1.12;letter-spacing:-.4px;margin:0;max-width:24ch;text-shadow:0 3px 24px rgba(0,0,0,.5);overflow-wrap:anywhere;text-wrap:balance;unicode-bidi:plaintext}
+.rd-hero-title{font-family:var(--serif);color:#fff;font-weight:600;font-size:clamp(30px,4.4vw,50px);line-height:1.12;letter-spacing:-.4px;margin:0;max-width:24ch;text-shadow:0 3px 24px rgba(0,0,0,.5);overflow-wrap:break-word;text-wrap:balance;unicode-bidi:plaintext}
 .rd-hero-by{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}
 .rd-hero-by .nm{color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
 .rd-hero-by .tm{color:rgba(255,255,255,.74);font-size:13px;margin-top:2px}
@@ -1169,7 +1170,7 @@ a.src-row:hover .src-action{color:var(--emerald);border-color:rgba(31,78,126,.32
 .rd-page .rd-figure:hover{box-shadow:0 8px 22px -14px rgba(25,33,48,.5);border-color:#c2c1bf}
 .rd-page .rd-figure-img{aspect-ratio:4/3;background:#e9e8e6}
 .rd-page .rd-figure-fallback{background:#e9e8e6}
-.rd-page .rd-figure-num{left:12px;top:12px;bottom:auto;font-weight:400;color:var(--muted);background:rgba(255,255,255,.72);backdrop-filter:none}
+.rd-page .rd-figure-num{left:12px;top:12px;bottom:auto;font-weight:700;color:#fff;background:var(--ox-blue);backdrop-filter:none;box-shadow:0 2px 8px rgba(0,33,71,.35)}
 .rd-page .rd-figure figcaption{padding:9px 0 0;font-size:13px;color:var(--ink-2)}
 
 /* ---- Files — portrait mono badge (keeps the app's doc-type badge colours)

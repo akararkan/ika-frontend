@@ -268,14 +268,30 @@ textarea.field{padding:11px 13px;font-family:var(--sans);font-size:14.5px}
 *::-webkit-scrollbar-thumb{background:rgba(122,132,148,.4);background-clip:padding-box}
 *::-webkit-scrollbar-thumb:hover{background:rgba(77,88,105,.55);background-clip:padding-box}
 
-/* ---------- Oxford DARK palette (opt-in) ----------
-   The token remap for a future dark mode: set data-theme="dark" on
-   <html> and every token-driven rule follows. Surfaces are Oxford
+/* ---------- Oxford DARK palette ----------
+   The token remap for dark mode: `appearance.theme` (LIGHT | DARK |
+   SYSTEM) is applied by lib/prefs.js, which sets data-theme="dark" on
+   <html>, and every token-driven rule follows. Surfaces are Oxford
    blue-blacks (never neutral grey-black), Sky carries the accents,
-   and stone flips to hairline blues. NOTE: rules that hard-code
-   light-surface literals (the in-place hex layer in warm/*) do NOT
-   flip yet — full dark mode requires tokenising that layer first;
-   until then this block is the palette contract, not a switch. */
+   and stone flips to hairline blues.
+
+   This block is the PALETTE CONTRACT — treat its values as fixed.
+   The rules that hard-code light-surface literals in place (the hex
+   layer scattered through styles/* and warm/*) cannot read it, so
+   they are repaired by warm/dark.css, which loads last in the warm
+   layer and scopes every override under the same attribute. When you
+   add a rule with a literal colour, either use a token or add the
+   dark case to dark.css — its head comment classifies which literals
+   must flip, which are dark by design, and which are content colours
+   that must never flip.
+
+   Two traps live in here. (1) --navy / --rubric / --gold / --brass
+   all resolve to LIGHT blues on dark, because they carry headings and
+   links; a rule that uses one as a filled PLATE with #fff ink inverts
+   into light-on-light. (2) --emerald / --emerald-deep go the other
+   way and stay dark, because they are the button blues; using one as
+   accent TEXT goes dark-on-dark. dark.css §3 and §6 hold the repairs
+   for both, and new code should not add to either list. */
 :root[data-theme="dark"]{
   --ink:#e8edf3;
   --ink-2:#dce4ec;

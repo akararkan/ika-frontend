@@ -11,7 +11,7 @@
    (profile, close friends, email prefs…) remain below.
    ========================================================= */
 import React from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Icon, Avatar, showToast } from '../components/ui.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { EmptyState, Loader } from '../components/states.jsx'
@@ -19,6 +19,9 @@ import { useImageViewer } from '../components/ImageLightbox.jsx'
 import { SpecializationPicker, MadhhabSelect } from '../components/Taxonomy.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
+import { SetCard, ToggleRow, Field } from '../components/settings/shared.jsx'
+import { SettingsSearch } from '../components/settings/SettingsSearch.jsx'
+import { OverviewPanel } from '../components/settings/OverviewPanel.jsx'
 import { AppearancePanel, AccessibilityPanel } from '../components/settings/AppearancePanel.jsx'
 import { PrivacyPanel } from '../components/settings/PrivacyPanel.jsx'
 import { AudiencePanel } from '../components/settings/AudiencePanel.jsx'
@@ -123,8 +126,7 @@ function ProfilePanel({ me }) {
   }
 
   return (
-    <div className="card card-pad">
-      <h3 className="title">Public profile</h3>
+    <SetCard id="profile" icon="user" title="Public profile">
       <div className="set-avatar-row">
         <span {...openable(me.profileImage, { className:'flex', label:'View your profile photo' })}>
           <Avatar initials={me.initials} color={me.avc} size={72} src={me.profileImage}/>
@@ -138,19 +140,19 @@ function ProfilePanel({ me }) {
         </div>
       </div>
       <div className="set-grid">
-        <div><label className="field-label">Full name</label><input className="field" value={full} onChange={e => setFull(e.target.value)}/></div>
-        <div><label className="field-label">Handle</label><input className="field" value={'@'+handle.replace(/^@/, '')} onChange={e => setHandle(e.target.value)}/></div>
-        <div style={{gridColumn:'1/-1'}}><label className="field-label">Tagline</label><input className="field" value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Scholar · Author · Researcher"/></div>
-        <div style={{gridColumn:'1/-1'}}><label className="field-label">Bio</label><textarea className="field" value={bio} onChange={e => setBio(e.target.value)}/></div>
-        <div><label className="field-label">Academic title</label><input className="field" value={field} onChange={e => setField(e.target.value)} placeholder="e.g. Professor of Fiqh"/></div>
-        <div><label className="field-label">Institution</label><input className="field" value={institution} onChange={e => setInstitution(e.target.value)} placeholder="e.g. Salahaddin University"/></div>
+        <Field label="Full name"><input className="field" value={full} onChange={e => setFull(e.target.value)}/></Field>
+        <Field label="Handle"><input className="field" value={'@'+handle.replace(/^@/, '')} onChange={e => setHandle(e.target.value)}/></Field>
+        <div style={{gridColumn:'1/-1'}}><Field label="Tagline"><input className="field" value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Scholar · Author · Researcher"/></Field></div>
+        <div style={{gridColumn:'1/-1'}}><Field label="Bio"><textarea className="field" value={bio} onChange={e => setBio(e.target.value)}/></Field></div>
+        <Field label="Academic title"><input className="field" value={field} onChange={e => setField(e.target.value)} placeholder="e.g. Professor of Fiqh"/></Field>
+        <Field label="Institution"><input className="field" value={institution} onChange={e => setInstitution(e.target.value)} placeholder="e.g. Salahaddin University"/></Field>
         {/* Madhhab — chosen from the platform's fixed vocabulary, not typed
             (TAXONOMY §2 / §3.2). Saved as `madhhabId`; "Not specified" sends null. */}
         <div><label className="field-label">School of jurisprudence</label><MadhhabSelect value={madhhabId} onChange={editMadhhab} disabled={busy}/></div>
-        <div><label className="field-label">Location</label><input className="field" placeholder="City, Country" value={location} onChange={e => setLocation(e.target.value)}/></div>
-        <div><label className="field-label">Content language</label><select className="field" value={lang} onChange={e => setLang(e.target.value)}>{LANGUAGES.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-        <div><label className="field-label">Website</label><input className="field" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://…"/></div>
-        <div><label className="field-label">ORCID iD</label><input className="field" value={orcid} onChange={e => setOrcid(e.target.value)} placeholder="0000-0002-1825-0097"/></div>
+        <Field label="Location"><input className="field" placeholder="City, Country" value={location} onChange={e => setLocation(e.target.value)}/></Field>
+        <Field label="Content language"><select className="field" value={lang} onChange={e => setLang(e.target.value)}>{LANGUAGES.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+        <Field label="Website"><input className="field" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://…"/></Field>
+        <Field label="ORCID iD" hint="Your 16-digit researcher identifier."><input className="field" value={orcid} onChange={e => setOrcid(e.target.value)} placeholder="0000-0002-1825-0097"/></Field>
         {/* Specializations — the ordered topic list shown on the profile
             (TAXONOMY §3.1). Replace-all: what is here IS the new list. */}
         <div style={{gridColumn:'1/-1'}}>
@@ -158,19 +160,15 @@ function ProfilePanel({ me }) {
           <SpecializationPicker value={specs} onChange={editSpecs} disabled={busy}/>
         </div>
       </div>
-      <div className="set-toggle" style={{ marginTop:14 }}>
-        <div><b>Available for hire</b><small className="muted">Show an “Available for hire” badge on your profile.</small></div>
-        <button className={'sw ' + (forHire ? 'on' : '')} onClick={() => setForHire(v => !v)}/>
-      </div>
-      <div className="set-toggle">
-        <div><b>Private profile</b><small className="muted">Only followers can see your posts and research.</small></div>
-        <button className={'sw ' + (priv ? 'on' : '')} onClick={() => setPriv(v => !v)}/>
-      </div>
+      <ToggleRow title="Available for hire" desc="Show an “Available for hire” badge on your profile."
+        on={forHire} onToggle={() => setForHire(v => !v)}/>
+      <ToggleRow title="Private profile" desc="Only followers can see your posts and research."
+        on={priv} onToggle={() => setPriv(v => !v)}/>
       <div className="set-actions">
         <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
       </div>
       {viewer}
-    </div>
+    </SetCard>
   )
 }
 
@@ -191,9 +189,8 @@ function LinksPanel({ me }) {
   }
   const remove = (id) => { setLinks(ls => ls.filter(l => l.id !== id)); api.users.removeLink(id).then(() => refreshUser?.()).catch(() => {}); showToast('Link removed') }
   return (
-    <div className="card card-pad">
-      <h3 className="title"><Icon name="link" className="sm"/>Links</h3>
-      <p className="muted text-sm" style={{marginBottom:14}}>External profiles — ORCID, GitHub, your site. Shown publicly on your profile.</p>
+    <SetCard id="links" icon="link" title="Links"
+      sub="External profiles — ORCID, GitHub, your site. Shown publicly on your profile.">
       {links.length > 0 && (
         <div className="rail-list" style={{ marginBottom:12 }}>
           {links.map(l => (
@@ -206,12 +203,12 @@ function LinksPanel({ me }) {
         </div>
       )}
       <div className="set-grid">
-        <div><label className="field-label">Platform</label><select className="field" value={platform} onChange={e => setPlatform(e.target.value)}>{LINK_PLATFORMS.map(p => <option key={p} value={p}>{platformLabel(p)}</option>)}</select></div>
-        <div><label className="field-label">Label (optional)</label><input className="field" value={desc} onChange={e => setDesc(e.target.value)} placeholder="e.g. My research profile"/></div>
-        <div style={{gridColumn:'1/-1'}}><label className="field-label">URL</label><input className="field" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" onKeyDown={e => { if (e.key==='Enter') add() }}/></div>
+        <Field label="Platform"><select className="field" value={platform} onChange={e => setPlatform(e.target.value)}>{LINK_PLATFORMS.map(p => <option key={p} value={p}>{platformLabel(p)}</option>)}</select></Field>
+        <Field label="Label (optional)"><input className="field" value={desc} onChange={e => setDesc(e.target.value)} placeholder="e.g. My research profile"/></Field>
+        <div style={{gridColumn:'1/-1'}}><Field label="URL"><input className="field" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" onKeyDown={e => { if (e.key==='Enter') add() }}/></Field></div>
       </div>
       <div className="set-actions"><button className="btn btn-primary btn-sm" disabled={!url.trim()} onClick={add}><Icon name="follow" className="xs"/>Add link</button></div>
-    </div>
+    </SetCard>
   )
 }
 
@@ -231,9 +228,8 @@ function ContactsPanel({ me }) {
   }
   const remove = (id) => { setContacts(cs => cs.filter(c => c.id !== id)); api.users.removeContact(id).then(() => refreshUser?.()).catch(() => {}); showToast('Contact removed') }
   return (
-    <div className="card card-pad">
-      <h3 className="title"><Icon name="at" className="sm"/>Contacts</h3>
-      <p className="muted text-sm" style={{marginBottom:14}}>Direct-message handles. <b>Private by default</b> — toggle public to show one on your profile.</p>
+    <SetCard id="contacts" icon="at" title="Contacts"
+      sub="Direct-message handles. Private by default — toggle public to show one on your profile.">
       {contacts.length > 0 && (
         <div className="rail-list" style={{ marginBottom:12 }}>
           {contacts.map(c => (
@@ -246,15 +242,13 @@ function ContactsPanel({ me }) {
         </div>
       )}
       <div className="set-grid">
-        <div><label className="field-label">Platform</label><select className="field" value={platform} onChange={e => setPlatform(e.target.value)}>{CONTACT_PLATFORMS.map(p => <option key={p} value={p}>{platformLabel(p)}</option>)}</select></div>
-        <div><label className="field-label">Handle / address</label><input className="field" value={value} onChange={e => setValue(e.target.value)} placeholder="@handle or address" onKeyDown={e => { if (e.key==='Enter') add() }}/></div>
+        <Field label="Platform"><select className="field" value={platform} onChange={e => setPlatform(e.target.value)}>{CONTACT_PLATFORMS.map(p => <option key={p} value={p}>{platformLabel(p)}</option>)}</select></Field>
+        <Field label="Handle / address"><input className="field" value={value} onChange={e => setValue(e.target.value)} placeholder="@handle or address" onKeyDown={e => { if (e.key==='Enter') add() }}/></Field>
       </div>
-      <div className="set-toggle" style={{ marginTop:4 }}>
-        <div><b>Show publicly</b><small className="muted">Off keeps this visible only to you.</small></div>
-        <button className={'sw ' + (pub ? 'on' : '')} onClick={() => setPub(v => !v)}/>
-      </div>
+      <ToggleRow title="Show publicly" desc="Off keeps this visible only to you."
+        on={pub} onToggle={() => setPub(v => !v)}/>
       <div className="set-actions"><button className="btn btn-primary btn-sm" disabled={!value.trim()} onClick={add}><Icon name="follow" className="xs"/>Add contact</button></div>
-    </div>
+    </SetCard>
   )
 }
 
@@ -268,11 +262,14 @@ function CloseFriendsPanel() {
   const add = (u) => { setList(l => [...l, u]); api.closeFriends.add(u.id).then(() => showToast(`Added ${u.full.split(' ')[0]}`)).catch(() => showToast('They must be following you first')) }
   const remove = (u) => { setList(l => l.filter(x => x.id !== u.id)); api.closeFriends.remove(u.id).catch(() => {}); showToast('Removed') }
   return (
-    <div className="card card-pad">
-      <h3 className="title"><Icon name="users" className="sm"/>Close friends</h3>
-      <p className="muted text-sm" style={{marginBottom:14}}>Your inner circle. Stories set to <b>Close friends</b> are shown only to people on this list.</p>
-      <div className="cmt-box" style={{ marginTop:0, marginBottom:12 }}>
-        <input className="field" placeholder="Search people to add…" value={q} onChange={e => searchUsers(e.target.value)}/>
+    <SetCard id="close-friends" icon="users" title="Close friends"
+      sub="Your inner circle. Stories set to Close friends are shown only to people on this list.">
+      {/* `.stx-search`, not the chat `.cmt-box`: at ≤720px the responsive
+          sheet pins a `.card-pad > .cmt-box` to the bottom of the viewport as
+          a composer bar, which detached this field from its card. */}
+      <div className="stx-search">
+        <input className="field" type="search" aria-label="Search people to add"
+          placeholder="Search people to add…" value={q} onChange={e => searchUsers(e.target.value)}/>
       </div>
       {q && results.length > 0 && (
         <div className="rail-list" style={{ marginBottom:12 }}>
@@ -296,7 +293,7 @@ function CloseFriendsPanel() {
           ))}
         </div>
       ) : <EmptyState icon="users" title="No close friends yet" sub="Add people to share close-friends stories with."/>}
-    </div>
+    </SetCard>
   )
 }
 
@@ -304,11 +301,10 @@ function BlockedPanel() {
   const [list, setList] = React.useState(null)
   React.useEffect(() => { api.users.blocked().then(setList).catch(() => setList([])) }, [])
   const unblock = (u) => { setList(l => l.filter(x => x.id !== u.id)); api.users.unblock(u.id).catch(() => {}); showToast('Unblocked') }
-  if (list === null) return <div className="card card-pad"><h3 className="title">Blocked users</h3><p className="muted text-sm">Loading…</p></div>
+  const sub = 'Blocked people can’t see your posts, follow you, or message you. Blocking is mutual and severs any follows in both directions.'
+  if (list === null) return <SetCard id="blocked" icon="block" title="Blocked people" sub={sub}><Loader/></SetCard>
   return (
-    <div className="card card-pad">
-      <h3 className="title">Blocked users</h3>
-      <p className="muted text-sm" style={{marginBottom:14}}>Blocked people can’t see your posts, follow you, or message you.</p>
+    <SetCard id="blocked" icon="block" title="Blocked people" sub={sub}>
       {list.length ? (
         <div className="rail-list">
           {list.map(u => (
@@ -320,7 +316,7 @@ function BlockedPanel() {
           ))}
         </div>
       ) : <EmptyState icon="block" title="You haven’t blocked anyone"/>}
-    </div>
+    </SetCard>
   )
 }
 
@@ -334,7 +330,7 @@ function EmailPrefsPanel() {
       return next
     })
   }
-  if (!prefs) return <div className="card card-pad"><h3 className="title">Email preferences</h3><p className="muted text-sm">Loading…</p></div>
+  if (!prefs) return <SetCard id="emails" icon="mail" title="Email preferences"><Loader/></SetCard>
   const rows = [
     ['master', 'All emails', 'Master switch — turn off to stop all outbound emails.'],
     ['social', 'Social', 'Follows, blocks, and other social interactions.'],
@@ -343,21 +339,18 @@ function EmailPrefsPanel() {
     ['trending', 'Trending digest', 'Daily roundup of what scholars and researchers are talking about.'],
   ]
   const test = () => api.users.testEmail().then(r => showToast(r?.queued ? `Test email sent to ${r.to}` : (r?.reason || 'No email on file'))).catch(() => showToast('Could not send'))   // §16.3
-  const unsub = () => api.users.unsubscribeAll().then(() => { showToast('Unsubscribed from all emails'); setPrefs(p => ({ ...p, master:false })) }).catch(() => {})   // §16.4
+  const unsub = () => api.users.unsubscribeAll().then(() => { showToast('Unsubscribed from all emails'); setPrefs(p => ({ ...p, master:false })) }).catch(() => showToast('Could not unsubscribe', 'err'))   // §16.4
   return (
-    <div className="card card-pad">
-      <h3 className="title">Email preferences</h3>
+    <SetCard id="emails" icon="mail" title="Email preferences"
+      sub="Which emails IKA may send you. These five categories are the mail switch; the per-event grid in Notifications covers in-app and push.">
       {rows.map(([k, title, desc]) => (
-        <div key={k} className="set-toggle">
-          <div><b>{title}</b><small className="muted">{desc}</small></div>
-          <button className={'sw ' + (prefs[k] ? 'on' : '')} onClick={() => toggle(k)}/>
-        </div>
+        <ToggleRow key={k} title={title} desc={desc} on={!!prefs[k]} onToggle={() => toggle(k)}/>
       ))}
       <div className="set-actions" style={{ marginTop:8 }}>
         <button className="btn btn-secondary btn-sm" onClick={test}><Icon name="bell" className="xs"/>Send test email</button>
-        <button className="btn btn-secondary btn-sm" onClick={unsub}>Unsubscribe from all</button>
+        <button className="btn btn-danger btn-sm" onClick={unsub}>Unsubscribe from all</button>
       </div>
-    </div>
+    </SetCard>
   )
 }
 
@@ -365,11 +358,10 @@ function RestrictedPanel() {
   const [list, setList] = React.useState(null)
   React.useEffect(() => { api.users.restricted().then(setList).catch(() => setList([])) }, [])   // §11.10
   const unrestrict = (u) => { setList(l => l.filter(x => x.id !== u.id)); api.users.unrestrict(u.id).catch(() => {}); showToast('Restriction removed') }
-  if (list === null) return <div className="card card-pad"><h3 className="title">Restricted users</h3><p className="muted text-sm">Loading…</p></div>
+  const sub = 'Restricted people can still see your content, but their comments are visible only to themselves. They are never told.'
+  if (list === null) return <SetCard id="restricted" icon="eye" title="Restricted people" sub={sub}><Loader/></SetCard>
   return (
-    <div className="card card-pad">
-      <h3 className="title">Restricted users</h3>
-      <p className="muted text-sm" style={{marginBottom:14}}>Restricted people can still see your content, but their comments are visible only to themselves.</p>
+    <SetCard id="restricted" icon="eye" title="Restricted people" sub={sub}>
       {list.length ? (
         <div className="rail-list">
           {list.map(u => (
@@ -380,8 +372,8 @@ function RestrictedPanel() {
             </div>
           ))}
         </div>
-      ) : <EmptyState icon="eye" title="No restricted users"/>}
-    </div>
+      ) : <EmptyState icon="eye" title="No restricted people"/>}
+    </SetCard>
   )
 }
 
@@ -389,29 +381,36 @@ function SecurityPanel() {
   const { logoutEverywhere } = useAuth()
   const [cur, setCur] = React.useState(''); const [next, setNext] = React.useState(''); const [busy, setBusy] = React.useState(false)
   const change = async () => {
-    if (next.length < 8) { showToast('New password must be at least 8 characters'); return }
+    if (next.length < 8) { showToast('New password must be at least 8 characters', 'err'); return }
     setBusy(true)
     try { await api.auth.changePassword(cur, next); setCur(''); setNext(''); showToast('Password updated') }   // §8.6
-    catch (e) { showToast(e?.code === 'INVALID_CREDENTIALS' ? 'Current password is wrong' : (e?.message || 'Could not update password')) }
+    catch (e) { showToast(e?.code === 'INVALID_CREDENTIALS' ? 'Current password is wrong' : (e?.message || 'Could not update password'), 'err') }
     finally { setBusy(false) }
   }
-  const logoutAll = async () => {                                                                  // §8.5 — see ContactMatchingPanel below for the other destructive privacy op
-    const ok = await uiConfirm({ title:'Sign out everywhere?', message:'Your active sessions on every other browser, phone, and tablet will end immediately. You stay signed in here.', confirmLabel:'Sign out everywhere', icon:'logout' })
+  /* §8.5. The confirm used to promise "You stay signed in here" — the backend
+     revokes every refresh token including this one, and logoutEverywhere()
+     clears the local session too, so the copy now says what actually happens. */
+  const logoutAll = async () => {
+    const ok = await uiConfirm({
+      title: 'Sign out everywhere?',
+      message: 'Every active session ends immediately — on every browser, phone and tablet, including this one. You will need to sign in again.',
+      confirmLabel: 'Sign out everywhere', danger: true, icon: 'logout',
+    })
     if (ok) logoutEverywhere()
   }
   return (
-    <div className="card card-pad"><h3 className="title">Security</h3>
+    <SetCard id="password" icon="lock" title="Password">
       <div className="set-grid">
-        <div><label className="field-label">Current password</label><input className="field" type="password" value={cur} onChange={e => setCur(e.target.value)} placeholder="••••••••"/></div>
-        <div><label className="field-label">New password</label><input className="field" type="password" value={next} onChange={e => setNext(e.target.value)} placeholder="At least 8 characters"/></div>
+        <Field label="Current password"><input className="field" type="password" autoComplete="current-password" value={cur} onChange={e => setCur(e.target.value)} placeholder="••••••••"/></Field>
+        <Field label="New password" hint="At least 8 characters."><input className="field" type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} placeholder="At least 8 characters"/></Field>
       </div>
       <p className="muted text-xs" style={{ marginTop:6 }}>Changing your password signs out every other device.</p>
       <div className="set-actions"><button className="btn btn-primary" disabled={busy || !cur || !next} onClick={change}>{busy ? 'Updating…' : 'Update password'}</button></div>
       <div className="set-toggle" style={{ marginTop:8 }}>
-        <div><b>Log out everywhere</b><small className="muted">Revoke every active session on all devices.</small></div>
-        <button className="btn btn-secondary btn-sm" onClick={logoutAll}><Icon name="logout" className="xs"/>Log out all</button>
+        <div><b>Sign out everywhere</b><small className="muted">Ends every session, including this one.</small></div>
+        <button className="btn btn-danger btn-sm" onClick={logoutAll}><Icon name="logout" className="xs"/>Sign out all</button>
       </div>
-    </div>
+    </SetCard>
   )
 }
 
@@ -452,18 +451,13 @@ function ContactMatchingPanel() {
        older /users/contacts route, but it also writes the consent-withdrawal
        event, which is the whole point of having a consent ledger. */
     try { await api.settings.contactsSync.clear(); setGranted(false); showToast('Uploaded contacts deleted') }
-    catch { showToast('Could not delete uploaded contacts') }
+    catch { showToast('Could not delete uploaded contacts', 'err') }
     finally { setBusy(false) }
   }
   return (
-    <div className="card card-pad">
-      <h3 className="title"><Icon name="users" className="sm"/>Contact matching</h3>
-      <p className="muted text-sm" style={{ marginTop:2 }}>
-        If you upload your address book on the People page, it is hashed on your device with SHA-256
-        before it is sent — the server stores one-way hashes and never sees a name, an email address
-        or a phone number. They are used only to suggest people you may already know.
-      </p>
-      <p className="muted text-xs" style={{ marginTop:6 }}>
+    <SetCard id="contact-matching" icon="users" title="Contact matching"
+      sub="If you upload your address book on the People page, it is hashed on your device with SHA-256 before it is sent — the server stores one-way hashes and never sees a name, an email address or a phone number. They are used only to suggest people you may already know.">
+      <p className="muted text-xs" style={{ marginTop:-8 }}>
         This is separate from the <b>Contacts</b> card in the Profile tab, which lists contact
         methods you choose to show on your public profile.
       </p>
@@ -477,11 +471,11 @@ function ContactMatchingPanel() {
       )}
       <div className="set-toggle" style={{ marginTop:10 }}>
         <div><b>Delete uploaded contacts</b><small className="muted">Erase every hash you have uploaded and rebuild suggestions without them.</small></div>
-        <button className="btn btn-secondary btn-sm" disabled={busy} onClick={wipe}>
+        <button className="btn btn-danger btn-sm" disabled={busy} onClick={wipe}>
           <Icon name="trash" className="xs"/>{busy ? 'Deleting…' : 'Delete'}
         </button>
       </div>
-    </div>
+    </SetCard>
   )
 }
 
@@ -489,6 +483,7 @@ function ContactMatchingPanel() {
 
 const NAV = [
   { group: 'Account', items: [
+    ['overview', 'grid', 'Overview'],
     ['profile', 'user', 'Profile'],
     ['appearance', 'sparkle', 'Appearance'],
   ]},
@@ -520,12 +515,80 @@ const NAV = [
   ]},
 ]
 const SLUGS = new Set(NAV.flatMap(g => g.items.map(([slug]) => slug)))
+/** slug → {group, label, icon}, for the tab heading and the breadcrumb. */
+const NAV_BY_SLUG = Object.fromEntries(
+  NAV.flatMap(g => g.items.map(([slug, icon, label]) => [slug, { group: g.group, icon, label }])),
+)
+
+/** Deep links address a CARD, not just a tab: /settings/security#two-factor
+ *  scrolls it into view, moves focus to it (so a keyboard user lands where the
+ *  link pointed) and flashes its outline once so the eye finds it too. */
+function useCardAnchor(tab) {
+  const { hash } = useLocation()
+  React.useEffect(() => {
+    if (!hash || hash.length < 2) return undefined
+    const id = decodeURIComponent(hash.slice(1))
+    /* The panel may still be fetching; retry across a few frames rather than
+       failing silently on the first paint. */
+    let tries = 0
+    let raf = 0
+    let timer = 0
+    const find = () => {
+      const el = document.getElementById(id)
+      if (!el) {
+        if (tries++ < 40) raf = requestAnimationFrame(find)
+        return
+      }
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      el.focus({ preventScroll: true })
+      el.classList.add('stx-flash')
+      timer = setTimeout(() => el.classList.remove('stx-flash'), 1600)
+    }
+    raf = requestAnimationFrame(find)
+    return () => { cancelAnimationFrame(raf); clearTimeout(timer) }
+  }, [hash, tab])
+}
 
 export function SettingsPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { tab: rawTab } = useParams()
-  const tab = SLUGS.has(rawTab) ? rawTab : 'profile'
+  const { hash } = useLocation()
+  const known = SLUGS.has(rawTab)
+  const tab = known ? rawTab : 'overview'
+  const meta = NAV_BY_SLUG[tab]
+  const railRef = React.useRef(null)
+  const headRef = React.useRef(null)
+
+  /* URL, highlight and content must agree: a bare /settings or a typo like
+     /settings/securty used to render the profile editor while the address bar
+     said something else. */
+  React.useEffect(() => {
+    if (!known) navigate('/settings/overview', { replace: true })
+  }, [known, navigate])
+
+  /* On a phone the nav is one horizontal rail of 20 pills; deep-linking to the
+     last one would otherwise show it scrolled hard left, apparently on an
+     unrelated tab. */
+  React.useEffect(() => {
+    const rail = railRef.current
+    const on = rail?.querySelector('.set-item.on')
+    if (on && rail.scrollWidth > rail.clientWidth + 4) {
+      on.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+    }
+  }, [tab])
+
+  /* Changing tab is a navigation: name the page, move the reader to the new
+     heading, and start at the top — unless a #card anchor owns the scroll. */
+  React.useEffect(() => {
+    document.title = meta ? `${meta.label} · Settings · IKA` : 'Settings · IKA'
+    if (hash) return
+    window.scrollTo({ top: 0 })
+    headRef.current?.focus({ preventScroll: true })
+  }, [tab, meta, hash])
+
+  useCardAnchor(tab)
+
   // Hook-phase placeholder only — the render below is guarded on `user`.
   const me = user || { initials:'', avc:'' }
 
@@ -535,6 +598,7 @@ export function SettingsPage() {
   }
 
   const body = {
+    overview: <OverviewPanel/>,
     profile: <div className="set-stack"><ProfilePanel me={me}/><LinksPanel me={me}/><ContactsPanel me={me}/></div>,
     appearance: <div className="set-stack"><AppearancePanel/><AccessibilityPanel/></div>,
     privacy: <PrivacyPanel/>,
@@ -558,24 +622,37 @@ export function SettingsPage() {
   return (
     <div className="main center">
       <div className="col-main">
-        <div className="phead"><div><h1>Settings <span className="phead-ar" lang="ar" dir="rtl">الإعدادات</span></h1><p className="sub">Manage your account, privacy, notifications, and security.</p></div></div>
+        <div className="phead">
+          <div><h1>Settings <span className="phead-ar" lang="ar" dir="rtl">الإعدادات</span></h1><p className="sub">Manage your account, privacy, notifications, and security.</p></div>
+          <SettingsSearch/>
+        </div>
 
         <div className="settings-shell">
-          <aside className="set-side">
+          <nav className="set-side" ref={railRef} aria-label="Settings sections">
             {NAV.map(({ group, items }) => (
               <React.Fragment key={group}>
                 <div className="set-group">{group}</div>
                 {items.map(([slug, ic, lab]) => (
-                  <button key={slug} className={'set-item ' + (tab === slug ? 'on' : '')}
+                  <button key={slug} type="button"
+                    className={'set-item ' + (tab === slug ? 'on' : '')}
+                    aria-current={tab === slug ? 'page' : undefined}
                     onClick={() => navigate(`/settings/${slug}`)}>
                     <Icon name={ic} className="sm"/>{lab}
                   </button>
                 ))}
               </React.Fragment>
             ))}
-          </aside>
+          </nav>
 
-          <div>{body}</div>
+          <div>
+            {meta && (
+              <h2 className="stx-tabhead" ref={headRef} tabIndex={-1}>
+                <Icon name={meta.icon} className="sm"/>{meta.label}
+                <span className="stx-crumb">{meta.group}</span>
+              </h2>
+            )}
+            {body}
+          </div>
         </div>
       </div>
     </div>

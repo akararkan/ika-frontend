@@ -615,7 +615,6 @@ img,video{max-width:100%;height:auto}
   .rd-gallery{grid-template-columns:1fr;gap:10px}          /* real class, not .rd-figs */
   .rd-figure-img{aspect-ratio:16/10}
   .rd-author-bar .btn{min-height:36px}
-  .cite-box{overflow-wrap:anywhere;word-break:break-word}
   .r-owner-bar{gap:8px;padding:12px 16px}
   .r-owner-bar button{min-height:36px}
   .back-btn{min-height:40px;padding:9px 14px;font-size:14px}
@@ -625,11 +624,10 @@ img,video{max-width:100%;height:auto}
   .prof-counts{display:flex;overflow-x:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-left:0;border-right:0;background:transparent;border-radius:0}
   .prof-counts button{flex:none;padding:10px 14px 10px 0;margin-right:14px}
   .set-toggle .btn-sm{flex:none}
-  .settings-shell{display:block}
-  .set-side{position:static;top:auto;flex-direction:row;gap:8px;padding:8px 12px;margin:0 -14px 16px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;border-radius:0;border-left:0;border-right:0;background:var(--card)}
-  .set-side::-webkit-scrollbar{display:none}
-  .set-item{flex:none;width:auto;white-space:nowrap;padding:9px 14px;border-radius:999px;font-size:13.5px;background:var(--card-2)}
-  .set-item .ico{width:15px;height:15px}
+  /* The settings shell/nav collapse used to live here at ≤720 while
+     styles-user.css collapsed the grid at ≤780 — leaving 721–780px with a
+     full-width vertical 18-button column stacked above the content. It now
+     lives in warm/settings.css under the single ≤780 breakpoint. */
 
   /* ----- Discovery: Explore / Tag / Saved / Activity ----- */
   .explore-search{height:50px;padding:0 12px;gap:10px}

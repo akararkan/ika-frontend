@@ -22,6 +22,7 @@
    the posts/research realtime model in realtime.js.
    ========================================================= */
 import { http, parseJson, saveBlob } from './http.js'
+import { mockEnabled } from '../mock/flag.js'
 import { API_BASE, assetUrl, session } from './config.js'
 import { authorFrom, handleOf, timeAgo } from './adapters.js'
 import { mid } from './ids.js'
@@ -865,6 +866,45 @@ function adaptEvent(type, d = {}) {
  *    expired token) the browser will NOT retry; the caller should re-subscribe.
  */
 function stream(handlers = {}) {
+
+  /* Mock mode: EventSource does not pass through request(), so nothing can
+     intercept it — opening one only retry-loops against a server that is not
+     running. Report connected, then trickle the fixture's live-chat rows in as
+     `stream.chat` frames.
+
+     That replay is the ONLY way those rows can reach a screen: live chat is
+     broadcast-only on the real backend (POST to send, SSE to receive, no GET,
+     never persisted), so there is no REST route the fixture layer could serve
+     them from. Everything else stays silent. */
+  if (mockEnabled()) {
+    const timers = []
+    let stopped = false
+    timers.push(setTimeout(() => handlers.onConnected?.({ mock: true }), 0))
+    /* Mirror the real dispatch below: the mapped handler AND the `onAny`
+       firehose. ChatContext's own onStream only watches for stage invites —
+       it is `onAny` that re-broadcasts to subscribe() consumers, which is how
+       the live room's chat rail actually receives a frame.
+
+       This CYCLES rather than replaying once. ChatContext opens this stream at
+       app mount, but the live room subscribes only when you navigate into it,
+       so a one-shot replay has always finished before anyone is listening. A
+       loop also happens to be the truthful shape: live chat is a stream that
+       keeps arriving, not a backlog you fetch. */
+    let i = 0
+    import('../mock/index.js').then(({ liveChatFrames }) => liveChatFrames()).then(frames => {
+      if (stopped || !frames.length) return
+      const tick = () => {
+        if (stopped) return
+        const f = frames[i++ % frames.length]
+        const evt = { type: 'stream.chat', streamChat: f, streamId: f.streamId, userId: f.userId }
+        handlers.onStream?.(evt)
+        handlers.onAny?.(evt)
+        timers.push(setTimeout(tick, 4000))
+      }
+      timers.push(setTimeout(tick, 1500))
+    }).catch(() => {})
+    return () => { stopped = true; timers.forEach(clearTimeout) }
+  }
   let es = null
   let closed = false
   let lastBeat = Date.now()

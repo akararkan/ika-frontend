@@ -25,6 +25,7 @@
    ========================================================= */
 import React from 'react'
 import { Icon, Avatar, Verify, linkify, showToast } from '../ui.jsx'
+import { openReport } from '../ReportDialog.jsx'
 import { useChat } from '../../context/ChatContext.jsx'
 import { Popover } from './Popover.jsx'
 import { systemNoticeOf } from './systemEvents.js'
@@ -525,6 +526,23 @@ export function MessageBubble({
     // ladder already says it, and the endpoint excludes the sender anyway.
     if (isGroup && mine) {
       menuItems.push({ key: 'seen', label: 'Seen by', icon: 'checks', run: () => onSeenBy?.(msg) })
+    }
+    /* Reporting your own message tells the moderators nothing, so the row is
+       offered on received messages only. The report names the MESSAGE itself —
+       moderators resolve the thread from it, which is why no conversation id
+       is sent. */
+    if (!mine && msg.id) {
+      menuItems.push({
+        key: 'report', label: 'Report message', icon: 'flag',
+        /* `subject` is the dialog's excerpt plate: in a run of near-identical
+           bubbles "this message" alone does not say WHICH one, and a report
+           filed against the wrong message is worse than none. It is shown
+           locally, never sent — so protectedContent has nothing to withhold. */
+        run: () => openReport({
+          targetType: 'MESSAGE', targetId: msg.id, targetLabel: 'this message',
+          subject: hasText ? msg.body : '',
+        }),
+      })
     }
     if (mine && hasText) menuItems.push({ key: 'edit', label: 'Edit', icon: 'edit', run: () => onEdit?.(msg) })
     /* Two genuinely different deletes, so they are two rows rather than one

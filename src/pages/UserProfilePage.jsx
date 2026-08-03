@@ -26,6 +26,7 @@ export function UserProfilePage() {
   const [research, setResearch] = React.useState([])
   const [reels, setReels] = React.useState([])      // reel-only list (§17.2 by-author)
   const [stats, setStats] = React.useState(null)   // §9.14
+  const [muted, setMuted] = React.useState(null)   // null = list not read yet
   const [followList, setFollowList] = React.useState(null)   // {mode} → followers/following list modal
   const [loading, setLoading] = React.useState(true)
   const { openable, viewer } = useImageViewer()   // cover + portrait open full-screen
@@ -38,6 +39,13 @@ export function UserProfilePage() {
     setLoading(true)
     api.users.profile(id).then(x => { if (alive) setU(x) }).catch(() => { if (alive) setU(false) }).finally(() => { if (alive) setLoading(false) })
     if (!isMe) api.users.socialStatus(id).then(s => { if (alive) setStatus(s) }).catch(() => {})
+    /* SocialStatusResponse carries follow/block/restrict but NOT mute, so the
+       muted state comes from the privacy list — bare UUID strings, hence the
+       String() compare. A failed read leaves it null: the button then offers
+       "Mute", and mute is idempotent server-side, so guessing costs nothing. */
+    if (!isMe) api.settings.privacy.muted.ids()
+      .then(ids => { if (alive) setMuted((ids || []).some(x => String(x) === String(id))) })
+      .catch(() => {})
     api.users.stats(id).then(s => { if (alive) setStats(s) }).catch(() => {})
     api.posts.byAuthor(id).then(p => { if (alive) setPosts(p || []) }).catch(() => {})
     api.research.byResearcher(id).then(r => { if (alive) setResearch(r || []) }).catch(() => {})
@@ -80,6 +88,18 @@ export function UserProfilePage() {
       })
   }
   const block = () => { api.users.block(id).then(() => { showToast('User blocked'); navigate(-1) }).catch(() => {}) }
+  /* Mute is the quiet cousin of Block: one-directional and never notified.
+     HONESTY: MuteService is only ever called by its own controller — nothing
+     in feed assembly reads mutedIds/isMuted today — so the truthful promise is
+     the LIST, not a feed that visibly changes. Say that, and no more; the copy
+     can grow once the server filters. */
+  const toggleMute = () => {
+    const was = !!muted
+    setMuted(!was)
+    ;(was ? api.settings.privacy.muted.unmute(id) : api.settings.privacy.muted.mute(id))
+      .then(() => showToast(was ? `Unmuted @${u.handle}` : `Muted @${u.handle} — they are never told`))
+      .catch(() => { setMuted(was); showToast('Could not update mute', 'err') })
+  }
   const report = () => openReport({ targetType:'USER', targetId:id, targetLabel:'@' + u.handle })
   const restricting = status?.isRestricting
   const toggleRestrict = () => {
@@ -118,7 +138,10 @@ export function UserProfilePage() {
               </button>
             )}
             <button className={'btn btn-secondary icon-only' + (restricting ? ' on-brass' : '')} onClick={toggleRestrict} title={restricting ? 'Restricted — tap to remove' : 'Restrict — their comments show only to them'} aria-label="Restrict"><Icon name="eye" className="sm"/></button>
-            <button className="btn btn-secondary icon-only" onClick={block} title="Block" aria-label="Block"><Icon name="block" className="sm"/></button>
+            <button className={'btn btn-secondary icon-only' + (muted ? ' on-brass' : '')} onClick={toggleMute}
+              title={muted ? 'Muted — on your muted list (Settings → Muted). Tap to unmute.' : 'Mute — adds them to your muted list. Silent and one-way: they are never told, and unlike Block nothing is severed.'}
+              aria-label={muted ? 'Unmute' : 'Mute'} aria-pressed={!!muted}><Icon name="mute" className="sm"/></button>
+            <button className="btn btn-secondary icon-only" onClick={block} title="Block — they can no longer follow, message or see you" aria-label="Block"><Icon name="block" className="sm"/></button>
             {!isMe && <button className="btn btn-secondary icon-only" onClick={report} title="Report this account" aria-label="Report"><Icon name="flag" className="sm"/></button>}
           </div>
         </div>

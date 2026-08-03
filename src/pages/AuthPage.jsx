@@ -2,18 +2,40 @@
    Auth page — sign in / create account (live).
    ========================================================= */
 import React from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Icon, BrandMark } from '../components/ui.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { api } from '../api/index.js'
 
-// Map the API's errorCode (§4) to a friendly message — never branch on message text (§18.1 #5).
+/* The documents the consent line covers, named in the order it names them.
+   These are PolicyService's keys verbatim — "Code of Conduct" (the old label)
+   is not one of them, so it could never have been shown or recorded. */
+const SIGNUP_POLICIES = ['terms', 'guidelines', 'privacy']
+
+/* Map the API's errorCode (§4) to a friendly message — never branch on message
+   text (§18.1 #5). The codes below are the SERVER's verbatim, which is not what
+   this map used to guess at:
+     · Spring's auth failures all come through GlobalExceptionHandler prefixed
+       AUTH_* (AUTH_BAD_CREDENTIALS, not INVALID_CREDENTIALS);
+     · a taken email and a taken handle share ONE code — DuplicateResourceException
+       builds it as <RESOURCE>_DUPLICATE, i.e. USER_DUPLICATE for both — and are
+       only told apart by details.field. Its own message interpolates the value
+       ("User already exists with email: …"), so it must never be shown raw;
+     · bean validation answers VALIDATION_FAILED with a placeholder message
+       ("Check 'fieldErrors' for details") — the per-field message is the useful
+       one, and http.js already lifts fieldErrors onto the error. */
 function authError(e, mode) {
+  const field = e?.payload?.details?.field
   switch (e?.code) {
-    case 'INVALID_CREDENTIALS':     return 'Wrong email/username or password.'
-    case 'ACCOUNT_DISABLED':        return 'Your email isn’t verified yet — check your inbox to activate your account.'
-    case 'EMAIL_ALREADY_EXISTS':    return 'That email is already registered — try signing in instead.'
-    case 'USERNAME_ALREADY_EXISTS': return 'That handle is already taken — please choose another.'
-    case 'VALIDATION_ERROR':        return e.message || 'Please check your details and try again.'
+    case 'AUTH_BAD_CREDENTIALS':  return 'Wrong email/username or password.'
+    /* isEnabled only ever goes false when the account is closed (softDelete) —
+       there is no email-verification step to point anyone at. */
+    case 'AUTH_ACCOUNT_DISABLED': return 'This account is closed. Contact support if that isn’t right.'
+    case 'AUTH_ACCOUNT_LOCKED':   return 'This account is locked. Please contact support.'
+    case 'USER_DUPLICATE':        return field === 'username'
+      ? 'That handle is already taken — please choose another.'
+      : 'That email is already registered — try signing in instead.'
+    case 'VALIDATION_FAILED':     return e.fieldErrors?.[0]?.message || 'Please check your details and try again.'
     default: return e?.message || (mode === 'SIGN_IN' ? 'Sign-in failed. Please try again.' : 'Could not create your account.')
   }
 }
@@ -59,9 +81,22 @@ function validate(mode, f, agree) {
     else if (!EMAIL_RE.test(m)) e.email = 'That doesn’t look like a valid email address.'
     if (!f.password) e.password = 'Choose a password.'
     else if (f.password.length < 8) e.password = 'Use at least 8 characters.'
-    if (!agree) e.agree = 'Please accept the Code of Conduct and Terms to continue.'
+    if (!agree) e.agree = 'Please accept the Terms, Community Guidelines and Privacy Policy to continue.'
   }
   return e
+}
+
+/* A policy link inside the consent <label>. New tab so a half-filled signup
+   form survives the read. The label's activation behaviour is already spec'd
+   to do nothing for clicks on an interactive descendant, so the checkbox will
+   not toggle — stopPropagation only keeps that true if a handler is ever put
+   on the label itself. */
+function PolicyLink({ to, children }) {
+  return (
+    <Link to={to} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+      {children}
+    </Link>
+  )
 }
 
 // Defined outside AuthPage so React keeps the same component identity across
@@ -143,7 +178,17 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
     setBusy(true)
     try {
       if (signIn) await login(fields)
-      else await register(fields)
+      else {
+        await register(fields)
+        /* register() stores the session (api/auth.js), so the authenticated
+           POST /app/policies/{key}/accept is callable from here — and only
+           from here: without these rows every new account lands on the feed
+           with VersionGate's re-consent banner already open, asking again for
+           what was just agreed to. Fire-and-forget: a failed ledger write must
+           never keep someone who just signed up out of the app, and Settings →
+           About can still record it later. */
+        SIGNUP_POLICIES.forEach(k => { api.settings.app.acceptPolicy(k).catch(() => {}) })
+      }
       navigate(loc.state?.from?.pathname || '/', { replace: true })
     } catch (err) {
       setError(authError(err, mode))
@@ -243,12 +288,17 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
                 <div className="auth-note"><Icon name="shield" className="sm"/><span>You’ll stay signed in on this device until you log out.</span></div>
               ) : (
                 <>
-                  <label className={'auth-agree' + (errs.agree ? ' bad' : '')}>
-                    <input type="checkbox" checked={agree}
+                  <label className={'auth-agree' + (errs.agree ? ' bad' : '')} htmlFor="f-agree">
+                    <input id="f-agree" type="checkbox" checked={agree}
+                      aria-invalid={!!errs.agree} aria-describedby={errs.agree ? 'f-agree-err' : undefined}
                       onChange={e => { setAgree(e.target.checked); setErrs(x => (x.agree ? { ...x, agree: undefined } : x)) }}/>
-                    <span>I agree to the <a>Code of Conduct</a> and <a>Terms of Service</a>.</span>
+                    <span>
+                      I agree to the <PolicyLink to="/policies/terms">Terms of Service</PolicyLink> and{' '}
+                      <PolicyLink to="/policies/guidelines">Community Guidelines</PolicyLink>, and to the{' '}
+                      <PolicyLink to="/policies/privacy">Privacy Policy</PolicyLink>.
+                    </span>
                   </label>
-                  {errs.agree && <small className="af-err" role="alert">{errs.agree}</small>}
+                  {errs.agree && <small id="f-agree-err" className="af-err" role="alert">{errs.agree}</small>}
                 </>
               )}
 

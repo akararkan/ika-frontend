@@ -8,6 +8,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, linkify, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
+import { openReport } from '../components/ReportDialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { authorOf } from '../lib/userView.js'
@@ -59,6 +60,16 @@ export function PostPage() {
   const [live, setLive] = React.useState(false)
   const [text, setText] = React.useState('')
   const [busy, setBusy] = React.useState(false)
+  /* The card's comment button hands off to the thread this page owns rather
+     than expanding its own — scroll it into view and put the caret in the
+     composer, so one tap gets you to typing. */
+  const commentsBoxRef = React.useRef(null)
+  const focusComments = React.useCallback(() => {
+    const box = commentsBoxRef.current
+    if (!box) return
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    box.querySelector('input,textarea,[contenteditable="true"]')?.focus({ preventScroll: true })
+  }, [])
   const [editingId, setEditingId] = React.useState(null)
   const [editValue, setEditValue] = React.useState('')
   const [replyTo, setReplyTo] = React.useState(null)       // comment id being replied to
@@ -346,10 +357,14 @@ export function PostPage() {
           : !post ? <EmptyState icon="feed" title="Post not found" sub="It may have been removed."/>
           : (
             <>
-              <PostCard post={post} onLike={like} onSave={save} onShare={share} onOpenComments={() => {}}
+              {/* `inlineComments={false}`: this page already renders the whole
+                  thread below, so the card must not expand a second copy of it.
+                  Its comment button (and "View all") jumps to the real one. */}
+              <PostCard post={post} onLike={like} onSave={save} onShare={share}
+                inlineComments={false} onOpenComments={focusComments}
                 observeView={false} owner={!!me.id && post.author === me.id} onEdit={() => openComposeEdit(post)} onDelete={delPost}/>
 
-              <div className="card card-pad" style={{ marginTop:14 }}>
+              <div className="card card-pad" ref={commentsBoxRef} style={{ marginTop:14 }}>
                 <h3 className="title">
                   <Icon name="comment" className="sm"/>Comments
                   {live && <span className="pill role" style={{ marginLeft:8 }}><span className="ps-heart" style={{ width:8, height:8, background:'var(--emerald-glow)' }}/>Live</span>}
@@ -396,6 +411,11 @@ export function PostPage() {
                           }}>Reply</button>
                           {cOwner && !editing && <button onClick={() => startEdit(c)}>Edit</button>}
                           {cOwner && <button onClick={() => delComment(c.id)} style={{ color:'var(--rose)' }}>Delete</button>}
+                          {/* optimistic rows carry a tmp- id the moderators cannot resolve.
+                              `subject` puts the comment's own text on the dialog's plate —
+                              a thread of similar replies otherwise all read "this comment". */}
+                          {!cOwner && c.id && !String(c.id).startsWith('tmp-') &&
+                            <button onClick={() => openReport({ targetType:'COMMENT', targetId:c.id, targetLabel:'this comment', subject:c.body })}>Report</button>}
                           <span>{c.time}</span>
                         </div>
 
@@ -446,6 +466,8 @@ export function PostPage() {
                                   <button onClick={() => { setReplyTo(c.id); setReplyTarget({ handle: ru.handle, userId: r.author, commentId: r.id }); setReplyText(`@${ru.handle} `) }}>Reply</button>
                                   {rOwner && !rEditing && <button onClick={() => startEdit(r)}>Edit</button>}
                                   {rOwner && <button onClick={() => delReply(c.id, r.id)} style={{ color:'var(--rose)' }}>Delete</button>}
+                                  {!rOwner && r.id && !String(r.id).startsWith('tmp-') &&
+                                    <button onClick={() => openReport({ targetType:'COMMENT', targetId:r.id, targetLabel:'this reply', subject:r.body })}>Report</button>}
                                   <span>{r.time}</span>
                                 </div>
                               </div>

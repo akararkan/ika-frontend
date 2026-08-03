@@ -408,9 +408,11 @@
   font-size:12px;font-weight:600;letter-spacing:.2px;color:var(--gold-deep);
 }
 .pc-src .ico{stroke:var(--gold)}
-.pc-src .btn{margin-inline-start:auto;padding-inline:14px}
 .post-card.is-explore{border-color:var(--line)}
 .post-card.is-explore .pc-head{padding-top:8px}
+/* Follow button sits on the author row itself, same line as the avatar/name —
+   flex:none so it keeps its size while .pc-who (flex:1) absorbs the space. */
+.pc-follow{flex:none;padding-inline:14px}
 
 /* ---------- "New posts" pill ---------- */
 /* Centred over the list rather than pinned to the viewport: the feed only

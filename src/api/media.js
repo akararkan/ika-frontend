@@ -17,6 +17,21 @@ import { http } from './http.js'
 
 export const MEDIA_STATUS_FAILED = new Set(['FAILED_VALIDATION', 'FAILED_MODERATION', 'FAILED_PROCESSING'])
 
+/** The server's own caps (MediaProperties.Limits), mirrored so the client can
+ *  refuse an impossible upload BEFORE reading half a gigabyte into a tab.
+ *  The server stays the authority — this is a courtesy, not a contract. */
+export const MEDIA_LIMITS = {
+  IMAGE: 26_214_400,        // 25 MB
+  AUDIO: 26_214_400,
+  VIDEO: 536_870_912,       // 512 MB
+  FILM: 536_870_912,
+  VIDEO_CLIP: 536_870_912,
+}
+
+/** Above this we skip the SHA-256 entirely: the digest needs the whole file in
+ *  an ArrayBuffer, and dedup is an optimisation, not a requirement. */
+const HASH_MAX_BYTES = 64 * 1024 * 1024
+
 export const media = {
   /* ---- primitives ---- */
   uploadIntent({ mime, sizeBytes, sha256, type = 'IMAGE' }, tier) {
@@ -45,7 +60,16 @@ export const media = {
    *  poll loop runs until READY or a FAILED_* status (which rejects with an
    *  Error carrying .status = the failed state). */
   async upload(file, { type = 'IMAGE', tier, onProgress, signal, pollMs = 1200, maxPolls = 150 } = {}) {
-    const sha256 = await media.sha256Of(file)
+    /* Refuse an oversize file up front. Doing this after sha256Of would mean
+       buffering the entire 512 MB into the tab just to be told MEDIA_TOO_LARGE. */
+    const cap = MEDIA_LIMITS[type]
+    if (cap && file.size > cap) {
+      const err = new Error(`That file is too large — the limit is ${Math.round(cap / 1024 / 1024)} MB.`)
+      err.code = 'MEDIA_TOO_LARGE'
+      throw err
+    }
+    // Dedup is optional; a huge file skips the digest rather than the upload.
+    const sha256 = file.size <= HASH_MAX_BYTES ? await media.sha256Of(file) : null
     const intent = await media.uploadIntent({ mime: file.type || 'application/octet-stream', sizeBytes: file.size, sha256, type }, tier)
 
     if (!intent.deduped) {

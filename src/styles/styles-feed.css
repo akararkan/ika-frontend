@@ -70,8 +70,7 @@
      (newlines render as line breaks, multiple spaces don't collapse) and
      still wrap long lines / break long URLs cleanly. */
   white-space:pre-wrap;
-  overflow-wrap:anywhere;
-  word-break:break-word;
+  overflow-wrap:break-word; /* `anywhere` breaks RTL multi-line alignment — see styles-richtext.css */
 }
 .tk-tag{color:var(--emerald);font-weight:600}
 .tk-mention{color:var(--rubric);font-weight:600}
@@ -204,7 +203,7 @@
   /* Preserve the original post's blank lines + spacing in the repost embed —
      but CLAMP it: the quote is a preview, the tap shows the whole post, and
      an unclamped original dwarfs the reposter's own note above it. */
-  white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;
+  white-space:pre-wrap;overflow-wrap:break-word;
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;
 }
 .rp-chip{

@@ -29,6 +29,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Icon, Avatar, showToast, Verify } from '../components/ui.jsx'
 import { Loader, ErrorState, EmptyState } from '../components/states.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
+import { openReport } from '../components/ReportDialog.jsx'
 import { useImageViewer } from '../components/ImageLightbox.jsx'
 import { useImageRatio, coverStyle } from '../lib/useImageRatio.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -247,6 +248,15 @@ export function ChannelPage() {
                 <button className="icon-btn" title="Share" aria-label={`Share ${ch.title}`}
                   onClick={() => openShare({ kind: 'channel', url: ch.shareUrl, title: ch.title })}>
                   <Icon name="share" className="sm"/>
+                </button>
+              )}
+
+              {/* Reporting your own channel tells the moderators nothing; every
+                  other visitor gets the affordance, subscribed or not. */}
+              {!isOwner && ch.id && (
+                <button className="icon-btn" title="Report channel" aria-label={`Report ${ch.title}`}
+                  onClick={() => openReport({ targetType: 'CHANNEL', targetId: ch.id, targetLabel: ch.title || 'this channel' })}>
+                  <Icon name="flag" className="sm"/>
                 </button>
               )}
 

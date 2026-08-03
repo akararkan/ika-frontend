@@ -1,30 +1,99 @@
 /* =========================================================
    Settings v2 — the widget vocabulary for the full settings
-   surface (privacy resolver, notification matrix, security,
-   sessions, media/storage, data & safety, about).
-   Prefix: `stx-` (settings-extended). Oxford tokens only —
-   see OXFORD_THEME.md. Reuses the existing `set-*` shell
-   (side nav, grids, toggles) and `.sw` switches from the
-   user styles; everything new lives here.
+   surface (overview, search, privacy resolver, notification
+   matrix, security, sessions, media/storage, data & safety,
+   about).
+
+   Prefix: `stx-` (settings-extended). Oxford tokens only — see
+   OXFORD_THEME.md. Reuses the existing `set-*` shell (side nav,
+   grids, toggles) and `.sw` switches from the user styles;
+   everything new lives here.
+
+   Two things this file deliberately OWNS, because they were
+   split across three stylesheets and disagreed:
+
+   1. The mobile settings nav. styles-responsive.css used to
+      flatten `.set-side` at =720 while styles-user.css collapsed
+      the shell at =780, leaving 721-780px with a full-width
+      vertical 18-button column stacked above the content. There
+      is now ONE breakpoint (780px) and it lives at the bottom of
+      this file; the =720 copy in styles-responsive.css is gone.
+
+   2. Non-text contrast of the control family. `--ox-stone` /
+      `--ox-stone-strong` borders on white are 1.4-1.8:1, below
+      the 3:1 that WCAG 1.4.11 requires for a control boundary.
+      Every unchecked tick / unselected day chip / off switch now
+      draws its boundary in `--muted` slate (5.2:1) instead.
    ========================================================= */
 
 /* ---------- side nav: group labels ---------- */
 .set-group{margin:14px 10px 4px;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
 .set-group:first-child{margin-top:6px}
+.set-side{scroll-margin-top:80px}
+.set-item{position:relative}
+.set-item:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+/* attention dot — an unresolved item on the tab (failing security check, strike…) */
+.set-item .stx-dot{margin-inline-start:auto;width:7px;height:7px;border-radius:50%;background:var(--ox-amber);flex:none}
+.set-item.on .stx-dot{background:var(--ox-sky)}
 
 /* ---------- a tab's vertical card stack ---------- */
 .set-stack{display:flex;flex-direction:column;gap:16px}
 
+/* ---------- card head: title + hover-revealed link anchor ---------- */
+.stx-card{scroll-margin-top:88px}
+.stx-card:focus{outline:none}
+/* The title keeps its own 12px bottom margin (styles.css `.card h3.title`) —
+   it is inside the flex row, so it still spaces the card body correctly. */
+.stx-head{display:flex;align-items:flex-start;gap:10px}
+/* The base `.card h3.title` is not a flex box, so its leading icon sat flush
+   against the first letter. */
+.stx-head .title{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.stx-head .title .ico{flex:none}
+.stx-head-act{display:flex;align-items:center;gap:6px;flex:none}
+.stx-anchor{width:30px;height:30px;border:0;border-radius:9px;background:transparent;color:var(--muted);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;
+  transition:opacity .15s ease,background .15s ease,color .15s ease}
+.stx-card:hover .stx-anchor,.stx-anchor:focus-visible{opacity:1}
+.stx-anchor:hover{background:var(--ox-wash);color:var(--ox-blue-link)}
+.stx-anchor:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:1px}
+
+/* the card a deep link just landed on */
+@keyframes stx-flash{0%,55%{box-shadow:0 0 0 2px var(--ox-blue-link)}100%{box-shadow:0 0 0 2px transparent}}
+.stx-card.stx-flash{animation:stx-flash 1.5s ease forwards}
+
 /* ---------- section intro line under a card title ---------- */
 .stx-sub{margin:2px 0 14px;font-size:13.5px;color:var(--muted);line-height:1.5;max-width:560px}
 
+/* ---------- a subordinate heading INSIDE a card ---------- */
+.stx-subhead{margin:20px 0 2px;padding-top:16px;border-top:1px solid var(--line-soft);
+  font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:.01em;color:var(--ink)}
+.stx-subhead:first-child{margin-top:0;padding-top:0;border-top:0}
+
+/* ---------- "see also" cross-tab pointer ---------- */
+.stx-seealso{display:flex;align-items:center;gap:6px;margin:12px 0 0;font-size:12.5px;color:var(--muted)}
+.stx-seealso .ico{color:var(--ox-blue-link)}
+.stx-seealso a{color:var(--ox-blue-link);font-weight:600}
+.stx-seealso a:hover{color:var(--ox-blue);text-decoration:underline}
+
+/* ---------- inline save state on a row ---------- */
+.stx-state{margin-inline-start:auto;font-size:12px;font-weight:600;white-space:nowrap}
+.stx-state.saving{color:var(--muted)}
+.stx-state.saved{color:var(--ox-green);animation:stx-fade 1.8s ease forwards}
+.stx-state.failed{color:var(--ox-red)}
+@keyframes stx-fade{0%,55%{opacity:1}100%{opacity:0}}
+@keyframes stx-revert{0%{background:var(--ox-red-wash)}100%{background:transparent}}
+.set-toggle.is-reverted,.stx-row.is-reverted,.stx-matrix td.is-reverted{animation:stx-revert 1.1s ease}
+/* .stx-state pushes the control right; the row already flexes, so only the
+   plain .set-toggle needs its label to stop stretching */
+.set-toggle > div:first-child{flex:1;min-width:0}
+
 /* ---------- segmented pill control (single-choice) ---------- */
-.stx-seg{display:inline-flex;gap:4px;padding:4px;background:var(--ox-off-white);border:1px solid var(--ox-stone-soft);border-radius:999px;max-width:100%;overflow-x:auto;scrollbar-width:none}
-.stx-seg::-webkit-scrollbar{display:none}
+.stx-seg{display:inline-flex;gap:4px;padding:4px;background:var(--ox-off-white);border:1px solid var(--ox-stone-soft);border-radius:999px;max-width:100%}
 .stx-seg-btn{border:0;background:transparent;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;white-space:nowrap;transition:background .15s ease,color .15s ease}
 .stx-seg-btn:hover{color:var(--ink)}
 .stx-seg-btn.on{background:var(--ox-blue);color:var(--ox-off-white)}
 .stx-seg-btn:disabled{opacity:.5;cursor:default}
+.stx-seg-btn:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:-2px}   /* the pill clips a positive offset */
 
 /* a labelled setting row whose control is a segmented pill / select */
 .stx-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;border-top:1px solid var(--line-soft);flex-wrap:wrap}
@@ -32,26 +101,47 @@
 .stx-row b{display:block;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px}
 .stx-row small{display:block;font-size:12.5px;color:var(--muted);line-height:1.4;max-width:420px}
 .stx-row .field{width:auto;min-width:170px}
+/* A five-option control (playback quality) is ~330px wide. Left to shrink, the
+   label column collapsed to a two-word-per-line sliver beside it, so the label
+   claims a 240px basis and the control refuses to shrink — the row wraps to two
+   lines instead, which is the readable outcome. */
+.stx-row > div:first-child{flex:1 1 240px;min-width:min(240px,100%)}
+.stx-row .stx-seg{flex:none}
+
+/* ---------- field hints ---------- */
+.stx-hint{display:block;margin-top:5px;font-size:12px;color:var(--muted);line-height:1.45}
+
+/* ---------- a settings-owned search box (NOT the chat .cmt-box) ---------- */
+.stx-search{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.stx-search .field{flex:1;min-width:0}
 
 /* ---------- generic scroll guard for wide content ---------- */
 .stx-scroll{overflow-x:auto;max-width:100%}
 
 /* ---------- notification matrix ---------- */
-.stx-matrix{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
-.stx-matrix th{background:var(--ox-off-white);color:var(--ink-soft);font-weight:600;text-align:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;letter-spacing:.02em}
-.stx-matrix th:first-child{text-align:left;border-top-left-radius:8px}
-.stx-matrix th:last-child{border-top-right-radius:8px}
+.stx-mwrap{overflow:auto;max-width:100%;max-height:min(62vh,620px);border:1px solid var(--line-soft);border-radius:12px}
+.stx-matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:520px;background:var(--card)}
+.stx-matrix th{background:var(--ox-off-white);color:var(--ink-soft);font-weight:600;text-align:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;letter-spacing:.02em;position:sticky;top:0;z-index:3}
+.stx-matrix th:first-child{text-align:left;z-index:4;left:0}
 .stx-matrix td{padding:7px 10px;border-bottom:1px solid var(--line-soft);text-align:center}
-.stx-matrix td:first-child{text-align:left;color:var(--ink);font-weight:500;max-width:280px}
+/* the row label stays put while the channel columns scroll */
+.stx-matrix td:first-child,.stx-matrix th:first-child{position:sticky;left:0;background:var(--card);text-align:left;max-width:260px;box-shadow:1px 0 0 var(--line-soft)}
+.stx-matrix td:first-child{color:var(--ink);font-weight:500;z-index:2}
 .stx-matrix td:first-child small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
-.stx-matrix tr:hover td{background:var(--ox-wash)}
-.stx-matrix .stx-mgroup td{background:var(--paper-2);color:var(--navy);font-family:var(--serif);font-size:13.5px;font-weight:700;text-align:left;padding-top:12px}
-/* compact checkbox for matrix cells */
-.stx-tick{appearance:none;width:19px;height:19px;border:1.5px solid var(--ox-stone-strong);border-radius:6px;background:#fff;cursor:pointer;position:relative;vertical-align:middle;transition:background .12s ease,border-color .12s ease}
+.stx-matrix tr:hover td,.stx-matrix tr:focus-within td{background:var(--ox-wash)}
+.stx-matrix tr:hover td:first-child,.stx-matrix tr:focus-within td:first-child{background:var(--ox-wash)}
+.stx-matrix .stx-mgroup td{background:var(--paper-2);color:var(--ox-blue);font-family:var(--serif);font-size:13.5px;font-weight:700;text-align:left;padding-top:12px;z-index:2}
+.stx-matrix .stx-mgroup td:first-child{background:var(--paper-2)}
+/* compact checkbox for matrix cells — boundary in slate so it clears 3:1 */
+.stx-tick{appearance:none;width:20px;height:20px;border:1.5px solid var(--muted);border-radius:6px;background:#fff;cursor:pointer;position:relative;vertical-align:middle;transition:background .12s ease,border-color .12s ease}
 .stx-tick:checked{background:var(--ox-blue);border-color:var(--ox-blue)}
-.stx-tick:checked::after{content:"";position:absolute;left:5.5px;top:2px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
-.stx-tick:disabled{opacity:.45;cursor:default}
+.stx-tick:checked::after{content:"";position:absolute;left:6px;top:2.5px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.stx-tick:disabled{opacity:.5;cursor:default}
 .stx-tick:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+/* the tap area, without growing the drawn box */
+.stx-cell{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:36px;cursor:pointer}
+.stx-mnote{margin:10px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5}
+.stx-mnote a{color:var(--ox-blue-link);font-weight:600}
 
 /* ---------- status chips ---------- */
 .stx-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;line-height:1.5;border:1px solid transparent}
@@ -75,7 +165,7 @@
 /* ---------- simple data table (login history, consent log) ---------- */
 .stx-table{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
 .stx-table th{background:var(--ox-off-white);color:var(--ink-soft);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px}
-.stx-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);color:var(--ink);vertical-align:top}
+.stx-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);color:var(--ink);vertical-align:top;font-variant-numeric:tabular-nums}
 .stx-table td .muted{font-size:12px}
 .stx-table tr:hover td{background:var(--ox-wash)}
 
@@ -86,20 +176,32 @@
 
 /* ---------- recovery codes ---------- */
 .stx-codes{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px}
-.stx-code{padding:9px 10px;text-align:center;background:var(--paper-2);border:1px solid var(--ox-stone-soft);border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;letter-spacing:.08em;color:var(--ink);user-select:all}
+.stx-code{padding:9px 10px;text-align:center;background:var(--paper-2);border:1px solid var(--ox-stone-soft);border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;letter-spacing:.08em;color:var(--ink);user-select:all;font-variant-numeric:tabular-nums}
 
 /* ---------- QR block ---------- */
 .stx-qr{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .stx-qr-box{flex:none;width:168px;height:168px;border-radius:14px;border:1px solid var(--ox-stone);background:#fff;display:flex;align-items:center;justify-content:center;padding:10px}
-.stx-qr-box canvas,.stx-qr-box svg,.stx-qr-box img{width:100%;height:100%;image-rendering:pixelated}
-.stx-qr-side{flex:1;min-width:220px}
+/* Belt and braces: the qrcode library sets an inline pixel size on the canvas
+   (the JS clears it after painting), so the box also hard-clamps its child. */
+.stx-qr-box{overflow:hidden}
+.stx-qr-box canvas,.stx-qr-box svg,.stx-qr-box img{max-width:100%;max-height:100%;width:100%;height:100%;image-rendering:pixelated}
+/* 260px basis: inside the settings content column the side content wraps BELOW
+   the code rather than being squeezed into a 5-line ribbon beside it. */
+.stx-qr-side{flex:1 1 260px;min-width:0}
+/* Opaque tokens and irc:// links are unbreakable strings — they ran off the
+   card edge until told they may break anywhere. */
+.stx-qr-side code,.stx-qr-side p{overflow-wrap:anywhere;word-break:break-word}
 
 /* ---------- security score ---------- */
 .stx-score{display:flex;align-items:center;gap:18px;margin:6px 0 12px;flex-wrap:wrap}
-.stx-score-num{flex:none;width:86px;height:86px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:
-  conic-gradient(var(--ox-blue) calc(var(--pct,0)*1%), var(--ox-stone-soft) 0)}
+.stx-score-num{--ring:var(--ox-blue);flex:none;width:86px;height:86px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:conic-gradient(var(--ring) calc(var(--pct,0)*1%), var(--ox-stone-soft) 0)}
+.stx-score-num[data-level="LOW"]{--ring:var(--ox-red)}
+.stx-score-num[data-level="MEDIUM"]{--ring:var(--ox-amber)}
+.stx-score-num[data-level="HIGH"]{--ring:var(--ox-blue)}
+.stx-score-num[data-level="EXCELLENT"]{--ring:var(--ox-green)}
 .stx-score-num i{width:72px;height:72px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal}
-.stx-score-num b{font-size:22px;color:var(--navy);line-height:1}
+.stx-score-num b{font-size:22px;color:var(--ring);line-height:1;font-variant-numeric:tabular-nums}
 .stx-score-num small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
 .stx-check{display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-top:1px solid var(--line-soft)}
 .stx-check:first-of-type{border-top:none}
@@ -107,8 +209,13 @@
 .stx-check-ic .ico{width:14px;height:14px}
 .stx-check.pass .stx-check-ic{background:var(--ox-green-wash);color:var(--ox-green)}
 .stx-check.fail .stx-check-ic{background:var(--ox-amber-wash);color:var(--ox-amber)}
+.stx-check-body{flex:1;min-width:0}
 .stx-check b{font-size:13.5px;color:var(--ink);display:block}
 .stx-check small{font-size:12.5px;color:var(--muted);display:block;line-height:1.4}
+.stx-check .btn{flex:none;align-self:center}
+
+/* ---------- a single large figure (storage total, counts) ---------- */
+.stx-figure{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.1;color:var(--ox-blue);font-variant-numeric:tabular-nums}
 
 /* ---------- storage usage bar ---------- */
 .stx-bar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:var(--ox-stone-soft);margin:12px 0 10px}
@@ -121,25 +228,38 @@
 
 /* ---------- day-of-week chips (DND) ---------- */
 .stx-days{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.stx-day{width:38px;height:32px;border-radius:9px;border:1px solid var(--ox-stone);background:#fff;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
+.stx-day{min-width:40px;height:38px;padding:0 6px;border-radius:9px;border:1px solid var(--muted);background:#fff;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
 .stx-day:hover{border-color:var(--ox-blue-link);color:var(--ox-blue)}
-.stx-day.on{background:var(--ox-blue);border-color:var(--ox-blue);color:var(--ox-off-white)}
+.stx-day.on{background:var(--ox-blue);border-color:var(--ox-blue);color:var(--ox-off-white);font-weight:700}
+/* a state cue that survives greyscale / low vision */
+.stx-day.on::after{content:"";display:block;height:2px;margin:3px auto 0;width:12px;background:currentColor;border-radius:2px}
+.stx-day:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
 
-/* ---------- danger zone ---------- */
-.stx-danger{border:1px solid #E5C4C0;background:linear-gradient(0deg,rgba(246,228,226,.35),rgba(246,228,226,.35)),#fff}
-.stx-danger h3.title{color:var(--ox-red)}
-.stx-danger h3.title .ico{color:var(--ox-red)}
-.btn-danger{background:var(--ox-red);border:1px solid var(--ox-red);color:#fff}
-.btn-danger:hover{background:#82302B;border-color:#82302B;color:#fff}
-.btn-danger:disabled{opacity:.55}
+/* ---------- danger zone ----------
+   Re-scoped through .settings-shell: warm/user.css:244 styles
+   `.settings-shell .card h3.title` (0,3,1) and would otherwise out-specify a
+   bare `.stx-danger h3.title` (0,2,1), so the destructive card used to render
+   in the same Oxford blue as "Storage". */
+.settings-shell .card.stx-danger{border-color:var(--ox-stone-strong);background:var(--ox-red-wash)}
+.settings-shell .card.stx-danger h3.title{color:var(--ox-red)}
+.settings-shell .card.stx-danger h3.title .ico{color:var(--ox-red)}
+.settings-shell .card.stx-danger .stx-sub{color:var(--ink-soft)}
+/* Destructive hierarchy: outline red = reversible / erases data (core.css owns
+   the quiet outline), FILLED red = the one irreversible action. Scoping the
+   fill to .stx-danger stops it leaking into every uiConfirm({danger}) button. */
+.stx-danger .btn-danger{background:var(--ox-red);border:1px solid var(--ox-red);color:var(--ox-white)}
+.stx-danger .btn-danger:hover{background:var(--ox-red);filter:brightness(.88);color:var(--ox-white)}
+.stx-danger .btn-danger:disabled{opacity:.5}
 
 /* ---------- inline notices (info / warn banners inside cards) ---------- */
-.stx-note{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:11px 13px;border-radius:10px;font-size:13px;line-height:1.5}
+.stx-note{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;padding:11px 13px;border-radius:10px;font-size:13px;line-height:1.5}
+.stx-note + .stx-note{margin-top:8px}
 .stx-note .ico{flex:none;width:15px;height:15px;margin-top:2px}
 .stx-note.info{background:var(--ox-sky-wash);color:var(--ox-blue-mid)}
 .stx-note.warn{background:var(--ox-amber-wash);color:var(--ox-amber)}
 .stx-note.err{background:var(--ox-red-wash);color:var(--ox-red)}
 .stx-note.ok{background:var(--ox-green-wash);color:var(--ox-green)}
+.stx-note a{color:inherit;font-weight:700;text-decoration:underline}
 
 /* ---------- policy / about ---------- */
 .stx-kv{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:13.5px;margin-top:10px}
@@ -151,12 +271,185 @@
 .stx-prog{height:8px;border-radius:999px;background:var(--ox-stone-soft);overflow:hidden;margin-top:8px}
 .stx-prog i{display:block;height:100%;background:var(--ox-blue);border-radius:999px;transition:width .2s ease}
 
-/* ---------- mobile ---------- */
+/* =========================================================
+   The version / policy banner (VersionGate)
+   A slim fixed bar. It must clear the mobile bottom nav — at
+   `bottom:16px` it landed square on top of the tab bar — and it
+   must never be the thing covering the control a person is
+   reaching for, so it sits inside the content column's width.
+   ========================================================= */
+.vg-banner{position:fixed;left:16px;right:16px;bottom:calc(16px + var(--safe-b));max-width:520px;margin:0 auto;
+  z-index:3000;padding:12px 14px;display:flex;align-items:center;gap:10px;
+  box-shadow:0 18px 40px -18px rgba(13,21,32,.45)}
+.vg-banner-txt{flex:1;line-height:1.4}
+@media(max-width:720px){
+  /* above the bottom tab bar, not on it */
+  .vg-banner{left:10px;right:10px;bottom:calc(72px + var(--safe-b))}
+}
+
+/* =========================================================
+   Overview tab — status tiles
+   ========================================================= */
+/* 178px keeps two tiles per row inside the settings content column (~440px on
+   a 1280 viewport); auto-fit widens to three or four on a roomier layout. */
+.stx-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-top:4px}
+.stx-tile{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:15px 16px;min-height:112px;
+  text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;cursor:pointer;
+  transition:border-color .15s ease,background .15s ease,transform .12s ease}
+.stx-tile:hover{border-color:var(--ox-blue-link);background:var(--ox-wash)}
+.stx-tile:active{transform:scale(.99)}
+.stx-tile:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+.stx-tile-top{display:flex;align-items:center;gap:8px;width:100%;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.stx-tile-top .ico{width:15px;height:15px;color:var(--ox-blue-link)}
+.stx-tile-val{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--ox-blue);line-height:1.15;font-variant-numeric:tabular-nums}
+.stx-tile-sub{font-size:12.5px;color:var(--muted);line-height:1.45}
+.stx-tile .stx-chip{margin-top:2px}
+.stx-tile.attn{border-color:var(--ox-amber)}
+.stx-tile.attn .stx-tile-top .ico{color:var(--ox-amber)}
+
+/* quick links strip under the tiles */
+.stx-jump{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.stx-jump button{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 13px;border-radius:999px;
+  border:1px solid var(--line);background:var(--card);color:var(--ink-soft);font-size:13px;font-weight:600;cursor:pointer;
+  transition:border-color .15s ease,color .15s ease,background .15s ease}
+.stx-jump button:hover{border-color:var(--ox-blue-link);color:var(--ox-blue);background:var(--ox-wash)}
+.stx-jump button:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+.stx-jump .ico{width:14px;height:14px}
+
+/* =========================================================
+   Settings search — finds a control by name, not by tab
+   ========================================================= */
+.stx-find{position:relative;flex:1;min-width:0;max-width:380px}
+.stx-find-wrap{display:flex;align-items:center;gap:8px;padding:0 12px;height:42px;background:var(--card);
+  border:1px solid var(--line);border-radius:12px;transition:border-color .15s ease,box-shadow .15s ease}
+.stx-find-wrap:focus-within{border-color:var(--ox-blue-link);box-shadow:0 0 0 3px rgba(31,78,126,.12)}
+.stx-find-wrap .ico{flex:none;width:16px;height:16px;color:var(--muted)}
+.stx-find-input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:14px;color:var(--ink);outline:none}
+.stx-find-input::placeholder{color:#98A1B0}
+.stx-find-kbd{flex:none;font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 6px;letter-spacing:.04em}
+.stx-find-pop{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;max-height:min(58vh,420px);overflow-y:auto;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);padding:6px}
+.stx-find-opt{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;border-radius:10px;background:transparent;
+  text-align:left;cursor:pointer;color:var(--ink)}
+.stx-find-opt:hover,.stx-find-opt.on{background:var(--ox-wash)}
+.stx-find-opt .ico{flex:none;width:15px;height:15px;color:var(--ox-blue-link)}
+.stx-find-txt{flex:1;min-width:0}
+.stx-find-txt b{display:block;font-size:13.5px;font-weight:600;line-height:1.3}
+.stx-find-path{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stx-find-none{padding:16px 12px;font-size:13px;color:var(--muted);text-align:center}
+
+/* =========================================================
+   Per-tab heading / breadcrumb above the card stack
+   ========================================================= */
+.stx-tabhead{display:flex;align-items:center;gap:9px;margin:0 0 14px;font-family:var(--serif);font-size:20px;color:var(--ox-blue)}
+.stx-tabhead:focus{outline:none}
+.stx-tabhead .ico{width:19px;height:19px;color:var(--ox-blue-link)}
+.stx-crumb{margin-inline-start:auto;font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+
+/* =========================================================
+   States inside cards
+   Loader / EmptyState / ErrorState each render their own
+   `.card`, and settings drops them INSIDE a card — which drew
+   a rounded stone box inside a rounded stone box. Strip the
+   inner shell; keep the content.
+   ========================================================= */
+.settings-shell .card .t-loader,
+.settings-shell .card .t-empty,
+.settings-shell .card .t-error{border:0;background:transparent;box-shadow:none;border-radius:0;padding:26px 0}
+.settings-shell .card .t-empty .t-empty-ic{width:48px;height:48px;margin-bottom:10px}
+
+/* content-shaped placeholder */
+.stx-skel{display:flex;flex-direction:column;gap:10px;padding:8px 0}
+.stx-skel-row{display:block;height:13px;border-radius:7px;background:linear-gradient(90deg,var(--ox-off-white) 25%,var(--ox-stone-soft) 37%,var(--ox-off-white) 63%);background-size:400% 100%;animation:stx-shimmer 1.4s ease infinite}
+.stx-skel-row:nth-child(2n){width:82%}
+.stx-skel-row:nth-child(3n){width:64%}
+@keyframes stx-shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+/* =========================================================
+   Mobile — ONE breakpoint for the whole shell (see header note)
+   ========================================================= */
 @media(max-width:780px){
-  .set-group{display:none}                        /* the side nav flattens to pills */
+  .settings-shell{display:block}
+  .set-side{
+    position:sticky;top:calc(56px + var(--safe-t));z-index:6;
+    flex-direction:row;align-items:center;gap:8px;padding:8px 14px;margin:0 -14px 16px;
+    border-radius:0;border-left:0;border-right:0;background:var(--card);
+    overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    scroll-snap-type:x proximity;
+  }
+  .set-side::-webkit-scrollbar{display:none}
+  /* keep the grouping — it is the only thing that says Privacy owns seven of
+     these pills — but lay it flat as a divider label */
+  .set-group{display:flex;align-items:center;flex:none;margin:0 2px;padding:0;font-size:10px;opacity:.75}
+  .set-group:first-child{margin-top:0}
+  .set-item{flex:none;width:auto;white-space:nowrap;min-height:44px;padding:0 15px;border-radius:999px;font-size:13.5px;background:var(--card-2);scroll-snap-align:center}
+  .set-item .ico{width:15px;height:15px}
+  .set-item:focus-visible{outline-offset:-2px}          /* the rail clips a positive offset */
+  .set-item .stx-dot{margin-inline-start:2px}
+
   .stx-row{align-items:flex-start;flex-direction:column;gap:8px}
   .stx-row .field{width:100%}
+  .stx-state{margin-inline-start:0}
   .stx-score{gap:14px}
   .stx-qr{justify-content:center}
   .stx-codes{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+  .stx-seg{flex-wrap:wrap;border-radius:14px}
+  .stx-seg-btn{min-height:38px}
+  .stx-find{max-width:none;width:100%}
+  .stx-search .field{font-size:16px;min-height:44px}     /* 16px = no iOS focus zoom */
+  .stx-overview{grid-template-columns:1fr 1fr;gap:10px}
+  .stx-tile{min-height:104px;padding:13px 14px}
+  .stx-tile-val{font-size:21px}
+  .stx-anchor{display:none}                              /* no hover on touch */
+  .stx-tabhead{font-size:18px}
+  .stx-mwrap{max-height:none}
+  /* comfortable tap targets for the row controls */
+  .set-toggle .btn-sm,.stx-row .btn-sm,.rail-row .btn-sm{min-height:38px}
+}
+@media(max-width:420px){
+  .stx-overview{grid-template-columns:1fr}
+}
+
+/* =========================================================
+   Reduced motion — every animation above is decorative
+   ========================================================= */
+:root[data-reduced-motion="on"] .stx-skel-row,
+:root[data-reduced-motion="on"] .stx-card.stx-flash,
+:root[data-reduced-motion="on"] .stx-state.saved,
+:root[data-reduced-motion="on"] .set-toggle.is-reverted,
+:root[data-reduced-motion="on"] .stx-row.is-reverted,
+:root[data-reduced-motion="on"] .stx-matrix td.is-reverted{animation:none}
+@media(prefers-reduced-motion:reduce){
+  .stx-skel-row,.stx-card.stx-flash,.stx-state.saved,
+  .set-toggle.is-reverted,.stx-row.is-reverted,.stx-matrix td.is-reverted{animation:none}
+  .stx-tile,.stx-anchor,.stx-seg-btn,.stx-day{transition:none}
+}
+
+/* =========================================================
+   Mock-mode badge (components/MockBadge.jsx)
+   Amber, because it is a warning, not a feature: what is on
+   screen did not come from the database. Sits above the bottom
+   nav on a phone, like the version banner.
+   ========================================================= */
+.mockbadge{position:fixed;left:16px;bottom:calc(16px + var(--safe-b));z-index:3200}
+.mockbadge-pill{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 12px;border-radius:999px;
+  border:1px solid var(--ox-amber);background:var(--ox-amber-wash);color:var(--ox-amber);
+  font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:var(--shadow-sm)}
+.mockbadge-pill:hover{filter:brightness(.97)}
+.mockbadge-pill:focus-visible{outline:2px solid var(--ox-amber);outline-offset:2px}
+.mockbadge-lang{font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:6px;
+  background:var(--ox-amber);color:var(--ox-white)}
+.mockbadge-pop{position:absolute;bottom:calc(100% + 8px);left:0;width:min(300px,calc(100vw - 32px));
+  padding:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg)}
+.mockbadge-pop p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--ink-soft)}
+.mockbadge-pop code{font-size:11.5px}
+.mockbadge-pop small{display:block;margin-top:8px;font-size:11.5px;color:var(--muted);line-height:1.45}
+.mockbadge-langs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.mockbadge-lbtn{min-height:32px;padding:0 11px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink-soft);font-size:12.5px;font-weight:600;cursor:pointer}
+.mockbadge-lbtn:hover{border-color:var(--ox-blue-link);color:var(--ox-blue)}
+.mockbadge-lbtn.on{background:var(--ox-blue);border-color:var(--ox-blue);color:var(--ox-off-white)}
+.mockbadge-lbtn:focus-visible{outline:2px solid var(--ox-blue-link);outline-offset:2px}
+@media(max-width:720px){
+  .mockbadge{left:10px;bottom:calc(72px + var(--safe-b))}
 }

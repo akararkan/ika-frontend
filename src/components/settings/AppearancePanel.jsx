@@ -7,6 +7,18 @@
    are optimistic JSON Merge Patches via useSection
    (shared.jsx); the whole-block PUT is used by nothing but
    "Reset to defaults", which is exactly what it wants.
+
+   COPY RULE FOR THIS CARD: lib/prefs.js is the only consumer,
+   and only five things reach the screen — theme, density,
+   contrast, reduced motion and the font/scale trio (prefs.css).
+   prefersHaptics() and prefersCaptions() exist beside them but
+   have no caller yet, so those two rows are stored-and-synced
+   like accentColor, screenReader and voiceNavigation. Every row
+   in the second group has to SAY it does nothing: a control that
+   silently no-ops reads as a bug and sends people hunting for
+   the effect they were promised. When a caller lands (haptic()
+   at MessageBubble.jsx:357, a <track> on the video players),
+   delete that sentence — it is the only copy that goes stale.
    ========================================================= */
 import React from 'react'
 import { Icon, showToast } from '../ui.jsx'
@@ -49,7 +61,7 @@ function ResetToDefaults({ section, name, defaults, onDone }) {
       showToast('Settings reset')
       onDone()
     } catch (e) {
-      if (e?.status !== 429) showToast('Could not reset')       // 429 toasts globally
+      if (e?.status !== 429) showToast('Could not reset', 'err')   // 429 toasts globally
     } finally {
       if (alive.current) setBusy(false)
     }
@@ -94,16 +106,16 @@ export function AppearancePanel() {
 }
 
 function AppearanceCard({ onReset }) {
-  const { block, setField, loading, error, retry } = useSection('appearance')
+  const { block, setField, statusOf, loading, error, retry } = useSection('appearance')
   if (loading) {
-    return <SetCard icon="sparkle" title="Appearance"><Loader/></SetCard>
+    return <SetCard id="appearance" icon="sparkle" title="Appearance"><Loader/></SetCard>
   }
   /* A failed load must NOT render the compiled-in defaults: every control
      would claim a value the account does not hold, and the person would
      "correct" settings that never arrived. */
   if (error) {
     return (
-      <SetCard icon="sparkle" title="Appearance">
+      <SetCard id="appearance" icon="sparkle" title="Appearance">
         <ErrorState message="Could not load your appearance settings" onRetry={retry}/>
       </SetCard>
     )
@@ -114,31 +126,42 @@ function AppearanceCard({ onReset }) {
   const scale = Number(block.interfaceScale ?? 1)          // stored 1 or 1.0 — Seg compares with ===
   const accent = block.accentColor ?? DEFAULT_ACCENT
   return (
-    <SetCard icon="sparkle" title="Appearance"
+    <SetCard id="appearance" icon="sparkle" title="Appearance"
       sub="These preferences are saved to your account and sync to every device you sign in on.">
-      <ControlRow title="Theme" desc="System follows your device setting. Applies on your next visit.">
+      <ControlRow title="Theme" desc="System follows your device setting. Changes take effect straight away."
+        status={statusOf('theme')}>
         <Seg ariaLabel="Theme" value={theme}
           options={[['SYSTEM', 'System'], ['LIGHT', 'Light'], ['DARK', 'Dark']]}
           onChange={v => setField('theme', v)}/>
       </ControlRow>
-      <ControlRow title="Text size" desc="Base size for body text across the app.">
+      {/* NO "dark mode is unfinished" caveat here. theme.css:295 carries the
+          token remap and warm/dark.css is the repair layer for the literals
+          that could not follow it — both shipped, and it loads last in the
+          warm layer. A warning on a finished feature is its own dishonesty. */}
+      <ControlRow title="Text size" desc="Base size for body text across the app."
+        status={statusOf('fontSize')}>
         <Seg ariaLabel="Text size" value={fontSize}
           options={[['SMALL', 'Small'], ['MEDIUM', 'Medium'], ['LARGE', 'Large'], ['XLARGE', 'Extra large']]}
           onChange={v => setField('fontSize', v)}/>
       </ControlRow>
-      <ControlRow title="Density" desc="Compact tightens spacing to fit more on screen.">
+      <ControlRow title="Density" desc="Compact tightens spacing to fit more on screen."
+        status={statusOf('density')}>
         <Seg ariaLabel="Density" value={density}
           options={[['COMFORTABLE', 'Comfortable'], ['COMPACT', 'Compact']]}
           onChange={v => setField('density', v)}/>
       </ControlRow>
-      <ControlRow title="Interface scale" desc="Scales the whole interface, not just text.">
+      <ControlRow title="Interface scale" desc="Scales body text everywhere, on top of the text size above."
+        status={statusOf('interfaceScale')}>
         <Seg ariaLabel="Interface scale" value={scale}
           options={[[0.9, '90%'], [1, '100%'], [1.1, '110%'], [1.25, '125%']]}
           onChange={v => setField('interfaceScale', v)}/>
       </ControlRow>
       <ToggleRow title="Reduced motion" desc="Minimise animations and transitions."
-        on={!!block.reducedMotion} onToggle={() => setField('reducedMotion', !block.reducedMotion)}/>
-      <ControlRow title="Accent colour" desc="Used for highlights and controls where a custom accent is supported.">
+        on={!!block.reducedMotion} status={statusOf('reducedMotion')}
+        onToggle={() => setField('reducedMotion', !block.reducedMotion)}/>
+      <ControlRow title="Accent colour"
+        desc="Stored and synced for surfaces that support a custom accent. Nothing in the current theme reads it yet, so you will not see a change."
+        status={statusOf('accentColor')}>
         <AccentControl value={accent} onCommit={v => setField('accentColor', v)}/>
       </ControlRow>
       <ResetToDefaults section="appearance" name="appearance" defaults={APPEARANCE_DEFAULTS} onDone={onReset}/>
@@ -155,34 +178,39 @@ export function AccessibilityPanel() {
 }
 
 function AccessibilityCard({ onReset }) {
-  const { block, setField, loading, error, retry } = useSection('accessibility')
+  const { block, setField, statusOf, loading, error, retry } = useSection('accessibility')
   if (loading) {
-    return <SetCard icon="eye" title="Accessibility"><Loader/></SetCard>
+    return <SetCard id="accessibility" icon="eye" title="Accessibility"><Loader/></SetCard>
   }
   // Same reasoning as Appearance: defaults must never impersonate saved values.
   if (error) {
     return (
-      <SetCard icon="eye" title="Accessibility">
+      <SetCard id="accessibility" icon="eye" title="Accessibility">
         <ErrorState message="Could not load your accessibility settings" onRetry={retry}/>
       </SetCard>
     )
   }
+  /* Descriptions state what the client actually does with each flag. Three
+     are real (largeText and highContrast are painted by prefs.css;
+     reducedMotion kills the transitions). The other four are stored and
+     synced only and say so — see the COPY RULE at the top of this file for
+     the caller each of them is waiting on. */
   const rows = [
     ['largeText', 'Large text', 'Increase text size beyond the appearance setting.', false],
-    ['highContrast', 'High contrast', 'Stronger colours and borders for readability.', false],
-    ['screenReader', 'Optimise for screen readers', 'Extra labels and structure for assistive technology.', false],
-    ['closedCaptions', 'Show closed captions on videos when available', 'Captions appear automatically when a video provides them.', false],
+    ['highContrast', 'High contrast', 'Stronger borders and less muted text.', false],
+    ['screenReader', 'Optimise for screen readers', 'Saved and synced. The app ships the same labels and landmarks either way, so this changes nothing on its own.', false],
+    ['closedCaptions', 'Show closed captions on videos when available', 'Saved and synced, ready for when captions arrive. No video here carries a caption track yet, so there is nothing to switch on.', false],
     ['reducedMotion', 'Reduced motion', 'Minimise animations and transitions.', false],
-    ['voiceNavigation', 'Voice navigation', 'Navigate with voice commands where supported.', false],
-    ['hapticFeedback', 'Haptic feedback', 'Vibration feedback on supported devices.', true],
+    ['voiceNavigation', 'Voice navigation', 'A device preference this app records and syncs — it has no voice commands of its own.', false],
+    ['hapticFeedback', 'Haptic feedback', 'Saved and synced. Nothing checks it yet, so the one buzz the app makes — holding a chat message — happens either way.', true],
   ]
   return (
-    <SetCard icon="eye" title="Accessibility"
+    <SetCard id="accessibility" icon="eye" title="Accessibility"
       sub="These preferences are saved to your account and sync to every device you sign in on.">
       {rows.map(([key, title, desc, dflt]) => {
         const on = !!(block[key] ?? dflt)
         return (
-          <ToggleRow key={key} title={title} desc={desc} on={on}
+          <ToggleRow key={key} title={title} desc={desc} on={on} status={statusOf(key)}
             onToggle={() => setField(key, !on)}/>
         )
       })}
