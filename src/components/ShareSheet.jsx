@@ -9,10 +9,23 @@
    The first explicit copy/share action records the share
    (POST → bumps shareCount, notifies the author, broadcasts)
    and reports the new count back through onShared(newCount).
+
+   MODERATION. The optional note on a POST share is scored text
+   (`share_caption`, CONTENT_ANNOTATION). It goes through
+   submitOrRefuse, which 400s on ANY non-approved verdict — so a
+   merely borderline note, or the classifier simply being
+   unreachable, refuses here where a post would have been let
+   through and held. That makes this surface noisier than most,
+   and it is why the refusal is shown quietly beside the note
+   rather than as a toast: nothing was persisted (no share
+   counted, no note attached), the note is still in the box, and
+   editing it is the whole recovery.
    ========================================================= */
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import { Icon, fmt, showToast } from './ui.jsx'
+import { ModerationAlert } from './Moderation.jsx'
+import { isModerationError } from '../lib/moderation.js'
 import { api } from '../api/index.js'
 
 const PATH = { post: 'posts', research: 'research', question: 'qna' }
@@ -55,6 +68,8 @@ function ShareModal({ sheet, onClose }) {
   const [count, setCount] = React.useState(typeof sheet.count === 'number' ? sheet.count : null)
   const [caption, setCaption] = React.useState('')
   const recorded = React.useRef(false)
+  const recording = React.useRef(false)          // one POST in flight at a time
+  const [capErr, setCapErr] = React.useState(null)   // the note's own refusal, shown inline
 
   React.useEffect(() => {
     let alive = true
@@ -70,17 +85,30 @@ function ShareModal({ sheet, onClose }) {
   const url = direct || info?.canonicalUrl || info?.shortUrl || `${window.location.origin}/${PATH[kind] || 'posts'}/${id}`
   const shown = direct || info?.shortUrl || url
 
-  // Record the share once per sheet (first explicit action), then sync the count.
+  /* Record the share once per sheet (first explicit action), then sync the count.
+     `recorded` is now set on SUCCESS only. It used to be set on the way in, which
+     meant a refused note could never be recorded again even after the author
+     fixed it — the sheet had quietly decided the share was done. A ref (not
+     state) still guards the in-flight window so a double tap is one POST. */
   const record = () => {
-    if (direct || recorded.current) return
-    recorded.current = true
+    if (direct || recorded.current || recording.current) return
+    recording.current = true
+    setCapErr(null)
     svc.record(id, kind === 'post' ? (caption.trim() || undefined) : undefined)
       .then(r => {
+        recorded.current = true
         const c = r?.shareCount
         if (typeof c === 'number') { setCount(c); onShared?.(c) }
         else setCount(n => { const nx = (n ?? 0) + 1; onShared?.(nx); return nx })
       })
-      .catch(() => {})
+      .catch(e => {
+        /* Only a moderation refusal is worth the user's attention here: it is
+           about text they wrote and can fix. Every other failure is a counter
+           that did not tick while the link copied perfectly well — staying
+           silent about that is the older, correct behaviour. */
+        if (isModerationError(e)) setCapErr(e)
+      })
+      .finally(() => { recording.current = false })
   }
 
   const copy = () => { navigator.clipboard?.writeText(url).then(() => showToast('Link copied')).catch(() => {}); record() }
@@ -115,7 +143,19 @@ function ShareModal({ sheet, onClose }) {
           {count != null && <div className="share-count"><Icon name="share" className="xs"/>{fmt(count)} share{count === 1 ? '' : 's'}</div>}
 
           {kind === 'post' && (
-            <textarea className="field share-caption" placeholder="Add a note (optional)…" value={caption} onChange={e => setCaption(e.target.value)}/>
+            <textarea className="field share-caption" placeholder="Add a note (optional)…" value={caption}
+              onChange={e => { setCaption(e.target.value); if (capErr) setCapErr(null) }}/>
+          )}
+          {/* The refusal sits with the note it is about, and the note stays put.
+              The second line is mechanics, not a hint: the copy the user just
+              asked for DID happen, and only the recorded share went with it. */}
+          {capErr && (
+            <>
+              <ModerationAlert error={capErr} onDismiss={() => setCapErr(null)}/>
+              <p className="muted text-xs" style={{ margin: '-4px 0 10px' }}>
+                The link itself is fine. Only the note was refused, so nothing was attached and this share was not counted — edit the note and share again.
+              </p>
+            </>
           )}
 
           <div className="share-grid">

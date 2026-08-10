@@ -7,6 +7,7 @@ import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { Icon, Avatar, BrandMark } from './ui.jsx'
 import { ToastHost, Loader } from './states.jsx'
 import { DialogHost } from './Dialog.jsx'
+import { StepUpHost } from './StepUpHost.jsx'
 import { ShareHost } from './ShareSheet.jsx'
 import { ReportHost } from './ReportDialog.jsx'
 import { VersionGate } from './VersionGate.jsx'
@@ -17,6 +18,7 @@ import { CallOverlay } from './chat/CallOverlay.jsx'
 import { useAuth, isPlatformAdmin } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { initChime, playChime } from '../lib/chime.js'
+import { isHeld } from '../lib/moderation.js'
 import { shouldDeliver, notify, inQuietHours, NAVIGATE_EVENT } from '../lib/desktopNotify.js'
 import { loadAndApplyPrefs, PREFS_EVENT } from '../lib/prefs.js'
 import { api, LOCKED_NOTIFICATION_TYPES } from '../api/index.js'
@@ -36,8 +38,12 @@ const NAV = [
   { to:'/settings',      icon:'settings',  label:'Settings' },
 ]
 
-/* Shown only to ROLE_ADMIN / SUPER_ADMIN (search-index maintenance). */
-const ADMIN_NAV = { to:'/admin/search', icon:'shield', label:'Search admin' }
+/* Shown only to ROLE_ADMIN / SUPER_ADMIN (search-index maintenance and the
+   automated-moderation console). */
+const ADMIN_NAV = [
+  { to:'/admin/search',     icon:'shield',    label:'Search admin' },
+  { to:'/admin/moderation', icon:'hourglass', label:'Moderation' },
+]
 
 /* ---- delivering one live notification ----------------------------------
    Two independent channels, each with its own column in the settings matrix:
@@ -194,7 +200,14 @@ export function Layout() {
 
   const onPublished = (post) => {
     window.dispatchEvent(new CustomEvent('ika:post-created', { detail: post }))
-    navigate('/')
+    /* A held post is dropped from EVERY list endpoint for its own author
+       (MODERATION_FRONTEND §7.3) — GET /posts/{id} is the only read that still
+       serves it. Landing on '/' relies on the event above, which only helps
+       when the feed was already mounted; published from any other page, the
+       feed mounts fresh, refetches, and the held post is reachable nowhere.
+       So a held post lands its author on the post page itself, where the
+       ModerationNotice + re-check watch live. */
+    navigate(isHeld(post) && post?.id ? `/posts/${post.id}` : '/')
   }
   // edit (PATCH §6.4): patch in place, stay on the current page
   const onEdited = (post) => window.dispatchEvent(new CustomEvent('ika:post-updated', { detail: post }))
@@ -256,9 +269,9 @@ export function Layout() {
           <button className="icon-btn" aria-label="Close menu" onClick={() => setNavOpen(false)}><Icon name="close"/></button>
         </div>
         <nav className="nav">
-          {/* Platform admins get one extra entry. Appended to the sidebar only —
+          {/* Platform admins get the extra entries. Appended to the sidebar only —
               the bottom tab bar is a curated four and stays that way. */}
-          {(isPlatformAdmin(me) ? [...NAV, ADMIN_NAV] : NAV).map(n => (
+          {(isPlatformAdmin(me) ? [...NAV, ...ADMIN_NAV] : NAV).map(n => (
             <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setNavOpen(false)}
               className={({ isActive }) => 'nav-item ' + (isActive ? 'active' : '')}>
               <Icon name={n.icon}/><span>{n.label}</span>
@@ -337,6 +350,10 @@ export function Layout() {
       <CallOverlay/>
       <ToastHost/>
       <DialogHost/>
+      {/* 403 STEP_UP_REQUIRED interceptor (error guide §2.2): http.js parks
+          the failing request here, the modal arms the window, the request
+          replays. Mounted once, app-wide, like the other overlays. */}
+      <StepUpHost/>
       <ShareHost/>
       {/* Reporting is reachable from every content surface, so its host lives
           with the other app-wide overlays rather than on any one page. */}

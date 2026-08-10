@@ -21,7 +21,9 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/index.js'
 import { Icon, Avatar, Verify, showToast } from '../ui.jsx'
 import { Loader } from '../states.jsx'
-import { uiConfirm, uiPrompt } from '../Dialog.jsx'
+import { uiConfirm } from '../Dialog.jsx'
+import { ModerationAlert } from '../Moderation.jsx'
+import { isModerationError } from '../../lib/moderation.js'
 import { openReport } from '../ReportDialog.jsx'
 import { useImageViewer } from '../ImageLightbox.jsx'
 import { useChat } from '../../context/ChatContext.jsx'
@@ -31,6 +33,7 @@ import { chatError } from './chatErrors.js'
 import {
   useCallStats, useConversationCalls, clearCallsFor, describeCall, talkTime,
 } from './callLog.js'
+import { deleteIntentOf, leaveIntentOf } from './conversationActions.js'
 
 /* ---------- the permission matrix, client side ---------- */
 
@@ -82,6 +85,81 @@ function ScopeSelect({ value, onChange, label, disabled }) {
       <option value="ALL_MEMBERS">Everyone</option>
       <option value="ADMINS_ONLY">Admins only</option>
     </select>
+  )
+}
+
+/* ---------- the two moderated fields, edited in place ----------
+   A group's name and description are the only text this panel writes, and both
+   are scored by automated moderation before anyone else can read them (as
+   `ModeratedEntityType.CHANNEL` — there is no GROUP type). That rules out
+   uiPrompt, which is what these used to be:
+
+     · uiPrompt RESOLVES AND UNMOUNTS the instant Save is pressed, so a refusal
+       arrives with the typed text already gone and nowhere on screen to put the
+       server's answer. For a rename that costs a sentence; for a description it
+       can cost several paragraphs.
+     · `PATCH /conversations/{id}` answers a HOLD with 400 CONTENT_UNDER_REVIEW,
+       not a 200 — the change did not land, the previously approved value keeps
+       serving, and the case usually settles within seconds. That is the one
+       moderation state where "Try again" is the honest control, and a dialog
+       that has already closed cannot offer it.
+
+   So the field edits where it sits: the box stays, the text stays in it, and
+   the refusal renders underneath. <ModerationAlert/> decides for itself whether
+   a retry is honest — it draws one only for CONTENT_UNDER_REVIEW — so `onRetry`
+   is passed unconditionally and a hard block still gets no retry button. */
+function InfoEdit({ label, initial, multiline, maxLength, placeholder, onSave, onCancel }) {
+  const [value, setValue] = React.useState(initial ?? '')
+  const [busy, setBusy] = React.useState(false)
+  const [refused, setRefused] = React.useState(null)
+  const fieldRef = React.useRef(null)
+
+  React.useEffect(() => { fieldRef.current?.focus() }, [])
+
+  const submit = async () => {
+    if (busy) return
+    setBusy(true)
+    setRefused(null)
+    try { await onSave(value) }
+    catch (e) {
+      /* Moderation keeps the editor open with the text intact. Anything else
+         has already been toasted by the caller — but the editor still stays
+         open, because a failed save is not a reason to throw the writing away. */
+      if (isModerationError(e)) setRefused(e)
+    } finally { setBusy(false) }
+  }
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); onCancel?.(); return }
+    // Enter commits a one-line name; a description needs Enter for paragraphs,
+    // so it takes the ⌘/Ctrl form the prompt dialog used.
+    if (e.key === 'Enter' && (!multiline || e.metaKey || e.ctrlKey)) { e.preventDefault(); submit() }
+  }
+
+  return (
+    /* `.cn-field` carries the whole label+field layout already; the two inline
+       properties only undo `.ci-hero`'s centring for a form, which is not worth
+       a rule in a shared stylesheet. */
+    <div className="cn-field ci-hero-edit" style={{ textAlign: 'start', marginTop: 12 }}>
+      <span>{label}</span>
+      {multiline ? (
+        <textarea ref={fieldRef} className="field" rows={3} dir="auto" value={value}
+          maxLength={maxLength} placeholder={placeholder} disabled={busy}
+          onChange={e => setValue(e.target.value)} onKeyDown={onKeyDown}/>
+      ) : (
+        <input ref={fieldRef} className="field" dir="auto" value={value}
+          maxLength={maxLength} placeholder={placeholder} disabled={busy}
+          onChange={e => setValue(e.target.value)} onKeyDown={onKeyDown}/>
+      )}
+      <ModerationAlert error={refused} onRetry={submit} onDismiss={() => setRefused(null)}/>
+      <div className="ci-hero-actions">
+        <button type="button" className="rq-btn" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="button" className="rq-btn primary" onClick={submit}
+          disabled={busy || (!multiline && !value.trim())}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -271,6 +349,11 @@ export function ConversationInfo({
   const [savingSettings, setSavingSettings] = React.useState(false)
   const [savingTtl, setSavingTtl] = React.useState(false)
   const [showAllMembers, setShowAllMembers] = React.useState(false)
+  /* null | 'title' | 'description' — which moderated field is open for editing
+     in the hero. One at a time, and never both, because they are two separate
+     PATCHes (see saveTitle/saveDescription) and a single "editing" flag makes
+     that structural rather than something each handler has to remember. */
+  const [editingField, setEditingField] = React.useState(null)
   const { openable, viewer } = useImageViewer()   // the hero photo opens full-screen
 
   /* Call history for this thread. `useCallStats` re-reads on every write to
@@ -305,6 +388,18 @@ export function ConversationInfo({
   /* Either party may set the timer in a DM; a group needs CHANGE_SETTINGS,
      which is admins-only by default. Same rule the server enforces. */
   const canSetTimer = !!convo && (!isGroup || can('CHANGE_SETTINGS', myRole, settings))
+
+  /* The panel's single danger row, decided where every other surface decides
+     it. `leaveIntentOf.allowed` is the whole rule; whoever it refuses falls to
+     DELETE, which for an owner destroys the room and for a DM just clears it.
+     ChatPage's `onLeave` asks the same pair, so the button and the call it
+     makes can never drift apart. */
+  const dangerIntent = React.useMemo(() => {
+    const leave = leaveIntentOf(convo)
+    return leave.allowed
+      ? { ...leave, icon: 'logout' }
+      : { ...deleteIntentOf(convo), icon: 'trash' }
+  }, [convo])
 
   /* ----- roster ----- */
   // Both inputs are hoisted to primitives so the declared deps and the ones the
@@ -398,43 +493,40 @@ export function ConversationInfo({
     }
   }
 
-  const renameGroup = async () => {
-    const title = await uiPrompt({
-      title: 'Group name',
-      label: 'Name',
-      initial: convo.title || '',
-      confirmLabel: 'Save',
-    })
-    if (!title || !title.trim() || title.trim() === convo.title) return
+  /* Both savers THROW on failure — that is how <InfoEdit/> knows to keep the
+     box open with the text still in it. Both also send their field ON ITS OWN,
+     never bundled with anything else: `PATCH /conversations/{id}` is
+     @Transactional and screens the text before applying anything, so a title
+     that is refused OR merely held rolls back the whole request. A rename sent
+     together with, say, an `avatarKey` would lose the avatar to a verdict that
+     had nothing to do with it. */
+  const saveTitle = async (raw) => {
+    const title = (raw || '').trim()
+    if (!title || title === convo.title) { setEditingField(null); return }
     try {
-      const updated = await api.chat.conversations.update(convo.id, { title: title.trim() })
+      const updated = await api.chat.conversations.update(convo.id, { title })
       if (updated) patchConvo(convo.id, { title: updated.title, displayTitle: updated.displayTitle })
+      setEditingField(null)
       showToast('Group renamed')
     } catch (e) {
-      showToast(chatError(e, 'Could not rename the group'))
+      if (!isModerationError(e)) showToast(chatError(e, 'Could not rename the group'))
+      throw e
     }
   }
 
-  const editDescription = async () => {
-    const next = await uiPrompt({
-      title: convo.isChannel ? 'Channel description' : 'Group description',
-      label: 'Description',
-      initial: convo.description || '',
-      multiline: true,
-      placeholder: 'What this conversation is for…',
-      confirmLabel: 'Save',
-    })
-    // `null` is "cancelled"; an empty STRING is a deliberate clear, which the
-    // API accepts as "". Collapsing the two would make the field unclearable.
-    if (next === null || next === undefined) return
-    const value = next.trim().slice(0, 500)
-    if (value === (convo.description || '')) return
+  const saveDescription = async (raw) => {
+    // An empty STRING is a deliberate clear, which the API accepts as "";
+    // only "unchanged" is a no-op, or the field could never be emptied.
+    const value = (raw || '').trim().slice(0, 500)
+    if (value === (convo.description || '')) { setEditingField(null); return }
     try {
       const updated = await api.chat.conversations.update(convo.id, { description: value })
       patchConvo(convo.id, { description: updated?.description ?? value })
+      setEditingField(null)
       showToast(value ? 'Description updated' : 'Description cleared')
     } catch (e) {
-      showToast(chatError(e, 'Could not update the description'))
+      if (!isModerationError(e)) showToast(chatError(e, 'Could not update the description'))
+      throw e
     }
   }
 
@@ -506,8 +598,34 @@ export function ConversationInfo({
               : (peer?.handle ? `@${peer.handle}` : '')}
           </div>
 
-          {isGroup && !!convo.description && (
+          {isGroup && !!convo.description && !editingField && (
             <p className="ci-hero-desc" dir="auto">{convo.description}</p>
+          )}
+
+          {/* Keyed on the field so switching from Rename to Edit description
+              remounts the editor with the right seed instead of keeping the
+              previous value in a box that now claims to hold the other one. */}
+          {editingField === 'title' && (
+            <InfoEdit
+              key="title"
+              label="Group name"
+              initial={convo.title || ''}
+              maxLength={120}
+              onSave={saveTitle}
+              onCancel={() => setEditingField(null)}
+            />
+          )}
+          {editingField === 'description' && (
+            <InfoEdit
+              key="description"
+              label={convo.isChannel ? 'Channel description' : 'Group description'}
+              initial={convo.description || ''}
+              multiline
+              maxLength={500}
+              placeholder="What this conversation is for…"
+              onSave={saveDescription}
+              onCancel={() => setEditingField(null)}
+            />
           )}
 
           <div className="ci-hero-actions">
@@ -516,11 +634,11 @@ export function ConversationInfo({
                 View profile
               </button>
             )}
-            {isGroup && can('EDIT_INFO', myRole, settings) && (
-              <button type="button" className="rq-btn" onClick={renameGroup}>Rename</button>
+            {isGroup && !editingField && can('EDIT_INFO', myRole, settings) && (
+              <button type="button" className="rq-btn" onClick={() => setEditingField('title')}>Rename</button>
             )}
-            {isGroup && can('EDIT_INFO', myRole, settings) && (
-              <button type="button" className="rq-btn" onClick={editDescription}>
+            {isGroup && !editingField && can('EDIT_INFO', myRole, settings) && (
+              <button type="button" className="rq-btn" onClick={() => setEditingField('description')}>
                 {convo.description ? 'Edit description' : 'Add description'}
               </button>
             )}
@@ -891,25 +1009,20 @@ export function ConversationInfo({
               </div>
             </button>
           )}
-          {isGroup ? (
-            <button type="button" className="ci-row click danger" onClick={onLeave}>
-              <Icon name="logout"/>
-              <div className="ci-row-body">
-                <div className="ci-row-title">Leave group</div>
-                <div className="ci-row-sub">
-                  {myRole === 'OWNER' ? 'Transfer ownership first if others remain.' : 'You’ll stop receiving its messages.'}
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button type="button" className="ci-row click danger" onClick={onLeave}>
-              <Icon name="trash"/>
-              <div className="ci-row-body">
-                <div className="ci-row-title">Delete conversation</div>
-                <div className="ci-row-sub">Removes it from your inbox.</div>
-              </div>
-            </button>
-          )}
+          {/* ONE row, and it never names its own verb. Leave vs delete, group
+              vs channel, "for me" vs "for everyone" — all four turn on rules
+              that live in conversationActions (a channel owner may never
+              leave; a group owner may only when alone), and `onLeave` in
+              ChatPage re-asks the same helper for the endpoint. Hard-coding
+              "Leave group" here is how a channel owner used to be shown a
+              button that could only 403. */}
+          <button type="button" className="ci-row click danger" onClick={onLeave}>
+            <Icon name={dangerIntent.icon}/>
+            <div className="ci-row-body">
+              <div className="ci-row-title">{dangerIntent.label}</div>
+              <div className="ci-row-sub">{dangerIntent.sub}</div>
+            </div>
+          </button>
         </div>
       </div>
       {viewer}

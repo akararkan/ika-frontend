@@ -423,3 +423,97 @@ Beware `nb_frames` and `duration` — both report the container's claims, not wh
 decodes. A file whose video is entirely undecodable still reports a healthy
 video stream. Only `-show_frames` (which decodes) and the decoder's own stderr
 tell the truth.
+
+---
+
+# Profile stats — `GET /users/{id}/stats` 500s on every cached read
+
+*(2026-08-10. Reproduced against the running stack, root-caused in the backend
+repo, fixed there; the frontend now also degrades honestly. Unrelated to live
+streaming — filed here because this is the "what the live backend actually
+does" ledger.)*
+
+**Symptom.** Every profile shows **0 Followers / 0 Following** while the follower
+list plainly has people in it:
+
+```
+GET /api/v1/users/{me}/stats     → 500 INTERNAL_ERROR
+GET /api/v1/users/{me}/followers → totalElements: 2   (omer, ali.akram)
+GET /api/v1/users/{me}/following → totalElements: 2
+```
+
+The zero is not the stat row — it is the client falling back to
+`profile.followerCount`, which `profile.md` documents as *denormalized, not
+maintained, may read 0*. A failed row and an empty row look identical on screen.
+
+**Cause — a Java record cached through a polymorphic serializer.**
+`RedisCacheConfig` builds its shared `GenericJackson2JsonRedisSerializer` on a
+mapper with `activateDefaultTyping(…, DefaultTyping.NON_FINAL, As.WRAPPER_ARRAY)`.
+A record is implicitly **final**, so:
+
+- **write** emits a bare object with no type header —
+  `{"postCount":1,…,"followerCount":2}` (the counts were always correct);
+- **read** goes through the same mapper into `Object.class`, which *demands* the
+  wrapper array and throws
+  `Unexpected token (START_OBJECT), expected START_ARRAY: need Array value to
+  contain 'As.WRAPPER_ARRAY' type information`.
+
+So the cache **miss** returns `200` and every read for the rest of the 30 s TTL
+returns `500`. It presents as an intermittent fault and is in fact total. Compare
+the two encodings in Redis — this is the whole bug in two lines:
+
+```
+user-stats::<id>            {"postCount":1,…}                  ← final record, no header
+knowledge-topics::SimpleKey [["ak.dev…Topic",{…}]]             ← non-final, header present
+```
+
+Three caches were affected — `user-stats`, `user-email-ctx`,
+`research-by-id`/`-by-slug` (all record-valued). `user-profile` is a record too
+and worked, because it already had its own typed serializer; that was the
+pattern to generalise, not an exception.
+
+**Fix (backend, `RedisCacheConfig`).** A `typed(base, mapper, Class<T>, ttl)`
+helper binds a cache's values to their concrete type — a serializer that knows
+the class writes and needs no header — applied to those four caches. Entries the
+broken config already wrote are plain JSON, so they read back correctly instead
+of being orphaned.
+
+**Fix (frontend, `api.users.stats`).** All six counts ride one request, so one
+failure takes the row. It now degrades instead of lying: followers/following are
+re-read from the public list endpoints (`totalElements`, `size=1`) and the rest
+come back **`null`, not 0** — call sites already spell
+`stats?.posts ?? list.length`, so a null falls through to the count they can see
+while a zero would overwrite it.
+
+**Verified, all four caches.** `user-stats` and `research-by-id` /
+`research-by-slug` end to end against the running server — the read that used to
+throw now returns `200` with the payload intact (the research row round-trips its
+enums, `LocalDateTime` and nested `tags`/`sources`/`contributors`/`mediaFiles`
+lists). `user-email-ctx` has no externally reachable trigger (it sits in the
+email fan-out), so it was verified by round-tripping the record through the exact
+serializer instead. A fully-populated `ResearchResponse` — all 45 components,
+nested records filled reflectively — comes back `equals()` to what went in.
+
+> Note for anyone repeating this: the research base path is **`/api/v1/researches`**,
+> not `/research`. Asking the wrong one returns `404`, which reads exactly like
+> "no data exists" and is how this cache first got written off as untestable.
+
+**Verify recipe.** The app runs from IntelliJ, so its stack traces are not on
+disk; reproduce the serializer standalone instead:
+
+```bash
+mvn -o -q dependency:build-classpath -Dmdep.outputFile=/tmp/cp.txt
+java -cp "$(cat /tmp/cp.txt):target/classes" Probe.java   # single-file launch
+```
+
+Build the same mapper, `serialize()` then `deserialize()` the record — the
+exception names itself. `spring-boot-devtools` is on the classpath, so
+`mvn -o compile` refreshing `target/classes` **auto-restarts the IDE-run app**:
+the fix goes live without touching the user's run configuration. Confirm with two
+back-to-back calls — the second one is the cache read that used to fail:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' :8080/api/v1/users/$U/stats   # 200 (miss)
+docker exec redis redis-cli TTL "user-stats::$U"                        # 30 → entry cached
+curl -s -w '%{http_code}\n' :8080/api/v1/users/$U/stats                 # 200 (read) — was 500
+```

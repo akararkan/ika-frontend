@@ -1,9 +1,26 @@
 /* =========================================================
    Research detail page — /research/:id
    Live full research + realtime counter stream.
+
+   MODERATION (src/lib/moderation.js). Two very different shapes meet on this
+   page:
+
+     · The PAPER. Publish (§6.3) is scored: it can be refused (400
+       CONTENT_REJECTED — the paper stays a draft, nothing else changes), it can
+       be "not yet" (400 CONTENT_UNDER_REVIEW, when a verdict on this exact text
+       is already in flight — the one retryable refusal on the platform), or it
+       can be HELD, which arrives as a perfectly ordinary 200 whose `status` is
+       still "DRAFT". That last one is the only inferable hold on the wire
+       (heldPublish), and it is why this page owns a re-check loop: nothing
+       pushes a verdict, so a held paper polls itself until it flips.
+     · COMMENTS. A held comment comes back byte-identical to a clean one — the
+       DTO has no moderation field at all. So there is no badge to render here
+       and we must not invent one; only the 400s are handled, and the author
+       keeps seeing their own comment either way because the server's read
+       filters carve the author out.
    ========================================================= */
 import React from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Icon, Verify, Avatar, fmt, linkify, bidiIsolate, showToast } from '../components/ui.jsx'
 import { MentionBox } from '../components/MentionBox.jsx'
 import { openShare } from '../components/ShareSheet.jsx'
@@ -14,7 +31,10 @@ import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
 import { RichText } from '../components/RichText.jsx'
 import { VoicePlayer } from '../components/VoicePlayer.jsx'
 import { PlayableVideo } from '../components/PlayableVideo.jsx'
-import { Loader, EmptyState } from '../components/states.jsx'
+import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
+import { isNotFound, errorText, traceRef } from '../api/errors.js'
+import { ModerationAlert, ModerationNotice, useHeldWatch } from '../components/Moderation.jsx'
+import { isModerationError, isUnderReview, heldPublish, moderationText } from '../lib/moderation.js'
 import { authorOf } from '../lib/userView.js'
 import { makeZip, makeTarGz, saveBlob, safeEntryName, uniqueNames } from '../lib/archive.js'
 import { useRealtime } from '../hooks/useRealtime.js'
@@ -150,10 +170,13 @@ function PromoVideo({ src, poster, onClose }) {
 export function ResearchDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const meId = user?.id
   const [r, setR] = React.useState(null)
   const [loading, setLoading] = React.useState(true)
+  const [loadErr, setLoadErr] = React.useState(null)        // 404 → tombstone; anything else → retry + traceId (error guide §2.5)
+  const [retryTick, setRetryTick] = React.useState(0)
   const [me, setMe] = React.useState({ liked:false, saved:false })
   const [comments, setComments] = React.useState([])
   const [cText, setCText] = React.useState('')
@@ -172,6 +195,17 @@ export function ResearchDetailPage() {
   const [followed, setFollowed] = React.useState(null)       // author follow state: null = unknown, true/false once socialStatus resolves
   const [archFmt, setArchFmt] = React.useState('zip')        // bundle format for "Download all"
   const [packing, setPacking] = React.useState('')           // '' = idle, else progress label
+  /* ---- moderation ---- */
+  // The composer navigates here with this flag after a publish IT saw come back
+  // held. Without it the author presses "Publish now" in the modal and lands on
+  // a page that simply says "Draft", with nothing to explain the contradiction.
+  const [held, setHeld] = React.useState(() => !!location.state?.moderationHeld)
+  const [modErr, setModErr] = React.useState(null)           // a refused publish — shown verbatim, never as a toast
+  const [cErr, setCErr] = React.useState(null)               // comment composer refusal
+  const [replyErr, setReplyErr] = React.useState(null)       // reply composer refusal (one reply box is open at a time)
+  const [cBusy, setCBusy] = React.useState(false)            // in-flight guards: the box-clear used to be the only one
+  const [replyBusy, setReplyBusy] = React.useState(false)
+  const [cmtErr, setCmtErr] = React.useState(null)           // { id, error } — a refused comment EDIT, pinned to its row
 
   const loadComments = React.useCallback(() => {
     api.research.comments(id).then(res => setComments((res?.content || res || []).map(adapters.researchCommentFrom))).catch(() => {})
@@ -188,11 +222,12 @@ export function ResearchDetailPage() {
   React.useEffect(() => {
     let alive = true
     setLoading(true)
-    loadResearch(true).then(() => { if (alive) loadComments() }).catch(() => { if (alive) setR(false) }).finally(() => { if (alive) setLoading(false) })
+    setLoadErr(null)
+    loadResearch(true).then(() => { if (alive) loadComments() }).catch((e) => { if (alive) { setLoadErr(e); setR(false) } }).finally(() => { if (alive) setLoading(false) })
     // Authoritative, displayOrder-sorted source list (public, block-aware).
     api.research.sources(id).then(s => { if (alive && s?.length) setSources(s) }).catch(() => {})
     return () => { alive = false }
-  }, [id, loadResearch, loadComments])
+  }, [id, loadResearch, loadComments, retryTick])
 
   // Follow state for the research author — hydrate once from socialStatus (skip
   // our own work and anonymous viewers). Mirrors the reels follow model.
@@ -298,6 +333,23 @@ export function ResearchDetailPage() {
   }
 
   const isAuthor = !!(meId && r && r.author === meId)
+
+  /* A held paper clears on its own and NOTHING pushes: there is no moderation
+     event on any stream, and the RESEARCH_PUBLISHED event that eventually fires
+     only helps if the SSE connection survived the wait. So the paper re-fetches
+     itself on the shared back-off (front-loaded, ending at the RESEARCH ceiling
+     of 60s) until its status stops being DRAFT. Author-only: nobody else can
+     even read a held paper — the server 404s them. */
+  const recheckHold = React.useCallback(async () => {
+    const mapped = await loadResearch()
+    if (mapped && String(mapped.status || '').toUpperCase() !== 'DRAFT') {
+      setHeld(false)
+      // The author sat on this page watching the hold — say so when it lands.
+      showToast('Your research is published — everyone can see it now.')
+    }
+  }, [loadResearch])
+  useHeldWatch(held && isAuthor, 'RESEARCH', recheckHold)
+
   // Follow / unfollow the author — optimistic toggle, rolls back on failure (reels model).
   const toggleFollow = () => {
     const aid = r?.author
@@ -310,12 +362,25 @@ export function ResearchDetailPage() {
   // lifecycle endpoints (§6.3-6.7) return the updated ResearchResponse → patch
   // the header (status pill, minted ircId) in place; keep live SSE counters.
   const lifecycle = (fn, label) => fn(id).then(updated => {
-    showToast(label)
+    /* Publish is the only scored transition here, and a HOLD arrives looking
+       exactly like a success: 200, but the paper is still a DRAFT. Every other
+       endpoint on this list returns the status it promises, so heldPublish can
+       only ever be true on the publish path — and DRAFT-after-publish has no
+       other cause. */
+    const wasHeld = fn === api.research.publish && heldPublish(updated)
+    setModErr(null); setHeld(wasHeld)
+    showToast(wasHeld ? 'Sent for checking' : label)
     if (updated && updated.id) {
       const mapped = adapters.researchDetailFrom(updated)
       setR(prev => prev ? { ...mapped, metrics: prev.metrics } : mapped)
     } else loadResearch()
-  }).catch(e => showToast(e?.message || 'Action failed'))
+  }).catch(e => {
+    /* A refusal gets the server's own sentence and the appeal link, on the page,
+       for as long as the author wants to read it — a 2.2s toast is the wrong
+       vessel for the only explanation they will ever be given. */
+    if (isModerationError(e)) { setModErr(e); return }
+    showToast(e?.message || 'Action failed')
+  })
   const publish   = () => lifecycle(api.research.publish, 'Published')
   const unpublish = () => lifecycle(api.research.unpublish, 'Moved back to draft')
   const archive   = () => lifecycle(api.research.archive, 'Archived')
@@ -413,12 +478,21 @@ export function ResearchDetailPage() {
   const copyCite = () => { navigator.clipboard?.writeText(r.citation); showToast('Citation copied') }
   const cite = () => { setR(p => p && ({ ...p, metrics:{ ...p.metrics, citations:p.metrics.citations + 1 } })); api.research.cite(id).then(() => showToast('Recorded — thank you for citing')).catch(() => {}) }
 
-  /* ---- comments (§17) ---- */
+  /* ---- comments (§17) ----
+     A held comment is INDISTINGUISHABLE from a clean one on the wire:
+     CommentResponse carries no moderation field (its `isHidden` is the admin
+     hide flag, not this). So these handlers do the 400 half of the contract
+     only — no badge, no "checking" chip, because any we drew would be a guess,
+     and a wrong guess marks clean content as held. The author sees their own
+     held comment regardless; the server's read filter carves them out. */
   const bumpC = (d) => setR(p => p && ({ ...p, metrics:{ ...p.metrics, comments: Math.max(0, p.metrics.comments + d) } }))
   const addComment = async () => {
     const v = cText.trim(); const file = cFile
-    if (!v && !file) return
-    setCText(''); setCFile(null)
+    /* The box-clear used to double as the in-flight guard; now that it only
+       happens on success, a second Enter (or a second click) while the first
+       request is still open would post the comment twice. */
+    if ((!v && !file) || cBusy) return
+    setCErr(null); setCBusy(true)
     try {
       let raw
       if (file) {   // §17.3 multipart: data JSON + media (image/video) or voice (audio)
@@ -430,13 +504,31 @@ export function ResearchDetailPage() {
         raw = await api.research.addComment(id, v)
       }
       setComments(cs => [adapters.researchCommentFrom(raw), ...cs]); bumpC(1)
-    } catch (e) { showToast(e?.code === 'COMMENTS_DISABLED' ? 'Comments are turned off' : 'Could not comment') }
+      /* Cleared HERE, not before the await. The old order threw the author's
+         comment away the instant anything failed — which is survivable for a
+         network blip and inexcusable for a moderation refusal, where the whole
+         point is that they can edit what they wrote and send it again. */
+      setCText(''); setCFile(null)
+    } catch (e) {
+      if (isModerationError(e)) { setCErr(e); return }
+      showToast(e?.code === 'COMMENTS_DISABLED' ? 'Comments are turned off' : 'Could not comment')
+    } finally {
+      setCBusy(false)          // finally, not a tail call — the moderation arm returns early
+    }
   }
   const submitReply = async (c) => {
-    const v = replyText.trim(); if (!v) return
-    setReplyText(''); setReplyTo(null)
-    try { const rep = adapters.researchCommentFrom(await api.research.addComment(id, v, c.id)); setComments(cs => cs.map(x => x.id===c.id ? { ...x, replyCount:(x.replyCount||0)+1, replies:[...(x.replies||[]), rep] } : x)); bumpC(1) }
-    catch { showToast('Could not reply') }
+    const v = replyText.trim(); if (!v || replyBusy) return
+    setReplyErr(null); setReplyBusy(true)
+    try {
+      const rep = adapters.researchCommentFrom(await api.research.addComment(id, v, c.id))
+      setComments(cs => cs.map(x => x.id===c.id ? { ...x, replyCount:(x.replyCount||0)+1, replies:[...(x.replies||[]), rep] } : x)); bumpC(1)
+      setReplyText(''); setReplyTo(null)          // same rule as above: only a saved reply clears the box
+    } catch (e) {
+      if (isModerationError(e)) { setReplyErr(e); return }   // box stays open with the text in it
+      showToast('Could not reply')
+    } finally {
+      setReplyBusy(false)
+    }
   }
   const reactComment = (c, parentId = null) => {
     const flip = (x) => ({ ...x, liked:!x.liked, likes:x.likes + (x.liked?-1:1) })
@@ -444,10 +536,31 @@ export function ResearchDetailPage() {
     ;(c.liked ? api.research.unreactComment(id, c.id) : api.research.reactComment(id, c.id)).catch(() => {})
   }
   const editComment = async (c, parentId = null) => {
-    const v = await uiPrompt({ title:'Edit comment', label:'Comment text', initial:c.body, multiline:true, icon:'compose', confirmLabel:'Save' })
-    if (v === null) return; const nv = v.trim(); if (!nv) return
-    setComments(cs => cs.map(x => parentId ? (x.id===parentId ? { ...x, replies:x.replies.map(rr => rr.id===c.id ? { ...rr, body:nv, edited:true } : rr) } : x) : (x.id===c.id ? { ...x, body:nv, edited:true } : x)))
-    api.research.editComment(id, c.id, nv).catch(() => showToast('Could not edit'))
+    /* uiPrompt destroys the draft — anything typed is gone by the time a
+       refusal lands. So the prompt LOOPS, pre-filled with the refused text and
+       the server's sentence above the field, until it saves or the author
+       cancels (the same shape as ProfilePage.addHighlight). */
+    let draft = c.body
+    let notice = null
+    for (;;) {
+      const v = await uiPrompt({ title:'Edit comment', label:'Comment text', initial:draft, multiline:true, icon:'compose', confirmLabel:'Save', message: notice || undefined })
+      if (v === null) return
+      const nv = v.trim(); if (!nv) return
+      setCmtErr(null)
+      try {
+        await api.research.editComment(id, c.id, nv)
+        /* Patched only after the server accepts it. The old code patched first and
+           never reverted, so a refused edit sat on screen looking saved — the one
+           failure mode that actively lies to the author, since the backend rolled
+           the row back to its previous body. */
+        setComments(cs => cs.map(x => parentId ? (x.id===parentId ? { ...x, replies:x.replies.map(rr => rr.id===c.id ? { ...rr, body:nv, edited:true } : rr) } : x) : (x.id===c.id ? { ...x, body:nv, edited:true } : x)))
+        return
+      } catch (e) {
+        if (isModerationError(e)) { draft = nv; notice = moderationText(e); continue }
+        showToast('Could not edit')
+        return
+      }
+    }
   }
   const deleteComment = async (c, parentId = null) => {
     const ok = await uiConfirm({ title:'Delete this comment?', confirmLabel:'Delete', danger:true, icon:'close' })
@@ -457,7 +570,13 @@ export function ResearchDetailPage() {
   }
 
   if (loading) return <div className="main center"><div className="col-main"><Loader label="Loading research…"/></div></div>
-  if (!r) return <div className="main center"><div className="col-main"><EmptyState icon="research" title="Research not found"/></div></div>
+  if (!r) return (
+    <div className="main center"><div className="col-main">
+      {loadErr && !isNotFound(loadErr)
+        ? <ErrorState message={errorText(loadErr, 'Could not load this research.')} traceId={traceRef(loadErr)} onRetry={() => setRetryTick(t => t + 1)}/>
+        : <EmptyState icon="research" title="This research is no longer available" sub="It may have been unpublished or removed, or the link is stale."/>}
+    </div></div>
+  )
 
   const u = authorOf(r)
   const sLower = r.status.toLowerCase()
@@ -520,6 +639,14 @@ export function ResearchDetailPage() {
           </div>
         </div>
 
+        {/* A refused (or still-in-flight) publish, in the server's own words.
+            CONTENT_UNDER_REVIEW is the single moderation answer worth retrying —
+            it means "a verdict on this exact text hasn't landed yet", not "no" —
+            so it is the only one that gets a button. */}
+        {isAuthor && modErr && (
+          <ModerationAlert error={modErr} onRetry={isUnderReview(modErr) ? publish : undefined} onDismiss={() => setModErr(null)}/>
+        )}
+
         {r.status === 'RETRACTED' && (
           <div className="rd-banner retracted">
             <div className="rd-banner-ico"><Icon name="flag"/></div>
@@ -532,7 +659,12 @@ export function ResearchDetailPage() {
             <div><b>Archived</b><p>Hidden from public feeds but still readable by direct link — for superseded papers that should remain citable.</p></div>
           </div>
         )}
-        {r.status === 'DRAFT' && isAuthor && (
+        {/* While a verdict is pending the paper IS a draft, but "publish when
+            ready" is the wrong advice — it already published itself into the
+            queue and will go live without another press. So the hold notice
+            replaces the draft banner rather than stacking with it. */}
+        {r.status === 'DRAFT' && isAuthor && held && <ModerationNotice state="checking" kind="research paper"/>}
+        {r.status === 'DRAFT' && isAuthor && !held && (
           <div className="rd-banner draft">
             <div className="rd-banner-ico"><Icon name="doc"/></div>
             <div><b>Draft</b><p>Only you can see this. Publish when ready to mint an IRC ID — the official paper identifier that stays stable through later unpublish/republish.</p></div>
@@ -707,9 +839,12 @@ export function ResearchDetailPage() {
                   <MentionBox className="field" placeholder={cFile ? `${cFile.name} attached…` : 'Add a comment…'} value={cText} onChange={e => setCText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') addComment() }}/>
                   <input ref={cFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setCFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={cFile ? cFile.name : 'Attach image / video / voice'} onClick={() => cFileRef.current?.click()} style={cFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
-                  <button className="icon-btn" disabled={!cText.trim() && !cFile} onClick={addComment}><Icon name="send" className="sm"/></button>
+                  <button className="icon-btn" disabled={cBusy || (!cText.trim() && !cFile)} onClick={addComment}><Icon name="send" className="sm"/></button>
                 </div>
               ) : <p className="muted text-sm">Comments are turned off for this research.</p>}
+              {/* Sits under the box the text is still sitting in — a refusal is
+                  only actionable next to the words that caused it. */}
+              {cErr && <ModerationAlert error={cErr} onDismiss={() => setCErr(null)}/>}
 
               {comments.map(c => {
             const cu = c._author; const own = !!(meId && c.author === meId)
@@ -724,21 +859,27 @@ export function ResearchDetailPage() {
                   </div>
                   <div className="cmt-meta">
                     <button onClick={() => reactComment(c)} style={c.liked ? { color:'var(--rose)' } : undefined}><Icon name="heart" className="xs"/>{c.likes || 0}</button>
-                    <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>Reply</button>
+                    {/* Moving or closing the reply box drops any standing
+                        refusal with it: `replyText` is shared across comments,
+                        so a refusal left behind would render under a DIFFERENT
+                        comment's empty box, accusing text that isn't there. */}
+                    <button onClick={() => { setReplyErr(null); setReplyText(''); setReplyTo(replyTo === c.id ? null : c.id) }}>Reply</button>
                     {own && <button onClick={() => editComment(c)}>Edit</button>}
                     {own && <button onClick={() => deleteComment(c)} style={{ color:'var(--rose)' }}>Delete</button>}
                     {/* `subject` shows the comment's own text on the dialog's plate — see PostPage */}
                     {!own && c.id && <button onClick={() => openReport({ targetType:'COMMENT', targetId:c.id, targetLabel:'this comment', subject:c.body })}>Report</button>}
                     <span>{c.time}</span>
                   </div>
+                  {cmtErr?.id === c.id && <ModerationAlert error={cmtErr.error} onDismiss={() => setCmtErr(null)}/>}
 
                   {replyTo === c.id && (
                     <div className="cmt-box" style={{ marginTop:8 }}>
                       <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={28} src={user?.profileImage}/>
-                      <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(c); if (e.key==='Escape') { setReplyTo(null); setReplyText('') } }}/>
-                      <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c)}><Icon name="send" className="sm"/></button>
+                      <MentionBox className="field" autoFocus placeholder={`Reply to ${cu.full}…`} value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(c); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyErr(null) } }}/>
+                      <button className="icon-btn" disabled={replyBusy || !replyText.trim()} onClick={() => submitReply(c)}><Icon name="send" className="sm"/></button>
                     </div>
                   )}
+                  {replyTo === c.id && replyErr && <ModerationAlert error={replyErr} onDismiss={() => setReplyErr(null)}/>}
 
                   {(c.replies || []).map(rr => {
                     const ru = rr._author; const rown = !!(meId && rr.author === meId)
@@ -758,6 +899,7 @@ export function ResearchDetailPage() {
                             {!rown && rr.id && <button onClick={() => openReport({ targetType:'COMMENT', targetId:rr.id, targetLabel:'this reply', subject:rr.body })}>Report</button>}
                             <span>{rr.time}</span>
                           </div>
+                          {cmtErr?.id === rr.id && <ModerationAlert error={cmtErr.error} onDismiss={() => setCmtErr(null)}/>}
                         </div>
                       </div>
                     )
@@ -869,8 +1011,13 @@ export function ResearchDetailPage() {
         )
       })()}
 
-      {editing && <ResearchComposeModal editResearch={r} onClose={() => setEditing(false)} onEdited={async () => {
+      {editing && <ResearchComposeModal editResearch={r} onClose={() => setEditing(false)} onEdited={async (updated) => {
         setEditing(false)
+        /* A HELD edit of a live paper comes back 200 with the status knocked to
+           DRAFT (publishedAt kept) — the paper has just left every reader's view.
+           The composer says so before it closes; this arms the re-check loop and
+           the notice so the page the author returns to says the same thing. */
+        if (r.status === 'PUBLISHED' && heldPublish(updated)) setHeld(true)
         await loadResearch()
         // Notify list pages (ResearchPage, search) so they pick up the new title/abstract/tags.
         try {

@@ -10,9 +10,19 @@
        §20 only takes one textContent + media file).
      · VIDEO story → keep the video as-is and bake the layers
        into a derived poster image (used as the thumbnail).
+
+   MODERATION. The editor never talks to the API — its host
+   (ComposeModal) owns the create and the poll attach — but it
+   owns the DRAFT, which is the only thing a refusal must not
+   destroy. So the host hands a rejected create/attach straight
+   back here through `error`, re-opens the editor, and the
+   author edits the caption or the poll in place. Rendering the
+   refusal on a modal the author has already been thrown out of
+   would show them a sentence about text they can no longer see.
    ========================================================= */
 import React from 'react'
 import { Icon } from './ui.jsx'
+import { ModerationAlert } from './Moderation.jsx'
 
 /* ---------- Editor preset palette ---------- */
 
@@ -193,7 +203,16 @@ function PollSticker({ poll, selected, onSelect, onMove, onEdit, onDelete }) {
 
 /* ---------- Main editor ---------- */
 
-export function StoryEditor({ initialMedia, onCancel, onSave }) {
+/**
+ * @param initialMedia  the file the composer already picked, if any
+ * @param error         an ApiError from a refused story create / poll attach.
+ *                      Shown verbatim; the draft below it is untouched, and
+ *                      there is deliberately no retry control — a caption the
+ *                      classifier refused can only be got past by editing it.
+ * @param onDismissError optional — clears the host's error when the author acks
+ * @param onCancel / onSave  as before
+ */
+export function StoryEditor({ initialMedia, onCancel, onSave, error = null, onDismissError }) {
   /* Background: gradient OR uploaded file (image or video). */
   const initialUrl = React.useMemo(() => initialMedia ? URL.createObjectURL(initialMedia) : null, [initialMedia])
   const initialKind = initialMedia ? (initialMedia.type.startsWith('video') ? 'video' : 'image') : null
@@ -225,7 +244,13 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
 
   /* Optional two-option poll sticker — { question, optionA, optionB, x%, y% }.
      Draggable like a text layer; attached to the story after create (StoryPoll
-     API). null = no poll. */
+     API). null = no poll.
+
+     The poll's three strings are scored on attach with NO held state — the
+     backend refuses anything short of an approved verdict, so a borderline
+     question (or an unreachable classifier) is a flat 400 while the story
+     itself may well have been accepted. That refusal comes back through
+     `error` and the sticker stays right here, editable. */
   const [poll, setPoll] = React.useState(null)
   const [pollEdit, setPollEdit] = React.useState(false)
   const [pollSelected, setPollSelected] = React.useState(false)
@@ -445,6 +470,15 @@ export function StoryEditor({ initialMedia, onCancel, onSave }) {
           <Icon name="feather" className="sm"/><span>Next</span>
         </button>
       </div>
+
+      {/* A refusal handed back by the host. It sits directly under the bar —
+          above the stage the sentence is about — and changes nothing else: the
+          layers, the media and the poll are all still here to be edited. */}
+      {error && (
+        <div style={{ padding: '0 14px' }}>
+          <ModerationAlert error={error} onDismiss={onDismissError}/>
+        </div>
+      )}
 
       {/* Stage — 9:16 preview */}
       <div

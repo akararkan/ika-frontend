@@ -4497,9 +4497,10 @@
    "id": "r-02",
    "authorId": "u-karwan",
    "soundId": "snd-08",
+   "still": true,
    "clip": 2,
    "cover": 2,
-   "durationSeconds": 38,
+   "durationSeconds": 30,
    "minsAgo": 240,
    "tags": [
     "kurdology",
@@ -16551,6 +16552,78 @@
     "ar": "صار مقطع «مرثية هورامية، تسجيل ميداني ١٩٨٧» متاحًا في مكتبة الأصوات.",
     "ku": "«لاوکی هەورامی، تۆمارێکی مەیدانی ١٩٨٧» ئێستا لە کتێبخانەی دەنگەکاندا بەردەستە.",
     "tr": "“Hawramî ağıt, 1987 saha kaydı” artık ses kütüphanesinde."
+   }
+  },
+  {
+   "id": "n-mod-1",
+   "type": "SYSTEM_MESSAGE",
+   "actorId": null,
+   "lastActorId": null,
+   "aggregateCount": 1,
+   "resourceType": null,
+   "resourceId": null,
+   "link": "none",
+   "isRead": false,
+   "minutesAgo": 34,
+   "title": {
+    "en": "Your content was removed",
+    "ar": "Your content was removed",
+    "ku": "Your content was removed",
+    "tr": "Your content was removed"
+   },
+   "body": {
+    "en": "Your comment was removed because it appears to violate the community guidelines. You can appeal this decision from your account settings.",
+    "ar": "Your comment was removed because it appears to violate the community guidelines. You can appeal this decision from your account settings.",
+    "ku": "Your comment was removed because it appears to violate the community guidelines. You can appeal this decision from your account settings.",
+    "tr": "Your comment was removed because it appears to violate the community guidelines. You can appeal this decision from your account settings."
+   }
+  },
+  {
+   "id": "n-mod-2",
+   "type": "SYSTEM_MESSAGE",
+   "actorId": null,
+   "lastActorId": null,
+   "aggregateCount": 1,
+   "resourceType": null,
+   "resourceId": null,
+   "link": "none",
+   "isRead": false,
+   "minutesAgo": 96,
+   "title": {
+    "en": "Your content is being reviewed",
+    "ar": "Your content is being reviewed",
+    "ku": "Your content is being reviewed",
+    "tr": "Your content is being reviewed"
+   },
+   "body": {
+    "en": "Your post is waiting on a moderator and is not visible to others yet. We will let you know as soon as it is reviewed.",
+    "ar": "Your post is waiting on a moderator and is not visible to others yet. We will let you know as soon as it is reviewed.",
+    "ku": "Your post is waiting on a moderator and is not visible to others yet. We will let you know as soon as it is reviewed.",
+    "tr": "Your post is waiting on a moderator and is not visible to others yet. We will let you know as soon as it is reviewed."
+   }
+  },
+  {
+   "id": "n-mod-3",
+   "type": "SYSTEM_MESSAGE",
+   "actorId": null,
+   "lastActorId": null,
+   "aggregateCount": 1,
+   "resourceType": null,
+   "resourceId": null,
+   "link": "none",
+   "isRead": true,
+   "minutesAgo": 210,
+   "title": {
+    "en": "Your content is live",
+    "ar": "Your content is live",
+    "ku": "Your content is live",
+    "tr": "Your content is live"
+   },
+   "body": {
+    "en": "Your research paper cleared review and is now visible to everyone.",
+    "ar": "Your research paper cleared review and is now visible to everyone.",
+    "ku": "Your research paper cleared review and is now visible to everyone.",
+    "tr": "Your research paper cleared review and is now visible to everyone."
    }
   }
  ],

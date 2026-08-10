@@ -551,7 +551,23 @@ export const routes = [
   },
 
   /* ---------- identity (§9) ---------- */
-  { m: 'GET', p: /^\/api\/v1\/users\/me$/, fn: (db) => userResponse(db, meUser(db), meId(db)) },
+  /* `localStorage.ika_mock_role = 'ADMIN'` promotes the mock identity for this
+     device only. Without it the staff screens are unreachable in the one mode
+     built to demo them: the fixture's `me` is a SCHOLAR, so RequireRole refuses
+     /admin/search and /admin/moderation and the whole moderation console can
+     only be seen against a live backend with a real admin account. The override
+     is read per request (not cached) so it can be flipped from the console
+     mid-session, and it is mock-only — nothing outside this file consults it,
+     and a real deployment's role still comes from the server. */
+  {
+    m: 'GET', p: /^\/api\/v1\/users\/me$/,
+    fn: (db) => {
+      const res = userResponse(db, meUser(db), meId(db))
+      let override = null
+      try { override = localStorage.getItem('ika_mock_role') } catch { /* private mode */ }
+      return override ? { ...res, role: String(override).toUpperCase() } : res
+    },
+  },
   {
     m: 'PATCH', p: /^\/api\/v1\/users\/me$/,
     fn: (db, { body }) => {

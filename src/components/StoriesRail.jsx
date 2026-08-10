@@ -32,10 +32,12 @@
    entirely on touch, where the rail is swiped.
    ========================================================= */
 import React from 'react'
-import { Icon, Avatar } from './ui.jsx'
+import { Icon, Avatar, showToast } from './ui.jsx'
+import { ModerationBadge, useHeldWatch } from './Moderation.jsx'
+import { moderationState, isHeld, MODERATION_COPY } from '../lib/moderation.js'
 import { useMyStoryViews } from '../lib/storyTray.js'
 import { isStoryUnseen, markStorySeen, isMyStoryUnseen, markMyStorySeen } from '../lib/storySeen.js'
-import { assetUrl } from '../api/index.js'
+import { api, assetUrl } from '../api/index.js'
 
 /** Scroll-position state for the arrow affordances. */
 function useRailScroll() {
@@ -74,15 +76,32 @@ function useRailScroll() {
 
 /** One story tile. `cover` may be null — the tile then wears a derived plate
  *  rather than an empty grey box, because a story with a text-only frame is
- *  ordinary and must still look deliberate. */
-function StoryTile({ cover, ring, label, sub, unseen = true, count = 0, onOpen }) {
+ *  ordinary and must still look deliberate.
+ *
+ *  `held` is 'checking' | 'review' and can only ever be YOUR OWN tile: the
+ *  server's canView drops a non-approved story for every other viewer, so a
+ *  friend's held frame never reaches this rail at all. There is nothing to
+ *  guess and nothing to hide — a marker here always means "mine, not out yet". */
+function StoryTile({ cover, ring, label, sub, unseen = true, count = 0, held = null, onOpen }) {
+  const note = held ? MODERATION_COPY[held].note : null
   return (
     <button className={'fbst' + (unseen ? ' is-unseen' : '')} onClick={onOpen}
+      title={note || undefined}
       aria-label={sub ? `${label} — ${sub}` : label}>
       <span className="fbst-cover" style={cover ? { backgroundImage: `url("${cover}")` } : undefined}>
         {!cover && <span className="fbst-cover-fb" style={{ background: ring.avc }} aria-hidden="true">{ring.initials}</span>}
       </span>
       <span className="fbst-scrim" aria-hidden="true"/>
+      {/* The veil is the "not published yet" plate every held surface wears.
+          Its chip is lifted clear of .fbst-name — bottom:8px, clamped to two
+          12px/1.25 lines, so 38px of tile — which is this tile's own chrome and
+          not something shared CSS should learn about. Hence the one inline
+          offset on this rail. */}
+      {held && (
+        <span className="mod-veil" style={{ padding: '10px 8px 42px' }}>
+          <ModerationBadge state={held}/>
+        </span>
+      )}
       <span className="fbst-ring">
         <Avatar initials={ring.initials} color={ring.avc} size={38} src={ring.profileImage}/>
       </span>
@@ -118,6 +137,47 @@ export function StoriesRail({ me, myStories = [], tray = [], onCreate, onOpen, o
     () => (myStories || []).reduce((max, s) => Math.max(max, s?.createdAt ? new Date(s.createdAt).getTime() : 0), 0),
     [myStories],
   )
+
+  /* Is anything of mine still being checked?
+     My own frames come back from /stories/by-author/{me} while they are held —
+     the server's canView carves the author out — and the response is the raw
+     Cassandra entity, so `moderationStatus` ("PENDING" | "IN_REVIEW" | null)
+     rides along. Stories are the ONE surface on this wire that can tell
+     "checking" from "a moderator now owns it", so the chip says which: an
+     escalation wins over a plain check, because it is the one worth reading.
+     A tile stands for the whole stack, so any held frame marks it. */
+  const myHeld = React.useMemo(() => {
+    const states = (myStories || []).map(moderationState)
+    if (states.includes('review')) return 'review'
+    return states.includes('checking') ? 'checking' : null
+  }, [myStories])
+
+  /* Nothing pushes when a hold clears: there is no moderation event on any
+     stream, and the tray SSE only ever carries removals and poll votes. So a
+     held tile re-reads itself on the back-off in lib/moderation.js (STORY
+     ceiling 15s, past which the backend fails OPEN and publishes anyway).
+     The re-check is a single by-author read; only when the hold has actually
+     gone do we fire the app's existing "my stories changed" signal, so the
+     page that owns the rows reloads them authoritatively. Polling THROUGH that
+     event instead would re-run the whole tray fan-out on every tick. */
+  /* Identity of the held SET, not its state: a second story held while the
+     first is still 'checking' leaves the state string unchanged, and the new
+     frame would silently join a back-off chain that may already have run out
+     to its ceiling (the §6 "watching a SET needs a key" trap). */
+  const myHeldIds = React.useMemo(
+    () => (myStories || []).filter(isHeld).map(s => s.id ?? s.storyId).join(','),
+    [myStories],
+  )
+  useHeldWatch(!!myHeld, 'STORY', async () => {
+    if (!me.id) return
+    const rows = await api.stories.byAuthor(me.id)
+    if (!(rows || []).some(isHeld)) {
+      window.dispatchEvent(new CustomEvent('ika:story-created'))
+      /* The one moment the client can announce — the platform never pushes a
+         verdict, and the bell only rings for content a human actually sat on. */
+      showToast('Your story is live for everyone now.')
+    }
+  }, myHeldIds)
 
   /* Every ring re-reads its local record when this bumps: opening a story,
      closing the viewer, a fresh view count landing. */
@@ -197,15 +257,20 @@ export function StoriesRail({ me, myStories = [], tray = [], onCreate, onOpen, o
 
         {/* Mine, when I have one — so tapping my own ring opens my viewer
             instead of the composer. Here the lit ring means "nobody has viewed
-            this yet", so it goes quiet the moment the first person watches. */}
+            this yet", so it goes quiet the moment the first person watches.
+            While a frame is held the subtitle answers the question the chip
+            raises — who can see this — instead of a view count that is
+            trivially zero because nobody else has the row yet. */}
         {hasMine && (
           <StoryTile
             cover={myCover}
             ring={me}
             label="Your story"
-            sub={myViews === 0 ? 'No views yet' : myViews > 0 ? `${myViews} ${myViews === 1 ? 'view' : 'views'}` : undefined}
+            sub={myHeld ? 'Only you can see it until it clears'
+              : myViews === 0 ? 'No views yet' : myViews > 0 ? `${myViews} ${myViews === 1 ? 'view' : 'views'}` : undefined}
             count={myStories.length}
             unseen={myUnseen}
+            held={myHeld}
             onOpen={openMine}
           />
         )}

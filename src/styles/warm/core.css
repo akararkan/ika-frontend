@@ -307,3 +307,10 @@
   .sidebar .cta-compose{ flex:0 0 auto; }
   .sidebar .side-section{ flex:0 0 auto; }
 }
+
+/* ---------- response caveats — error guide §3 ----------
+   A 2xx that still needs a caveat next to its data (capped listing,
+   collector-start series, degraded source). warning outranks note. */
+.rc-warn{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:11px 13px;border-radius:10px;background:var(--ox-amber-wash);color:var(--ox-amber);font-size:13px;line-height:1.5;font-weight:500}
+.rc-note{display:flex;gap:8px;align-items:flex-start;margin-top:8px;color:var(--muted);font-size:12.5px;line-height:1.5}
+.rc-warn svg,.rc-note svg{flex:none;margin-top:2px}

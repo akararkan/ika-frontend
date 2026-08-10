@@ -268,6 +268,13 @@ export function timeAgo(iso) {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 
+/** Media keys keep the uploaded file's extension (`posts/media/{uuid}.jpg`),
+ *  which is the only signal a feed row carries about what its media IS. */
+const isImageUrl = (u) => {
+  const s = String(u || '')
+  return /^data:image\//i.test(s) || /\.(jpe?g|png|webp|gif|avif|heic|heif|bmp)([?#]|$)/i.test(s)
+}
+
 function mediaFromUrls(urls = [], types = []) {
   const tarr = types || []   // default param only catches `undefined`; the backend can send `mediaTypes: null`
   return (urls || []).map((url, i) => {
@@ -314,7 +321,16 @@ export function postFromFeedItem(dto) {
   const cover = dto.mediaUrl ? assetUrl(dto.mediaUrl) : null   // VOICE_POST: this is the audio URL
   let media = []
   if (isReel && (video || cover)) {
-    media = [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#1a2836,#0b131d)', ratio: '9/16' }]
+    /* A STILL reel — a photo posted as a reel — is exactly a reel row with no
+       `videoUrl`: the server's own `firstVideoUrl` returns null when nothing in
+       mediaTypes is VIDEO, while the cover falls back to the first URL. That is
+       ALSO the shape of an old row whose video predates the videoUrl field, so
+       the two are told apart by the file extension the storage layer keeps on
+       every key (`posts/media/{uuid}.jpg`). Extension-less / unknown → assume
+       video, which keeps the legacy hydrate-on-error path intact. */
+    media = video || !isImageUrl(cover)
+      ? [{ type: 'VIDEO', url: video || cover, poster: cover, label: 'video', bg: 'linear-gradient(160deg,#1a2836,#0b131d)', ratio: '9/16' }]
+      : [{ type: 'IMAGE', url: cover, poster: cover, label: 'photo', bg: `center/cover no-repeat url("${cover}")`, ratio: '9/16' }]
   } else if (!isVoice && dto.mediaUrl) {
     media = mediaFromUrls([dto.mediaUrl], ['IMAGE'])
   }
@@ -325,13 +341,24 @@ export function postFromFeedItem(dto) {
     _author: a,
     type: dto.postType || 'TEXT',
     visibility: 'PUBLIC',
-    status: 'PUBLISHED',
+    /* Carry the wire status through instead of asserting PUBLISHED. A feed row
+       is normally published — held posts are dropped by the server's own
+       hydrator — but the composer inserts its freshly created post into this
+       same shape, and that one CAN be "PENDING_REVIEW". Hard-coding here is
+       what would silently strip the badge off it. */
+    status: dto.status || 'PUBLISHED',
     time: timeAgo(dto.createdAt),
     body: dto.textPreview || '',
     location: null,
     media,
     videoUrl: video,
     audioUrl: isVoice ? cover : null,   // VOICE_POST playable audio (feed puts it in mediaUrl)
+    /* Attached Sound — FeedItemResponse does NOT carry it today (the reels
+       viewer re-reads GET /posts/{id} for the active clip). Carried here
+       anyway so the day the feed row does include it, the extra read simply
+       stops happening. */
+    soundUrl: !isVoice && dto.audioTrackUrl ? assetUrl(dto.audioTrackUrl) : null,
+    soundName: !isVoice && dto.audioTrackName ? dto.audioTrackName : '',
     sharedPostId: dto.sharedPostId || null,   // feed items omit it → RepostEmbed fetches the full post
     likes: dto.reactionCount || 0,
     comments: dto.commentCount || 0,
@@ -485,6 +512,13 @@ export function postFromResponse(dto) {
     location: dto.locationName || null,
     media,
     audioUrl: assetUrl(dto.audioTrackUrl || null),   // VOICE_POST playable audio
+    /* The ATTACHED Sound (§19) — a picked track, not the media itself. A reel
+       keeps its own recorded audio inside the video file, so these two are
+       separate tracks the viewer plays together (and balances). VOICE_POST is
+       the single type where `audioTrackUrl` IS the media (`audioUrl` above),
+       so it deliberately exposes no added sound. */
+    soundUrl: dto.postType === 'VOICE_POST' ? null : assetUrl(dto.audioTrackUrl || null),
+    soundName: dto.postType === 'VOICE_POST' ? '' : (dto.audioTrackName || ''),
     sharedPostId: dto.sharedPostId || null,           // REPOST → original post id (embed it)
     likes: dto.reactionCount || 0,
     comments: dto.commentCount || 0,
@@ -799,6 +833,10 @@ export function soundFrom(dto) {
     artist: dto.artistName || '',
     artistName: dto.artistName || '',
     audioUrl: assetUrl(dto.audioUrl || null),
+    /* The un-absolutised url, kept for the round trip: a post that adopts this
+       sound stores it as its own `audioTrackUrl`, and baking this client's API
+       host into a DB column would break every OTHER client. */
+    audioUrlRaw: dto.audioUrl || null,
     cover: assetUrl(dto.coverArtUrl || null),
     coverArtUrl: assetUrl(dto.coverArtUrl || null),
     duration: dto.durationSeconds ?? null,

@@ -3,6 +3,15 @@
    Owners (MINE tab) can update each item's status inline
    (publish / unpublish / archive / retract / delete) with the
    card patched in place from the server's authoritative response.
+
+   Publish is the one moderated transition on this page (§6.3):
+   it can be refused (400 CONTENT_REJECTED), it can answer "not
+   yet" (400 CONTENT_UNDER_REVIEW, when a verdict on this text is
+   already in flight — the only retryable refusal), or it can be
+   HELD, which looks exactly like success apart from the paper
+   still being a DRAFT. Held cards keep a "Checking…" chip and
+   re-fetch themselves until the verdict lands, because nothing
+   pushes one. See src/lib/moderation.js.
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +19,8 @@ import { Icon, Verify, Avatar, fmt, showToast, ViewSeg } from '../components/ui.
 import { uiConfirm } from '../components/Dialog.jsx'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { ResearchComposeModal } from '../components/ResearchComposeModal.jsx'
+import { ModerationAlert, ModerationBadge, useHeldWatch } from '../components/Moderation.jsx'
+import { isModerationError, isUnderReview, heldPublish } from '../lib/moderation.js'
 import { authorOf } from '../lib/userView.js'
 import { useViewMode } from '../lib/useViewMode.js'
 import { useAuth, hasRole } from '../context/AuthContext.jsx'
@@ -40,6 +51,8 @@ export function ResearchPage() {
   const [loading, setLoading] = React.useState(true)
   const [composing, setComposing] = React.useState(false)
   const [editing, setEditing] = React.useState(null)
+  const [modErr, setModErr] = React.useState(null)     // { id, action, error } — a refused lifecycle call, kept on screen
+  const [heldIds, setHeldIds] = React.useState([])     // papers whose publish came back held (200, still DRAFT)
 
   React.useEffect(() => {
     let alive = true
@@ -81,9 +94,47 @@ export function ResearchPage() {
         const fresh = adapters.researchFrom(updated)
         setItems(prev => prev.map(it => it.id === id ? { ...it, ...fresh, metrics: it.metrics } : it))
       }
-      showToast(ACTION_TOAST[action] || 'Updated')
-    } catch (e) { showToast(e?.message || 'Action failed') }
+      /* Publish is the only scored transition, and its HOLD is a 200 whose paper
+         is still a DRAFT — no error, no marker, just a status that didn't move.
+         Every other action here returns the status it promises, so this test can
+         only fire where it means something. */
+      const wasHeld = action === 'publish' && heldPublish(updated)
+      setHeldIds(prev => wasHeld ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id))
+      setModErr(null)
+      showToast(wasHeld ? 'Sent for checking' : (ACTION_TOAST[action] || 'Updated'))
+    } catch (e) {
+      /* The refusal's wording is the server's and it is the only explanation the
+         author will get, so it is rendered in the page (with the appeal link)
+         rather than flashed for two seconds in a toast. */
+      if (isModerationError(e)) { setModErr({ id, action, error: e }); return }
+      showToast(e?.message || 'Action failed')
+    }
   }
+
+  /* Held papers clear on their own and nothing pushes a verdict, so the ones we
+     know about re-fetch themselves on the shared back-off until their status
+     stops being DRAFT. `heldIds` only ever holds ids whose publish response told
+     us it was held — a draft nobody tried to publish is just a draft. */
+  const recheckHeld = React.useCallback(async () => {
+    if (!heldIds.length) return
+    const fresh = await Promise.all(heldIds.map(rid => api.research.get(rid).catch(() => null)))
+    const cleared = []
+    fresh.forEach(dto => {
+      if (!dto?.id) return
+      const mapped = adapters.researchFrom(dto)
+      setItems(prev => prev.map(it => it.id === dto.id ? { ...it, ...mapped, metrics: it.metrics } : it))
+      if (String(dto.status || '').toUpperCase() !== 'DRAFT') cleared.push(dto.id)
+    })
+    if (cleared.length) {
+      setHeldIds(prev => prev.filter(x => !cleared.includes(x)))
+      // The only announcement there is: verdicts are never pushed, and the
+      // bell stays silent unless a human actually held it.
+      showToast(cleared.length === 1
+        ? 'Your research is published — everyone can see it now.'
+        : 'Your held research papers are published now.')
+    }
+  }, [heldIds])
+  useHeldWatch(heldIds.length > 0, 'RESEARCH', recheckHeld, heldIds.join(','))
 
   const removeR = async (id) => {
     const ok = await uiConfirm({ title:'Delete this research permanently?', message:'This cannot be undone. Drafts, sources, contributors, media and comments will all be removed.', confirmLabel:'Delete forever', danger:true, icon:'close' })
@@ -162,6 +213,9 @@ export function ResearchPage() {
               <small className="muted">{r.time}{r.irc ? <> · <span className="font-mono">{r.irc}</span></> : null}</small>
             </div>
             <span className={'status ' + sLower} style={{marginLeft:'auto'}}>{sLower}</span>
+            {/* Author-only by construction: the chip is driven by a publish
+                response only this viewer received. */}
+            {heldIds.includes(r.id) && <ModerationBadge state="checking"/>}
           </div>
           <h3>{r.title}</h3>
           <p className="r-abs">{r.abstract}</p>
@@ -197,6 +251,7 @@ export function ResearchPage() {
         </div>
         <div className="rrow-right">
           <span className={'status ' + sLower}>{sLower}</span>
+          {heldIds.includes(r.id) && <ModerationBadge state="checking"/>}
           <div className="rrow-metrics">
             <span><Icon name="eye" className="xs"/>{fmt(r.metrics.views)}</span>
             <span><Icon name="cite" className="xs"/>{r.metrics.citations}</span>
@@ -264,6 +319,17 @@ export function ResearchPage() {
           <div className="list-toolbar">
             <ViewSeg value={view} onChange={setView}/>
           </div>
+        )}
+
+        {/* CONTENT_UNDER_REVIEW is the one refusal a retry can resolve — the
+            verdict may simply have landed since. A block gets no button: the
+            same text can only be refused the same way, so the way out is the
+            editor. */}
+        {modErr && (
+          <ModerationAlert
+            error={modErr.error}
+            onRetry={isUnderReview(modErr.error) ? () => lifecycle(modErr.id, modErr.action) : undefined}
+            onDismiss={() => setModErr(null)}/>
         )}
 
         {loading ? <Loader label="Loading research…"/>

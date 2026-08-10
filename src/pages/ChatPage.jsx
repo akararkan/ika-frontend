@@ -37,13 +37,14 @@ import { CommentsPanel, TagPanel } from '../components/chat/ChannelPanels.jsx'
 import { useServerDraft } from '../components/chat/useServerDraft.js'
 import { PostComposer } from '../components/chat/PostComposer.jsx'
 import { VideoPlayer } from '../components/chat/VideoPlayer.jsx'
-import { deleteIntentOf, sendBlockReason, canSendIn } from '../components/chat/conversationActions.js'
+import { deleteIntentOf, leaveIntentOf, sendBlockReason, canSendIn } from '../components/chat/conversationActions.js'
 import { typingSentence, dominantActivity } from '../components/chat/activity.js'
 import { useConversationCalls } from '../components/chat/callLog.js'
 import { useCall } from '../context/CallContext.jsx'
 import { api } from '../api/index.js'
 import { maxId } from '../api/ids.js'
 import { chatError } from '../components/chat/chatErrors.js'
+import { isModerationError } from '../lib/moderation.js'
 
 const LIST_TABS = [['inbox', 'Inbox'], ['requests', 'Requests'], ['archived', 'Archived']]
 
@@ -397,11 +398,19 @@ export function ChatPage() {
     const gone = (evt.type === 'conversation.updated' && evt.memberChange === 'DELETED')
       || (evt.type === 'member.changed'
           && String(evt.userId) === String(myId)
-          && (evt.memberChange === 'REMOVED' || evt.memberChange === 'LEFT'))
+          /* `UNSUBSCRIBED` is a channel leave — same outcome as REMOVED/LEFT
+             (no membership, no read access), different wire spelling. It also
+             arrives when I leave from another tab. */
+          && (evt.memberChange === 'REMOVED'
+           || evt.memberChange === 'LEFT'
+           || evt.memberChange === 'UNSUBSCRIBED'))
     if (!gone) return
+    const channel = !!convoRef.current?.isChannel
     showToast(evt.type === 'conversation.updated'
-      ? 'This conversation was deleted'
-      : 'You are no longer a member of this conversation')
+      ? (channel ? 'This channel was deleted' : 'This conversation was deleted')
+      : evt.memberChange === 'UNSUBSCRIBED'
+        ? 'You left this channel'
+        : 'You are no longer a member of this conversation')
     navigate('/chat', { replace: true })
   }), [subscribe, id, myId, navigate])
 
@@ -423,6 +432,34 @@ export function ChatPage() {
   const [draft, setDraft] = React.useState('')
   React.useEffect(() => { setDraft('') }, [id])
   React.useEffect(() => { if (editing) setDraft(editing.body || '') }, [editing])
+
+  /* The last automated-moderation refusal, alongside the draft because they are
+     one situation: nothing was persisted, so the text is still the user's and
+     this is the only record of why it did not go. Cleared when the thread
+     changes — a refusal is about one message in one conversation. */
+  const [refused, setRefused] = React.useState(null)
+  React.useEffect(() => { setRefused(null) }, [id])
+
+  /* Hand a refused write back to the composer intact.
+     Order matters: the composer clears its own box the instant it submits (so
+     the next message can be typed while the first is in flight), and this runs
+     after the verdict, so it must not clobber whatever was typed in between —
+     hence the `d ||` guard. `reply` comes back too: a refusal did not persist
+     the message, so it did not persist what the message was answering either.
+     Returns whether it handled the error, so callers can fall through. */
+  /* `files` only arrives from the RETRY path: a first send keeps its own tray
+     (Composer holds it whenever the failure was a refusal), but a retry is
+     replaying an outbox entry that dropPending is about to delete, so the File
+     objects have to be handed forward or they are gone. */
+  const [restage, setRestage] = React.useState(null)
+  const takeRefusal = React.useCallback((e, { body, reply, files } = {}) => {
+    if (!isModerationError(e)) return false
+    setRefused(e)
+    if (body) setDraft(d => d || body)
+    if (reply) setReplyTo(r => r || reply)
+    if (files?.length) setRestage(files)
+    return true
+  }, [])
 
   /* …and it is mirrored to the server, so a half-written message follows the
      account across devices. Disabled while EDITING: the box then holds an
@@ -587,38 +624,40 @@ export function ChatPage() {
     if (c?.id) navigate(`/chat/${c.id}`)
   }, [navigate])
 
-  /* Leave a group / delete a DM from the info panel. The header owns its own
+  /* Leave a room / delete a DM from the info panel. The header owns its own
      copy of this for its overflow menu; both confirm before acting because
-     neither is reversible from the client. */
-  /* The info panel's danger action. A NON-owner in a group leaves; everyone
-     else hits DELETE, whose meaning depends on the role — see
-     conversationActions.deleteIntentOf. */
+     neither is reversible from the client.
+
+     Who gets which verb is NOT decided here — `leaveIntentOf.allowed` decides,
+     because the rule has four arms (a channel owner may never leave, a group
+     owner may only when alone) and two surfaces used to answer it separately.
+     Everyone it says no to falls to DELETE, whose meaning depends on the role
+     in turn — see conversationActions. `members.leave` covers a channel too:
+     the server delegates it to unsubscribe on a channel id. */
   const onLeaveOrDelete = React.useCallback(async () => {
     if (!convo) return
-    const leaving = convo.isGroup && convo.myRole !== 'OWNER'
+    const leave = leaveIntentOf(convo)
     const intent = deleteIntentOf(convo)
+    const act = leave.allowed ? leave : intent
     const ok = await uiConfirm({
-      title: leaving ? 'Leave group' : intent.title,
-      message: leaving
-        ? `Leave “${convo.displayTitle}”? You will stop receiving its messages.`
-        : intent.message,
+      title: act.title,
+      message: act.message,
       danger: true,
-      confirmLabel: leaving ? 'Leave' : intent.confirmLabel,
+      confirmLabel: act.confirmLabel,
     })
     if (!ok) return
     try {
-      if (leaving) {
+      if (leave.allowed) {
         await api.chat.members.leave(convo.id)
         removeConvo(convo.id)            // the member.changed frame may lag — drop it now
-        showToast('You left the group')
       } else {
         await deleteConvo(convo.id)      // the context rolls itself back and toasts on failure
-        showToast(intent.destroysForEveryone ? 'Group deleted' : 'Conversation cleared')
       }
+      showToast(act.toast)
       setPanel(null)
       navigate('/chat')
     } catch (e) {
-      showToast(chatError(e, leaving ? 'Could not leave the group' : 'Could not delete'))
+      showToast(chatError(e, leave.allowed ? `Could not leave the ${convo.isChannel ? 'channel' : 'group'}` : 'Could not delete'))
     }
   }, [convo, removeConvo, deleteConvo, navigate])
 
@@ -942,7 +981,15 @@ export function ChatPage() {
               onStar={(m) => thread.toggleStar(m.id ?? m)}
               onSeenBy={(m) => setSeenFor(m)}
               onHydrateReactions={thread.refreshReactions}
-              onRetry={(m) => thread.retry(m)}
+              /* "Tap to retry" on a bubble that failed on the wire. If the
+                 replay is what finally reaches the moderation gate, the store
+                 withdraws the bubble (nothing was ever persisted and a third
+                 attempt would refuse the same way) — so the text has to land
+                 somewhere, and the composer is the only place left that can
+                 hold it while it is rewritten. */
+              onRetry={(m) => {
+                thread.retry(m).catch(e => takeRefusal(e, { body: m?.body, files: e?.restoreFiles }))
+              }}
               onJumpTo={(mid) => onJump(mid, id)}
               onOpenProfile={(uid) => uid && navigate(`/u/${uid}`)}
               onOpenMedia={(items, index) => setViewer({ items, index })}
@@ -961,29 +1008,60 @@ export function ChatPage() {
               editing={editing}
               draft={draft}
               onDraftChange={setDraft}
+              moderationError={refused}
+              onClearModeration={() => setRefused(null)}
+              restageFiles={restage}
+              onRestaged={() => setRestage(null)}
               /* The promise is RETURNED, not fired and forgotten: the composer
                  awaits it to arm the slow-mode countdown, and a throttle
                  rejection has to reach it to be reconciled with the server's
                  Retry-After. */
               onSendText={({ body }) => {
-                const p = thread.sendText({ body, replyToId: replyTo?.id ?? null })
+                const reply = replyTo
+                const p = thread.sendText({ body, replyToId: reply?.id ?? null })
                 // Sending clears the server-side draft; tell the mirror so it
                 // does not write the text back in behind the send.
                 draftSent()
                 setReplyTo(null); setDraft('')
-                return p
+                return p.then(
+                  (v) => { setRefused(null); return v },
+                  (e) => { takeRefusal(e, { body, reply }); throw e },
+                )
               }}
               onSendFiles={({ files, body, durationMs, waveform }) => {
-                thread.sendFiles({ files, body, durationMs, waveform, replyToId: replyTo?.id ?? null })
+                /* Returned now, so the composer can hold its attachment tray
+                   until the server has actually taken the upload — a refused
+                   multipart send is rolled back in R2 and the files must go up
+                   again from here. */
+                const reply = replyTo
+                const p = thread.sendFiles({ files, body, durationMs, waveform, replyToId: reply?.id ?? null })
                 draftSent()
                 setReplyTo(null); setDraft('')
+                return p.then(
+                  (v) => { setRefused(null); return v },
+                  (e) => { takeRefusal(e, { body, reply }); throw e },
+                )
               }}
-              onCommitEdit={(body) => {
-                if (editing) thread.editMessage(editing.id, body)
-                setEditing(null); setDraft('')
+              onCommitEdit={async (body) => {
+                const target = editing
+                if (!target) return
+                try {
+                  await thread.editMessage(target.id, body)
+                  setEditing(null); setDraft(''); setRefused(null)
+                } catch (e) {
+                  /* The edit box STAYS OPEN on a failure, holding the text that
+                     was typed. This used to close unconditionally on the line
+                     after an un-awaited call, which was survivable for a
+                     network error (the old body is still there to try again
+                     from) and not survivable for a moderation block: the server
+                     keeps the previous wording and the rejected rewrite exists
+                     nowhere but in that box. */
+                  takeRefusal(e, { body })
+                  throw e            // …and the composer must not empty it either
+                }
               }}
               onCancelReply={() => setReplyTo(null)}
-              onCancelEdit={() => { setEditing(null); setDraft('') }}
+              onCancelEdit={() => { setEditing(null); setDraft(''); setRefused(null) }}
               onTyping={(isTyping) => sendTyping(convo.id, isTyping)}
               onSchedule={onSchedule}
               onOpenScheduled={toggleScheduled}
@@ -1124,7 +1202,14 @@ export function ChatPage() {
           onPick={async (targetId) => {
             setForwarding(null)
             try { await thread.forwardMessage(forwarding.id, targetId) }
-            catch { /* the thread store toasts its own failures */ }
+            catch (e) {
+              /* The store rethrows moderation refusals precisely so the surface
+                 can say them (useThread drops pending + throws). There is no
+                 composer here to pin an inline alert to — the picker is already
+                 gone — so the toast carries the server's own sentence
+                 (chatError defers to moderationText first). */
+              showToast(chatError(e, 'Could not forward'), 'err')
+            }
           }}
         />
       )}

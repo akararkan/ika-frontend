@@ -7,6 +7,7 @@
    ========================================================= */
 import { routes as users } from './users.js'
 import { routes as posts } from './posts.js'
+import { routes as moderation } from './moderation.js'
 import { routes as reels } from './reels.js'
 import { routes as qna } from './qna.js'
 import { routes as research } from './research.js'
@@ -18,6 +19,13 @@ import { routes as extra } from './extra.js'
 export const routes = [
   ...users,
   ...posts,
+  /* Moderation sits ABOVE reels deliberately. Its own namespace
+     (/admin/moderation/**) is unclaimed and could go anywhere, but its fake
+     classifier has to screen a story BEFORE the fragment that owns story
+     creation writes the row — and the registry has no fall-through, so the
+     screening route must be reached first. It hands every clean story straight
+     back to reels' handler; see the comment on storyCreateHandler(). */
+  ...moderation,
   ...reels,
   ...qna,
   ...research,

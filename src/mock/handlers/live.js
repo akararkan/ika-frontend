@@ -27,6 +27,8 @@
    sits above the id pattern.
    ========================================================= */
 import { page, paging, agoIso, mockError, NO_CONTENT } from '../util.js'
+import { fakeVerdict, blockedError, MOCK_HOLD_MS } from './moderation.js'
+import { CONTENT_UNDER_REVIEW, UNDER_REVIEW_FALLBACK } from '../../lib/moderation.js'
 
 /* ---------- helpers ---------- */
 
@@ -194,6 +196,9 @@ export const routes = [
   {
     m: 'POST', p: /^\/api\/v1\/streams$/,
     fn: (db, { body }) => {
+      /* Title/description are checked before followers are notified you've
+         gone live — a refused create is fully rolled back (never exists). */
+      if (fakeVerdict(body?.title, body?.description) === 'BLOCK') throw blockedError()
       const id = `s-mock-${(db.live.streams || []).length + 1}`
       const s = {
         id, hostId: meId(db), status: 'LIVE', viewerCount: 1, startedAgoMin: 0,
@@ -387,6 +392,13 @@ export const routes = [
       requireStream(db, id)
       const me = meId(db)
       const u = userOf(db, me)
+      /* Live chat is the one surface with NO held state and NO error: a line
+         that is confidently bad OR merely borderline is silently never shown —
+         200, empty-ish body, nothing appended, no notice ever (a heckler's mic
+         being cut isn't announced). Both markers drop here on purpose. */
+      if (fakeVerdict(body?.text)) {
+        return { streamId: id, userId: me, username: u?.username || '', text: body?.text || '', sentAt: agoIso(0) }
+      }
       if (!db.live.chat[id]) db.live.chat[id] = []
       db.live.chat[id].push({ userId: me, agoMin: 0, text: body?.text || '' })
       return { streamId: id, userId: me, username: u?.username || '', text: body?.text || '', sentAt: agoIso(0) }
@@ -476,6 +488,19 @@ export const routes = [
     m: 'PATCH', p: /^\/api\/v1\/streams\/([^/]+)$/,
     fn: (db, { params: [id], body }) => {
       const s = requireStream(db, id); requireHost(db, s)
+      /* Metadata updates never show a half-checked name: a refused change
+         applies NOTHING (400 CONTENT_REJECTED), a borderline one answers 400
+         CONTENT_UNDER_REVIEW — also with nothing applied — until the verdict
+         lands. The pending window makes the surface's "Try again" honest:
+         too soon → same answer; after MOCK_HOLD_MS → the change applies. */
+      const verdict = fakeVerdict(body?.title, body?.description)
+      if (verdict === 'BLOCK') throw blockedError()
+      if (verdict === 'HOLD') {
+        const now = Date.now()
+        if (!s._metaHoldUntil) s._metaHoldUntil = now + MOCK_HOLD_MS
+        if (now < s._metaHoldUntil) throw mockError(400, CONTENT_UNDER_REVIEW, UNDER_REVIEW_FALLBACK)
+        delete s._metaHoldUntil                    // verdict landed → the retry applies
+      }
       if (body?.title != null) s.title = body.title
       if (body?.description != null) s.description = body.description
       return streamDto(db, s, { viewer: false })

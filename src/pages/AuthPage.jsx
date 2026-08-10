@@ -6,6 +6,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Icon, BrandMark } from '../components/ui.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
+import { fieldErrorMap, duplicateField } from '../api/errors.js'
 
 /* The documents the consent line covers, named in the order it names them.
    These are PolicyService's keys verbatim — "Code of Conduct" (the old label)
@@ -32,12 +33,33 @@ function authError(e, mode) {
        there is no email-verification step to point anyone at. */
     case 'AUTH_ACCOUNT_DISABLED': return 'This account is closed. Contact support if that isn’t right.'
     case 'AUTH_ACCOUNT_LOCKED':   return 'This account is locked. Please contact support.'
+    case 'AUTH_ACCOUNT_EXPIRED':  return 'This account has expired. Please contact support.'
+    case 'AUTH_CREDENTIALS_EXPIRED': return 'Your credentials have expired. Please reset your password.'
     case 'USER_DUPLICATE':        return field === 'username'
       ? 'That handle is already taken — please choose another.'
       : 'That email is already registered — try signing in instead.'
     case 'VALIDATION_FAILED':     return e.fieldErrors?.[0]?.message || 'Please check your details and try again.'
     default: return e?.message || (mode === 'SIGN_IN' ? 'Sign-in failed. Please try again.' : 'Could not create your account.')
   }
+}
+
+/* Per-field server rejections → OUR input keys (error guide §2.4/§2.6):
+   VALIDATION_FAILED carries fieldErrors[] named after the register DTO
+   (fname/lname/username/email/password — the form shows one "full name"
+   input, so both name fields land on it; sign-in's `username` field is the
+   identifier input). USER_DUPLICATE is a 409 whose offending column arrives
+   in details.field — render it inline on that input, not as a banner. */
+function serverFieldErrs(e, mode) {
+  const rename = mode === 'SIGN_IN'
+    ? { username: 'identifier' }
+    : { fname: 'full', lname: 'full', username: 'handle' }
+  const out = fieldErrorMap(e, rename)
+  if (e?.code === 'USER_DUPLICATE') {
+    const f = duplicateField(e)
+    if (f === 'username') out.handle = 'That handle is already taken — please choose another.'
+    if (f === 'email') out.email = 'That email is already registered — try signing in instead.'
+  }
+  return out
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -141,6 +163,18 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
     else mounted.current = true
   }, [mode])
 
+  /* Why you're here: http.js parks the reason when it force-ends a session
+     (expired refresh; refresh-token REUSE gets its own "signed out of all
+     devices for security" copy — error guide §2.1). Shown once, then cleared. */
+  React.useEffect(() => {
+    let msg = null
+    try {
+      msg = sessionStorage.getItem('ika:signed-out')
+      if (msg) sessionStorage.removeItem('ika:signed-out')
+    } catch { /* private mode */ }
+    if (msg) setError(msg)
+  }, [])
+
   const set = k => e => {
     const v = e.target.value
     setFields(f => {
@@ -191,7 +225,11 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
       }
       navigate(loc.state?.from?.pathname || '/', { replace: true })
     } catch (err) {
-      setError(authError(err, mode))
+      /* Field-addressable rejections render inline next to their inputs;
+         everything else stays the form-level banner. */
+      const fe = serverFieldErrs(err, mode)
+      if (Object.keys(fe).length) setErrs(x => ({ ...x, ...fe }))
+      else setError(authError(err, mode))
     } finally {
       setBusy(false)
     }

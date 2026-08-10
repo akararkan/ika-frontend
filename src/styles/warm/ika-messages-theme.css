@@ -264,6 +264,16 @@
   /* the wide end inset is the clock's parking bay (see below) */
   padding-inline:16px 46px;
 }
+/* [IKA-FIX] The pill is only a pill while the draft is ONE LINE.
+   `999px` is clamped by the browser to half the box, so as the textarea
+   autogrows it keeps re-clamping and a long message ends up inside a giant
+   lozenge whose curved ends bite into its first and last lines. `.grown` is
+   set by Composer's autogrow the moment the text needs a second line (and
+   never on an empty box — a placeholder that wraps in a narrow composer must
+   not square an empty envelope's corners). 28px is what the resting pill
+   already measures on desktop, so the first wrap changes the height without
+   visibly changing the corner. */
+.ch-inputwrap.grown{ border-radius:28px; }
 .ch-inputwrap:focus-within{
   box-shadow:0 0 0 3px rgba(31,78,126,.10);
 }

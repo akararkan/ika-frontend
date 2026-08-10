@@ -14,6 +14,8 @@
    publishing, uploading and deleting all stick until reload.
    ========================================================= */
 import { page, paging, NO_CONTENT, mockError, agoIso } from '../util.js'
+import { fakeVerdict, blockedError, MOCK_HOLD_MS } from './moderation.js'
+import { CONTENT_UNDER_REVIEW, UNDER_REVIEW_FALLBACK } from '../../lib/moderation.js'
 
 /* ---------- shared helpers ---------- */
 
@@ -87,9 +89,24 @@ function knownUser(db, userId) {
 
 const researchList = (db) => db.research || []
 const findResearch = (db, id) => researchList(db).find(r => r.id === id)
+/* A pending mock hold (a `holdme` publish) resolves itself MOCK_HOLD_MS later,
+   on the next read — the real backend publishes a cleared hold automatically
+   and nothing ever pushes, so settling lazily is exactly the observable
+   behaviour: heldPublish() sees DRAFT until the re-check that lands after the
+   verdict, then PUBLISHED. */
+function settleModHold(r) {
+  if (r && r._modHoldUntil && Date.now() >= r._modHoldUntil) {
+    delete r._modHoldUntil
+    r.status = 'PUBLISHED'
+    r.publishedAgoMin = 0
+    if ((r.visibility || 'PRIVATE') === 'PRIVATE') r.visibility = 'PUBLIC'
+  }
+}
+
 function mustFind(db, id) {
   const r = findResearch(db, id)
   if (!r) throw mockError(404, 'RESEARCH_NOT_FOUND', 'Research not found')
+  settleModHold(r)
   return r
 }
 
@@ -567,6 +584,9 @@ export const routes = [
     if (!c) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')
     const content = String(ctx.body?.content || '').trim()
     if (!content) throw mockError(400, 'INVALID_REQUEST', 'Comment text is required')
+    // A refused edit applies nothing — the approved body stays (block-only:
+    // research comments carry no held marker on the wire).
+    if (fakeVerdict(content) === 'BLOCK') throw blockedError()
     c.content = content
     c.isEdited = true
     return commentDto(db, c, ctx.lang)
@@ -584,6 +604,7 @@ export const routes = [
     if (r.commentsEnabled === false) throw mockError(403, 'COMMENTS_DISABLED', 'Comments are turned off for this research')
     const content = String(ctx.body?.content || '').trim()
     if (!content) throw mockError(400, 'INVALID_REQUEST', 'Comment text is required')
+    if (fakeVerdict(content) === 'BLOCK') throw blockedError()
     const row = {
       id: newId('rcm'), researchId: r.id, userId: meId(db), parentId: ctx.body?.parentId || null,
       agoMin: 0, content, likeCount: 0, myReaction: null, isEdited: false, isHidden: false,
@@ -735,6 +756,27 @@ export const routes = [
 
   { m: 'POST', p: /^\/api\/v1\/researches\/([^/]+)\/publish$/, fn: (db, ctx) => {
     const r = mustFind(db, ctx.params[0])
+    /* The check happens AT PUBLISH — drafts are never scored (user-guide,
+       research-and-qna.md). `blockme` refuses the publish with the paper's
+       draft fully intact; `holdme` answers 200 with the row still DRAFT — the
+       exact heldPublish() signature — and settles to PUBLISHED on a later
+       read. Publishing again while the verdict is pending is the real
+       backend's CONTENT_UNDER_REVIEW arm, which is what makes the composer's
+       "Try again" button honest: too soon → same answer; after the verdict →
+       it lands. */
+    const verdict = fakeVerdict(r.title, r.abstract, r.body, r.keywords, r.citation)
+    if (verdict === 'BLOCK') throw blockedError()
+    if (r._modHoldUntil && Date.now() < r._modHoldUntil) {
+      throw mockError(400, CONTENT_UNDER_REVIEW, UNDER_REVIEW_FALLBACK)
+    }
+    /* mustFind already settled an expired hold to PUBLISHED — a retry that
+       arrives after the verdict must land as success, not hold again. */
+    if (String(r.status || '').toUpperCase() === 'PUBLISHED') return fullDto(db, r, ctx.lang)
+    if (verdict === 'HOLD') {
+      r._modHoldUntil = Date.now() + MOCK_HOLD_MS
+      r.updatedAgoMin = 0
+      return fullDto(db, r, ctx.lang)            // 200, status still DRAFT → held
+    }
     r.status = 'PUBLISHED'
     r.publishedAgoMin = 0
     r.updatedAgoMin = 0
@@ -848,6 +890,22 @@ export const routes = [
   { m: 'PATCH', p: /^\/api\/v1\/researches\/([^/]+)$/, fn: (db, ctx) => {
     const r = mustFind(db, ctx.params[0])
     const b = ctx.body || {}
+    /* Editing a LIVE paper re-checks the new text (wire table §3): a refused
+       edit applies NOTHING — readers keep the approved version; a borderline
+       edit applies and takes the paper back to DRAFT until the verdict lands
+       (settleModHold republishes it). Draft edits are never scored. */
+    if (String(r.status || '').toUpperCase() === 'PUBLISHED') {
+      const verdict = fakeVerdict(
+        b.title, b.description, b.abstractText, b.keywords, b.citation,
+        ...(Array.isArray(b.sources) ? b.sources.flatMap(s => [s?.title, s?.citationText]) : []),
+        ...(Array.isArray(b.contributors) ? b.contributors.map(c => c?.contributionNote) : []),
+      )
+      if (verdict === 'BLOCK') throw blockedError()
+      if (verdict === 'HOLD') {
+        r.status = 'DRAFT'
+        r._modHoldUntil = Date.now() + MOCK_HOLD_MS
+      }
+    }
     if (b.title !== undefined) r.title = b.title
     if (b.description !== undefined) r.body = b.description
     if (b.abstractText !== undefined) r.abstract = b.abstractText

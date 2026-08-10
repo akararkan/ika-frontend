@@ -12,6 +12,7 @@ import { uiConfirm } from '../components/Dialog.jsx'
 import { authorOf } from '../lib/userView.js'
 import { soundEnabled, setSoundEnabled, subscribeSound, playChime } from '../lib/chime.js'
 import { api } from '../api/index.js'
+import { moderationKindOf } from '../api/notifications.js'
 
 // 7-category inbox (NOTIFICATIONS_API §4) + All. "Unread only" is a composable
 // toggle (§7.1 — unread ANDs with category) rather than a separate tab. CHAT
@@ -65,6 +66,19 @@ const TYPE_TINT = {
   RESEARCH_CONTRIBUTOR_ADDED:'#1f4e7e', ACCOUNT_WARNING:'#8a5a17',
   MESSAGE_MENTION:'#6b5b8a',
 }
+
+/* Moderation is the one subject that arrives WITHOUT a kind of its own — a
+   removal, an escalation to a human and a clearance are all plain
+   SYSTEM_MESSAGE (see moderationKindOf, which is also the only place allowed
+   to tell them apart, and why). So these two maps are keyed by that verdict
+   rather than by `n.type`, and they override the type maps for exactly those
+   three rows: an unrecognised system message keeps the neutral `info` glyph
+   and the grey SYSTEM tint it has today.
+   Tones follow the theme's own trio, as literals like every other tint here
+   (the tile paints them as an inline background): red = refused,
+   amber = a person is looking at it, green = it is out. */
+const MOD_ICON = { removed:'shield', review:'hourglass', live:'check' }
+const MOD_TINT = { removed:'#9c3a33', review:'#8a5a17', live:'#426a5a' }
 
 // The daily trending digest (§5) has no actor and its body is a comma-joined
 // hashtag list. Parse the #tags so each can route to its tag feed.
@@ -241,7 +255,14 @@ export function NotificationsPage() {
                   // TRENDING_DIGEST: no actor — system tile + tag chips instead of a user avatar (§5)
                   const isTrending = n.type === 'TRENDING_DIGEST'
                   const tags = isTrending ? trendingTags(n.body) : []
-                  const tint = isTrending ? '#1f4e7e' : (CAT_TINT[n.category] || TYPE_TINT[n.type] || '#8a93a3')
+                  /* 'removed' | 'review' | 'live' | null. Title + body already
+                     read correctly in the generic row ("Your content was
+                     removed" + which kind of thing it was), so moderation
+                     needs no bespoke body like TRENDING_DIGEST — only its own
+                     glyph and tone, so a refusal is not a bell among bells. */
+                  const mod = moderationKindOf(n)
+                  const modIcon = mod ? MOD_ICON[mod] : null
+                  const tint = isTrending ? '#1f4e7e' : (mod ? MOD_TINT[mod] : (CAT_TINT[n.category] || TYPE_TINT[n.type] || '#8a93a3'))
                   const hasActor = !isTrending && !!n._actor?.id
                   const goActor = (e) => { e.stopPropagation(); if (hasActor) navigate(`/u/${u.id}`) }
                   // Aggregated rows name the NEWEST contributor when the wire
@@ -255,8 +276,8 @@ export function NotificationsPage() {
                       <div className="ntf-avatar" role={hasActor ? 'button' : undefined} onClick={goActor}>
                         {hasActor
                           ? <Avatar initials={u.initials} color={u.avc} size={44} src={u.profileImage}/>
-                          : <span className="ntf-tile" style={{ background: tint }}><Icon name={TYPE_ICON[n.type] || 'bell'}/></span>}
-                        <span className="ntf-badge" style={{ background: tint }}><Icon name={TYPE_ICON[n.type] || CAT_ICON[n.category] || 'bell'} className="xs"/></span>
+                          : <span className="ntf-tile" style={{ background: tint }}><Icon name={modIcon || TYPE_ICON[n.type] || 'bell'}/></span>}
+                        <span className="ntf-badge" style={{ background: tint }}><Icon name={modIcon || TYPE_ICON[n.type] || CAT_ICON[n.category] || 'bell'} className="xs"/></span>
                       </div>
                       <div className="ntf-body">
                         {isTrending && tags.length ? (

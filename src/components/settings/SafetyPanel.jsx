@@ -1,5 +1,9 @@
 /* =========================================================
-   Settings v2 — Safety Center: your reports & account standing.
+   Settings v2 — Safety Center: automatic checks, your reports
+   & account standing.
+   ContentModerationCard: the explainer for the automated
+   moderation every text-bearing write goes through, and the
+   honest account of what can be appealed and what cannot.
    SafetyReportsPanel: paged list of reports you filed, showing
    only the coarse outcome (the action taken on someone else's
    account is never disclosed) with a one-shot appeal from
@@ -11,8 +15,10 @@ import { Link } from 'react-router-dom'
 import { Icon, showToast } from '../ui.jsx'
 import { uiConfirm } from '../Dialog.jsx'
 import { EmptyState, ErrorState, Loader } from '../states.jsx'
+import { ModerationBadge } from '../Moderation.jsx'
 import { api, REPORT_REASONS, REPORT_OUTCOME_LABELS } from '../../api/index.js'
-import { SetCard, Skeleton, fmtWhen, fmtDate } from './shared.jsx'
+import { HOLD_CEILING_MS, ENTITY_LABEL } from '../../lib/moderation.js'
+import { SetCard, SubHead, Skeleton, fmtWhen, fmtDate } from './shared.jsx'
 
 const PAGE_SIZE = 15
 const REASON_LABELS = Object.fromEntries(REPORT_REASONS)
@@ -50,6 +56,116 @@ function TargetRef({ row }) {
     <Link to={route + row.targetId} style={TARGET_LINK} aria-label={`Open the reported ${word}`}>
       {word}
     </Link>
+  )
+}
+
+/* The kinds worth listing: the five a person actually writes into all day.
+   Times come from HOLD_CEILING_MS and the nouns from ENTITY_LABEL (the same
+   words the server puts in its notification bodies) so this table can never
+   drift from the contract in lib/moderation.js — if a ceiling moves, it moves
+   here too. */
+const CEILING_ROWS = ['POST', 'POST_COMMENT', 'STORY', 'RESEARCH', 'CHAT_MESSAGE']
+
+/**
+ * What automatic moderation does, in the four outcomes a person can actually
+ * experience — plus the one thing they came here to do, answered honestly.
+ *
+ * THE APPEAL GAP, stated here because this is the card most likely to be
+ * "fixed" by adding a button: there is NO user-facing API for appealing a
+ * moderation decision. The only appeal endpoint on the whole safety surface is
+ * POST /api/v1/safety/reports/{id}/appeal, and it re-opens a REPORT THE USER
+ * FILED about someone else — it takes a report id, which a moderation
+ * notification could never supply (those rows carry no ids at all). There is no
+ * /moderation/appeals, no case number and no support address anywhere in the
+ * API. So this card links to the routes that do work and says plainly that an
+ * automatic decision cannot be appealed from the app yet. Do not add a button
+ * for it: it would 404, and a dead appeal button is crueller than an honest
+ * sentence.
+ */
+function ContentModerationCard() {
+  const sub = 'Everything you write — posts, comments, messages, stories, papers — is checked '
+    + 'automatically before anyone else can see it. Almost all of it clears instantly and you '
+    + 'never hear about the check at all.'
+  return (
+    <SetCard id="moderation" icon="shield" title="Content & moderation" sub={sub}>
+      <div className="stx-row">
+        <div>
+          <b>It clears</b>
+          <small>The ordinary case. Your post appears for everyone straight away and nothing is shown to you.</small>
+        </div>
+        <span className="stx-chip ok"><Icon name="check"/>Posted</span>
+      </div>
+      <div className="stx-row">
+        <div>
+          <b>It is being checked</b>
+          <small>
+            Held for a moment. You still see it wherever it normally appears; nobody else does,
+            and it goes live for everyone the instant it clears.
+          </small>
+        </div>
+        {/* A LEGEND, not live state: these three are the actual <ModerationBadge/>
+            an author sees on their own held item, rendered here so the chip is
+            recognised in the wild rather than re-drawn as a lookalike. Nothing on
+            this card inspects any content — it cannot, and must not guess. */}
+        <ModerationBadge state="checking"/>
+      </div>
+      <div className="stx-row">
+        <div>
+          <b>A moderator is reading it</b>
+          <small>
+            When the automatic check cannot decide in time, a person takes over. It stays visible
+            to you alone until they finish, and you are told either way.
+          </small>
+        </div>
+        <ModerationBadge state="review"/>
+      </div>
+      <div className="stx-row">
+        <div>
+          <b>It is refused</b>
+          <small>
+            Nothing was saved and nobody else ever saw it. Your text stays in the box so you can
+            edit it, and the reason you were given at the time is the whole reason there is.
+          </small>
+        </div>
+        <ModerationBadge state="removed"/>
+      </div>
+
+      <SubHead>How long a check can take</SubHead>
+      <div className="stx-scroll">
+        <table className="stx-table">
+          <thead>
+            <tr><th>What you wrote</th><th>Decided within</th></tr>
+          </thead>
+          <tbody>
+            {CEILING_ROWS.map(kind => (
+              <tr key={kind}>
+                <td>{humanise(ENTITY_LABEL[kind])}</td>
+                <td>{Math.round(HOLD_CEILING_MS[kind] / 1000)} seconds</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="stx-mnote">
+        These are ceilings, not waits — most content clears in well under a second, and past the
+        ceiling a person owns the decision instead. Not every surface can show you that a check is
+        running: a held comment, message or answer looks completely normal to you while it waits.
+        Nobody else sees it either way.
+      </p>
+
+      <div className="stx-note info">
+        <Icon name="info"/>
+        <span>
+          <b>Followed an “Appeal” link here?</b> An automatic decision has no appeal form in the app
+          yet. What does work: read the <Link to="/settings/about#policies">Community Guidelines</Link>,
+          then write the thing again in your own words — and check{' '}
+          <Link to="/settings/safety#strikes">Account standing</Link> below, where a confirmed
+          violation would show up as a strike. The <b>Appeal</b> button in{' '}
+          <Link to="/settings/safety#reports">Your reports</Link> re-opens a report you filed about
+          someone else; it does not reach a check made on your own content.
+        </span>
+      </div>
+    </SetCard>
   )
 }
 
@@ -108,55 +224,61 @@ export function SafetyReportsPanel() {
 
   const sub = 'Reports you have filed and their outcome. To protect everyone’s privacy, the specific action taken on someone else’s account is never disclosed.'
 
-  if (items === null) {
-    return (
-      <SetCard id="reports" icon="flag" title="Your reports" sub={sub}>
-        <Skeleton rows={3}/>
-      </SetCard>
-    )
-  }
+  /* The moderation explainer rides with this panel instead of being mounted on
+     its own: SettingsPage builds the safety tab as exactly
+     `<div className="set-stack"><SafetyReportsPanel/><StrikesPanel/></div>`,
+     and .set-stack is a plain flex column — so a fragment drops the card into
+     the stack ahead of "Your reports", which is the order the two read in
+     (what the checks do → what you can actually do about a decision). It is
+     also why the loading branch became a ternary rather than an early return:
+     the card must not blink out while the report list is fetching. */
   return (
-    <SetCard id="reports" icon="flag" title="Your reports" sub={sub}>
-      {error ? (
-        <ErrorState message="Could not load your reports" onRetry={loadFirst}/>
-      ) : items.length === 0 ? (
-        <EmptyState icon="flag" title="No reports filed" sub="Reports you file about content or people appear here."/>
-      ) : (
-        <>
-          {items.map(row => {
-            const outcomeLabel = row.coarseOutcome ? (REPORT_OUTCOME_LABELS[row.coarseOutcome] || humanise(row.coarseOutcome)) : null
-            return (
-              <div key={row.id} className="stx-sess">
-                <div className="stx-sess-ic"><Icon name="flag"/></div>
-                <div className="stx-sess-info">
-                  <b>{(REASON_LABELS[row.reason] || humanise(row.reason)) + ' · '}<TargetRef row={row}/></b>
-                  <small>{fmtWhen(row.createdAt)}</small>
+    <>
+      <ContentModerationCard/>
+      <SetCard id="reports" icon="flag" title="Your reports" sub={sub}>
+        {items === null ? (
+          <Skeleton rows={3}/>
+        ) : error ? (
+          <ErrorState message="Could not load your reports" onRetry={loadFirst}/>
+        ) : items.length === 0 ? (
+          <EmptyState icon="flag" title="No reports filed" sub="Reports you file about content or people appear here."/>
+        ) : (
+          <>
+            {items.map(row => {
+              const outcomeLabel = row.coarseOutcome ? (REPORT_OUTCOME_LABELS[row.coarseOutcome] || humanise(row.coarseOutcome)) : null
+              return (
+                <div key={row.id} className="stx-sess">
+                  <div className="stx-sess-ic"><Icon name="flag"/></div>
+                  <div className="stx-sess-info">
+                    <b>{(REASON_LABELS[row.reason] || humanise(row.reason)) + ' · '}<TargetRef row={row}/></b>
+                    <small>{fmtWhen(row.createdAt)}</small>
+                  </div>
+                  <div className="flex gap-8" style={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {outcomeLabel && (
+                      <span className={'stx-chip ' + (OUTCOME_CHIP[row.coarseOutcome] || 'plain')}>{outcomeLabel}</span>
+                    )}
+                    {APPEALABLE_STATES.has(row.state) && (
+                      <button type="button" className="btn btn-secondary btn-sm"
+                        disabled={appealingId === row.id}
+                        onClick={() => appeal(row)}>
+                        {appealingId === row.id ? 'Appealing…' : 'Appeal'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-8" style={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  {outcomeLabel && (
-                    <span className={'stx-chip ' + (OUTCOME_CHIP[row.coarseOutcome] || 'plain')}>{outcomeLabel}</span>
-                  )}
-                  {APPEALABLE_STATES.has(row.state) && (
-                    <button type="button" className="btn btn-secondary btn-sm"
-                      disabled={appealingId === row.id}
-                      onClick={() => appeal(row)}>
-                      {appealingId === row.id ? 'Appealing…' : 'Appeal'}
-                    </button>
-                  )}
-                </div>
+              )
+            })}
+            {hasMore && (
+              <div className="set-actions" style={{ marginTop: 12 }}>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={loadMore}>
+                  {busy ? 'Loading…' : 'Load more'}
+                </button>
               </div>
-            )
-          })}
-          {hasMore && (
-            <div className="set-actions" style={{ marginTop: 12 }}>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={loadMore}>
-                {busy ? 'Loading…' : 'Load more'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </SetCard>
+            )}
+          </>
+        )}
+      </SetCard>
+    </>
   )
 }
 

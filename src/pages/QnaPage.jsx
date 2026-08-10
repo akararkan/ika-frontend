@@ -1,5 +1,22 @@
 /* =========================================================
    Q&A list page — /qna
+
+   MODERATION (src/lib/moderation.js): nothing to do here, and that is a
+   deliberate conclusion rather than an omission.
+
+     · This page CREATES NOTHING. "Ask a question" is a launcher —
+       openCompose('QUESTION') fires a window event that Layout answers with the
+       shared ComposeModal, and every refusal (400 CONTENT_REJECTED, draft kept,
+       no retry) belongs to that composer. There is no api.qna.create call in
+       this file to wrap.
+     · A HELD question is byte-identical to a clean one: QuestionResponse has no
+       moderation field at all. So the `ika:question-created` prepend below is
+       right to show it immediately and wrong to badge it — the author is the one
+       person who can see it, and the feed queries carve the author out, so it
+       survives a refetch too (unlike a held post, which does not).
+     · `q.status` here is QuestionStatus (OPEN / ANSWERED / CLOSED). It is NOT a
+       moderation marker, and moderationState() must never be pointed at these
+       rows expecting one.
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -51,7 +68,10 @@ export function QnaPage() {
   }
 
   // a freshly-asked question shows up immediately — prepend the created
-  // (mapped) question rather than refetching the whole list
+  // (mapped) question rather than refetching the whole list. This is also the
+  // correct behaviour for a question that is being checked: the composer only
+  // dispatches on a 2xx, a refusal never gets here, and a hold is invisible on
+  // the wire — so anything that arrives is either live or the author's own.
   React.useEffect(() => {
     const onCreated = (e) => {
       const q = e.detail

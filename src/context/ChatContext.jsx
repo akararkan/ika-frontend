@@ -453,8 +453,15 @@ export function ChatProvider({ children }) {
         },
         onMember: (evt) => {
           const mine = String(evt.userId) === String(myIdRef.current)
-          // I was removed / I left → drop the conversation from my inbox.
-          if (mine && (evt.memberChange === 'REMOVED' || evt.memberChange === 'LEFT')) {
+          /* I was removed / I left → drop the conversation from my inbox.
+             `UNSUBSCRIBED` is the channel's spelling of the same thing (a
+             channel leave removes the membership row rather than leaving a
+             `LEFT` tombstone) and the server sends it straight to the
+             leaver's own tabs, which is what keeps a leave performed in ONE
+             tab from leaving a live-looking channel row in the others. */
+          if (mine && (evt.memberChange === 'REMOVED'
+                    || evt.memberChange === 'LEFT'
+                    || evt.memberChange === 'UNSUBSCRIBED')) {
             removeConvo(evt.conversationId)
             return
           }
@@ -468,11 +475,12 @@ export function ChatProvider({ children }) {
               patchConvo(evt.conversationId, { myStatus: 'RESTRICTED' })
             } else if (evt.memberChange === 'UNRESTRICTED') {
               patchConvo(evt.conversationId, { myStatus: 'ACTIVE' })
-            } else if (evt.memberChange === 'ADDED') {
-              // I was (re-)added. Nothing local can be patched into shape —
-              // role, status, settings and the history floor are all new — so
-              // pull the authoritative row. Previously this fell through the
-              // `mine` branch and the conversation never appeared.
+            } else if (evt.memberChange === 'ADDED' || evt.memberChange === 'SUBSCRIBED') {
+              // I was (re-)added, or I subscribed to a channel in another tab.
+              // Nothing local can be patched into shape — role, status,
+              // settings and the history floor are all new — so pull the
+              // authoritative row. Previously this fell through the `mine`
+              // branch and the conversation never appeared.
               api.chat.conversations.get(evt.conversationId)
                 .then(c => { if (c) upsertConvo(c) })
                 .catch(() => {})

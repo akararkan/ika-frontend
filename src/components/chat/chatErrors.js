@@ -28,6 +28,7 @@
    fallback is only reached for an undocumented code, and even
    then the server's own `message` wins over it.
    ========================================================= */
+import { isModerationError, moderationText } from '../../lib/moderation.js'
 
 const COPY = {
   /* ---- authorization ---- */
@@ -98,6 +99,26 @@ const COPY = {
  * @returns {string}
  */
 export function chatError(e, fallback = 'Something went wrong.') {
+  /* Automated moderation comes FIRST, ahead of the table, and hands back the
+     server's sentence untouched. Three reasons it cannot be given an entry in
+     COPY like every other code:
+
+     1. The wording is the product. `CONTENT_REJECTED` and
+        `CONTENT_UNDER_REVIEW` are the only chat codes whose message is written
+        for the person reading it rather than for a developer, and it carries
+        the appeal route. Rewriting it here would drop that.
+     2. It must stay VAGUE. A friendlier local sentence is how a category or a
+        matched phrase leaks back in, and a precise refusal is a working oracle
+        for probing the classifier until something gets through.
+     3. One of the two codes never appears literally — the multipart-post block
+        arrives as a 500 whose `code` is `post_create_failed`
+        (lib/moderation.js MULTIPART_BLOCK). `isModerationError` knows that;
+        a `COPY[e.code]` lookup structurally cannot.
+
+     Note this only serves the callers that TOAST. Anything with a draft in
+     hand should render <ModerationAlert error={e}/> beside the box instead —
+     a refusal the author has to re-read while rewriting must not scroll away. */
+  if (isModerationError(e)) return moderationText(e)
   const mapped = e?.code && COPY[e.code]
   if (mapped) return mapped
   /* BAD_REQUEST is deliberately absent from the table: it is a validation

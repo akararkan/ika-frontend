@@ -20,6 +20,7 @@ import { showToast } from '../ui.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useChat } from '../../context/ChatContext.jsx'
 import { chatError, isThrottle } from './chatErrors.js'
+import { isModerationError } from '../../lib/moderation.js'
 import { newTmpId, isTmpId, cmpId, gtId } from '../../api/ids.js'
 
 /* Message ids are Snowflake STRINGS (see api/ids.js): 18 digits, well past
@@ -291,6 +292,35 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
     })
   }, [])
 
+  /* ---------------- a moderation refusal is NOT a failed send ----------------
+     `markFailed` exists for transport: the bubble stays, goes red, and offers
+     "Tap to retry" because the same bytes very probably succeed on the second
+     attempt. Every one of those assumptions is wrong for a block.
+
+     `MessageService.send` screens BEFORE the Cassandra write and releases the
+     idempotency nonce on refusal, so nothing was persisted and there is nothing
+     to reconcile — but there is also nothing to retry: identical text is scored
+     identically, and a retry button there would be a loop with a red bubble at
+     the end of it. So the optimistic row is WITHDRAWN and the error is
+     re-thrown, which is how the composer learns to put the draft back and
+     render the server's own words next to the box that will be edited.
+
+     (A HELD message is the opposite case and needs nothing at all: it comes
+     back as an ordinary 201 with a complete MessageResponse and no marker of
+     any kind — `MessageResponse` has no moderationStatus field — so the sender
+     genuinely cannot tell, and inventing a "checking…" bubble here would be a
+     guess that mislabels every clean send. Recipients simply do not receive it
+     until it clears, at which point the normal `message.new` fan-out runs.) */
+  const dropPending = React.useCallback((nonce) => {
+    revokeUrls(nonce)
+    outboxRef.current.delete(nonce)          // nothing to replay — the server took nothing
+    setMsgMap(prev => {
+      const next = new Map(prev)
+      for (const [k, v] of next) if (v.clientNonce === nonce) next.delete(k)
+      return next
+    })
+  }, [revokeUrls])
+
   /** Build an optimistic bubble that matches the msgFrom view shape. */
   const buildOptimistic = React.useCallback((nonce, { type, body, replyToId, media }) => {
     const rt = replyToId ? msgMapRef.current.get(replyToId) : null
@@ -332,15 +362,18 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
       const real = await api.chat.messages.send(conversationId, { clientNonce: nonce, type: 'TEXT', body: text, replyToId, silent })
       reconcile(nonce, real)
     } catch (e) {
+      // Refused by moderation — withdraw the bubble and let the caller restore
+      // the draft. No toast: the composer shows the server's copy in place.
+      if (isModerationError(e)) { dropPending(nonce); throw e }
       markFailed(nonce)
       if (!isThrottle(e)) showToast(chatError(e, 'Message failed to send'))
-      /* A throttle is RE-THROWN, uniquely among send failures: it is the only
-         one the composer can act on (arm the slow-mode countdown from the
+      /* A throttle is RE-THROWN, uniquely among transport failures: it is the
+         only one the composer can act on (arm the slow-mode countdown from the
          server's own Retry-After). http.js has already shown the toast, and
          the awaiting caller catches it — nothing escapes. */
       else throw e
     }
-  }, [conversationId, buildOptimistic, reconcile, markFailed])
+  }, [conversationId, buildOptimistic, reconcile, markFailed, dropPending])
 
   const sendFiles = React.useCallback(async ({ files, body, replyToId, durationMs, waveform } = {}) => {
     const list = Array.from(files || [])
@@ -373,10 +406,15 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
       })
       reconcile(nonce, real)
     } catch (e) {
+      /* A caption can be refused even when the files are fine, and the
+         multipart controller then DELETES the objects it had already put in R2
+         — so there is no half-uploaded message to resume and the files must be
+         re-sent from the composer's tray. Re-thrown for exactly that reason. */
+      if (isModerationError(e)) { dropPending(nonce); throw e }
       markFailed(nonce)
       if (!isThrottle(e)) showToast(chatError(e, 'Upload failed'))
     }
-  }, [conversationId, buildOptimistic, reconcile, markFailed])
+  }, [conversationId, buildOptimistic, reconcile, markFailed, dropPending])
 
   const retry = React.useCallback(async (msg) => {
     const nonce = msg?.clientNonce
@@ -394,13 +432,35 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
         : await api.chat.messages.send(conversationId, { clientNonce: nonce, type: 'TEXT', body: entry.body, replyToId: entry.replyToId, silent: entry.silent })
       reconcile(nonce, real)
     } catch (e) {
+      /* The replay of a message that failed on the wire can still trip the
+         moderation gate (the first attempt may never have reached the scorer at
+         all). Same withdrawal as a first send, and the same re-throw — ChatPage
+         lifts the text back into the composer, which is the only place left
+         that can hold it once the bubble is gone. */
+      if (isModerationError(e)) {
+        /* The outbox entry is the LAST reference to the picked File objects —
+           dropPending is about to delete it, and the composer cleared its tray
+           when this send first failed on the wire. Hand them back on the error
+           so the caller can re-stage them; losing someone's photos to a caption
+           refusal would be a worse failure than the refusal itself. */
+        if (entry.kind === 'files' && entry.files?.length) e.restoreFiles = entry.files
+        dropPending(nonce)
+        throw e
+      }
       markFailed(nonce)
       if (!isThrottle(e)) showToast(chatError(e, 'Still could not send'))
     }
-  }, [conversationId, patchMsg, reconcile, markFailed])
+  }, [conversationId, patchMsg, reconcile, markFailed, dropPending])
 
   /* ---------------- edit / delete ---------------- */
 
+  /**
+   * Commit an edit. RESOLVES only when the server took it, and REJECTS on
+   * every failure — the caller needs that to decide whether the edit box may
+   * close. (It used to swallow everything, so ChatPage closed the box and
+   * dropped the typed text a beat before the rejection landed; on a moderation
+   * block that is the one text the author most needs back.)
+   */
   const editMessage = React.useCallback(async (id, body) => {
     const prev = msgMapRef.current.get(id)
     if (!prev) return
@@ -410,8 +470,25 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
       const real = await api.chat.messages.edit(id, text)
       if (real) patchMsg(id, real)
     } catch (e) {
+      /* Put the previous wording back. `MessageService.edit` screens BEFORE the
+         Cassandra write, so a refused edit leaves the stored body untouched and
+         broadcasts no `message.edited` frame — nothing else will ever correct
+         this row, and without the revert the bubble would sit there showing the
+         rejected text, marked "edited", as though it had saved. That is the
+         precise failure this whole change set out to remove, so it must not be
+         reintroduced here.
+
+         Reverting the ROW does not take the rewrite away from the author: the
+         text they are editing lives in ChatPage's `editing`/`draft` state, and
+         the rejection is what keeps that box open.
+
+         (A HELD edit is invisible here too: the editor gets 200 with their own
+         new body. The only tell is a `message.edited` SSE whose `body` key is
+         ABSENT — @JsonInclude(NON_NULL) — which the realtime switch below
+         cannot distinguish from a normal edit frame. No badge is possible.) */
       patchMsg(id, { body: prev.body, editedAt: prev.editedAt })
-      showToast(chatError(e, 'Could not edit message'))
+      if (!isModerationError(e)) showToast(chatError(e, 'Could not edit message'))
+      throw e
     }
   }, [patchMsg])
 
@@ -657,10 +734,33 @@ export function useThread(conversationId, { onConvoPatch } = {}) {
             reloadScheduled()
           }
           break
-        case 'message.edited':
+        case 'message.edited': {
           if (evt.conversationId !== conversationId) return
-          patchMsg(evt.messageId, { body: evt.body, editedAt: evt.editedAt })
+          /* The ONE realtime hold signal the whole chat module has. An edit
+             that is held broadcasts `message.edited` with the `body` key
+             ABSENT (ChatRealtimeEvent is @JsonInclude(NON_NULL)); api/chat.js
+             normalises that to `''`, which is unambiguous because the endpoint
+             rejects a blank body — an empty string here can only mean
+             "withheld", never "edited to nothing". Blanking is the correct
+             render for everyone else: the new wording is not cleared for
+             anyone until it clears for everyone, and the same event fires
+             again with the text in it the moment it does.
+
+             The author is the exception, and it has to be coded, not assumed:
+             the same frame fans out to the editor's own tabs, and their PATCH
+             already returned 200 with the new body. Wiping it here would be
+             this client inventing a redaction the server deliberately does not
+             apply to the author — the message would go blank in front of the
+             one person allowed to see it. `editedAt` is always present and is
+             applied either way. */
+          const withheld = !evt.body
+          const mine = String(msgMapRef.current.get(evt.messageId)?.senderId) === String(myIdRef.current)
+          patchMsg(evt.messageId, {
+            ...(withheld && mine ? null : { body: evt.body }),
+            editedAt: evt.editedAt,
+          })
           break
+        }
         case 'message.deleted':
           if (evt.conversationId !== conversationId) return
           /* `deletedBy` is only ever knowable from this frame — the message

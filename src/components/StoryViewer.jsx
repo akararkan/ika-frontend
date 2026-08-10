@@ -2,12 +2,23 @@
    Story viewer — full-screen 24h story playback (live).
    Loads an author's active stories, records views, shows the
    two-option poll if one is attached. Reuses .reels-view/.rv-*.
+
+   MODERATION. `/stories/by-author/{id}` is one of only two read
+   surfaces in the platform that hand an author their own held
+   content back (canView carves the author out, everyone else
+   silently loses the row), and the raw entity it returns still
+   carries `moderationStatus`. So a held frame lands HERE, in
+   the author's own viewer, wearing a badge — and can land
+   nowhere else, which is why no guessing is involved: another
+   person's held story is never in `items` to begin with.
    ========================================================= */
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon, Avatar, Verify, showToast } from './ui.jsx'
 import { uiConfirm, uiPrompt } from './Dialog.jsx'
 import { openReport } from './ReportDialog.jsx'
+import { ModerationBadge, useHeldWatch } from './Moderation.jsx'
+import { moderationState, isHeld, isModerationError, moderationText } from '../lib/moderation.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api, adapters, assetUrl } from '../api/index.js'
 
@@ -99,12 +110,34 @@ function AddToHighlightSheet({ storyId, authorId, onClose }) {
   const [hls, setHls] = React.useState(null)
   React.useEffect(() => { api.highlights.byAuthor(authorId).then(r => setHls(r || [])).catch(() => setHls([])) }, [authorId])
   const addTo = (hid) => { api.highlights.addStory(hid, storyId, authorId).then(() => showToast('Added to highlight')).catch(() => showToast('Could not add')); onClose() }
+  /* A highlight TITLE is scored text with no held state: the backend refuses
+     anything short of an approved verdict, so borderline wording — or the
+     classifier merely being unreachable — comes back as a flat 400, more often
+     than a post would ever be refused. There is no rename endpoint either, so
+     the name can only be set here, once. Losing it to a toast was the wrong
+     trade: re-open the prompt PRE-FILLED with the server's own sentence above
+     the field, verbatim and undecorated, and let the author edit their way out.
+     (Same shape as ProfilePage.addHighlight — the other place a highlight is
+     born.) Adding the story afterwards submits no text and is not moderated. */
   const newHl = async () => {
-    const title = (await uiPrompt({ title:'New highlight', label:'Name', initial:'' }))?.trim()
-    if (!title) { onClose(); return }
-    try { const h = await api.highlights.create({ authorId, title }); await api.highlights.addStory(h.highlightId || h.id, storyId, authorId); showToast('Highlight created') }
-    catch { showToast('Could not create highlight') }
-    onClose()
+    let draft = ''
+    let notice = null
+    for (;;) {
+      const typed = await uiPrompt({ title:'New highlight', label:'Name', initial: draft, message: notice })
+      if (typed == null) { onClose(); return }        // dismissed
+      draft = typed
+      const title = typed.trim()
+      if (!title) { onClose(); return }
+      try {
+        const h = await api.highlights.create({ authorId, title })
+        await api.highlights.addStory(h.highlightId || h.id, storyId, authorId)
+        showToast('Highlight created')
+        onClose(); return
+      } catch (e) {
+        if (!isModerationError(e)) { showToast('Could not create highlight'); onClose(); return }
+        notice = moderationText(e)
+      }
+    }
   }
   return (
     <div className="overlay open" onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ zIndex:62 }}>
@@ -194,6 +227,11 @@ const mapStories = (rows) => (rows || []).map(r => ({
   text: r.textContent || '',
   hasMedia: !!r.mediaUrl,
   time: adapters.timeAgo(r.createdAt),
+  /* Carried through untouched so moderationState() can read it: "PENDING",
+     "IN_REVIEW", or absent once the verdict lands. Absent also covers every
+     row written before moderation existed, which is exactly right — no
+     marker has always meant approved. */
+  moderationStatus: r.moderationStatus || null,
 }))
 
 export function StoryViewer({ authorId, author, onClose }) {
@@ -237,6 +275,26 @@ export function StoryViewer({ authorId, author, onClose }) {
   }, [authorId])
 
   const item = items[idx]
+
+  /* This frame's moderation state, and whether to say so. The ownership test is
+     belt-and-braces: a stranger's held story is never in `items` because the
+     server refuses to serve the row at all, so `heldState` can only be
+     non-'live' on my own list. */
+  const heldState = moderationState(item)
+  const showHeld = isOwner && isHeld(item)
+
+  /* A hold clears silently — there is no moderation event on any stream and the
+     "your content is live" bell only fires for content that actually waited —
+     so while any of my frames is held the list re-reads itself on the STORY
+     back-off (ceiling 15s, past which the backend fails OPEN and publishes it
+     regardless). Re-mapping the rows is the whole update: the marker vanishes
+     from the entity and the badge goes with it. */
+  useHeldWatch(isOwner && items.some(isHeld), 'STORY',
+    () => api.stories.byAuthor(authorId).then(rows => setItems(mapStories(rows))),
+    /* Identity of the held SET: a second story going up while the first is
+       still held must restart the back-off, not inherit a chain that may have
+       already run out. */
+    items.filter(isHeld).map(s => s.id ?? s.storyId).join(','))
 
   React.useEffect(() => {
     if (!item) return
@@ -386,6 +444,13 @@ export function StoryViewer({ authorId, author, onClose }) {
         {/* keyed per story → the page-turn animation replays on every step */}
         <div key={idx} className="rv-card">
           <div className="rv-bg" style={{ background: item.bg }}/>
+          {/* Held: the frame keeps playing, it just stops pretending to be
+              published. The plate is the shared .mod-veil, empty — the chip
+              itself rides in .rv-meta below, in normal flow, because the foot
+              of a story frame is already occupied (reply pill, poll sticker)
+              and absolutely positioning a second thing into it would mean
+              guessing pixel offsets that differ per breakpoint. */}
+          {showHeld && <div className="mod-veil" aria-hidden="true"/>}
           {item.text && !item.hasMedia && <div className="rv-center">{item.text}</div>}
           {poll && (
             <div
@@ -396,6 +461,18 @@ export function StoryViewer({ authorId, author, onClose }) {
             </div>
           )}
           <div className="rv-meta">
+            {/* The chip and the one line that answers the question it raises.
+                Above the foot control rather than over the picture: this is
+                information about the frame, and the foot is where this viewer
+                already keeps information about the frame. */}
+            {showHeld && (
+              <div style={{ marginBottom: 8 }}>
+                <ModerationBadge state={heldState}/>
+                <span style={{ display: 'block', marginTop: 5, fontSize: 12.5, lineHeight: 1.45, textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>
+                  Only you can see this story until it clears.
+                </span>
+              </div>
+            )}
             {isOwner ? (
               <button className="rvm-sound" onClick={() => setShowViewers(true)}>
                 <Icon name="eye" className="xs"/>Seen by — view

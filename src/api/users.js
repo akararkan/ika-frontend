@@ -37,10 +37,51 @@ export const users = {
   async searchList(q, opts) { return (await this.search(q, opts)).items },
   async updateIdentity(body){ return userFrom(await http.patch('/api/v1/users/me', body)) },                           // §9.5
   deleteAccount()           { return http.del('/api/v1/users/me') },                                                    // §9.13 (soft)
-  async stats(id)           { return userStatsFrom(await http.get(`/api/v1/users/${id}/stats`)) },                      // §9.14
+  /* §9.14 — the LIVE stat row: six counts computed across three datastores.
+     Prefer it over `profile.followerCount` & co, which the API documents as
+     denormalized, NOT maintained, and free to read 0.
+
+     It degrades instead of lying. All six counts ride ONE request, so a single
+     failure takes the whole row with it — and every call site then falls back
+     to those unmaintained counters, which is how a profile with two followers
+     came to render "0 Followers" with nothing on screen saying anything had
+     failed. (Root cause was server-side: the stat row is a Java record cached
+     through a serializer whose default typing skips final types, so the write
+     succeeded and every read inside the 30s TTL threw. Fixed in the backend —
+     this fallback is what keeps the number honest when it happens again.)
+
+     Followers/following are recoverable: their list endpoints are public and
+     their `totalElements` is the same number from the same table, so ask for
+     one row and read the total. Everything else comes back `null`, NOT 0 —
+     callers already spell `stats?.posts ?? list.length`, so a null falls
+     through to the count they can see, while a 0 would overwrite it. */
+  async stats(id) {
+    try {
+      return userStatsFrom(await http.get(`/api/v1/users/${id}/stats`))
+    } catch {
+      // `users.` and not `this.`: the fallback must still work if a caller ever
+      // destructures the method off the service.
+      const [f, g] = await Promise.allSettled([
+        users.followers(id, { page: 0, size: 1 }),
+        users.following(id, { page: 0, size: 1 }),
+      ])
+      const totalOf = (r) => (r.status === 'fulfilled' ? (r.value?.total ?? null) : null)
+      return {
+        posts: null, reels: null, research: null, questions: null,
+        followers: totalOf(f), following: totalOf(g),
+      }
+    }
+  },
 
   /* ---- profile (§10) ---- */
   async profile(id)         { return userFrom(await http.get(`/api/v1/users/${id}/profile`)) },                        // §10.1
+  /** §10.2 — the OWNER view of my own profile. Distinct from `profile(myId)`
+   *  in two ways the public read cannot give you: `profileViews` is populated
+   *  (it reads 0 for everyone else) and non-public links/contacts are
+   *  included. It is also uncached server-side, so it is the read to use
+   *  straight after a profile write when the 5-minute public cache would
+   *  still be serving the old row. */
+  async meProfile()         { return userFrom(await http.get('/api/v1/users/me/profile')) },
   async updateProfile(body) { return userFrom(await http.patch('/api/v1/users/me/profile', body)) },                   // §10.3
   uploadAvatar(file) { const fd = new FormData(); fd.append('image', file); return http.upload('/api/v1/users/me/profile/avatar', fd) },  // §10.4
   removeAvatar()     { return http.del('/api/v1/users/me/profile/avatar') },                                            // §10.5

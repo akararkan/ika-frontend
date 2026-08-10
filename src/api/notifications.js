@@ -42,6 +42,45 @@ const LINK_REWRITE = [
 ]
 const UNROUTABLE = /^\/(comments|answers)\//
 
+/* ---------------------------------------------------------
+   Moderation system messages — the one place this client is
+   allowed to read notification COPY.
+
+   Automated moderation has no notification kind of its own:
+   ModerationNotifier posts a plain SYSTEM_MESSAGE carrying a
+   title and a body and nothing else — no resourceId, no
+   resourceType, no deepLink, no case id. So a removal, an
+   escalation and a clearance arrive as the same `type` as every
+   other system announcement, and the title is the ONLY thing
+   that separates them.
+
+   Matching on wording is normally forbidden here (codes are the
+   contract, copy is tuned server-side — src/lib/moderation.js
+   rule 2). This is the documented exception, and it is kept
+   deliberately narrow: SYSTEM_MESSAGE only, three exact titles,
+   and every miss falls straight through to the ordinary system
+   row. A title tweak upstream therefore costs a bespoke icon,
+   never a wrong one. The day the backend ships a real type — or
+   any id at all — this block is deleted rather than extended.
+   --------------------------------------------------------- */
+const MODERATION_TITLES = {
+  'Your content was removed': 'removed',
+  'Your content is being reviewed': 'review',
+  'Your content is live': 'live',
+}
+
+/**
+ * 'removed' | 'review' | 'live' for the three moderation system messages,
+ * null for everything else — including every OTHER SYSTEM_MESSAGE, which must
+ * keep rendering exactly as it does today.
+ *
+ * Accepts a wire DTO or a `notifFrom` row: both carry `type` + `title`.
+ */
+export function moderationKindOf(n) {
+  if (!n || n.type !== 'SYSTEM_MESSAGE') return null
+  return MODERATION_TITLES[String(n.title || '').trim()] || null
+}
+
 function linkOf(dto) {
   const d = dto.deepLink || null
   if (d) {
@@ -49,6 +88,12 @@ function linkOf(dto) {
     for (const [re, to] of LINK_REWRITE) if (re.test(d)) return d.replace(re, to)
     return d
   }
+  /* Moderation rows carry no ids at all, so there is nothing to derive and
+     nothing to open: the entity behind "was removed" is gone, and "is live"
+     never says WHICH post it was. Send all three to the Safety card that
+     explains the automatic checks and what can actually be done about a
+     decision — the same place the composer's own refusal links to. */
+  if (moderationKindOf(dto)) return '/settings/safety#moderation'
   // No server link — derive one from the resource so the row stays clickable.
   const id = dto.resourceId
   const derived = id ? {

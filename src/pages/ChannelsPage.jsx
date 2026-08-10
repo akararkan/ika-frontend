@@ -34,6 +34,8 @@ import React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Icon, showToast, Verify } from '../components/ui.jsx'
 import { EmptyState, ErrorState } from '../components/states.jsx'
+import { ModerationAlert } from '../components/Moderation.jsx'
+import { isModerationError } from '../lib/moderation.js'
 import { openShare } from '../components/ShareSheet.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { api } from '../api/index.js'
@@ -68,6 +70,10 @@ function CreateChannel({ onClose, onCreated, cats = [] }) {
   const [isPublic, setIsPublic] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
   const [taken, setTaken] = React.useState(null)     // null | 'checking' | true | false
+  /* Title and description are scored before the row is written. A refusal
+     rolls the JPA insert back, so there is no half-created channel to clean up
+     and no handle quietly taken — the form just stays as it is. */
+  const [refused, setRefused] = React.useState(null)
 
   /* Art picked BEFORE the channel exists. The create endpoint is JSON-only, so
      the files are held locally (object-URL previews) and uploaded through the
@@ -110,7 +116,15 @@ function CreateChannel({ onClose, onCreated, cats = [] }) {
   const submit = async () => {
     if (!canSubmit) return
     setBusy(true)
+    setRefused(null)
     try {
+      /* A HELD channel is created and the OWNER's response is not redacted —
+         `toResponse` is called with `me = OWNER` — so this returns the real
+         title and everything below proceeds normally. What is deferred is the
+         search indexing: the channel is absent from /channels/discover, and
+         everyone else reads `title: null, description: null`, until it clears.
+         `ChannelResponse` carries no moderation field, so that state is
+         undetectable from here and nothing may be badged. */
       const ch = await api.channels.create({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -132,6 +146,9 @@ function CreateChannel({ onClose, onCreated, cats = [] }) {
       showToast('Channel created')
       onCreated?.(final)
     } catch (e) {
+      // Nothing was created, so nothing is lost by staying put: the name, the
+      // handle, the category and both picked images are all still here.
+      if (isModerationError(e)) { setRefused(e); return }
       showToast(chatError(e, 'Could not create the channel'))
     } finally {
       setBusy(false)
@@ -215,6 +232,11 @@ function CreateChannel({ onClose, onCreated, cats = [] }) {
                 onChange={e => setDescription(e.target.value)}
                 placeholder="What this channel publishes…"/>
             </label>
+
+            {/* Under the two fields that were scored. Create only ever refuses
+                with CONTENT_REJECTED (a held create SUCCEEDS), so there is
+                nothing to retry and <ModerationAlert/> offers no retry. */}
+            <ModerationAlert error={refused} onDismiss={() => setRefused(null)}/>
 
             <label className="cn-field">
               <span>Category <small>optional — where it sits in the directory</small></span>
@@ -406,7 +428,7 @@ function CardSkeleton() {
 export function ChannelsPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const { upsertConvo, conversations, myId, subscribe } = useChat()
+  const { upsertConvo, removeConvo, conversations, myId, subscribe } = useChat()
 
   const [q, setQ] = React.useState(params.get('q') || '')
   const [category, setCategory] = React.useState(params.get('category') || '')
@@ -471,6 +493,14 @@ export function ChannelsPage() {
      applied optimistically in `toggle`/`openChannel`, so my own echo is
      skipped or the count would move twice. */
   React.useEffect(() => subscribe((evt) => {
+    /* A channel its owner just deleted is gone from discovery server-side (it
+       is de-indexed on the way out), but this grid is a snapshot taken before
+       that happened — and every control on the card would now 404. Drop the
+       row instead of leaving a subscribe button pointing at nothing. */
+    if (evt?.type === 'conversation.updated' && evt.memberChange === 'DELETED') {
+      setRows(prev => prev.filter(r => String(r.id) !== String(evt.conversationId)))
+      return
+    }
     if (evt?.type !== 'member.changed') return
     if (evt.memberChange !== 'SUBSCRIBED' && evt.memberChange !== 'UNSUBSCRIBED') return
     if (String(evt.userId) === String(myId)) return
@@ -533,7 +563,13 @@ export function ChannelsPage() {
     try {
       if (before) {
         await api.channels.unsubscribe(ch.id)
-        showToast('Unsubscribed')
+        /* Unsubscribing IS leaving: the chat goes for good, and it will not
+           come back on the channel's next post. "Your channels" reads off the
+           inbox, so drop the row now rather than waiting for the
+           `UNSUBSCRIBED` frame that would otherwise leave the channel listed
+           as joined right under a card that says Subscribe. */
+        removeConvo(ch.id)
+        showToast('Unsubscribed — the channel left your inbox')
       } else {
         const next = await api.channels.subscribe(ch.id)
         // Three outcomes, not two: a `joinByRequest` channel answers with
@@ -558,7 +594,7 @@ export function ChannelsPage() {
     } finally {
       setBusyId(null)
     }
-  }, [upsertConvo])
+  }, [upsertConvo, removeConvo])
 
   /* My channels — from the inbox, not from discovery (see the file header).
      This is the only view that knows about private channels and unread state. */

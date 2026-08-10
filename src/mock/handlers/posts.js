@@ -24,6 +24,7 @@
    until the page is reloaded.
    ========================================================= */
 import { mockError, seeded } from '../util.js'
+import { fakeVerdict, blockedError, multipartBlockedError, holdRow, settleHold } from './moderation.js'
 
 /* One clock for the whole session. The fixture stores ages in minutes rather
    than dates, so "2h ago" stays true however long this file lives — but the
@@ -95,6 +96,12 @@ const preview = (text) => (typeof text === 'string' && text.length > 280 ? text.
 
 /** PostByIdEntity + counters + viewer flags → PostResponse. */
 function postWire(db, p) {
+  /* A mocked moderation hold expires when someone LOOKS, not on a timer — and
+     this is the one funnel every endpoint that can serve a post passes through,
+     so one call here is what makes useHeldWatch's re-check loop actually
+     resolve instead of polling to its ceiling and giving up. A row that was
+     never held is untouched (settleHold checks its own marker). */
+  settleHold(p)
   return {
     id: p.id,
     authorId: p.authorId,
@@ -543,12 +550,29 @@ function createPost(db, ctx) {
   const cmd = isForm ? fromFormData(body) : (body || {})
   const me = viewer(db)
   const id = `p-new-${++seq}`
+
+  /* Moderation runs BEFORE anything is written, exactly as it does server-side:
+     a blocked post is not persisted at all, which is what makes "keep the
+     draft, offer no retry" the only honest composer behaviour. The verdict is
+     the fake marker-word classifier in handlers/moderation.js — type `blockme`
+     or `holdme` into the composer. See the header there. */
+  const verdict = fakeVerdict(cmd.textContent, cmd.text, cmd.locationName)
+  /* The multipart path does NOT answer 400 CONTENT_REJECTED: this controller
+     wraps createPost in `catch (Exception)`, so the block escapes as a 500
+     `post_create_failed` carrying the moderation sentence. Mock mode reproduces
+     the quirk rather than smoothing it over — it is the only rehearsal the one
+     message sniff in lib/moderation.js ever gets. */
+  if (verdict === 'BLOCK') throw isForm ? multipartBlockedError() : blockedError()
+
   const row = {
     id,
     authorId: me,
     author: authorSummary(db, me, { id: me, username: 'you', fullName: 'You', profileImage: null }),
     postType: cmd.postType || 'TEXT',
-    status: 'PUBLISHED',
+    /* PENDING_REVIEW is the posts/reels marker — PENDING and IN_REVIEW collapse
+       into this one string on the wire, so a held post can only ever say
+       "checking", never "a human has it". */
+    status: verdict === 'HOLD' ? 'PENDING_REVIEW' : 'PUBLISHED',
     visibility: cmd.visibility || 'PUBLIC',
     textContent: cmd.textContent || cmd.text || '',
     audioTrackUrl: cmd.audioTrackUrl || null,
@@ -564,9 +588,19 @@ function createPost(db, ctx) {
     likedByMe: false, savedByMe: false,
     minutesAgo: 0, updatedMinutesAgo: 0,
   }
+  /* Remember WHEN the hold started so a later read can clear it — without that
+     the badge never goes away and the re-check loop looks broken. Nothing is
+     scheduled: holds expire when someone looks (see settleHold in postWire). */
+  if (verdict === 'HOLD') holdRow(row)
+
   db.posts = db.posts || []
   db.posts.unshift(row)
   db.feed = db.feed || []
+  /* A held post still enters the feed here, and that is correct rather than
+     sloppy: the server hides held content from OTHER viewers, and in mock mode
+     the only viewer IS its author. FeedItemResponse carries no status field
+     either way, so no badge can appear on a feed card — the detail page is
+     where a hold is visible. */
   db.feed.unshift({ postId: id, source: 'SELF', rankScore: 1 })
   // A repost is a share of the original — the original's counter says so.
   if (row.sharedPostId) {
@@ -734,6 +768,7 @@ export const routes = [
     fn: (db, ctx) => {
       const hit = findComment(db, ctx.params[0])
       if (!hit) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')
+      if (fakeVerdict(ctx.body?.text) === 'BLOCK') throw blockedError()
       // Depth-1 rule: replying to a reply lands under the same top-level parent.
       const parent = hit.parent || hit.comment
       const me = viewer(db)
@@ -757,6 +792,11 @@ export const routes = [
     fn: (db, ctx) => {
       const hit = findComment(db, ctx.params[0])
       if (!hit) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')
+      /* A refused EDIT must leave the original wording untouched — the server
+         throws before it writes, and the client is expected to revert its
+         optimistic patch. Screening before the assignment is what makes that
+         rehearsable here. */
+      if (fakeVerdict(ctx.body?.text) === 'BLOCK') throw blockedError()
       hit.comment.textContent = String(ctx.body?.text ?? hit.comment.textContent)
       hit.comment.edited = true
       return null                                   // 204
@@ -795,6 +835,12 @@ export const routes = [
     m: 'POST', p: /^\/api\/v1\/posts\/(?!r-\d)([^/]+)\/comments$/,
     fn: (db, ctx) => {
       const post = requirePost(db, ctx.params[0])
+      /* Comments are screened exactly like posts, but only the REFUSAL is
+         observable: CommentResponse carries no moderation field, so a held
+         comment is byte-identical to a clean one on the wire (the server hides
+         it from other readers, never from its author). Rehearsing `blockme`
+         here is therefore the whole of what a client can be asked to render. */
+      if (fakeVerdict(ctx.body?.text) === 'BLOCK') throw blockedError()
       const me = viewer(db)
       const cm = {
         id: `c-new-${++seq}`,
@@ -930,6 +976,9 @@ export const routes = [
     m: 'POST', p: /^\/api\/v1\/posts\/(?!r-\d)([^/]+)\/share$/,
     fn: (db, ctx) => {
       const post = requirePost(db, ctx.params[0])
+      /* Share captions are submitOrRefuse: any non-approved verdict is a hard
+         400 and the share is not recorded (the copied link itself is fine). */
+      if (fakeVerdict(ctx.body?.caption)) throw blockedError()
       post.shareCount = (post.shareCount || 0) + 1
       shareLedger(db, post).unshift({
         postId: post.id, createdAt: agoIso(0), shareId: `sh-new-${++seq}`,
@@ -964,7 +1013,17 @@ export const routes = [
       const post = requirePost(db, ctx.params[0])
       const b = ctx.body || {}
       const text = b.textContent ?? b.text ?? b.content ?? b.body        // Jackson aliases
+      /* An edit re-enters moderation, and the two outcomes differ from a create:
+         a REFUSED edit is thrown before anything is written, so the previously
+         approved wording stays live; a HELD edit is applied and takes the post
+         back to PENDING_REVIEW — i.e. the author's own edit temporarily
+         un-publishes it. Both are worth rehearsing, because "my published post
+         went private after I edited it" is the single most alarming thing this
+         feature does to someone who has not been told about it. */
+      const verdict = fakeVerdict(text, b.locationName, b.audioTrackName)
+      if (verdict === 'BLOCK') throw blockedError()
       if (text != null) post.textContent = String(text)
+      if (verdict === 'HOLD') holdRow(post)
       if (b.visibility) post.visibility = b.visibility
       if (b.locationName !== undefined) post.locationName = b.locationName
       const media = b.mediaUrls ?? b.media ?? b.images

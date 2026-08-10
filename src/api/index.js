@@ -3,7 +3,16 @@
      import { api } from '../api'
    ========================================================= */
 export { API_BASE, assetUrl, session } from './config.js'
-export { http, ApiError } from './http.js'
+export { http, ApiError, setStepUpPrompt } from './http.js'
+/* Error taxonomy (frontend-error-handling.md): branch on codes via these
+   predicates, display via errorText, count down via cooldownSecondsFrom —
+   never string-match `message` and never hardcode copy the backend sends. */
+export {
+  codeOf, detailsOf, isNotFound, isDuplicate, duplicateField, isConflict,
+  isRateLimited, isStepUp, isTransient, isNetworkError, isClientBug,
+  isUnhydratedParam, needsLargeAudienceConfirm, cooldownSecondsFrom,
+  fieldErrorMap, traceRef, errorText, logApiError,
+} from './errors.js'
 export { openStream, applyPostDelta, applyResearchDelta } from './realtime.js'
 export {
   convoFrom, msgFrom, memberFrom, requestFrom, participantFrom,
@@ -29,6 +38,13 @@ export {
 export { OTP_PURPOSES } from './security.js'
 export { MEDIA_STATUS_FAILED } from './media.js'
 export { REINDEX_CORPORA } from './admin.js'
+export {
+  MODERATION_REDACTED, REDACTED_ENTITY_TYPES, isRedactedText, isRedactedType,
+  MODERATION_STATUSES, MODERATION_VERDICTS, MODERATED_ENTITY_TYPES, MODERATION_LABELS,
+  FALLBACK_POLICIES, MODEL_VERSION_STATUSES, TRAINING_SOURCES, REASON_CODES,
+  BLOCKLIST_SEVERITIES, REVIEW_SORTS, QUEUE_SOURCES, QUEUE_BULK_ACTIONS, REQUIRES_STEP_UP,
+  entityTypeName, entityTypeKey, labelsTo, goldenLabelsOf,
+} from './moderation.js'
 export * as adapters from './adapters.js'
 
 import { auth } from './auth.js'
@@ -48,6 +64,7 @@ import { chat } from './chat.js'
 import { channels } from './channels.js'
 import { topics, madhhabs } from './taxonomy.js'
 import { admin } from './admin.js'
+import { moderation } from './moderation.js'
 import { settings } from './settings.js'
 import { security } from './security.js'
 import { media } from './media.js'
@@ -59,6 +76,11 @@ export const api = {
   topics, madhhabs,
   // Search-index maintenance (ROLE_ADMIN only).
   admin,
+  // Automated-moderation console (ADMIN/MODERATOR, some routes widen to
+  // ANALYST): review queue, decision-engine settings, classifier registry, and
+  // the pre-existing reactive queue + keyword blocklist. Seven writes need a
+  // step-up marker — wrap those in security.withStepUp (see REQUIRES_STEP_UP).
+  moderation,
   // Settings module (SETTINGS docs): cosmetics + privacy resolver + presence +
   // discovery/QR + consent + notification matrix + storage + data + safety + app.
   settings,

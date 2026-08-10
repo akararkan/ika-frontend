@@ -66,7 +66,7 @@ export function ChannelPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { upsertConvo, subscribe, myId } = useChat()
+  const { upsertConvo, removeConvo, subscribe, myId } = useChat()
 
   const [ch, setCh] = React.useState(null)
   const [state, setState] = React.useState('loading')   // loading | ready | missing | denied | error
@@ -103,8 +103,15 @@ export function ChannelPage() {
       const d = evt.memberChange === 'SUBSCRIBED' || evt.memberChange === 'ADDED' ? 1
         : evt.memberChange === 'UNSUBSCRIBED' ? -1 : 0
       if (d) setCh(prev => (prev ? { ...prev, subscriberCount: Math.max(0, prev.subscriberCount + d) } : prev))
-    } else if (evt.type === 'conversation.updated' && evt.memberChange === 'CHANNEL_INFO_CHANGED') {
-      setReload(n => n + 1)
+    } else if (evt.type === 'conversation.updated') {
+      /* DELETED is the owner ending the channel for everyone. Re-fetching
+         would only trade this page for a 404 pane that says nothing about
+         what happened, so the page tells the truth itself — and the profile
+         of a channel that no longer exists must not keep offering Subscribe.
+         The inbox row is dropped by ChatContext on the same frame; this only
+         handles the copy of it that THIS page is holding. */
+      if (evt.memberChange === 'DELETED') { setState('missing'); setCh(null) }
+      else if (evt.memberChange === 'CHANNEL_INFO_CHANGED') setReload(n => n + 1)
     }
   }), [subscribe, id, myId])
 
@@ -145,7 +152,11 @@ export function ChannelPage() {
       if (before) {
         await api.channels.unsubscribe(ch.id)
         setCh(p => ({ ...p, subscribed: false, myRole: null, subscriberCount: Math.max(0, p.subscriberCount - 1) }))
-        showToast('Unsubscribed')
+        /* Unsubscribing IS leaving the chat, and it does not resurface on the
+           next post the way a "deleted for me" DM does — so the inbox row goes
+           now instead of waiting for the `UNSUBSCRIBED` frame. */
+        removeConvo(ch.id)
+        showToast('Unsubscribed — the channel left your inbox')
       } else {
         const next = await api.channels.subscribe(ch.id)
         setCh(next)
@@ -323,6 +334,11 @@ export function ChannelPage() {
           channel={ch}
           onClose={() => setManaging(false)}
           onChanged={(next) => setCh(next)}
+          /* The console already closed itself. Drop the inbox row rather than
+             waiting for the `DELETED` frame — the owner who just pressed the
+             button is the one person guaranteed to be looking, and a channel
+             still sitting in their rail reads as a delete that failed. */
+          onDeleted={() => { removeConvo(ch.id); navigate('/channels') }}
         />
       )}
       {viewer}

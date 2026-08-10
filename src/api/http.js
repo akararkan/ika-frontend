@@ -6,8 +6,14 @@
        QnA/Research: { error, message, path, ... }  (error = code)
    - Handles "bare-body" responses (401/403/404 with no JSON)
    - Returns parsed JSON, or null for 204 No Content
+   - Self-reports every failure once (status/code/traceId) via
+     logApiError, flags Deprecation'd routes and unhydrated
+     path params, and — being the single funnel — owns the two
+     global recovery dances: 401 refresh-retry-logout and
+     403 STEP_UP_REQUIRED arm-and-replay (<StepUpHost/>).
    ========================================================= */
 import { API_BASE, session } from './config.js'
+import { logApiError } from './errors.js'
 
 /* ---------- big-integer-safe JSON ----------
    Message ids are Snowflakes — 18-digit longs, an order of magnitude ABOVE
@@ -46,6 +52,7 @@ export class ApiError extends Error {
     this.payload = payload || null    // full parsed body when present
     this.fieldErrors = payload?.fieldErrors || null
     this.traceId = payload?.traceId || null
+    this.details = payload?.details || null   // per-error context: {retryAfterSeconds, maxSize, field, hint, resetsAt, …}
     /* 429 rate-limit hints. Older modules put them at the envelope top level
        (REALTIME guide §10); the Settings module nests them under `details`
        (ApiErrorResponse.details = {action, retryAfterSeconds}). Read both. */
@@ -55,16 +62,19 @@ export class ApiError extends Error {
 }
 
 /* Minimal toast poke — replicated here (not imported from ui.jsx) to avoid an
-   api→ui circular import. Surfaces a friendly "slow down" on 429s app-wide. */
+   api→ui circular import. Surfaces a friendly "slow down" on 429s app-wide.
+   Mirrors showToast(): tone class BEFORE the text (the live-region announces
+   on the text swap), assertive for anything that isn't a confirmation. */
 let _toastTimer
-function flashToast(msg) {
+function flashToast(msg, tone = 'warn') {
   if (typeof document === 'undefined') return
   const el = document.getElementById('toast')
   if (!el) return
+  el.className = 'toast show t-' + tone
+  el.setAttribute('aria-live', tone === 'ok' ? 'polite' : 'assertive')
   const m = el.querySelector('.tmsg'); if (m) m.textContent = msg
-  el.classList.add('show')
   clearTimeout(_toastTimer)
-  _toastTimer = setTimeout(() => el.classList.remove('show'), 2600)
+  _toastTimer = setTimeout(() => el.classList.remove('show'), tone === 'ok' ? 2600 : 3600)
 }
 
 function buildUrl(path, query) {
@@ -137,6 +147,11 @@ function refreshOnce() {
   return refreshing
 }
 
+/** → {ok:true} | {ok:false, code} — the code is the refresh endpoint's OWN
+ *  errorCode (AUTH_REFRESH_TOKEN_EXPIRED/_INVALID/_MISSING/_NOT_FOUND/_REUSED),
+ *  every one of which is terminal per the error guide §2.1. It matters because
+ *  _REUSED means the server detected token reuse and revoked EVERY session —
+ *  the sign-out copy must say so, not claim an ordinary expiry. */
 async function doRefresh() {
   try {
     const res = await fetch(buildUrl('/api/v1/auth/refresh'), {
@@ -145,17 +160,40 @@ async function doRefresh() {
       body: '{}',                            // refresh token comes from the HttpOnly cookie (or this body if present)
       credentials: 'include',
     })
-    if (!res.ok) return false
-    const data = await res.json().catch(() => null)
-    if (data?.accessToken) { session.setToken(data.accessToken); return true }   // Bearer beats cookie (§2) — must adopt the fresh one
-    return false
-  } catch { return false }
+    if (res.ok) {
+      const data = await res.json().catch(() => null)
+      if (data?.accessToken) { session.setToken(data.accessToken); return { ok: true } }   // Bearer beats cookie (§2) — must adopt the fresh one
+      return { ok: false, code: null }
+    }
+    const body = await res.json().catch(() => null)
+    return { ok: false, code: body?.errorCode || body?.error || null }
+  } catch { return { ok: false, code: null } }
 }
 
-function endSession() {
+const SIGNED_OUT_COPY = 'Your session expired. Please sign in again.'
+const SIGNED_OUT_REUSED_COPY = 'You were signed out of all devices for security. Please sign in again.'
+
+function endSession(reason = SIGNED_OUT_COPY) {
   session.clear()
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event('ika:auth-expired'))   // AuthProvider → setUser(null) → RequireAuth redirects
+  if (typeof window === 'undefined') return
+  /* Parked for the login screen: the redirect unmounts the toast host, so the
+     "why am I here?" line has to survive the navigation. AuthPage reads and
+     clears it on mount. */
+  try { sessionStorage.setItem('ika:signed-out', reason) } catch { /* private mode */ }
+  window.dispatchEvent(new Event('ika:auth-expired'))   // AuthProvider → setUser(null) → RequireAuth redirects
 }
+
+/* ---------- 403 STEP_UP_REQUIRED — arm-and-replay (guide §2.2) ----------
+   Not a permission failure: the user IS allowed, they just have to re-prove
+   presence. <StepUpHost/> (mounted once in the Layout) registers a prompt that
+   collects the password / TOTP code, POSTs /api/v1/security/step-up, and
+   resolves true — at which point the ORIGINAL request is replayed once. The
+   server-side window (~5 min) then covers the rest of the batch, so a run of
+   sensitive actions prompts once, not per click. With no host registered
+   (signed-out shell, tests) the 403 falls through to the caller unchanged. */
+let stepUpPrompt = null
+export function setStepUpPrompt(fn) { stepUpPrompt = fn }
+function isStepUpPath(path) { return path.includes('/api/v1/security/step-up') }
 
 /** `attachment; filename="2026-07-27_09-15-03.mp4"` → the bare filename.
  *  RFC 5987's `filename*=UTF-8''…` wins when present (it is the one that can
@@ -187,8 +225,18 @@ async function tryMock(method, path, opts) {
   return mock.resolveMock(method, path, opts)
 }
 
+/* A path segment that is the literal 'undefined'/'null' is always a component
+   that fetched before its variable was hydrated — the server answers 400
+   TYPE_MISMATCH with hint=frontend_path_param_unhydrated. Catch it on the way
+   OUT too, so the console names the bug even when the mock layer absorbs it. */
+const UNHYDRATED_PATH_RE = /\/(?:undefined|null)(?=\/|$|\?)/
+
 export async function request(method, path, opts = {}) {
-  const { body, query, headers = {}, multipart = false, signal, keepalive = false, as = 'json', _retried = false } = opts
+  const { body, query, headers = {}, multipart = false, signal, keepalive = false, as = 'json', _retried = false, _stepUpRetried = false } = opts
+
+  if (UNHYDRATED_PATH_RE.test(path)) {
+    console.error(`[api] ${method} ${path} — a path segment is the JS literal 'undefined'/'null': the call site fetched before its variable was hydrated. Guard it (e.g. \`if (!id) return\`).`)
+  }
 
   if (MOCK_BUILD) {
     let mocked
@@ -198,7 +246,19 @@ export async function request(method, path, opts = {}) {
       /* A handler that threw mockError() is a deliberate failure path — surface
          it as the real client would. Anything else is a broken fixture, and a
          broken fixture must not silently turn into a live request. */
-      if (e?.__mockStatus) throw new ApiError(e.__mockStatus, e.__mockBody?.errorCode, e.__mockBody?.message, e.__mockBody)
+      if (e?.__mockStatus) {
+        const err = new ApiError(e.__mockStatus, e.__mockBody?.errorCode, e.__mockBody?.message, e.__mockBody)
+        /* The fixture speaks the same step-up dialect as the backend — replay
+           through the same dance so mock mode exercises the real flow. */
+        if (err.status === 403 && err.code === 'STEP_UP_REQUIRED' && !_stepUpRetried && stepUpPrompt && !isStepUpPath(path)) {
+          let armed
+          try { armed = await stepUpPrompt(err) } catch { armed = false }
+          if (armed) return request(method, path, { ...opts, _stepUpRetried: true })
+          err.stepUpCancelled = true
+        }
+        logApiError(err, method, path)
+        throw err
+      }
       throw e
     }
     if (mocked.hit) return mocked.value
@@ -238,6 +298,13 @@ export async function request(method, path, opts = {}) {
     keepalive: keepalive || undefined,
   })
 
+  /* Deprecation contract (guide §4): a legacy alias still answers, but stamps
+     `Deprecation: true` + a Link successor. Log it so future re-homings
+     self-report instead of rotting until the alias is removed. */
+  if (res.headers.get('Deprecation') === 'true') {
+    console.warn(`[api] deprecated route: ${method} ${path} — migrate to ${res.headers.get('Link') || '(successor not announced)'}`)
+  }
+
   if (res.ok) {
     if (res.status === 204) return null
     if (as === 'blob') {
@@ -256,21 +323,38 @@ export async function request(method, path, opts = {}) {
 
   // 429 rate-limit (REALTIME guide §10): surface a friendly "slow down" toast with
   // the server's retry hint. Callers can still read err.retryAfterSeconds / err.action
-  // to disable the submit button during the cooldown.
+  // (or cooldownSecondsFrom(err) — it also folds MEDIA_QUOTA_EXCEEDED's resetsAt)
+  // to disable the submit button during the cooldown. Never auto-retry a 429.
   if (res.status === 429) {
     const secs = err.retryAfterSeconds ?? 5
-    flashToast(err.message || `Slow down — try again in ${secs}s`)
+    flashToast(err.message || `Slow down — try again in ${secs}s`, 'warn')
+    logApiError(err, method, path)
     throw err
+  }
+
+  // 403 STEP_UP_REQUIRED → collect a fresh credential, arm, replay ONCE (§2.2).
+  if (res.status === 403 && err.code === 'STEP_UP_REQUIRED' && !_stepUpRetried && stepUpPrompt && !isStepUpPath(path)) {
+    let armed
+    try { armed = await stepUpPrompt(err) } catch { armed = false }
+    if (armed) return request(method, path, { ...opts, _stepUpRetried: true })
+    err.stepUpCancelled = true          // tells withStepUp-style wrappers not to prompt AGAIN
   }
 
   // Only attempt recovery when we believe we're signed in, on a non-auth path, once.
   if (res.status === 401 && token && !_retried && !isAuthPath(path)) {
-    if (err.code === 'TOKEN_REVOKED') { endSession(); throw err }   // terminal — logged out elsewhere / token reused
-    const ok = await refreshOnce()                                  // TOKEN_EXPIRED, UNAUTHORIZED, or bare-body 401 → try a refresh
-    if (ok) return request(method, path, { ...opts, _retried: true })
-    endSession(); throw err                                         // refresh failed → session is dead
+    if (err.code === 'TOKEN_REVOKED') { endSession(); logApiError(err, method, path); throw err }   // terminal — logged out elsewhere / token reused
+    const refreshed = await refreshOnce()             // expired/invalid access token → try ONE rotation
+    if (refreshed.ok) return request(method, path, { ...opts, _retried: true })
+    /* Refresh refused → the session is dead, and every AUTH_REFRESH_TOKEN_*
+       code is terminal. _REUSED gets its own copy: the server revoked ALL
+       sessions after detecting token reuse — saying "expired" would hide a
+       security event from the person it happened to. */
+    endSession(refreshed.code === 'AUTH_REFRESH_TOKEN_REUSED' ? SIGNED_OUT_REUSED_COPY : SIGNED_OUT_COPY)
+    logApiError(err, method, path)
+    throw err
   }
 
+  logApiError(err, method, path)
   throw err
 }
 

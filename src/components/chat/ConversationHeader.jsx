@@ -29,7 +29,7 @@ import { useChat } from '../../context/ChatContext.jsx'
 import { useCall } from '../../context/CallContext.jsx'
 import { Popover } from './Popover.jsx'
 import { activityIcon } from './activity.js'
-import { deleteIntentOf } from './conversationActions.js'
+import { deleteIntentOf, leaveIntentOf } from './conversationActions.js'
 import { chatError } from './chatErrors.js'
 
 /** epoch ms → "last seen 3h ago". Null/0 → a plain "offline". */
@@ -143,21 +143,25 @@ export function ConversationHeader({
     finally { if (aliveRef.current) setBusy(false) }
   }, [busy])
 
+  /* Groups AND channels: `POST …/leave` on a channel id delegates to
+     unsubscribe server-side, so one call serves both and only the wording
+     differs — which is why every word of it comes from `leaveIntentOf`. */
   const doLeave = React.useCallback(() => guard(async () => {
+    const intent = leaveIntentOf(convo)
     const ok = await uiConfirm({
-      title: 'Leave group',
-      message: `Leave “${convo.displayTitle}”? You will stop receiving its messages.`,
+      title: intent.title,
+      message: intent.message,
       danger: true,
-      confirmLabel: 'Leave',
+      confirmLabel: intent.confirmLabel,
     })
     if (!ok) return
     try {
       await api.chat.members.leave(convo.id)
       removeConvo(convo.id)                       // the member.changed frame may lag; drop it now
-      showToast('You left the group')
+      showToast(intent.toast)
       navigate('/chat')
     } catch (e) {
-      showToast(chatError(e, 'Could not leave the group'))
+      showToast(chatError(e, `Could not leave the ${convo.isChannel ? 'channel' : 'group'}`))
     }
   }), [guard, convo, removeConvo, navigate])
 
@@ -177,12 +181,13 @@ export function ConversationHeader({
 
   /* A group OWNER cannot leave while anyone else remains — the server answers
      `400 BAD_REQUEST` ("Transfer ownership before leaving, or delete the
-     group"). Offering them a bare "Leave group" was a button that could only
-     fail. Their real options are transfer-then-leave, or retire the group, so
-     the menu offers the second one — and takes every word of it from
-     `deleteIntentOf`, because for an owner this DELETE destroys the group for
-     every member. This is precisely the mislabel that helper exists to
-     prevent, which is why the header now imports it. */
+     group") — and a CHANNEL owner cannot leave at all, alone or not (`403`).
+     Offering either of them a bare "Leave" was a button that could only fail.
+     Their real options are transfer-then-leave, or retire the room, so the
+     menu offers the second one — and takes every word of it from
+     `deleteIntentOf`, because for an owner this DELETE destroys the room for
+     every member/subscriber. This is precisely the mislabel that helper exists
+     to prevent, which is why the header imports it. */
   const doGroupDelete = React.useCallback(() => guard(async () => {
     const intent = deleteIntentOf(convo)
     const ok = await uiConfirm({
@@ -193,7 +198,7 @@ export function ConversationHeader({
     })
     if (!ok) return
     await deleteConvo(convo.id)
-    showToast(intent.destroysForEveryone ? 'Group deleted' : 'Conversation cleared')
+    showToast(intent.toast)
     navigate('/chat')
   }), [guard, convo, deleteConvo, navigate])
 
@@ -253,15 +258,17 @@ export function ConversationHeader({
             run: () => onToggleInfo?.(),        // the picker lives in the info panel
           })
     }
-    /* Three outcomes, not two. A sole owner CAN leave (the server soft-deletes
-       the group in the same transaction), but an owner with company cannot —
-       so they get the delete path, labelled by the shared intent. */
+    /* Three outcomes, not two. A sole GROUP owner CAN leave (the server
+       soft-deletes the group in the same transaction), but an owner with
+       company cannot — and a CHANNEL owner never can, alone or not — so they
+       get the delete path instead, labelled by the shared intent. The rule
+       itself lives in `leaveIntentOf.allowed`; this only picks a row. */
     if (!convo.isGroup) {
       rows.push({ key: 'delete', label: 'Delete chat', icon: 'trash', danger: true, run: doDelete })
-    } else if (convo.myRole === 'OWNER' && (convo.memberCount || 0) > 1) {
-      rows.push({ key: 'delete-group', label: deleteIntentOf(convo).label, icon: 'trash', danger: true, run: doGroupDelete })
+    } else if (leaveIntentOf(convo).allowed) {
+      rows.push({ key: 'leave', label: leaveIntentOf(convo).label, icon: 'logout', danger: true, run: doLeave })
     } else {
-      rows.push({ key: 'leave', label: 'Leave group', icon: 'logout', danger: true, run: doLeave })
+      rows.push({ key: 'delete-group', label: deleteIntentOf(convo).label, icon: 'trash', danger: true, run: doGroupDelete })
     }
     return rows
   }, [convo, onToggleInfo, onToggleStarred, onToggleScheduled, onTogglePrefs, markUnread,

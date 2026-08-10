@@ -961,3 +961,17 @@
 :root[data-theme="dark"] .btn.on-dark:hover,
 :root[data-theme="dark"] .btn-primary.on-dark:hover{background:var(--ox-cerulean-lift);color:var(--ox-blue)}
 
+
+/* ---------- §MODERATION — the one light-only pair in warm/moderation.css ----
+   The held (amber) and review (blue) states already use theme-complete aliases
+   and need nothing here. Only the REMOVED state is built from --ox-red-wash,
+   a light pink that would glare on the night surface — same repair the safety
+   chips take above. */
+:root[data-theme="dark"] .mod-badge.mod-removed,
+:root[data-theme="dark"] .mod-note.mod-removed,
+:root[data-theme="dark"] .mod-alert.mod-blocked{background:var(--dk-red-wash);color:var(--danger)}
+:root[data-theme="dark"] .mod-alert.mod-blocked{border-color:var(--dk-red-wash)}
+:root[data-theme="dark"] .mod-badge.mod-review,
+:root[data-theme="dark"] .mod-note.mod-review{background:var(--wash);color:var(--rubric)}
+:root[data-theme="dark"] .mod-alert-x:hover{background:rgba(255,255,255,.08)}
+:root[data-theme="dark"] .mod-veil{background:linear-gradient(to top,rgba(10,18,28,.75),rgba(10,18,28,0) 55%)}

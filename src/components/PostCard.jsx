@@ -11,17 +11,45 @@ import { openReport } from './ReportDialog.jsx'
 import { uiPrompt } from './Dialog.jsx'
 import OrbitPlayer from './OrbitPlayer.jsx'
 import { PlayableVideo } from './PlayableVideo.jsx'
+import { ModerationAlert, ModerationBadge, useHeldWatch } from './Moderation.jsx'
 import { authorOf } from '../lib/userView.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
+import { isHeld, isModerationError, moderationState, moderationText } from '../lib/moderation.js'
 
 /* REPOST = a new post referencing the original (POST_API §6.1); self-repost
    allowed (§28). Optional caption. Shared by the card button + ⋯ menu. */
+/* A repost IS a post, so its caption is scored like any other body: it can come
+   back held (status PENDING_REVIEW — up, but visible to nobody but its author)
+   or refused outright.
+
+   The prompt therefore LOOPS, exactly as the reels rail does: a refusal
+   re-opens it PRE-FILLED with the server's sentence above the field. uiPrompt
+   resolves and unmounts, so without this the typed caption is destroyed by the
+   very error that asks the author to reword it — and editing is the only way
+   past a block. Verbatim sentence, no category, no offending phrase. */
 async function doRepost(post) {
-  const caption = await uiPrompt({ title:'Repost to your profile', label:'Add a note (optional)', placeholder:'Why is this worth sharing?', multiline:true, icon:'repost', confirmLabel:'Repost' })
-  if (caption === null) return
-  api.posts.create({ postType: 'REPOST', visibility: 'PUBLIC', sharedPostId: post.id, textContent: caption || '', mediaUrls: [], mediaTypes: [] })
-    .then(() => showToast('Reposted to your profile'))
-    .catch(() => showToast('Could not repost'))
+  let draft = ''
+  let notice = null
+  for (;;) {
+    const caption = await uiPrompt({
+      title:'Repost to your profile', label:'Add a note (optional)',
+      placeholder:'Why is this worth sharing?', multiline:true, icon:'repost',
+      confirmLabel:'Repost', initial: draft, message: notice,
+    })
+    if (caption === null) return                      // cancelled
+    draft = caption
+    try {
+      const created = await api.posts.create({ postType: 'REPOST', visibility: 'PUBLIC', sharedPostId: post.id, textContent: caption || '', mediaUrls: [], mediaTypes: [] })
+      const held = isHeld(created)
+      showToast(held ? 'Reposted — being checked. Only you can see it until it clears.' : 'Reposted to your profile',
+        held ? 'warn' : 'ok')
+      return
+    } catch (e) {
+      if (!isModerationError(e)) { showToast('Could not repost', 'err'); return }
+      notice = moderationText(e)
+    }
+  }
 }
 
 /* ⋯ menu — Copy link (anyone) + Edit/Delete (author-only, per the
@@ -249,9 +277,13 @@ function PostMedia({ post, onOpenReel, onOpenImage }) {
       <figure className="pc-plate">
       <div className="post-media count-1">
         <button className="pm-cell pm-reel" onClick={onOpenReel} aria-label="Watch reel">
-          {m.url
-            ? <PlayableVideo src={m.url} poster={m.poster} muted controls={false} autoPlay={false} className="pm-reel-cover" wrapperClassName="pm-reel-video" style={{ borderRadius:0 }} modal />
-            : <span className="pm-reel-bg" style={{ background: m.bg }}/>}
+          {/* A PHOTO reel has no clip to frame — handing its image to the video
+              player would render a broken <video>. It is a cover, so show it. */}
+          {m.url && m.type === 'IMAGE'
+            ? <img className="pm-reel-cover" src={m.url} alt="" loading="lazy"/>
+            : m.url
+              ? <PlayableVideo src={m.url} poster={m.poster} muted controls={false} autoPlay={false} className="pm-reel-cover" wrapperClassName="pm-reel-video" style={{ borderRadius:0 }} modal />
+              : <span className="pm-reel-bg" style={{ background: m.bg }}/>}
           <span className="pm-play"><Icon name="play" className="lg"/></span>
           <span className="pm-reel-badge"><Icon name="reels" className="xs"/>Reel</span>
         </button>
@@ -333,10 +365,54 @@ function ExploreFollowBtn({ authorId, authorName }) {
  *   second comment list and a second composer on screen, and a reply typed in
  *   the wrong one silently lands in a list the reader is not looking at. With
  *   it off the button becomes a jump to the real thread via `onOpenComments`.
+ * @param {(post:object)=>void} [onModerationCleared] — fired once with the fresh
+ *   post when a moderation hold on it resolves. The card re-checks the hold
+ *   itself (see below), so a page that renders its own banner from the same post
+ *   subscribes here rather than running a second poller against the same id.
  */
-export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true, inlineComments = true }) {
+export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owner = false, onEdit, onDelete, observeView = true, inlineComments = true, onModerationCleared }) {
   const [shares, setShares] = React.useState(post.shares)
   const u = authorOf(post)
+  const { user } = useAuth() || {}
+
+  /* ---- moderation: the author's own view of a held post -------------------
+     A held post is a normal post that nobody but its author can see. It never
+     comes back from a list endpoint — not even the author's own profile or home
+     feed — so the only copy in the app is the one the composer handed straight
+     to the feed, carrying `status: "PENDING_REVIEW"` from the create response.
+     This card is therefore the only place that state can be shown at all.
+
+     `owner` is passed by the surfaces that know (feed, profile, post page) but
+     not by all of them, so authorship is also derived the way the rest of the
+     app derives it — the signed-in user's id against post.author.
+
+     Nothing pushes when a hold clears: there is no realtime moderation event
+     anywhere, and the "your content is live" bell fires only for content that
+     actually waited. So the card re-reads GET /posts/{id} on the back-off
+     schedule until the verdict lands, and takes the STATUS alone off that read
+     — the parent owns this row's counters and viewer flags (delta-maintained,
+     with likes/saves possibly in flight), and swapping the whole object in
+     would clobber them. */
+  const [modStatus, setModStatus] = React.useState(null)   // status observed by the re-check
+  /* The parent's word wins whenever it changes: an edit can push an already
+     cleared post back into review, and a stale local "PUBLISHED" would hide it. */
+  React.useEffect(() => { setModStatus(null) }, [post.status])
+  const mine = owner || (!!user?.id && post.author === user.id)
+  const modState = moderationState({ status: modStatus || post.status })
+  const flagged = mine && modState !== 'live'              // held OR removed — either way it is not public
+  const watching = flagged && modState !== 'removed'       // a verdict is still coming
+  useHeldWatch(watching, 'POST', async () => {
+    const fresh = await api.posts.get(post.id)
+    if (!fresh?.status) return
+    setModStatus(fresh.status)
+    if (!isHeld(fresh)) {
+      onModerationCleared?.(fresh)
+      /* Nothing pushes a verdict and the "your content is live" bell only
+         fires for content that actually waited on a human — so this watch is
+         the one place the author can be told the badge flipped. */
+      if (moderationState(fresh) === 'live') showToast('Your post is live — everyone can see it now.')
+    }
+  })
   const navigate = useNavigate()
   const goAuthor = () => post.author && navigate(`/u/${post.author}`)
   const [lightbox, setLightbox] = React.useState(null)
@@ -374,6 +450,7 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
   const [comments, setComments] = React.useState(null)     // null = not loaded yet
   const [cText, setCText] = React.useState('')
   const [cBusy, setCBusy] = React.useState(false)
+  const [cErr, setCErr] = React.useState(null)             // moderation refusal on the comment box
   const [cCount, setCCount] = React.useState(post.comments || 0)
   React.useEffect(() => { setCCount(post.comments || 0) }, [post.comments])
   const toggleComments = () => {
@@ -382,12 +459,20 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
     setShowC(s => !s)
     if (comments == null) api.posts.comments(post.id, { pageSize: 20 }).then(r => setComments(r || [])).catch(() => setComments([]))
   }
+  /* Comments are scored like everything else, but their response carries NO
+     moderation marker of any kind: CommentResponse has no status field and the
+     mapper writes none, so a held comment is byte-identical to a cleared one.
+     There is deliberately no badge here — guessing would mark clean comments as
+     "Checking…" — and nothing is lost by staying quiet: the server's read filter
+     carves the author out, so we keep seeing our own comment in the list either
+     way. The refusal is the half the wire DOES tell us, and it renders inline
+     next to the box (below) with the draft untouched. */
   const postComment = () => {
     const v = cText.trim(); if (!v || cBusy) return
-    setCBusy(true)
+    setCBusy(true); setCErr(null)
     api.posts.addComment(post.id, { text: v })
       .then(saved => { setComments(cs => [saved, ...(cs || [])]); setCText(''); setCCount(n => n + 1) })
-      .catch(() => showToast('Could not post comment'))
+      .catch(e => { if (isModerationError(e)) setCErr(e); else showToast('Could not post comment', 'err') })
       .finally(() => setCBusy(false))
   }
   const reactComment = (cid) => {
@@ -396,7 +481,7 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
   }
 
   return (
-    <article ref={cardRef} className={'post-card rise' + (post.source === 'EXPLORE' ? ' is-explore' : '')} style={{ animationDelay: `${index * 60}ms` }}>
+    <article ref={cardRef} className={'post-card rise' + (post.source === 'EXPLORE' ? ' is-explore' : '') + (flagged ? ' mod-held' : '')} style={{ animationDelay: `${index * 60}ms` }}>
       {post.source === 'EXPLORE' && <ExploreCaption/>}
       <header className="pc-head">
         <span role="button" onClick={goAuthor} style={{ cursor:'pointer' }}>
@@ -411,6 +496,10 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
             <span>{u.role === 'SCHOLAR' ? 'Scholar' : u.role === 'RESEARCHER' ? 'Researcher' : 'Member'}</span>
             <span className="pc-dot"/>
             <span className="pc-handle" role="button" onClick={goAuthor} style={{ cursor:'pointer' }}>@{u.handle}</span>
+            {/* On the meta line rather than in .pc-side: that row wraps and this
+                one does not, so a chip up there would squeeze the time and the
+                ⋯ menu on a narrow card. Only the author ever sees it. */}
+            {flagged && <ModerationBadge state={modState}/>}
           </div>
         </div>
         {post.source === 'EXPLORE' && <ExploreFollowBtn authorId={post.author} authorName={u.full}/>}
@@ -428,23 +517,29 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
 
       <PostMedia post={post} onOpenReel={openReel} onOpenImage={openImage}/>
 
-      <div className="pc-actions">
-        <button className={'pca ' + (post.liked ? 'on' : '')} onClick={() => onLike?.(post.id)} aria-label="Like">
+      {/* Nobody can like, comment on, repost or share what nobody can see, so
+          while the post is held every engagement affordance is genuinely dead.
+          They stay in the DOM (aria-disabled + disabled, dimmed by .mod-off)
+          rather than being removed, so the row does not reflow under the
+          reader's finger the moment the verdict lands. */}
+      <div className={'pc-actions' + (flagged ? ' mod-off' : '')}>
+        <button className={'pca ' + (post.liked ? 'on' : '')} onClick={() => onLike?.(post.id)} aria-label="Like" disabled={flagged} aria-disabled={flagged}>
           <Icon name="heart"/><span>{fmt(post.likes)}</span>
         </button>
-        <button className={'pca ' + (showC ? 'active' : '')} onClick={toggleComments}>
+        <button className={'pca ' + (showC ? 'active' : '')} onClick={toggleComments} disabled={flagged} aria-disabled={flagged}>
           <Icon name="comment"/><span>{fmt(cCount)}</span>
         </button>
-        <button className="pca" onClick={() => doRepost(post)} aria-label="Repost">
+        <button className="pca" onClick={() => doRepost(post)} aria-label="Repost" disabled={flagged} aria-disabled={flagged}>
           <Icon name="repost"/>
         </button>
-        <button className="pca" onClick={() => openShare({ kind:'post', id:post.id, title: post.body ? post.body.slice(0, 90) : 'this post', count: shares, onShared: setShares })}>
+        <button className="pca" disabled={flagged} aria-disabled={flagged}
+          onClick={() => openShare({ kind:'post', id:post.id, title: post.body ? post.body.slice(0, 90) : 'this post', count: shares, onShared: setShares })}>
           <Icon name="share"/><span>Share</span>
         </button>
         {views > 0 && (
           <span className="pc-views" title={`${fmt(views)} views`}><Icon name="eye" className="xs"/><span>{fmt(views)}</span></span>
         )}
-        <button className={'pca pca-end ' + (post.saved ? 'saved' : '')} onClick={() => onSave?.(post.id)}>
+        <button className={'pca pca-end ' + (post.saved ? 'saved' : '')} onClick={() => onSave?.(post.id)} disabled={flagged} aria-disabled={flagged}>
           <Icon name="bookmark"/><span>Save</span>
         </button>
       </div>
@@ -482,10 +577,16 @@ export function PostCard({ post, onLike, onSave, index = 0, onOpenComments, owne
           )}
           <div className="cmt-box">
             <input className="field" placeholder="Write a comment…" value={cText}
-              onChange={e => setCText(e.target.value)}
+              onChange={e => { setCErr(null); setCText(e.target.value) }}
               onKeyDown={e => { if (e.key === 'Enter') postComment() }}/>
             <button className="icon-btn tint" disabled={cBusy || !cText.trim()} onClick={postComment} aria-label="Post comment"><Icon name="send" className="sm"/></button>
           </div>
+          {/* Inline under the box that produced it, never a toast: the refusal
+              is the only guidance the server gives and a 3.6s pill takes it
+              away before it can be read. The draft stays in the input (it is
+              only cleared on success), so editing is a live option — which is
+              the sole way past a block. */}
+          <ModerationAlert error={cErr} onRetry={postComment} onDismiss={() => setCErr(null)}/>
         </div>
       )}
 

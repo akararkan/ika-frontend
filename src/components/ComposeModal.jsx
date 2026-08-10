@@ -10,11 +10,16 @@ import React from 'react'
 import { Icon, Avatar, showToast } from './ui.jsx'
 import { MentionBox } from './MentionBox.jsx'
 import { SoundPicker } from './SoundPicker.jsx'
+import { SoundMix } from './SoundMix.jsx'
+import { DEFAULT_MIX, withMix, soundLabel } from '../lib/soundMix.js'
 import { TagInput } from './TagInput.jsx'
 import { StoryEditor } from './StoryEditor.jsx'
+import { ModerationAlert } from './Moderation.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 import { normalizeTags } from '../api/tags.js'
+import { isHeld, isModerationError, moderationText } from '../lib/moderation.js'
+import { useCooldown } from '../hooks/useCooldown.js'
 
 const TABS = [
   { key:'TEXT',       icon:'compose', label:'Post' },
@@ -37,7 +42,11 @@ const PLACEHOLDER = {
   QUESTION:"Add context, what you've already read, and what you're unsure about…",
   STORY:'Add text to your story…',
 }
-const ACCEPT = { EMBEDDED:'image/*,video/*', REEL:'video/*', STORY:'image/*,video/*' }
+/* A reel is a video OR a photo: a still reel plays for STILL_SECS with whatever
+   sound is attached, the same way Facebook turns a photo into a reel. */
+const ACCEPT = { EMBEDDED:'image/*,video/*', REEL:'video/*,image/*', STORY:'image/*,video/*' }
+const STILL_SECS = 30
+
 
 // view visibility ('FOLLOWERS') → backend PostVisibility enum (for edit prefill)
 const VIS_TO_ENUM = { PUBLIC:'PUBLIC', FOLLOWERS:'FOLLOWERS_ONLY', FOLLOWERS_ONLY:'FOLLOWERS_ONLY', ONLY_ME:'ONLY_ME', CLOSE_FRIENDS:'CLOSE_FRIENDS' }
@@ -46,6 +55,17 @@ const VIS_TO_ENUM = { PUBLIC:'PUBLIC', FOLLOWERS:'FOLLOWERS_ONLY', FOLLOWERS_ONL
    custom bodies (§6.2) to a friendly, accurate message for the toast. */
 function composeError(e) {
   const code = e?.code, status = e?.status
+  /* Moderation FIRST, and specifically before the `post_create_failed` arm
+     below. The multipart create endpoint wraps the service call in a bare
+     `catch (Exception)`, so a refusal comes back as that same 500 with the
+     moderation sentence in `message` and no errorCode at all — the generic
+     "uploaded but the post failed and was rolled back" line would then be a
+     flat lie about a content decision. isBlocked() (via isModerationError)
+     owns that discrimination; see the MULTIPART_BLOCK note in lib/moderation.js.
+     The normal composer path never reaches here — a moderation failure renders
+     as <ModerationAlert/> inside the modal — but this helper is the file's one
+     error-to-copy funnel and must not be the thing that mistranslates it. */
+  if (isModerationError(e)) return moderationText(e)
   if (code === 'upload_failed')      return 'Media upload failed — nothing was published. Please try again.'        // §6.2 (502)
   if (code === 'post_create_failed') return 'Media uploaded but the post failed and was rolled back. Try again.'    // §6.2 (500)
   if (status === 401)                                      return 'Please sign in to publish.'                       // bare body (§2)
@@ -98,10 +118,21 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const [qMax, setQMax] = React.useState('')           // QUESTION maxAnswers ('' = unlimited)
   const [files, setFiles] = React.useState([])
   const [sound, setSound] = React.useState(null)
+  const [mix, setMix] = React.useState(DEFAULT_MIX)      // authored balance, set before publishing
   const [recording, setRecording] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  const [cooldown, startCooldown] = useCooldown()       // 429 countdown — draft kept, Publish disabled for the hint
   const [storyEditor, setStoryEditor] = React.useState(false)   // STORY: open the rich editor
   const [storyDraft, setStoryDraft] = React.useState(null)      // editor result: { kind, media, thumbnail, textContent }
+  /* Set when a story published but its poll sticker was REFUSED: the story id
+     the reworded sticker must attach to. Publish becomes sticker-only while
+     this is set; discarded with the modal. */
+  const pollTarget = React.useRef(null)
+  /* A moderation refusal is the one failure that must NOT close the modal or
+     toast: the draft is the only copy of the text, the message is the only
+     guidance the server gives, and a toast takes both away in 3.6s. It renders
+     as a band under the header, beside the Publish button that produced it. */
+  const [modErr, setModErr] = React.useState(null)
 
   const fileRef = React.useRef(null)
   const recRef = React.useRef(null)
@@ -111,7 +142,7 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const heading = isEdit ? 'Edit post' : tab === 'QUESTION' ? 'Ask a question' : tab === 'STORY' ? 'Add to your story' : 'Create'
 
   // reset attachments when switching tabs
-  React.useEffect(() => { setFiles([]); setRecording(false); setSound(null); if (vis === 'CLOSE_FRIENDS' && tab !== 'STORY') setVis('PUBLIC') }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { setFiles([]); setRecording(false); setSound(null); setMix(DEFAULT_MIX); if (vis === 'CLOSE_FRIENDS' && tab !== 'STORY') setVis('PUBLIC') }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // live media thumbnails — images, videos AND audio get object URLs so the
   // gallery can show the real media (revoked on change/unmount)
@@ -126,6 +157,9 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
     [files],
   )
   React.useEffect(() => () => previews.forEach(p => p.url && URL.revokeObjectURL(p.url)), [previews])
+
+  // a REEL whose attachment is a photo → the still-reel flow (30s + a sound)
+  const stillReel = tab === 'REEL' && !!files[0] && files[0].type.startsWith('image')
 
   const pickFiles = () => fileRef.current?.click()
   const addFiles = (picked) => { if (picked.length) setFiles(prev => (tab === 'REEL' ? picked.slice(0, 1) : [...prev, ...picked])) }
@@ -160,9 +194,32 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const stopRec = () => { try { recRef.current?.stop() } catch { /* ignore */ } setRecording(false) }
   const voiceTap = () => { if (recording) stopRec(); else if (files.length) setFiles([]); else startRec() }
 
+  /* Every text setter goes through these: a refusal is about THIS text, so it
+     dies the moment the text changes. Left standing it would keep accusing a
+     draft the author has already rewritten — and rewriting is the ONLY way
+     forward out of a block, so the panel must never look like a verdict on the
+     new words. */
+  const editText = (v) => { setModErr(null); setText(v) }
+  const editTitle = (v) => { setModErr(null); setTitle(v) }
+
+  /* The "it went up" line, told honestly.
+     A held post comes back as an ordinary 200 whose `status` is PENDING_REVIEW:
+     it exists, it carries our text, and it is visible to nobody but us until it
+     clears. Saying "Published" there would claim something the author cannot
+     check for themselves — held posts are dropped from EVERY list endpoint, the
+     author's own profile and home feed included, so the card this composer hands
+     to the feed is the only place that post can be seen at all until it clears.
+     (PENDING and IN_REVIEW collapse into that one wire string, so a post can
+     only ever reach the 'checking' state — never 'review'.) */
+  const announce = (created) => {
+    if (isHeld(created)) showToast('Posted — being checked. Only you can see it until it clears.', 'warn')
+    else showToast('Published')
+  }
+
   /* ---- publish ---- */
   const publish = async () => {
     setBusy(true)
+    setModErr(null)
     try {
       if (isEdit) {
         // PATCH /api/v1/posts/{id} — EditPostCommand (§6.4). Every field is
@@ -171,11 +228,26 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         // fix landed May 2026), so we re-fetch the canonical state via GET
         // and broadcast THAT — guarantees the feed/post page show what the
         // server actually stored, including re-extracted hashtags.
-        await api.posts.edit(editPost.id, { textContent: text, visibility: vis })
+        const patched = await api.posts.edit(editPost.id, { textContent: text, visibility: vis })
         let fresh
         try { fresh = await api.posts.get(editPost.id) } catch { /* fall back below */ }
-        onEdited?.(fresh || { ...editPost, body: text, visibility: vis === 'FOLLOWERS_ONLY' ? 'FOLLOWERS' : vis })
-        showToast('Post updated'); onClose(); return
+        /* A HELD edit is a normal 200 that already APPLIED the new text and
+           flipped `status` to PENDING_REVIEW — the post keeps our words and
+           loses its audience until the verdict lands. A REJECTED edit never
+           reached the row at all and arrives in the catch below, with the old
+           text still live. Carry the status through the fallback too, or a
+           failed re-read would silently downgrade a held post to "published". */
+        const saved = fresh || {
+          ...editPost,
+          body: text,
+          visibility: vis === 'FOLLOWERS_ONLY' ? 'FOLLOWERS' : vis,
+          status: patched?.status || editPost.status,
+        }
+        const heldEdit = isHeld(saved)
+        onEdited?.(saved)
+        showToast(heldEdit ? 'Saved — being checked. Only you can see the change until it clears.' : 'Post updated',
+          heldEdit ? 'warn' : 'ok')
+        onClose(); return
 
       } else if (tab === 'QUESTION') {
         // CreateQuestionRequest (QNA_API §6.1): title, body, tags[], keywords, answersLocked, maxAnswers
@@ -183,11 +255,36 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         const tags = normalizeTags(qTags)
         const maxAnswers = qMax.trim() ? Math.max(1, parseInt(qMax, 10) || 0) || null : null
         const created = await api.qna.create({ title, body: text, tags, keywords: qKeywords.trim() || undefined, answersLocked: qLocked, maxAnswers })
+        /* No held branch here on purpose: QuestionResponse carries no
+           moderation field of any kind, so a question waiting on a verdict is
+           byte-identical to one that cleared. The wire cannot tell us, and
+           guessing would badge clean questions as "Checking…". A refusal still
+           lands in the catch below, which is the half we CAN see. */
         showToast('Question posted')
         window.dispatchEvent(new CustomEvent('ika:question-created', { detail: created }))
 
       } else if (tab === 'STORY') {
+        /* Second pass after a refused poll sticker: the STORY itself already
+           exists (pollTarget holds its id), so only the reworded sticker is
+           resubmitted — re-creating the story would post it twice. Media/text
+           changes made in the editor meanwhile cannot apply to the published
+           frame; the sticker is the only part still in flight. */
+        if (pollTarget.current && storyDraft?.poll) {
+          const { question, optionA, optionB, x, y } = storyDraft.poll
+          try {
+            await api.stories.attachPoll(pollTarget.current, { question, optionA, optionB, posX: Math.round(x), posY: Math.round(y) })
+          } catch (e) {
+            if (isModerationError(e)) { setModErr(e); return }   // still refused — keep the draft, try other words
+            throw e
+          }
+          pollTarget.current = null
+          showToast('Poll added to your story')
+          window.dispatchEvent(new CustomEvent('ika:story-created'))
+          onClose()
+          return
+        }
         let created
+        let pollErr = null      // a refused poll sticker, reported after the story's own line
         // Prefer the rich-editor result (flattened PNG with text layers baked
         // in) over a raw file. Falls back to a text-only story if nothing was
         // designed.
@@ -206,7 +303,15 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
           if (storyDraft.poll && (created?.storyId || created?.id)) {
             const { question, optionA, optionB, x, y } = storyDraft.poll
             const req = { question, optionA, optionB, posX: Math.round(x), posY: Math.round(y) }
-            await api.stories.attachPoll(created.storyId || created.id, req).catch(() => {})
+            /* Still best-effort — the story is up and a failed sticker must not
+               sink it — but a REFUSED poll is a content decision, not a hiccup,
+               and swallowing it made the sticker vanish with nothing said. Poll
+               text is scored with submitOrRefuse, which turns even a merely
+               borderline question (or the classifier simply being unreachable)
+               into a hard 400, so this is the likeliest refusal in the whole
+               story flow. Held here, not toasted here: there is one toast
+               element, and the "Story added" line below would overwrite it. */
+            await api.stories.attachPoll(created.storyId || created.id, req).catch(e => { pollErr = e })
           }
         } else if (files.length) {
           // Legacy path — user attached a file without opening the editor.
@@ -219,7 +324,27 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         } else {
           created = await api.stories.create({ storyType: 'TEXT', visibility: vis, textContent: text })
         }
-        showToast('Story added')
+        /* Stories DO carry a marker (`moderationStatus: PENDING | IN_REVIEW`,
+           null once approved) and, unlike posts, the author keeps getting the
+           row back from /stories/by-author — so the honest line here is that it
+           went up but nobody else has it yet. */
+        const heldStory = isHeld(created)
+        if (pollErr && isModerationError(pollErr)) {
+          /* The STORY is up — only the sticker was refused, and refused text
+             must keep its draft (rule 1's sibling: a toast destroys it). Keep
+             the modal open with the poll intact, show the sentence inline, and
+             remember the story id so Publish now retries JUST the sticker. */
+          pollTarget.current = created.storyId || created.id
+          window.dispatchEvent(new CustomEvent('ika:story-created', { detail: created }))   // the frame itself is real
+          setModErr(pollErr)
+          return
+        }
+        if (pollErr) {
+          showToast('Your story is up, but the poll sticker could not be added', 'warn')
+        } else {
+          showToast(heldStory ? 'Story added — being checked. Only you can see it until it clears.' : 'Story added',
+            heldStory ? 'warn' : 'ok')
+        }
         // refresh the story tray in place — no reload needed
         window.dispatchEvent(new CustomEvent('ika:story-created', { detail: created }))
 
@@ -231,25 +356,52 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         if (text) fd.append('textContent', text)
         // VOICE_POST carries a display label for the audio track (§5 / §6.1).
         if (tab === 'VOICE_POST') fd.append('audioTrackName', (files[0].name || 'Voice note').replace(/\.[^./\\]+$/, ''))
-        if (sound) fd.append('soundId', sound.id) // adopts a Sound (§19), bumps use_count
+        /* A picked Sound needs BOTH halves. `soundId` is bookkeeping — it
+           adopts the sound (§19) and bumps use_count — but the server never
+           copies the sound's audio onto the post, so a post that sent only
+           `soundId` comes back with `audioTrackUrl: null` and the viewer has
+           nothing to play. The track url + label are what make it audible;
+           the RAW url is stored so the value stays host-independent. */
+        if (sound) {
+          fd.append('soundId', sound.id)
+          const url = sound.audioUrlRaw || sound.audioUrl
+          // …#mix=orig,music — the authored balance (see SoundMix.jsx)
+          if (url) fd.append('audioTrackUrl', tab === 'REEL' ? withMix(url, mix) : url)
+          fd.append('audioTrackName', soundLabel(sound))
+        }
         files.forEach(f => fd.append('files', f)) // §6.2 accepts files/media/file/video/image
         const created = await api.posts.createMultipart(fd)
-        onPublished?.(created); showToast('Published')
+        onPublished?.(created); announce(created)
 
       } else {
         // text-only JSON create (POST_API §6.1)
-        const created = await api.posts.create({ postType: tab, visibility: vis, textContent: text, mediaUrls: [], mediaTypes: [], soundId: sound?.id || null })
-        onPublished?.(created); showToast('Published')
+        const created = await api.posts.create({
+          postType: tab, visibility: vis, textContent: text, mediaUrls: [], mediaTypes: [],
+          soundId: sound?.id || null,
+          // see the multipart branch: `soundId` alone is silent
+          audioTrackUrl: sound ? (sound.audioUrlRaw || sound.audioUrl || null) : null,
+          audioTrackName: sound ? soundLabel(sound) : null,
+        })
+        onPublished?.(created); announce(created)
       }
       onClose()
     } catch (e) {
-      showToast(composeError(e))
+      /* Moderation is not a failed request: nothing here is retriable by
+         hammering it, and the text is worth more than the modal. Keep the modal
+         open with the draft where it is and render the server's own words
+         inline — verbatim, undecorated (rule 1 in lib/moderation.js). Everything
+         else stays a toast, because everything else is worth re-trying. */
+      if (isModerationError(e)) { setModErr(e); return }
+      /* 429 → countdown, not a dead end (error guide §2.3): the draft stays
+         where it is and Publish disables for the server's own retry hint. */
+      startCooldown(e)
+      showToast(composeError(e), 'err')
     } finally {
       setBusy(false)
     }
   }
 
-  const disabled = busy || (
+  const disabled = busy || cooldown > 0 || (
     isEdit             ? (tab === 'TEXT' && !text.trim()) :
     tab === 'QUESTION' ? !title.trim() :
     tab === 'TEXT'     ? !text.trim() :
@@ -261,7 +413,7 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
 
   // Footer affordances append to the body text (the @ / # then trigger the
   // usual tag/mention flows as the user keeps typing).
-  const insertToken = (ch) => setText(t => { const s = t || ''; return (s && !/\s$/.test(s) ? s + ' ' : s) + ch })
+  const insertToken = (ch) => { setModErr(null); setText(t => { const s = t || ''; return (s && !/\s$/.test(s) ? s + ' ' : s) + ch }) }
 
   // Story editor is a separate full-screen surface; render it instead of the
   // compose modal while it's open so the canvas gets the whole viewport.
@@ -269,9 +421,21 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
     return (
       <StoryEditor
         initialMedia={storyDraft?.media || files[0] || null}
+        /* The refusal has to travel INTO the editor. A story's caption lives on
+           the editor's stage, not in this modal's textarea, so the only way to
+           act on "this text was refused" is to reopen the editor — which
+           replaces this whole surface. Without these two props the author
+           rewrites the caption with the sentence they are trying to satisfy no
+           longer on screen. */
+        error={modErr}
+        onDismissError={() => setModErr(null)}
         onCancel={() => setStoryEditor(false)}
         onSave={(draft) => {
           setStoryDraft(draft)
+          /* The draft just changed, so the standing refusal is about wording
+             that no longer exists — the same rule editText/editTitle follow.
+             Left standing it would accuse a caption the author already fixed. */
+          setModErr(null)
           setStoryEditor(false)
         }}
       />
@@ -285,7 +449,7 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
           <button className="cm-cancel" onClick={onClose}>Cancel</button>
           <div className="cm-headwrap"><span className="cm-kicker">New entry</span><h3>{heading}</h3></div>
           <button className="btn btn-primary cm-publish" disabled={disabled} onClick={publish}>
-            <Icon name="feather" className="sm"/>{busy ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save' : tab === 'QUESTION' ? 'Post' : tab === 'STORY' ? 'Add' : 'Publish'}
+            <Icon name="feather" className="sm"/>{busy ? (isEdit ? 'Saving…' : 'Posting…') : cooldown > 0 ? `Wait ${cooldown}s` : isEdit ? 'Save' : tab === 'QUESTION' ? 'Post' : tab === 'STORY' ? 'Add' : 'Publish'}
           </button>
         </div>
 
@@ -297,6 +461,20 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
                 <Icon name={t.icon} className="xs"/>{t.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Between the header and the SCROLLING body on purpose: the alert has
+            to stay next to the Publish button that produced it, and anything
+            inside .mbody can be scrolled out of sight the moment the draft is
+            longer than the modal. `onRetry` is inert for posts today — this
+            module only ever throws CONTENT_REJECTED, and <ModerationAlert/>
+            shows the button for CONTENT_UNDER_REVIEW alone — but a re-submit is
+            exactly the right action on the day one of these paths starts
+            answering "not yet" instead of "no". */}
+        {modErr && (
+          <div style={{ padding: '0 16px' }}>
+            <ModerationAlert error={modErr} onRetry={publish} onDismiss={() => setModErr(null)}/>
           </div>
         )}
 
@@ -317,9 +495,9 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
           {tab !== 'STORY' && (
             <div className="cm-sheet">
               {tab === 'QUESTION' && (
-                <input className="field cm-qtitle" dir="auto" placeholder="What would you like to ask?" value={title} onChange={e => setTitle(e.target.value)}/>
+                <input className="field cm-qtitle" dir="auto" placeholder="What would you like to ask?" value={title} onChange={e => editTitle(e.target.value)}/>
               )}
-              <MentionBox as="textarea" className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => setText(e.target.value)}/>
+              <MentionBox as="textarea" className="cm-area" dir="auto" placeholder={PLACEHOLDER[tab]} value={text} onChange={e => editText(e.target.value)}/>
             </div>
           )}
 
@@ -387,8 +565,18 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             <div className={'cm-drop' + (dragOver ? ' over' : '')} onClick={pickFiles} style={{ cursor:'pointer' }} {...dropProps}>
               <Icon name="reels" className="lg"/>
               <b>Attach your reel</b>
-              <span className="text-xs">MP4 or WebM · vertical 9:16 · shown as a plate card</span>
+              <span className="text-xs">MP4 or WebM — or a photo, which plays for {STILL_SECS} seconds · vertical 9:16</span>
             </div>
+          )}
+          {/* A photo reel has no sound of its own: whatever is picked below is
+              the ONLY thing anyone will hear. Say so where the choice is made,
+              rather than letting the author find out after publishing. */}
+          {!isEdit && tab === 'REEL' && stillReel && (
+            <p className="muted text-sm" style={{ marginTop: 10 }}>
+              <Icon name="clock" className="xs"/>{' '}
+              This photo plays for {STILL_SECS} seconds.{' '}
+              {sound ? 'Your chosen sound plays over it.' : 'Add a sound below, or it goes out silent.'}
+            </p>
           )}
           {!isEdit && tab === 'VOICE_POST' && (
             <div className="cm-voice">
@@ -403,6 +591,13 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
 
           {!isEdit && (tab === 'TEXT' || tab === 'EMBEDDED' || tab === 'REEL') && (
             <SoundPicker value={sound} onChange={setSound}/>
+          )}
+          {/* The balance is authored HERE, where the sound was chosen and while
+              the clip is still a local file that can be played instantly — not
+              left to whoever watches it later. Reels only: nothing else on the
+              platform plays a post's added sound. */}
+          {!isEdit && tab === 'REEL' && sound && (
+            <SoundMix sound={sound} mix={mix} onChange={setMix} file={files[0] || null}/>
           )}
 
           {!isEdit && tab === 'QUESTION' && (

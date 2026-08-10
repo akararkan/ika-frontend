@@ -44,6 +44,7 @@ const ChannelPage        = named(() => import('./pages/ChannelPage.jsx'), 'Chann
 const ChannelLinkPage    = named(() => import('./pages/ChannelLinkPage.jsx'), 'ChannelLinkPage')
 const LivePage           = named(() => import('./pages/LivePage.jsx'), 'LivePage')
 const AdminSearchPage    = named(() => import('./pages/AdminSearchPage.jsx'), 'AdminSearchPage')
+const AdminModerationPage = named(() => import('./pages/AdminModerationPage.jsx'), 'AdminModerationPage')
 const QrResolvePage      = named(() => import('./pages/QrResolvePage.jsx'), 'QrResolvePage')
 const PolicyPage         = named(() => import('./pages/PolicyPage.jsx'), 'PolicyPage')
 
@@ -136,6 +137,14 @@ export default function App() {
                   rather than redirecting — see RequireRole. */}
               <Route path="admin/search" element={
                 <RequireRole roles={PLATFORM_ADMIN_ROLES}><AdminSearchPage/></RequireRole>
+              }/>
+              {/* The automated-moderation console: review queue, decision-engine
+                  thresholds and the classifier's own lifecycle. Gated to the
+                  same platform-admin roles — the backend additionally admits
+                  MODERATOR/ANALYST on some of these endpoints, but this app has
+                  no moderator shell to put them in yet. */}
+              <Route path="admin/moderation" element={
+                <RequireRole roles={PLATFORM_ADMIN_ROLES}><AdminModerationPage/></RequireRole>
               }/>
             </Route>
 

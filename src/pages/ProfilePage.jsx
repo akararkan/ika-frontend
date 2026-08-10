@@ -14,6 +14,7 @@ import { useImageRatio, coverStyle } from '../lib/useImageRatio.js'
 import { Loader, EmptyState } from '../components/states.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { openComposeEdit } from '../lib/openCompose.js'
+import { isModerationError, moderationText } from '../lib/moderation.js'
 import { api, assetUrl } from '../api/index.js'
 
 const TABS = [
@@ -95,16 +96,49 @@ export function ProfilePage() {
     setPosts(ps => ps.filter(p => p.id !== id))
     api.posts.remove(id).then(() => showToast('Post deleted')).catch(() => showToast('Could not delete post'))
   }
-  const cardOwnership = (p) => ({ owner: !!me.id && p.author === me.id, onEdit: () => openComposeEdit(p), onDelete: del })
+  /* `onModerationCleared` writes the fresh status back into the row a card was
+     rendered from. It is not cosmetic: PostCard resets its own held state on the
+     PARENT's status, so a list that never updates leaves that state stale and a
+     second hold (an edit that lands borderline) would show no badge at all. */
+  const cardOwnership = (p) => ({
+    owner: !!me.id && p.author === me.id,
+    onEdit: () => openComposeEdit(p),
+    onDelete: del,
+    onModerationCleared: (fresh) => setPosts(ps => ps.map(x => (x.id === p.id ? { ...x, status: fresh.status } : x))),
+  })
 
   // Highlights: create + drag-to-reorder (persisted via PATCH /highlights/order)
   const hid = (h) => h.highlightId || h.id
   const dragIx = React.useRef(null)
+  /* A highlight TITLE is scored text. The backend runs it through
+     submitOrRefuse, which refuses on any verdict that is not APPROVED — merely
+     borderline wording, or the classifier being unreachable, both land as a
+     plain 400 with no held state to fall back on. There is also no rename
+     endpoint, so the only way to fix a name is to type it again.
+     A toast would therefore have thrown away the one thing worth keeping. So
+     the prompt re-opens PRE-FILLED with what was typed, carrying the server's
+     own sentence above the field — verbatim, never decorated with a reason,
+     because the vagueness is the anti-probing measure. Editing is the way out;
+     there is no retry button, and pressing OK on an unchanged title just
+     fails identically. */
   const addHighlight = async () => {
-    const title = (await uiPrompt({ title:'New highlight', label:'Name', initial:'' }))?.trim()
-    if (!title) return
-    try { const h = await api.highlights.create({ authorId: me.id, title }); setHighlights(hs => [...hs, h]); showToast('Highlight created') }   // §17 authorId is read from the body
-    catch { showToast('Could not create highlight') }
+    let draft = ''
+    let notice = null
+    for (;;) {
+      const typed = await uiPrompt({ title:'New highlight', label:'Name', initial: draft, message: notice })
+      if (typed == null) return                 // dismissed — nothing to keep
+      draft = typed
+      const title = typed.trim()
+      if (!title) return
+      try {
+        const h = await api.highlights.create({ authorId: me.id, title })   // §17 authorId is read from the body
+        setHighlights(hs => [...hs, h]); showToast('Highlight created')
+        return
+      } catch (e) {
+        if (!isModerationError(e)) { showToast('Could not create highlight'); return }
+        notice = moderationText(e)
+      }
+    }
   }
   const dropHighlight = (toIx) => {
     const from = dragIx.current; dragIx.current = null

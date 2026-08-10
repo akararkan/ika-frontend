@@ -240,11 +240,11 @@ Routes: `chat`, `chat/requests`, `chat/:id` all mount [ChatPage.jsx](src/pages/C
 | `SeenBySheet` | Group "Seen by" for one message; disambiguates "nobody yet" from "your receipts are off". | [SeenBySheet.jsx](src/components/chat/SeenBySheet.jsx) |
 | `CallOverlay` | The single call surface — ringer, in-call tiles, control bar, and the collapsed pill. Mounted from [Layout.jsx](src/components/Layout.jsx), not from the chat page. | [CallOverlay.jsx](src/components/chat/CallOverlay.jsx) |
 | `StreamTile` (local) | One `<video>` bound imperatively to a `MediaStream`, with an avatar fallback for audio-only peers. | [CallOverlay.jsx](src/components/chat/CallOverlay.jsx) |
-| `deleteIntentOf` | Single source of truth for what `DELETE /conversations/{id}` means to *this* user. | [conversationActions.js](src/components/chat/conversationActions.js) |
+| `deleteIntentOf` / `leaveIntentOf` | Single source of truth for what `DELETE /conversations/{id}` and `POST …/leave` mean to *this* user — including who may press leave at all (`allowed`). | [conversationActions.js](src/components/chat/conversationActions.js) |
 | `MediaLightbox`, `ForwardPicker` (local) | Full-screen media viewer with focus trap; forward-target sheet filtered to `myStatus === 'ACTIVE'`. | [ChatPage.jsx](src/pages/ChatPage.jsx) |
 | `ChannelsPage` | Create / discover / subscribe and the category directory. Reading and posting happen at `/chat/<channelId>` — a channel *is* a conversation. | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx) |
 | `ChannelPage` | A channel's **profile** (`/channels/:id`): cover, verified badge, category, and the admin console entry. Distinct from its timeline. | [ChannelPage.jsx](src/pages/ChannelPage.jsx) |
-| `ChannelManage` | The tabbed admin console — info, settings, admins & rights, invite links, join requests, discussion group + slow mode, statistics. Tabs are gated on the caller's own rights. | [ChannelManage.jsx](src/components/channels/ChannelManage.jsx) |
+| `ChannelManage` | The tabbed admin console — info (+ the owner-only delete), settings, admins & rights, invite links, join requests, discussion group + slow mode, statistics. Tabs are gated on the caller's own rights. | [ChannelManage.jsx](src/components/channels/ChannelManage.jsx) |
 | `PostExtras` | The typed payloads inside a bubble — `PollCard`, `LocationCard`, `ContactCard`, `VideoNote` — plus `PostRail` (tags, signature, view/forward/comment counters). | [PostExtras.jsx](src/components/chat/PostExtras.jsx) |
 | `PostComposer` | Sends the types a textarea can't express: POLL (incl. quiz), LOCATION, CONTACT. | [PostComposer.jsx](src/components/chat/PostComposer.jsx) |
 | `ChannelPanels` | `CommentsPanel` (a post's thread in the linked discussion group) and `TagPanel` (exact `#tag` lookup). Both ride the `.ch-search` slide-over rung. | [ChannelPanels.jsx](src/components/chat/ChannelPanels.jsx) |
@@ -265,6 +265,10 @@ Call it as `onSendText(body)` and the destructure yields `undefined`; `useThread
 **`Composer.onSendFiles({ files, body, durationMs })` — same object form, and `durationMs` is voice-only.** The attachment path sends `{ files: payload, body }`; the recorder's `onstop` sends `{ files: [file], body: '', durationMs, waveform }` — both measured by decoding the finished blob (`waveformOf`), because the recording timer floor-counts whole seconds. Both are also APPENDED to the multipart body best-effort, but **today's backend drops them** (measured: the echo carries neither), so they survive only on the *optimistic* media until `reconcile` swaps in the server's copy. Persisting them server-side is the single change that would make every receiver's clock and waveform correct at first paint. Drop it and voice bubbles flash 0:00; make it positional and the whole payload is `undefined`.
 
 **Return the promise from both handlers if you want the double-send guard.** Composer's `sending` flag exists so the send button can't swap to the MIC between the draft clearing and the request resolving. ChatPage's handlers are block-bodied arrows that do *not* `return thread.sendText(...)`, so `await` resolves on the next microtask and the guard is effectively inert. If you touch this area, return the promise rather than deleting the flag.
+
+**The composer's autogrow depends on the WIDTH as much as on the text.** `resize()` writes `style.height` from `scrollHeight`, capped at 160px. Re-running it only on `text` was not enough: the info / search / starred panels slide into the thread's own row, so the composer can lose ~300px without a keystroke, and a draft measured at the old width kept its height while the re-wrapped text went on living behind an internal scrollbar (measured: needed 172px, box stayed 85px — the last lines simply invisible). A `ResizeObserver` on the textarea re-measures, **gated on the width actually changing** — reacting to the height it just set itself is a feedback loop.
+
+**The composer pill is only a pill at one line.** `999px` is clamped by the browser to half the box, so as the textarea autogrows it keeps re-clamping and a long draft ends up inside a giant lozenge whose curved ends bite into its own first and last lines. `resize()` therefore also sets a `grown` flag — `.ch-inputwrap.grown` relaxes to a 28px rounded rectangle, which is what the resting pill already measures on desktop, so the first wrap changes the height without visibly changing the corner. Two details are load-bearing: the one-line threshold is derived from the textarea's own `lineHeight` + padding (a hard-coded pixel height would silently rot the next time the composer's type changes), and an **empty** box is never `grown` — in a narrow composer the *placeholder* wraps, and squaring an empty envelope over a placeholder is a shape change nobody asked for.
 
 **`Composer.conversationId` is a reset key, not decoration.** The Composer does not unmount between chats (same element, new props), so the unmount teardown never fires on a switch. The `[conversationId]` effect — the file calls it "focus + reset when the conversation or context changes" ([Composer.jsx](src/components/chat/Composer.jsx)) — is what aborts an in-flight `MediaRecorder`. Remove or stabilise that prop and a voice note started in chat A is delivered into chat B.
 
@@ -319,19 +323,24 @@ The quick-react strip (`.ch-quickreact` in [MessageBubble.jsx](src/components/ch
 
 The corollary every call site documents: **do not add a local outside-click handler.** Because the panel lives on `<body>`, a `wrapRef.contains(e.target)` test reads every click *inside* the menu as an outside click and dismisses it before the item runs. Popover owns outside-`pointerdown` (capture, so it closes before the underlying click lands) and Escape; it also ignores pointerdowns on the anchor so the trigger can toggle itself. `ConversationHeader` keeps its own Escape listener only to restore focus to the trigger.
 
-### (d) `deleteIntentOf(convo)` and its three outcomes
+### (d) `deleteIntentOf(convo)` / `leaveIntentOf(convo)` and their four outcomes
 
-`DELETE /conversations/{id}` is overloaded, and the blast radius depends on who you are. [conversationActions.js](src/components/chat/conversationActions.js) turns `{ isGroup, myRole, displayTitle, memberCount, peer }` into `{ destroysForEveryone, label, title, message, confirmLabel }`:
+`DELETE /conversations/{id}` is overloaded, and the blast radius depends on who you are. [conversationActions.js](src/components/chat/conversationActions.js) turns `{ isGroup, isChannel, myRole, displayTitle, memberCount, peer }` into `{ destroysForEveryone, leavesForGood, label, title, message, confirmLabel, toast, sub }`:
 
-| Input | `destroysForEveryone` | Menu label / confirm | What the server does |
+| Input | Flags | Menu label / confirm | What the server does |
 | --- | --- | --- | --- |
-| `isGroup && myRole === 'OWNER'` | `true` | "Delete group" / "Delete for everyone" | soft-deletes the group **for every member**; irreversible |
-| `isGroup && myRole !== 'OWNER'` | `false` | "Clear and hide" / "Clear for me" | per-member `clearedBeforeMessageId` — hides it from your inbox *and* archived list, unpins, zeroes unread; returns on the next message showing only newer ones |
-| DIRECT (either side) | `false` | "Delete chat" / "Delete for me" | same one-sided clear; the peer keeps their copy and is not notified |
+| `isGroup && myRole === 'OWNER'` (group **or channel**) | `destroysForEveryone` | "Delete group" / "Delete channel" — "Delete for everyone" | soft-deletes it **for every member/subscriber**; a channel is de-indexed from discovery too; irreversible |
+| `isChannel && myRole !== 'OWNER'` | `leavesForGood` | "Leave channel" / "Leave channel" | **unsubscribes** — the membership row is removed and the chat leaves your inbox **for good**; it does *not* return on the channel's next post |
+| `isGroup && myRole !== 'OWNER'` | — | "Clear and hide" / "Clear for me" | per-member `clearedBeforeMessageId` — hides it from your inbox *and* archived list, unpins, zeroes unread; returns on the next message showing only newer ones |
+| DIRECT (either side) | — | "Delete chat" / "Delete for me" | same one-sided clear; the peer keeps their copy and is not notified |
 
-Its consumers: the inbox row menu (`ConversationRow` in [ConversationList.jsx](src/components/chat/ConversationList.jsx)) and the info panel's danger row via `ChatPage.onLeaveOrDelete` ([ChatPage.jsx](src/pages/ChatPage.jsx)), which calls the helper and additionally routes non-owner group members to `api.chat.members.leave` instead. The point of centralising it: a call site that labelled this "Hide group" would let an owner destroy a group while believing they were tidying their inbox. `destroysForEveryone` is also what picks the success toast ("Group deleted" vs "Conversation cleared"). Distinct from `POST /archive`, which only moves a conversation to the archived list.
+The channel row is the one to read twice: the **same verb on the same conversation shape is reversible in a group and permanent in a channel**, so "it comes back when someone posts" must never be said about a channel.
 
-`ConversationHeader.doDelete` is the one surface that does **not** use the helper — it hard-codes "Delete chat / This cannot be undone", and it is only reachable for DMs (the `convo.isGroup` branch of its `items` memo pushes "Leave group" instead, [ConversationHeader.jsx](src/components/chat/ConversationHeader.jsx)), so today it is correct by construction. Add a group case to that menu and it becomes the exact mislabel the helper exists to prevent.
+`leaveIntentOf(convo)` is the twin for `POST /conversations/{id}/leave` — which the backend now delegates to unsubscribe on a channel id, so one call serves both kinds. Its `allowed` flag is the whole eligibility rule, in one place: a group member may leave; a **sole** group owner may (the server retires the group with them); a group owner with company may not (`400`); a **channel owner may never**, alone or not (`403`); a DM has no such concept. Every surface asks `allowed` and falls back to `deleteIntentOf` when it is `false` — which is how a lone channel owner stopped being offered a "Leave group" button that could only 403.
+
+Consumers: the inbox row menu (`ConversationRow` in [ConversationList.jsx](src/components/chat/ConversationList.jsx)), the header overflow menu ([ConversationHeader.jsx](src/components/chat/ConversationHeader.jsx)), the info panel's danger row ([ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx), label + `sub` + icon), its action `ChatPage.onLeaveOrDelete` ([ChatPage.jsx](src/pages/ChatPage.jsx)) — and, outside chat entirely, the channel console's danger zone ([ChannelManage.jsx](src/components/channels/ChannelManage.jsx)), which translates its `ChannelResponse` into conversation shape rather than writing the sentence twice. `toast` picks the success line so the same act is never announced two ways.
+
+`ConversationHeader.doDelete` is the one surface that still does **not** use the helper — it hard-codes "Delete chat / This cannot be undone" and is only reachable for DMs, so it is correct by construction. Add a group or channel case to that branch and it becomes the exact mislabel the helper exists to prevent.
 
 
 ## The stylesheet: vocabulary, stacking, responsive
@@ -538,7 +547,7 @@ Everything goes through [src/api/http.js](src/api/http.js) (`http.get(path, quer
 | `members.remove` | `DELETE /{id}/members/{userId}` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
 | `members.setRole` | `POST /{id}/members/{userId}/role` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) (promote + demote) |
 | `members.restrict` | `POST /{id}/members/{userId}/restrict` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
-| `members.leave` | `POST /{id}/leave` | raw | [ConversationHeader.jsx](src/components/chat/ConversationHeader.jsx), [ChatPage.jsx](src/pages/ChatPage.jsx) |
+| `members.leave` | `POST /{id}/leave` | raw | [ConversationHeader.jsx](src/components/chat/ConversationHeader.jsx), [ChatPage.jsx](src/pages/ChatPage.jsx). **Channels too**: on a channel id the server delegates it to unsubscribe, so both surfaces call it for either kind and only the wording differs |
 | `members.transferOwner` | `POST /{id}/transfer-owner` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
 | `members.createInvite` | `POST /{id}/invite-link` | raw `{conversationId, token, expiresAt, maxUses, useCount}` | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx), always `expiresInHours: 168`; `maxUses` never sent |
 | `members.revokeInvite` | `DELETE /{id}/invite-link` | raw | [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) |
@@ -562,7 +571,8 @@ Everything goes through [src/api/http.js](src/api/http.js) (`http.get(path, quer
 | `scheduled.list` | `GET /{id}/scheduled` | `scheduled[]` | on conversation change, and after a fired row lands |
 | `scheduled.cancel` | `DELETE /messaging/scheduled/{id}` | raw (204) | [ScheduledPanel.jsx](src/components/chat/ScheduledPanel.jsx) |
 | `settings.get` / `.update` | `GET`/`PUT /messaging/settings` | `settings` | seeded in [ChatContext.jsx](src/context/ChatContext.jsx) (outside the `Promise.all`, so a deploy without the endpoint still opens the inbox), written by [ChatPrefsPanel.jsx](src/components/chat/ChatPrefsPanel.jsx) |
-| `channels.create` / `.discover` / `.subscribe` / `.unsubscribe` | `/channels…` | `channel` | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx) |
+| `channels.create` / `.discover` / `.subscribe` / `.unsubscribe` | `/channels…` | `channel` | [ChannelsPage.jsx](src/pages/ChannelsPage.jsx). `.unsubscribe` **is** leaving — the row leaves the inbox for good, so both call sites `removeConvo` immediately rather than waiting for the `UNSUBSCRIBED` frame |
+| `channels.remove` | `DELETE /channels/{id}` | `204` | the owner-only danger zone in [ChannelManage.jsx](src/components/channels/ChannelManage.jsx). Deletes the channel **for everyone** and de-indexes it from discovery; `403 NOT_OWNER` for an admin, which is why the section is not rendered for one |
 | `channels.byHandle` | `GET /channels/by-handle/{handle}` | `channel` | the **exact-address fallback** in ChannelsPage's discovery effect — `discover` is a text search, this is an address lookup, and a pasted `@handle` is asking the second question. Fires only when discovery came back empty and the query is handle-shaped; a 404 means "no channel at that address", not an error |
 | `calls.start` / `.accept` / `.decline` / `.end` / `.signal` | `/conversations/{id}/calls`, `/calls/{id}…` | `call` | [CallContext.jsx](src/context/CallContext.jsx) |
 | `calls.get` | `GET /calls/{callId}` | `call` | **UNUSED** — every state transition arrives on the stream as a `call.*` frame carrying the full `CallResponse`, so there is nothing to poll for. It is the natural backing for a "rejoin after a reload" flow, which does not exist yet |
@@ -590,33 +600,33 @@ A row rebuilt by `reload()` loses the flag and re-hydrates on next intent, which
 
 **`messages.get` is still unused.** It is the natural backing for a "jump to message" that is not in the loaded window — but see the floor rules below: it 404s more often than you'd expect.
 
-### `DELETE /conversations/{id}` is two operations behind one call
+### `DELETE /conversations/{id}` is four operations behind one call
 
-The endpoint is overloaded and the client **cannot** encode which one it wants — there is no flag, no query param, no body. `chat.js` just does `http.del('/api/v1/conversations/{id}')`. The server picks the behaviour from your role:
+The endpoint is overloaded and the client **cannot** encode which one it wants — there is no flag, no query param, no body. `chat.js` just does `http.del('/api/v1/conversations/{id}')`. The server picks the behaviour from what you are:
 
-- **Group + you are the OWNER** → soft-deletes the group **for everyone**. Every member loses access, it vanishes from all inboxes, sends and reads start failing. Irreversible. Emits `conversation.updated` with `memberChange: 'DELETED'`.
-- **Group + not the owner, or either side of a DM** → **"delete for me"**. The thread is cleared and hidden on your side only, drops out of *both* the inbox and the archived list, is unpinned, unread zeroed. The peer/group is untouched.
+- **Group or channel + you are the OWNER** → soft-deletes it **for everyone**. Every member loses access, it vanishes from all inboxes, sends and reads start failing; a channel additionally leaves discovery and the by-handle index. Irreversible. Emits `conversation.updated` with `memberChange: 'DELETED'`.
+- **Channel + you are a subscriber** → **leaves the channel.** The membership row is removed (no `LEFT` tombstone, no system message) and the chat is gone from your inbox *for good* — unlike the branch below it does **not** resurface on the channel's next post, because you are no longer a member. Re-subscribing brings back the full history. Emits `member.changed` (`UNSUBSCRIBED`), to the remaining members **and to your own other tabs**.
+- **Group + not the owner, or either side of a DM** → **"delete for me"**. The thread is cleared and hidden on your side only, drops out of *both* the inbox and the archived list, is unpinned, unread zeroed. The peer/group is untouched, and it returns on the next message.
 
-Because the wire call is identical in both cases, the *only* thing standing between an owner and accidentally destroying a group is the UI copy. That is why [conversationActions.js](src/components/chat/conversationActions.js) exists: `deleteIntentOf(convo)` returns the label, confirm title, body and confirm-button text, keyed on `isGroup && myRole === 'OWNER'`.
+Because the wire call is identical in all four cases, the *only* thing standing between an owner and accidentally destroying a room — or a subscriber and a "clear" that is actually permanent — is the UI copy. That is why [conversationActions.js](src/components/chat/conversationActions.js) exists: `deleteIntentOf(convo)` returns the label, confirm title, body, confirm-button text, success toast and one-line `sub`, keyed on `isChannel` and `myRole === 'OWNER'`. Its twin `leaveIntentOf(convo)` does the same for `POST …/leave` and owns the *eligibility* rule in `allowed` — see [§(d)](#d-deleteintentofconvo--leaveintentofconvo-and-their-four-outcomes).
 
 ```js
-const ownsGroup = !!convo?.isGroup && convo?.myRole === 'OWNER'
-// → { destroysForEveryone: true, label: 'Delete group', title: 'Delete this group?',
-//     confirmLabel: 'Delete for everyone', … }
-// → group, not owner:  label: 'Clear and hide', confirmLabel: 'Clear for me'
-// → DM:                label: 'Delete chat',    confirmLabel: 'Delete for me'
+const ownsRoom = !!convo?.isGroup && convo?.myRole === 'OWNER'
+// → { destroysForEveryone: true, label: 'Delete group' | 'Delete channel',
+//     confirmLabel: 'Delete for everyone', toast: 'Group deleted' | 'Channel deleted', … }
+// → channel, not owner: label: 'Leave channel',  confirmLabel: 'Leave channel'  (leavesForGood)
+// → group, not owner:   label: 'Clear and hide', confirmLabel: 'Clear for me'
+// → DM:                 label: 'Delete chat',    confirmLabel: 'Delete for me'
 ```
 
-Its importers are few, and they do not cover every surface:
+Every destructive chat surface now imports it, and none writes its own label:
 
-- **Row menu** — [ConversationList.jsx](src/components/chat/ConversationList.jsx) takes `label`, `title`, `message` and `confirmLabel` straight from the intent. This is the only surface whose *menu item text* is derived.
-- **Info panel danger row** — the panel itself never calls `deleteIntentOf`; its button is statically labelled "Leave group" (groups, owner included) or "Delete conversation" (DMs) and just fires the `onLeave` prop. That prop is `onLeaveOrDelete` in [ChatPage.jsx](src/pages/ChatPage.jsx), which computes `leaving = convo.isGroup && convo.myRole !== 'OWNER'` and, for everyone who is *not* leaving, pulls the confirm dialog from the intent. So a group OWNER clicks a row that says "Leave group" and only learns it destroys the group from the confirm text — the intent is the last line of defence there, not a redundant one.
-- **Header overflow menu** — [ConversationHeader.jsx](src/components/chat/ConversationHeader.jsx) does **not** import `conversationActions.js` at all. `doDelete` hard-codes `title: 'Delete chat'` / `'Delete this conversation from your inbox? This cannot be undone.'` / `confirmLabel: 'Delete'`, and the menu only offers delete for non-groups (`rows.push(convo.isGroup ? {leave} : {delete})`), so the destructive owner path is unreachable from the header. [ChatPage.jsx](src/pages/ChatPage.jsx) says so in a comment: "The header owns its own copy of this for its overflow menu."
+- **Row menu** — [ConversationList.jsx](src/components/chat/ConversationList.jsx) takes `label`, `title`, `message` and `confirmLabel` straight from the intent.
+- **Info panel danger row** — [ConversationInfo.jsx](src/components/chat/ConversationInfo.jsx) renders ONE row whose icon, label and `sub` come from `leaveIntentOf(convo).allowed ? leaveIntentOf : deleteIntentOf`, and `ChatPage.onLeaveOrDelete` re-asks the identical pair to pick the endpoint (`members.leave` vs `deleteConvo`). Button and call can no longer disagree — the old static "Leave group" label sat above a call that, for an owner, destroyed the group.
+- **Header overflow menu** — [ConversationHeader.jsx](src/components/chat/ConversationHeader.jsx) picks its last row the same way: DM → its own hard-coded "Delete chat"; `leaveIntentOf().allowed` → the leave row; otherwise the delete row labelled by `deleteIntentOf`.
+- **Channel console** — [ChannelManage.jsx](src/components/channels/ChannelManage.jsx)'s owner-only danger zone calls the *explicit* `DELETE /channels/{id}` but takes its wording from `deleteIntentOf` given the channel in conversation shape.
 
-If you add a delete affordance that *can* reach a group owner, call `deleteIntentOf` — do not write your own label. Labelling the owner path "Hide group" is a data-loss bug, not a copy nit. Note also that `myRole` comes from the conversation view object, so a stale inbox row can misclassify — and the two surfaces sit on opposite sides of that risk:
-
-- The **row menu** derives label *and* confirm from one `deleteIntentOf(convo)` result, computed while the row renders and captured by the menu item's `run` closure. Those two can never disagree with each other — but if the row is stale, both are stale together, and the confirm silently agrees with a wrong label.
-- The **info panel** is the inverse: `onLeaveOrDelete` calls `deleteIntentOf` at click time against the freshest `convo`, so the *dialog* is current while the button the user actually pressed is static text. For a group owner the confirm is **expected** to contradict its own button — that contradiction is the safety mechanism.
+If you add a delete affordance that *can* reach an owner, call `deleteIntentOf` — do not write your own label. Labelling the owner path "Hide group" is a data-loss bug, not a copy nit. Note also that `myRole` comes from the conversation view object, so a **stale** inbox row can misclassify: the row menu computes label *and* confirm from one result at render time (they agree with each other, and are stale together), while the info panel and the header re-derive at click time against the freshest `convo`.
 
 Also distinct from `POST /{id}/archive`, which only moves a thread to the archived list where it remains fully visible.
 
@@ -962,6 +972,44 @@ none:
 - a **private** channel rejects self-subscribe — you get in through the group
   invite-link flow, so the card shows "Invite only". Discovery never returns a
   private channel, so that arm is reachable only via an exact `@handle` lookup.
+
+#### Leaving and deleting a channel
+
+For a long stretch a channel was the one conversation you could not get rid of:
+`POST /conversations/{id}/leave` answered "group-only action" on a channel id,
+and `DELETE /conversations/{id}` merely hid it — you stayed subscribed and it
+came back on the channel's next post. The backend closed both, with Telegram
+parity, and the frontend follows:
+
+- **Leave** — `POST /conversations/{id}/leave` on a channel id **delegates to
+  unsubscribe**. Identical to `DELETE /channels/{id}/subscribe`: the membership
+  row is removed (no `LEFT` status, no SYSTEM message), `subscriberCount` drops
+  by one, the unread badge is invalidated, remaining members get
+  `member.changed` (`UNSUBSCRIBED`, a −1 delta) and **so do your own other
+  tabs**. Idempotent. The owner still gets `403`.
+- **Delete chat** — `DELETE /conversations/{id}` on a channel id: a subscriber
+  **leaves for good**; the owner **deletes the channel for everyone** (and it
+  leaves the public-channel search index).
+- **Delete channel** — `DELETE /channels/{id}`, owner-only, the explicit form of
+  that second branch. `api.channels.remove`, used by the console's danger zone.
+
+Three consequences the client has to honour, and does:
+
+1. **A channel chat never resurfaces.** The group/DM "delete for me" promise —
+   *it comes back when someone writes* — is false here, so `deleteIntentOf`
+   carries a separate channel branch rather than reusing the group copy.
+2. **`UNSUBSCRIBED` is a departure, not just a counter tick.** [ChatContext](src/context/ChatContext.jsx)
+   treats `mine && UNSUBSCRIBED` exactly like `REMOVED`/`LEFT` (drop the
+   conversation); [ChatPage](src/pages/ChatPage.jsx) tears the open thread down
+   on it; the peer case stays a −1 `memberCount` delta as before. Both
+   unsubscribe call sites also `removeConvo` on the spot, because the person who
+   pressed the button is the one guaranteed to be watching.
+3. **A deleted channel must vanish from the channel surfaces too**, not only
+   from the inbox: [ChannelPage](src/pages/ChannelPage.jsx) switches to its
+   "no longer exists" pane on `DELETED` (re-fetching would only trade it for a
+   404 that explains nothing), and [ChannelsPage](src/pages/ChannelsPage.jsx)
+   drops the discovery row — the grid is a snapshot taken before the
+   de-indexing, and every control on that card would now 404.
 
 `discover` and `by-handle` are different questions and the page asks both:
 text search first, then the exact address lookup **only if** discovery came

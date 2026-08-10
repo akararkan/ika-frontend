@@ -28,6 +28,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Icon, Avatar, Verify, showToast } from '../components/ui.jsx'
 import { FollowButton } from '../components/FollowButton.jsx'
 import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
+import { ModerationAlert } from '../components/Moderation.jsx'
+import { isModerationError } from '../lib/moderation.js'
 import { openShare } from '../components/ShareSheet.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -110,6 +112,7 @@ function EditStream({ stream, onClose, onSaved }) {
   const [title, setTitle] = React.useState(stream?.title || '')
   const [description, setDescription] = React.useState(stream?.description || '')
   const [busy, setBusy] = React.useState(false)
+  const [refused, setRefused] = React.useState(null)
 
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -117,9 +120,20 @@ function EditStream({ stream, onClose, onSaved }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  /* `PATCH /streams/{id}` is a STRICT edit, and the strictness is the whole
+     design: the metadata a live room is showing has already been approved, and
+     the server refuses to swap it for something only half-checked. So a pending
+     verdict comes back as **400 CONTENT_UNDER_REVIEW** rather than a 200 — the
+     previous title keeps serving, the transaction is rolled back, and nothing
+     about the broadcast changes. That is "not yet", not "no": the case settles
+     inside the 30 s STREAM_META ceiling and the same text usually goes through,
+     which is why this modal keeps the draft AND offers a retry. A hard block
+     (CONTENT_REJECTED) reaches the same handler and gets no retry, because
+     <ModerationAlert/> only draws one for the pending code. */
   const submit = async () => {
     if (!title.trim() || busy) return
     setBusy(true)
+    setRefused(null)
     try {
       const s = await api.chat.streams.update(stream.id, {
         title: title.trim(),
@@ -127,6 +141,7 @@ function EditStream({ stream, onClose, onSaved }) {
       })
       onSaved?.(s)
     } catch (e) {
+      if (isModerationError(e)) { setRefused(e); return }
       showToast(chatError(e, 'Could not save the changes'))
     } finally {
       setBusy(false)
@@ -160,6 +175,7 @@ function EditStream({ stream, onClose, onSaved }) {
               You’re live — everyone watching sees the new title straight away.
             </p>
           )}
+          <ModerationAlert error={refused} onRetry={submit} onDismiss={() => setRefused(null)}/>
         </div>
         <div className="ch-modal-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
@@ -331,6 +347,7 @@ function GoLive({ onClose, onStarted }) {
      is the answer that has to be chosen, never the one that happens quietly. */
   const [record, setRecord] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  const [refused, setRefused] = React.useState(null)
 
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
@@ -338,9 +355,23 @@ function GoLive({ onClose, onStarted }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  /* The moderation gate on going live runs INSIDE `POST /streams`, before the
+     stream row exists, and the throw rolls the whole transaction back: no
+     stream, no media path, no follower notification. So a refusal has to stop
+     the go-live flow right here — `onStarted` is what navigates into the room
+     and the room is what asks for the camera and dials WHIP, and none of that
+     may happen for a broadcast the server never created.
+
+     The opposite case needs no handling at all: a HELD stream goes live
+     normally. The 201 comes back unredacted for the host (title, description,
+     ingest and WHIP URLs all present) and video publishes exactly as usual —
+     the only thing deferred is the "@host is live" fan-out to followers, which
+     fires late when the case clears. `LiveStreamResponse` has no moderation
+     field, so that state is invisible from here and nothing may be badged. */
   const submit = async () => {
     if (!title.trim() || busy) return
     setBusy(true)
+    setRefused(null)
     try {
       const s = await api.chat.streams.start({
         title: title.trim(),
@@ -352,6 +383,9 @@ function GoLive({ onClose, onStarted }) {
          and the media server refused", and those need different words. */
       onStarted?.(s, record)
     } catch (e) {
+      // Modal stays open with the title and description intact; the host can
+      // rewrite them and go live without starting the form again.
+      if (isModerationError(e)) { setRefused(e); return }
       showToast(chatError(e, 'Could not start the stream'))
     } finally {
       setBusy(false)
@@ -394,6 +428,10 @@ function GoLive({ onClose, onStarted }) {
             Next you’ll go live straight from your camera — just allow access when
             asked. Prefer OBS or other software? A private ingest URL is there too.
           </p>
+          {/* No retry: creating a stream only ever refuses with
+              CONTENT_REJECTED. The strict CONTENT_UNDER_REVIEW answer belongs
+              to the metadata EDIT (see EditStream), not to go-live. */}
+          <ModerationAlert error={refused} onDismiss={() => setRefused(null)}/>
         </div>
         <div className="ch-modal-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
@@ -1231,6 +1269,26 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
     if (el) el.scrollTop = el.scrollHeight
   }, [lines])
 
+  /* NO MODERATION UI HERE, AND THAT IS DELIBERATE — read this before filing a
+     bug about a line that never showed up.
+
+     Live chat is the one moderated surface with no failure mode a client can
+     observe. `LiveStreamService.chat` scores the text as `LIVE_CHAT` and, if
+     the verdict is rejected — or merely borderline, since
+     `livechat.borderline.hidden` defaults to true — it simply `return`s before
+     the broadcast. The controller is a `ResponseEntity<Void>`, so the sender
+     still gets **200 with an empty body**, byte-identical to a delivered line.
+     There is no error, no held state (LIVE_CHAT is ephemeral: never queued,
+     never revisited), no notification ever (the notifier returns early for
+     ephemeral types), and no SSE echo — the `stream.chat` broadcast is after
+     both returns, and the sender is normally in its recipient list, which is
+     precisely why a delivered line comes back and a dropped one does not.
+
+     So a line CAN vanish with a clean 200 and nothing to render. Inventing a
+     "checking…" state for it would mislabel every ordinary message, since the
+     two are indistinguishable; waiting for the echo before clearing the box
+     would hang the composer for every clean send. The honest client behaviour
+     is the one below: send, clear, and stay quiet. */
   const send = async () => {
     const text = draft.trim()
     if (!text || sending) return
@@ -1241,6 +1299,8 @@ function StreamRoom({ streamId, recordRequested, onExit }) {
       // No optimistic line: the server echoes our own message back on the
       // stream, and a local copy would render it twice with no id to dedupe on.
     } catch (e) {
+      // Reachable only for transport / permission failures — a refusal never
+      // arrives as one.
       showToast(chatError(e, 'Could not send'))
     } finally {
       setSending(false)

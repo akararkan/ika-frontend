@@ -24,6 +24,8 @@
 import React from 'react'
 import { Icon, showToast } from '../ui.jsx'
 import { MentionBox } from '../MentionBox.jsx'
+import { ModerationAlert } from '../Moderation.jsx'
+import { isModerationError } from '../../lib/moderation.js'
 import { Popover } from './Popover.jsx'
 import { ACTIVITY, uploadActivityOf } from './activity.js'
 
@@ -142,6 +144,19 @@ export function Composer({
   onCommitEdit,
   onCancelReply,
   onCancelEdit,
+  /* An automated-moderation refusal for the last send/edit, lifted to the
+     parent for the same reason `draft` is: the page owns what has to survive
+     it (the draft, the reply target, the open edit box), so it also owns the
+     one piece of state that says why. `null` when there is nothing to say. */
+  moderationError = null,
+  onClearModeration,
+  /* Files handed back after a RETRY was refused. The composer clears its tray
+     when a send fails on the wire, and the retry path then deletes the outbox
+     entry that held the File objects — so without this the attachments are
+     gone by the time the author is asked to reword the caption. Consumed once,
+     then acknowledged through `onRestaged`. */
+  restageFiles = null,
+  onRestaged,
   onTyping,
   onSchedule,
   onOpenScheduled,
@@ -194,13 +209,48 @@ export function Composer({
   const text = draft
 
   /* ---------- autogrow ---------- */
+  /* Has the draft outgrown a single line? The envelope's border-radius turns
+     on it: a pill is the right shape for one line and a lozenge for six (see
+     `.ch-inputwrap.grown`). */
+  const [grown, setGrown] = React.useState(false)
   const resize = React.useCallback(() => {
     const ta = taRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    ta.style.height = `${Math.min(160, ta.scrollHeight)}px`
+    const h = Math.min(160, ta.scrollHeight)
+    ta.style.height = `${h}px`
+    /* Measured from the element's OWN metrics, never a hard-coded pixel
+       height, so changing the composer's font or padding cannot silently
+       break the test. An empty box is never "grown": in a narrow composer the
+       placeholder itself wraps, and squaring the corners of an empty envelope
+       because of a placeholder would be a shape change nobody asked for. */
+    const cs = getComputedStyle(ta)
+    const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45
+    const oneLine = line + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+    setGrown(ta.value.length > 0 && h > oneLine + 4)
   }, [])
   React.useEffect(() => { resize() }, [text, resize])
+
+  /* The height depends on the WIDTH as much as on the text, and the width
+     moves on its own here: the info / search / starred panels slide into the
+     same row as the thread, so the composer can lose 300px without a single
+     keystroke. The measurement above only re-ran on `text`, so the box kept a
+     height computed for the old width and the re-wrapped draft went on living
+     behind an internal scrollbar — with the last lines simply not visible.
+     Gated on the width having actually changed: reacting to the height we
+     just set ourselves would be a feedback loop. */
+  React.useEffect(() => {
+    const ta = taRef.current
+    if (!ta || typeof ResizeObserver === 'undefined') return undefined
+    let lastWidth = ta.clientWidth
+    const ro = new ResizeObserver(() => {
+      if (ta.clientWidth === lastWidth) return
+      lastWidth = ta.clientWidth
+      resize()
+    })
+    ro.observe(ta)
+    return () => ro.disconnect()
+  }, [resize])
 
   /* ---------- focus + reset when the conversation or context changes ---------- */
   /* Mirrors the prop for the async tail of recorder.onstop: the waveform
@@ -242,6 +292,17 @@ export function Composer({
   }, [])
   React.useEffect(() => () => revokeAll(), [revokeAll])
 
+  /* Revoke ONE tray's previews rather than all of them. The tray now outlives
+     the request that is uploading it (see `submit`), so a file picked while
+     that upload is still running would have its preview killed by a blanket
+     revoke the moment the earlier send landed. */
+  const revokeTray = React.useCallback((tray) => {
+    const dead = new Set((tray || []).map(t => t.url).filter(Boolean))
+    if (!dead.size) return
+    dead.forEach(u => { try { URL.revokeObjectURL(u) } catch { /* noop */ } })
+    previewsRef.current = previewsRef.current.filter(u => !dead.has(u))
+  }, [])
+
   /* ---------- emoji popover dismissal ---------- */
   /* Dismissal is Popover's — the picker portals to <body>, so a
      contains() test against this wrapper would read every emoji click as an
@@ -262,6 +323,16 @@ export function Composer({
       return [...prev, ...added]
     })
   }, [previewFor])
+
+  /* Re-stage the files handed back by a refused RETRY. Consumed exactly once:
+     onRestaged() clears the parent's copy, so `restageFiles` is null on the
+     next render and the guard below stops a second staging even if addFiles
+     changes identity in between. */
+  React.useEffect(() => {
+    if (!restageFiles?.length) return
+    addFiles(restageFiles)
+    onRestaged?.()
+  }, [restageFiles, addFiles, onRestaged])
 
   const removeFile = (idx) => setFiles(prev => prev.filter((_, i) => i !== idx))
 
@@ -295,21 +366,44 @@ export function Composer({
 
     if (editing) {
       if (!body) return
-      onCommitEdit?.(body)
-      onDraftChange?.('')
-      stopTyping()
+      /* AWAITED, and the box is emptied only once the server has taken it.
+         `onCommitEdit` used to be fired and forgotten with the draft cleared on
+         the next line, so a rejection — a moderation block above all, where the
+         old wording survives and the NEW wording is the only copy in
+         existence — arrived with the typed text already thrown away. The page
+         keeps `editing` open on a failure for the same reason. */
+      setSending(true)
+      try {
+        await onCommitEdit?.(body)
+        onDraftChange?.('')
+        stopTyping()
+      } catch { /* the page renders the reason and keeps the box open */ }
+      finally { setSending(false) }
       return
     }
 
     if (files.length) {
-      const payload = files.map(f => f.file)
-      setFiles([])
-      revokeAll()
+      /* The tray is held until the request settles. On a moderation refusal the
+         multipart controller has already DELETED the objects it put in R2, so
+         there is nothing on the server to resume from and these exact files
+         have to go up again — which is impossible if the tray was emptied
+         before the verdict landed. Every other outcome clears it as before, so
+         a transport failure still hands off to the failed bubble's retry rather
+         than leaving the files staged in two places at once. */
+      const tray = files
+      const payload = tray.map(f => f.file)
       onDraftChange?.('')
       setSending(true)
+      let refused = false
       // The receiver sees "sending a photo…" for as long as the upload runs.
       try { await withActivity(uploadActivityOf(payload), () => onSendFiles?.({ files: payload, body })) }
+      catch (e) { refused = isModerationError(e) }
       finally { setSending(false) }
+      if (!refused) {
+        // Functional, because a file picked DURING the upload must survive.
+        setFiles(prev => prev.filter(f => !tray.includes(f)))
+        revokeTray(tray)
+      }
       return
     }
 
@@ -326,11 +420,14 @@ export function Composer({
     } catch (e) {
       /* Over quota. The server's own `Retry-After` beats the local guess —
          another device may have sent in this window, so our countdown was
-         never running. http.js has already surfaced the toast. */
+         never running. http.js has already surfaced the toast.
+         A moderation refusal also lands here; it needs nothing from the
+         composer beyond not being treated as a send that happened — the page
+         puts the draft back and hands us `moderationError` to render. */
       if (e?.status === 429) setCooldown(e.retryAfterSeconds ?? slowModeSeconds ?? 5)
     } finally { setSending(false) }
   }, [sending, text, files, editing, onCommitEdit, onDraftChange, onSendFiles, onSendText,
-      revokeAll, stopTyping, withActivity, slowModeSeconds, silent])
+      revokeTray, stopTyping, withActivity, slowModeSeconds, silent])
 
   /* One interval for the whole countdown, torn down when it reaches zero —
      not a fresh timeout per tick, which would drift. */
@@ -359,6 +456,9 @@ export function Composer({
   const onChange = (e) => {
     const v = e.target.value.slice(0, MAX_BODY)
     onDraftChange?.(v)
+    // Editing the refused text IS the answer to the refusal — the notice has
+    // done its job and standing there while the rewrite happens only nags.
+    if (moderationError) onClearModeration?.()
     if (v.trim()) onTyping?.(true, ACTIVITY.TYPING)
   }
 
@@ -451,8 +551,15 @@ export function Composer({
            past the [conversationId] abort (recRef.recorder is already null).
            Same rule as that abort: a switch cancels the note. */
         if (convoIdRef.current !== conversationId) return
-        await withActivity(ACTIVITY.SENDING_VOICE,
-          () => onSendFiles?.({ files: [file], body: '', durationMs: durationMs ?? secs * 1000, waveform }))
+        /* A voice note carries no text, so the server opens no moderation case
+           for it at all (an empty submission short-circuits to a passthrough)
+           — but `onSendFiles` can now REJECT, and an unhandled rejection out of
+           a MediaRecorder callback is not catchable by anything upstream. The
+           thread store has already shown whatever there was to show. */
+        try {
+          await withActivity(ACTIVITY.SENDING_VOICE,
+            () => onSendFiles?.({ files: [file], body: '', durationMs: durationMs ?? secs * 1000, waveform }))
+        } catch { /* reported by the store / the page */ }
       }
 
       recorder.start()
@@ -505,6 +612,23 @@ export function Composer({
         addFiles(e.dataTransfer?.files)
       }}
     >
+      {/* Automated moderation refused the last send or edit. It belongs HERE,
+          against the box that still holds the text, rather than in a toast that
+          slides away while the author is re-reading what they wrote.
+
+          No `onRetry` is passed, and that is the contract rather than an
+          omission: a message block is `CONTENT_REJECTED`, which means this
+          exact wording was scored and refused, and resubmitting it can only be
+          refused identically. `CONTENT_UNDER_REVIEW` — the one moderation
+          state where retrying IS honest — is never returned for a message; it
+          exists only on the three metadata edits (channel, group, stream), so
+          <ModerationAlert/> will never render a retry from this call site.
+
+          The copy is the server's, verbatim: no category, no score, no echo of
+          the offending phrase. The vagueness is anti-probing and re-adding the
+          detail here would hand back exactly what the backend withheld. */}
+      <ModerationAlert error={moderationError} onDismiss={onClearModeration}/>
+
       {/* Disappearing messages are enforced at WRITE time, so the warning
           belongs on the composer, not the thread: everything typed from here
           expires, while the history above it does not. */}
@@ -670,7 +794,7 @@ export function Composer({
             onChange={(e) => { addFiles(e.target.files); e.target.value = '' }}
           />
 
-          <div className="ch-inputwrap">
+          <div className={'ch-inputwrap' + (grown ? ' grown' : '')}>
             {/* @-autocomplete rides the same MentionBox as posts/Q&A/research —
                 the backend extracts mentions from the body and rings a
                 dedicated MESSAGE_MENTION bell (through mute and presence), so

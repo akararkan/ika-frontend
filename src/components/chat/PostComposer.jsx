@@ -17,6 +17,8 @@
    ========================================================= */
 import React from 'react'
 import { Icon, showToast } from '../ui.jsx'
+import { ModerationAlert } from '../Moderation.jsx'
+import { isModerationError } from '../../lib/moderation.js'
 import { api } from '../../api/index.js'
 import { chatError } from './chatErrors.js'
 
@@ -31,6 +33,12 @@ const MAX_OPTIONS = 10
 export function PostComposer({ conversationId, replyToId, onClose, onSent }) {
   const [kind, setKind] = React.useState('POLL')
   const [busy, setBusy] = React.useState(false)
+  /* These payloads carry more moderated text than a plain message does: the
+     server scores `poll_question` and every `poll_option[i]` separately, plus
+     `location_name` / `location_address` and the contact's first and last name.
+     Any one of them can refuse the whole send, and the refusal never says
+     which — so the form stays exactly as it is and the author re-reads it. */
+  const [refused, setRefused] = React.useState(null)
 
   // poll
   const [question, setQuestion] = React.useState('')
@@ -82,6 +90,7 @@ export function PostComposer({ conversationId, replyToId, onClose, onSent }) {
   const send = async () => {
     if (!ready || busy) return
     setBusy(true)
+    setRefused(null)
     try {
       const base = { clientNonce: api.chat.newNonce(), type: kind, replyToId: replyToId ?? undefined }
       const payload =
@@ -115,10 +124,17 @@ export function PostComposer({ conversationId, replyToId, onClose, onSent }) {
           },
         }
 
+      /* A HELD poll is indistinguishable from a clean one here: the 201 carries
+         a complete MessageResponse and the DTO has no moderation field at all,
+         so there is nothing to badge and nothing to watch. It simply does not
+         reach anyone else until it clears. */
       const msg = await api.chat.messages.send(conversationId, payload)
       onSent?.(msg)
       onClose?.()
     } catch (e) {
+      // Refused: nothing was written, so the modal stays open with every
+      // option, coordinate and name exactly where the author left it.
+      if (isModerationError(e)) { setRefused(e); return }
       showToast(chatError(e, 'Could not send that'))
     } finally { setBusy(false) }
   }
@@ -135,6 +151,13 @@ export function PostComposer({ conversationId, replyToId, onClose, onSent }) {
         </div>
 
         <div className="ch-modal-body cn-modal-body single">
+          {/* Above the form, not below the Send button: it is the answer to the
+              press that just happened, and the fields it refers to are what the
+              author is about to scroll through. No retry — a message send only
+              ever refuses with CONTENT_REJECTED, which is final for this exact
+              wording. */}
+          <ModerationAlert error={refused} onDismiss={() => setRefused(null)}/>
+
           <div className="pc-kinds" role="tablist" aria-label="What to send">
             {KINDS.map(([k, label, icon, hint]) => (
               <button key={k} role="tab" aria-selected={kind === k}

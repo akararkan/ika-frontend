@@ -27,12 +27,39 @@ export function EmptyState({ icon = 'feed', title = 'Nothing here yet', sub }) {
   )
 }
 
-export function ErrorState({ message = 'Something went wrong', onRetry }) {
+export function ErrorState({ message = 'Something went wrong', onRetry, traceId }) {
   return (
     <div className="card t-error">
       <p>{message}</p>
+      {/* Every error envelope carries a traceId and the server logged a
+          matching line before answering — quoting it turns "it broke" into a
+          greppable incident (error guide §1.1 rule 3). */}
+      {traceId && <p className="muted text-xs" style={{ marginTop: 6 }}>Ref: <code>{traceId}</code></p>}
       {onRetry && <button className="btn btn-secondary btn-sm mt-12" onClick={onRetry}><Icon name="settings" className="xs"/>Try again</button>}
     </div>
+  )
+}
+
+/** Inline caveat on a SUCCESSFUL response (error guide §3): some 200 bodies
+ *  carry `note` / `warning` fields that are part of the API contract — a
+ *  capped listing, a series that starts at collector deployment, a degraded
+ *  source. Render them next to the data they qualify; silently dropping one
+ *  turns an honest partial answer into a lie. `warning` outranks `note`. */
+export function ResponseCaveat({ note, warning }) {
+  if (!warning && !note) return null
+  return (
+    <>
+      {warning && (
+        <p className="rc-warn" role="alert">
+          <Icon name="alert" className="xs"/><span>{warning}</span>
+        </p>
+      )}
+      {note && (
+        <p className="rc-note">
+          <Icon name="info" className="xs"/><span>{note}</span>
+        </p>
+      )}
+    </>
   )
 }
 

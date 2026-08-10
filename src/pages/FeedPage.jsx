@@ -435,6 +435,13 @@ export function FeedPage() {
                     <PostCard key={key} post={p} index={i} onLike={like} onSave={save} onShare={share}
                       onOpenComments={() => navigate(`/posts/${p.id}`)}
                       owner={p.source === 'SELF' || (!!me.id && p.author === me.id)}
+                      /* Push the cleared status back into the row. Without this
+                         the list keeps its stale 'PENDING_REVIEW' forever, and
+                         because the card resets its local state on the PARENT's
+                         status, a SECOND hold — an edit that lands borderline —
+                         would find that state unchanged and render no badge at
+                         all. Syncing here is what makes the reset key work. */
+                      onModerationCleared={fresh => patch(p.id, x => ({ ...x, status: fresh.status }))}
                       onEdit={() => openComposeEdit(p)} onDelete={del}/>
                   )
                 }

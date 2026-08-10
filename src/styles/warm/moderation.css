@@ -1,0 +1,105 @@
+/* =========================================================
+   MODERATION — the author-facing layer            prefix: .mod-
+   Components: src/components/Moderation.jsx · contract: src/lib/moderation.js
+
+   Three surfaces, one idea: a hold is a WAIT, not a punishment, and it should
+   look like one. Amber for "checking", blue for "a person has it", red only for
+   an actual refusal. Nothing here shouts — the overwhelming majority of holds
+   clear before the user finishes reading the badge.
+
+   Colour comes from the theme-complete aliases (--warn / --warn-wash, --blue /
+   --wash) wherever a pair exists in BOTH themes, so most of this file needs no
+   dark repair at all. The one exception is the red pair, whose wash is
+   light-only; its dark case lives in warm/dark.css §MODERATION, per the
+   convention in that file's head comment.
+   ========================================================= */
+
+/* ---------- the chip on a held item ---------- */
+.mod-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:999px;
+  font-size:11.5px;font-weight:700;line-height:1.5;letter-spacing:.01em;
+  border:1px solid transparent;vertical-align:middle;
+}
+.mod-badge .ico{width:12px;height:12px}
+.mod-badge.mod-checking{color:var(--warn);background:var(--warn-wash)}
+.mod-badge.mod-review{color:var(--ox-blue-mid);background:var(--ox-sky-wash)}
+.mod-badge.mod-removed{color:var(--ox-red);background:var(--ox-red-wash)}
+
+/* A held card is still the author's card — it is dimmed, never hidden.
+   `filter` rather than `opacity` on the media alone would fight every nested
+   stacking context in the feed, so the whole card carries one tint. */
+.mod-held{position:relative}
+.mod-held > *:not(.mod-note):not(.mod-badge){opacity:.72}
+.mod-held .pc-media,
+.mod-held .mod-veil{position:relative}
+
+/* Media inside a held item: readable, obviously not published. */
+.mod-veil{
+  position:absolute;inset:0;z-index:2;
+  display:flex;align-items:flex-end;justify-content:flex-start;
+  padding:10px;pointer-events:none;
+  background:linear-gradient(to top,rgba(0,33,71,.55),rgba(0,33,71,0) 55%);
+}
+
+/* Affordances that cannot work yet (nobody can like what nobody can see).
+   Kept in the DOM and aria-disabled rather than removed, so the row does not
+   reflow the moment a verdict lands. */
+.mod-off{opacity:.45;pointer-events:none}
+
+/* ---------- the explaining banner ---------- */
+.mod-note{
+  display:flex;gap:11px;align-items:flex-start;
+  margin:12px 0;padding:12px 14px;border-radius:var(--r-sm);
+  font-size:13px;line-height:1.55;
+}
+.mod-note-ic{flex:none;display:flex;margin-top:1px}
+.mod-note-ic .ico{width:16px;height:16px}
+.mod-note-body{min-width:0}
+.mod-note-title{display:block;font-size:13.5px;font-weight:800;margin-bottom:2px}
+.mod-note-tx{margin:0;color:inherit;opacity:.92}
+.mod-note-link{
+  display:inline-block;margin-top:7px;
+  color:inherit;font-weight:700;text-decoration:underline;
+}
+.mod-note.mod-checking{background:var(--warn-wash);color:var(--warn)}
+.mod-note.mod-review{background:var(--ox-sky-wash);color:var(--ox-blue-mid)}
+.mod-note.mod-removed{background:var(--ox-red-wash);color:var(--ox-red)}
+
+/* ---------- the composer refusal ---------- */
+.mod-alert{
+  display:flex;gap:11px;align-items:flex-start;
+  margin:10px 0;padding:12px 14px;border-radius:var(--r-sm);
+  font-size:13px;line-height:1.55;
+  border:1px solid transparent;
+}
+.mod-alert.mod-blocked{background:var(--ox-red-wash);color:var(--ox-red);border-color:var(--ox-red-wash)}
+.mod-alert.mod-pending{background:var(--warn-wash);color:var(--warn);border-color:var(--warn-wash)}
+.mod-alert-ic{flex:none;display:flex;margin-top:1px}
+.mod-alert-ic .ico{width:16px;height:16px}
+.mod-alert-body{flex:1;min-width:0}
+.mod-alert-tx{margin:0;font-weight:600}
+.mod-alert-acts{display:flex;align-items:center;gap:10px;margin-top:8px}
+/* Empty on the blocked path apart from the appeal link — deliberately no retry
+   control, because resubmitting the same text can only fail the same way. */
+.mod-alert-acts:empty{display:none}
+.mod-alert-link{color:inherit;font-weight:700;text-decoration:underline}
+.mod-alert-x{
+  margin-inline-start:auto;display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border:0;border-radius:8px;
+  background:transparent;color:inherit;cursor:pointer;opacity:.7;
+}
+.mod-alert-x:hover{opacity:1;background:rgba(0,0,0,.06)}
+
+/* ---------- density ---------- */
+@media (max-width:600px){
+  .mod-note,.mod-alert{padding:11px 12px;font-size:12.5px}
+  .mod-badge{font-size:11px;padding:2px 8px}
+  /* The chip's label is what makes it comprehensible; the glyph alone is a
+     mystery. Keep the text and let the row wrap instead. */
+  .mod-badge-tx{display:inline}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .mod-badge,.mod-note,.mod-alert{transition:none}
+}

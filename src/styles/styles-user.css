@@ -439,6 +439,129 @@ a.pa-fact:hover{text-decoration:underline;text-underline-offset:2px}
 .cm-attach-row button:hover{background:var(--card-2)}
 
 /* =========================================================
+   Sound picker — .snd-* (the sheet, the chip, the mix)
+   A bottom sheet on phones, a centred card on desktop. Every row
+   can be HEARD before it is chosen, so the play button, the
+   position readout and the failure line all live on the row.
+   ========================================================= */
+.snd-scrim{
+  position:fixed;inset:0;z-index:140;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(13,21,32,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+  animation:sndFade .18s ease;
+}
+@keyframes sndFade{from{opacity:0}to{opacity:1}}
+@keyframes sndUp{from{transform:translateY(18px);opacity:.4}to{transform:none;opacity:1}}
+.snd-sheet{
+  display:flex;flex-direction:column;width:min(560px,100%);max-height:88dvh;
+  background:var(--card);border:1px solid var(--line);border-radius:20px 20px 0 0;
+  box-shadow:var(--shadow-lg);overflow:hidden;animation:sndUp .26s cubic-bezier(.2,.8,.3,1);
+  padding-bottom:env(safe-area-inset-bottom,0);
+}
+@media(min-width:721px){
+  .snd-scrim{align-items:center}
+  .snd-sheet{border-radius:18px;max-height:80dvh}
+}
+.snd-grab{flex:none;width:44px;height:4px;border-radius:999px;background:var(--line);margin:9px auto 2px}
+.snd-top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 8px}
+.snd-top b{font-size:15px}
+
+.snd-search{
+  flex:none;display:flex;align-items:center;gap:9px;margin:0 14px 10px;padding:10px 13px;
+  border-radius:999px;background:var(--card-2);border:1px solid transparent;transition:border-color .15s ease;
+}
+.snd-search:focus-within{border-color:var(--blue)}
+.snd-search .ico{color:var(--muted);flex:none}
+.snd-search input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:15px;color:var(--ink);outline:none}
+.snd-search input::placeholder{color:var(--muted)}
+
+.snd-chips{
+  flex:none;display:flex;align-items:center;gap:8px;padding:0 14px 12px;
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.snd-chips::-webkit-scrollbar{display:none}
+.snd-chip-sep{flex:none;width:1px;height:22px;background:var(--line)}
+.snd-tab{
+  flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:999px;
+  background:var(--card-2);color:var(--ink-soft);font-size:13.5px;font-weight:600;white-space:nowrap;
+  transition:background .15s ease,color .15s ease;
+}
+.snd-tab:hover{background:var(--line-soft,var(--card-2));color:var(--ink)}
+.snd-tab.on{background:var(--ink);color:var(--paper)}
+.snd-tab.on .ico{color:var(--paper)}
+
+.snd-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 14px 6px}
+.snd-sec{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:4px 0 8px}
+.snd-sec h4{font-size:17px;font-weight:700}
+.snd-note{color:var(--muted);font-size:13.5px;line-height:1.5;padding:6px 0}
+
+.snd-row{
+  position:relative;display:flex;align-items:center;gap:6px;
+  padding:9px 0;border-top:1px solid var(--line-soft);
+}
+.snd-row:first-of-type{border-top:none}
+.snd-row.picked{background:var(--blue-wash,var(--card-2));border-radius:12px;padding-inline:8px}
+.snd-row-main{flex:1;min-width:0;display:flex;align-items:center;gap:12px;text-align:start;padding:2px 0}
+.snd-art{
+  position:relative;flex:none;width:46px;height:46px;border-radius:9px;overflow:hidden;
+  background:var(--card-2) center/cover no-repeat;display:grid;place-items:center;color:var(--muted);
+  box-shadow:inset 0 0 0 1px var(--line);
+}
+.snd-meta{min-width:0;display:flex;flex-direction:column;gap:2px}
+.snd-meta b{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.snd-meta small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.snd-row.bad .snd-meta small{color:var(--rose)}
+.snd-save,.snd-play{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;transition:.15s}
+.snd-save{color:var(--muted)}
+.snd-save:hover{background:var(--card-2);color:var(--ink)}
+.snd-save.on{color:var(--blue)}
+.snd-save.on .ico{fill:currentColor}
+.snd-play{background:var(--card-2);color:var(--ink)}
+.snd-play:hover{background:var(--line-soft,var(--line))}
+.snd-play.on{background:var(--ink);color:var(--paper)}
+/* position of the running preview, hairline under its row */
+.snd-prog{position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--line-soft);overflow:hidden}
+.snd-prog i{display:block;height:100%;background:var(--blue);transition:width .2s linear}
+/* three bars, so a playing row is obvious at a glance */
+.snd-eq{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding-bottom:9px;background:rgba(8,14,22,.45)}
+.snd-eq em{width:3px;height:8px;border-radius:2px;background:#fff;animation:sndEq .9s ease-in-out infinite}
+.snd-eq em:nth-child(2){animation-delay:.15s}
+.snd-eq em:nth-child(3){animation-delay:.3s}
+@keyframes sndEq{0%,100%{height:6px}50%{height:16px}}
+.snd-foot{flex:none;padding:8px 14px 12px;border-top:1px solid var(--line-soft);text-align:center}
+
+/* the chosen sound, in the composer */
+.snd-chip{
+  display:flex;align-items:center;gap:11px;margin-top:14px;padding:9px 10px;
+  border:1px solid var(--line);border-radius:14px;background:var(--card-2);
+}
+.snd-chip-art{
+  flex:none;width:40px;height:40px;border-radius:9px;background:var(--card) center/cover no-repeat;
+  display:grid;place-items:center;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line);
+}
+.snd-chip-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.snd-chip-meta b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snd-chip-meta small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snd-chip-btn{flex:none;width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--ink-soft);transition:.14s}
+.snd-chip-btn:hover{background:var(--card)}
+
+/* the pre-publish balance */
+.snd-mix{margin-top:12px;padding:13px 14px 12px;border:1px solid var(--line);border-radius:14px}
+.snd-mix-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.snd-mix-head b{font-size:14px}
+.snd-mix-play{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
+  background:var(--ink);color:var(--paper);font-size:12.5px;font-weight:700;transition:.15s;
+}
+.snd-mix-play:hover{opacity:.88}
+.snd-mix-play.on{background:var(--rose);color:#fff}
+.snd-mix-clip{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.snd-mix-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;margin-top:9px}
+.snd-mix-name{font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snd-mix-pct{font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.snd-mix-row input[type=range]{grid-column:1 / -1;width:100%;height:18px;margin:0;accent-color:var(--blue);cursor:pointer;background:transparent}
+.snd-mix-note{margin-top:9px;font-size:12px;line-height:1.5;color:var(--muted)}
+
+/* =========================================================
    Research composer — .rm-* (MIDAD studio · Jun 2026)
    A full-page, 3-column manuscript desk: left "Contents" rail
    with scroll-spy + completion ticks, a center canvas that reads

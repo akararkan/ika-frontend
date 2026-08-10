@@ -28,10 +28,13 @@
 import React from 'react'
 import { Icon, showToast } from '../ui.jsx'
 import { Loader } from '../states.jsx'
+import { ModerationAlert } from '../Moderation.jsx'
+import { isModerationError } from '../../lib/moderation.js'
 import { uiConfirm } from '../Dialog.jsx'
 import { api } from '../../api/index.js'
 import { channelSettingsTo } from '../../api/chat.js'
 import { chatError } from '../chat/chatErrors.js'
+import { deleteIntentOf } from '../chat/conversationActions.js'
 import { useChat } from '../../context/ChatContext.jsx'
 import { ChannelAdmins, ChannelRequests } from './ChannelAdmins.jsx'
 import { ChannelSubscribers } from './ChannelSubscribers.jsx'
@@ -52,7 +55,7 @@ const SLOW_WORDS = { 10: '10 seconds', 30: '30 seconds', 60: 'minute', 300: '5 m
 /* ---------------------------------------------------------
    Tab 1 — identity: photo, cover, title, handle, category.
    --------------------------------------------------------- */
-function InfoTab({ channel, onChanged }) {
+function InfoTab({ channel, onChanged, isOwner, onDeleted }) {
   const [title, setTitle] = React.useState(channel.title)
   const [description, setDescription] = React.useState(channel.description)
   const [handle, setHandle] = React.useState(channel.handle)
@@ -60,6 +63,10 @@ function InfoTab({ channel, onChanged }) {
   const [isPublic, setIsPublic] = React.useState(channel.publicChannel)
   const [busy, setBusy] = React.useState(false)
   const [uploading, setUploading] = React.useState(null)   // 'photo' | 'cover'
+  /* The refusal (or the still-pending verdict) on the last save. This is one of
+     only three surfaces in the whole app where a HOLD arrives as an error
+     rather than as a 200 — see `save`. */
+  const [refused, setRefused] = React.useState(null)
   const { open, viewer } = useImageViewer()   // tapping the art shows it full-size; the chips still edit it
   const coverAr = useImageRatio(channel.coverUrl)   // the preview takes the cover's own shape
 
@@ -73,20 +80,50 @@ function InfoTab({ channel, onChanged }) {
     || category !== channel.category
     || isPublic !== channel.publicChannel
 
+  /* TWO requests, text first, and they must not be merged back into one.
+     `PATCH /channels/{id}` is @Transactional and submits `title` +
+     `description` to moderation BEFORE it applies anything else, then throws on
+     a non-approved verdict — so a single mixed PATCH loses the category, the
+     handle and the public/private flag to a verdict about the title. Sent
+     apart, a refused rename costs the rename and nothing else.
+
+     Text goes first so that a refusal aborts before the non-text half runs; the
+     reverse order would leave the handle released while the rename bounced.
+
+     The second thing this surface does differently from every other create:
+     **a HOLD is an error here, not a 200.** `PATCH /channels/{id}` answers a
+     pending verdict with 400 CONTENT_UNDER_REVIEW, the previously approved
+     title keeps serving, and the whole patch is rolled back. That is not a
+     refusal — the same text usually lands a moment later once the case settles
+     (30 s ceiling for CHANNEL) — which is why this is one of the few places
+     where <ModerationAlert/> is given an `onRetry` and the retry is honest. */
   const save = async () => {
     if (!title.trim() || needsHandle || busy) return
     setBusy(true)
+    setRefused(null)
     try {
-      const next = await api.channels.update(channel.id, {
-        title: title.trim(),
-        description: description.trim(),
-        handle: isPublic ? cleanHandle : undefined,
-        category: category.trim(),          // an empty string CLEARS it, per the API
-        publicChannel: isPublic,
-      })
+      let next = channel
+      if (title !== channel.title || description !== channel.description) {
+        next = await api.channels.update(channel.id, {
+          title: title.trim(),
+          description: description.trim(),
+        })
+      }
+      if (cleanHandle !== channel.handle || category !== channel.category || isPublic !== channel.publicChannel) {
+        next = await api.channels.update(channel.id, {
+          handle: isPublic ? cleanHandle : undefined,
+          category: category.trim(),        // an empty string CLEARS it, per the API
+          publicChannel: isPublic,
+        })
+      }
       showToast('Channel updated')
       onChanged?.(next)
     } catch (e) {
+      /* Nothing applied, and the form is left exactly as typed — the whole
+         point of the strict-edit contract is that the channel never shows a
+         half-checked name to its subscribers, so the only copy of the new one
+         is in these inputs. `dirty` stays on, which is the truth. */
+      if (isModerationError(e)) { setRefused(e); return }
       showToast(chatError(e, 'Could not save the changes'))
     } finally { setBusy(false) }
   }
@@ -231,6 +268,18 @@ function InfoTab({ channel, onChanged }) {
         )}
       </div>
 
+      {/* Between the form and the save row, where the eye lands after pressing
+          Save. `onRetry` is real here and nowhere else in this file: a channel
+          update is one of the three surfaces that answer a HOLD with 400
+          CONTENT_UNDER_REVIEW, and <ModerationAlert/> draws the button only for
+          that code — a hard block still gets none. */}
+      <ModerationAlert error={refused} onRetry={save} onDismiss={() => setRefused(null)}/>
+
+      {/* Last of the SCROLLING content — the save row below it is sticky and
+          owns the pane's bottom edge, so anything placed after it would scroll
+          underneath the bar and be unreachable. Owner-only; see DangerZone. */}
+      {isOwner && <DangerZone channel={channel} onDeleted={onDeleted}/>}
+
       <div className="cm-save">
         <span className={'cm-dirty' + (dirty ? ' on' : '')} aria-live="polite">
           {dirty ? 'Unsaved changes' : 'All saved'}
@@ -242,6 +291,81 @@ function InfoTab({ channel, onChanged }) {
       </div>
       {viewer}
     </div>
+  )
+}
+
+/* ---------------------------------------------------------
+   Deleting the channel.
+   ---------------------------------------------------------
+   `DELETE /channels/{id}` is **owner-only** and deletes for
+   **everyone**: the channel drops out of every subscriber's
+   inbox at once, posting and reading start failing, discovery
+   and @handle lookups 404, and it is de-indexed from the
+   public-channel search. The member rows and the message log are
+   retained server-side, but nothing in any client can reach them
+   again — so from here it is irreversible, and the confirmation
+   says so with the real subscriber count rather than a generic
+   "are you sure".
+
+   Two decisions worth keeping:
+
+   · The copy is NOT written here. It comes from the same
+     `deleteIntentOf` every chat surface uses, given this channel
+     in conversation shape — one wording for one act, whether it
+     is reached from the console, the inbox row menu or the
+     thread header.
+   · An ADMIN with `canChangeInfo` reaches this very tab, and the
+     server would answer them `403 NOT_OWNER`. The section is
+     therefore not rendered for them at all: a control that can
+     only fail is worse than no control.
+   --------------------------------------------------------- */
+function DangerZone({ channel, onDeleted }) {
+  const [busy, setBusy] = React.useState(false)
+
+  /* The chat surfaces hold a ConversationResponse; this one holds a
+     ChannelResponse. Same channel, two shapes — so translate rather than
+     duplicate the sentence. */
+  const intent = deleteIntentOf({
+    isGroup: true,
+    isChannel: true,
+    myRole: 'OWNER',
+    displayTitle: channel.title,
+    memberCount: channel.subscriberCount,
+  })
+
+  const run = async () => {
+    if (busy) return
+    const ok = await uiConfirm({
+      title: intent.title,
+      message: intent.message,
+      confirmLabel: intent.confirmLabel,
+      danger: true,
+      icon: 'trash',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      await api.channels.remove(channel.id)
+      showToast(intent.toast)
+      onDeleted?.(channel)
+    } catch (e) {
+      showToast(chatError(e, 'The channel could not be deleted'))
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <section className="cm-danger">
+      <h5 className="cm-danger-h">Delete channel</h5>
+      <p className="cm-danger-p">
+        Ends the channel for its {channel.subscriberCount === 1 ? 'subscriber' : 'subscribers'} as
+        well as for you: the chat leaves every inbox, its posts stop being readable, and it
+        disappears from discovery{channel.handle ? <> — links to <b>@{channel.handle}</b> stop resolving</> : null}.
+        There is no undo.
+      </p>
+      <button type="button" className="btn btn-danger cm-danger-btn" disabled={busy} onClick={run}>
+        <Icon name="trash" className="xs"/>{busy ? 'Deleting…' : 'Delete this channel'}
+      </button>
+    </section>
   )
 }
 
@@ -462,7 +586,7 @@ function DiscussionTab({ channel, onChanged }) {
 /* ---------------------------------------------------------
    The shell.
    --------------------------------------------------------- */
-export function ChannelManage({ channel, onClose, onChanged }) {
+export function ChannelManage({ channel, onClose, onChanged, onDeleted }) {
   const { myId, subscribe } = useChat()
   const [tab, setTab] = React.useState('info')
   const [me, setMe] = React.useState(null)          // my own admin row → my rights
@@ -587,7 +711,13 @@ export function ChannelManage({ channel, onClose, onChanged }) {
                   <h4>{TABS.find(t => t[0] === tab)?.[1]}</h4>
                   <p>{TABS.find(t => t[0] === tab)?.[4]}</p>
                 </header>
-                {tab === 'info'       && <InfoTab channel={channel} onChanged={onChanged}/>}
+                {tab === 'info'       && (
+                  <InfoTab channel={channel} onChanged={onChanged}
+                    /* Owner-only, from the admin row — NOT from `myRole`, for
+                       the same reason every other gate here reads `me`. */
+                    isOwner={!!me.isOwner}
+                    onDeleted={(ch) => { onClose?.(); onDeleted?.(ch) }}/>
+                )}
                 {tab === 'settings'   && <SettingsTab channel={channel} onChanged={onChanged}/>}
                 {tab === 'admins'     && <ChannelAdmins channel={channel} myId={myId}/>}
                 {tab === 'subscribers'&& <ChannelSubscribers channel={channel} myId={myId} me={me} subscribe={subscribe}/>}

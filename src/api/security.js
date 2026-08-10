@@ -64,10 +64,17 @@ export const security = {
   /** Run a step-up-guarded action: try it, and when the server answers
    *  403 STEP_UP_REQUIRED, ask the caller to collect credentials (via
    *  `challenge()` → {password} | {code} | null to abort), arm, retry once.
-   *  Panels pass a small prompt-dialog as `challenge`. */
+   *  Panels pass a small prompt-dialog as `challenge`.
+   *
+   *  NOTE: http.js now runs this dance GLOBALLY via <StepUpHost/> — when that
+   *  host is mounted the action just succeeds and this wrapper never fires.
+   *  It survives for two cases: the host was cancelled (err.stepUpCancelled —
+   *  translate to the cancel shape, never prompt a SECOND time), and callers
+   *  running outside the shell where no host is registered. */
   async withStepUp(action, challenge) {
     try { return await action() }
     catch (e) {
+      if (e?.stepUpCancelled) { const err = new Error('Cancelled'); err.cancelled = true; throw err }
       if (e?.status !== 403 || e?.code !== 'STEP_UP_REQUIRED') throw e
       const cred = await challenge()
       if (!cred) { const err = new Error('Cancelled'); err.cancelled = true; throw err }

@@ -286,7 +286,27 @@ export const channels = {
   async update(id, patch) { return channelFrom(await http.patch(`/api/v1/channels/${id}`, patch || {})) },
 
   async subscribe(id)  { return channelFrom(await http.post(`/api/v1/channels/${id}/subscribe`, {})) },  // idempotent
+
+  /** Unsubscribe = leave. `POST /conversations/{id}/leave` on a channel id is
+   *  the SAME operation server-side (it delegates here), so the chat surfaces
+   *  may keep calling `chat.members.leave` — both remove the membership row
+   *  outright: no `LEFT` tombstone, no SYSTEM message, the chat gone from the
+   *  inbox for good. Idempotent (leaving a channel you are not in is a `204`).
+   *  The OWNER cannot leave — `403`; they transfer or `remove()`. */
   unsubscribe(id)      { return http.del(`/api/v1/channels/${id}/subscribe`) },                          // 204
+
+  /** Delete the channel — **owner only**, and for EVERYONE. Soft-delete: it
+   *  drops out of every subscriber's inbox at once, posting/reading start
+   *  failing, discovery and by-handle lookups 404, and it is de-indexed from
+   *  public-channel search. Members and the message log are retained, but
+   *  nothing in the UI can reach them again. Broadcasts `conversation.updated`
+   *  with `memberChange: "DELETED"` to every active member.
+   *
+   *  `DELETE /conversations/{id}` on a channel id is the same thing for an
+   *  owner (and "leave" for everyone else) — this endpoint is the explicit,
+   *  un-overloaded form, so the profile/console call it and can trust `403
+   *  NOT_OWNER` to mean what it says. */
+  remove(id)           { return http.del(`/api/v1/channels/${id}`) },                                    // 204
 
   /* ---------- identity: photo, cover, verified ---------- */
 

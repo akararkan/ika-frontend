@@ -632,6 +632,27 @@
 .cm-dirty.on::before{ background:var(--gold);box-shadow:0 0 0 3px rgba(127,168,206,.18); }
 .cm-save-note{ font-size:12px;color:var(--danger); }
 
+/* Danger zone — the owner's delete, at the foot of the Info pane and set
+   apart from it. Deliberately NOT a red plate: a permanent alarm-coloured
+   panel trains the eye to skip it, and this pane is opened to rename a
+   channel far more often than to end one. So it reads as a quiet closing
+   note — hairline rule, muted prose, the danger carried by the button alone
+   (the app's outline `.btn-danger`, which fills only on hover). */
+.cm-danger{
+  display:grid;gap:8px;justify-items:start;
+  margin-top:8px;padding-top:16px;
+  border-top:1px solid var(--line-soft);
+}
+.cm-danger-h{
+  margin:0;font-family:var(--serif);font-size:14px;font-weight:600;color:var(--danger);
+}
+.cm-danger-p{
+  margin:0;max-width:62ch;
+  font:400 12.5px/1.65 var(--sans);color:var(--muted);
+}
+.cm-danger-p b{ color:var(--ink);font-weight:600; }
+.cm-danger-btn{ display:inline-flex;align-items:center;gap:7px; }
+
 /* =========================================================
    4 · Admins, rights, join requests
    ========================================================= */

@@ -10,8 +10,11 @@ import { MentionBox } from '../components/MentionBox.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { openReport } from '../components/ReportDialog.jsx'
 import { PostCard } from '../components/PostCard.jsx'
-import { Loader, EmptyState } from '../components/states.jsx'
+import { ModerationAlert, ModerationNotice } from '../components/Moderation.jsx'
+import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
+import { isNotFound, errorText, traceRef } from '../api/errors.js'
 import { authorOf } from '../lib/userView.js'
+import { isModerationError, moderationState } from '../lib/moderation.js'
 import { openComposeEdit } from '../lib/openCompose.js'
 import { useRealtime } from '../hooks/useRealtime.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -57,6 +60,8 @@ export function PostPage() {
   const [post, setPost] = React.useState(null)
   const [comments, setComments] = React.useState([])
   const [loading, setLoading] = React.useState(true)
+  const [loadErr, setLoadErr] = React.useState(null)        // the load failure — 404 renders a tombstone, the rest retry+traceId
+  const [retryTick, setRetryTick] = React.useState(0)       // bump to re-run the load effect
   const [live, setLive] = React.useState(false)
   const [text, setText] = React.useState('')
   const [busy, setBusy] = React.useState(false)
@@ -74,7 +79,17 @@ export function PostPage() {
   const [editValue, setEditValue] = React.useState('')
   const [replyTo, setReplyTo] = React.useState(null)       // comment id being replied to
   const [replyText, setReplyText] = React.useState('')
+  const [replyBusy, setReplyBusy] = React.useState(false)
   const [replyTarget, setReplyTarget] = React.useState(null)
+  /* One moderation refusal per composer on this page — the top comment box, the
+     open reply box, and the open edit box. They are separate states because all
+     three can be on screen at once and a refusal belongs to exactly one of them.
+     Each is cleared the moment its own text changes: rewriting is the only way
+     past a block, and a panel left standing would accuse the new words too. */
+  const [cErr, setCErr] = React.useState(null)
+  const [replyErr, setReplyErr] = React.useState(null)
+  const [editErr, setEditErr] = React.useState(null)
+  const [editBusy, setEditBusy] = React.useState(false)
   const [repliesMap, setRepliesMap] = React.useState({})   // commentId → [reply views]
   const [openReplies, setOpenReplies] = React.useState({}) // commentId → shown?
 
@@ -110,6 +125,7 @@ export function PostPage() {
   React.useEffect(() => {
     let alive = true
     setLoading(true)
+    setLoadErr(null)
     seenC.current = new Set()
     delC.current = new Set()
     Promise.all([api.posts.get(id), api.posts.comments(id).catch(() => [])])
@@ -120,11 +136,14 @@ export function PostPage() {
         ;(c || []).forEach(x => seenC.current.add(x.id))
         setPost(p); setComments(c)
       })
-      .catch(() => { if (alive) setPost(false) })
+      /* Keep the error: a 404/*_NOT_FOUND is "this content is gone" (quiet
+         tombstone), anything else is a failure that deserves a retry button
+         and its traceId (error guide §2.5 / §2.9). */
+      .catch((e) => { if (alive) { setLoadErr(e); setPost(false) } })
       .finally(() => { if (alive) setLoading(false) })
     api.posts.recordView(id).catch(() => {})
     return () => { alive = false }
-  }, [id])
+  }, [id, retryTick])
 
   // reflect an in-place edit (PATCH §6.4 broadcasts ika:post-updated)
   React.useEffect(() => {
@@ -264,15 +283,32 @@ export function PostPage() {
     api.posts.remove(id).then(() => { showToast('Post deleted'); navigate('/') }).catch(() => showToast('Could not delete post'))
   }
   // comment edit (PATCH §14.5) / delete (DELETE §14.6) — own comments only
-  const startEdit = (c) => { setEditingId(c.id); setEditValue(c.body || '') }
+  const startEdit = (c) => { setEditErr(null); setEditingId(c.id); setEditValue(c.body || '') }
+  const cancelEdit = () => { setEditingId(null); setEditErr(null) }
   // edits a comment OR a reply (a reply is a comment too, §14.5). Pass the
   // parent comment id when editing a reply so the right list updates.
   const saveEdit = async (cid, parentId = null) => {
-    const v = editValue.trim(); if (!v) return
-    if (parentId) setRepliesMap(m => ({ ...m, [parentId]: (m[parentId] || []).map(r => r.id === cid ? { ...r, body: v } : r) }))
-    else setComments(cs => cs.map(c => c.id === cid ? { ...c, body: v } : c))
-    setEditingId(null)
-    try { await api.posts.editComment(cid, v) } catch { showToast('Could not edit') }
+    const v = editValue.trim(); if (!v || editBusy) return
+    setEditBusy(true); setEditErr(null)
+    try {
+      await api.posts.editComment(cid, v)
+      /* Patch the row only now that the server has taken it. A REJECTED edit is
+         thrown before the write, so the stored comment still holds the OLD text
+         — and this used to patch first and never revert, leaving the refused
+         words on screen as though they had saved. (A HELD edit did apply
+         server-side and is hidden from everyone but us, so writing it in is
+         right in both accepted cases. The endpoint answers 204 with an empty
+         body either way, so the wire cannot tell those two apart — no badge is
+         possible on a comment, see PostCard.) */
+      if (parentId) setRepliesMap(m => ({ ...m, [parentId]: (m[parentId] || []).map(r => r.id === cid ? { ...r, body: v } : r) }))
+      else setComments(cs => cs.map(c => c.id === cid ? { ...c, body: v } : c))
+      setEditingId(null)
+    } catch (e) {
+      // The box stays open with the typed text in it — the only way past a
+      // block is rewriting, and closing it would delete the thing to rewrite.
+      if (isModerationError(e)) setEditErr(e)
+      else showToast('Could not edit', 'err')
+    } finally { setEditBusy(false) }
   }
   const delComment = async (cid) => {
     const ok = await uiConfirm({ title:'Delete this comment?', confirmLabel:'Delete', danger:true, icon:'close' })
@@ -306,19 +342,29 @@ export function PostPage() {
     }
   }
   const submitReply = async (cid) => {
-    const v = replyText.trim(); if (!v) return
+    const v = replyText.trim(); if (!v || replyBusy) return
     const handle = replyTarget?.handle || null
     const body = handle && !new RegExp(`^@${handle}(\\s|$)`, 'i').test(v) ? `@${handle} ${v}` : v
-    setReplyText(''); setReplyTo(null); setReplyTarget(null)
-    const tmp = { id: 'tmp-' + Date.now(), _author: me, author: me.id, body, time: 'now', likes: 0, _replyToHandle: handle }
-    setRepliesMap(m => ({ ...m, [cid]: [...(m[cid] || []), tmp] }))
-    setOpenReplies(o => ({ ...o, [cid]: true }))
-    setComments(cs => cs.map(c => c.id === cid ? { ...c, replyCount: (c.replyCount || 0) + 1 } : c))
-    setPost(p => p ? { ...p, comments: (p.comments || 0) + 1 } : p)
+    setReplyBusy(true); setReplyErr(null)
     try {
       const saved = await api.posts.addReply(cid, { text: body })
-      setRepliesMap(m => ({ ...m, [cid]: (m[cid] || []).map(r => r.id === tmp.id ? saved : r) }))
-    } catch { showToast('Could not post reply') }
+      /* Everything below used to run BEFORE this await: the box emptied and
+         closed, a tmp- row went into the thread and two counters went up — none
+         of it rolled back on failure. A refusal therefore left a phantom reply
+         standing in a thread it was never written to, and took the text it was
+         made of with it. Insert once, after the server has agreed.
+         `_replyToHandle` is kept from the local target because ReplyResponse
+         only carries it when the backend resolved the username itself. */
+      seenC.current.add(saved.id)
+      setRepliesMap(m => ({ ...m, [cid]: [...(m[cid] || []), { ...saved, _replyToHandle: saved._replyToHandle || handle }] }))
+      setOpenReplies(o => ({ ...o, [cid]: true }))
+      setComments(cs => cs.map(c => c.id === cid ? { ...c, replyCount: (c.replyCount || 0) + 1 } : c))
+      setPost(p => p ? { ...p, comments: (p.comments || 0) + 1 } : p)
+      setReplyText(''); setReplyTo(null); setReplyTarget(null)
+    } catch (e) {
+      if (isModerationError(e)) setReplyErr(e)     // box stays open, text intact
+      else showToast('Could not post reply', 'err')
+    } finally { setReplyBusy(false) }
   }
   const reactReply = (cid, rid) => {
     const flip = () => setRepliesMap(m => ({ ...m, [cid]: (m[cid] || []).map(r => r.id === rid ? { ...r, liked: !r.liked, likes: (r.likes || 0) + (r.liked ? -1 : 1) } : r) }))
@@ -337,16 +383,36 @@ export function PostPage() {
   }
 
   const submit = async () => {
-    const value = text.trim(); if (!value) return
-    setText(''); setBusy(true)
-    const tmp = { id:'tmp-' + Date.now(), _author: me, body:value, time:'now', likes:0 }
-    setComments(cs => [...cs, tmp]); setPost(p => ({ ...p, comments:(p.comments||0)+1 }))
+    const value = text.trim(); if (!value || busy) return
+    setBusy(true); setCErr(null)
     try {
       const saved = await api.posts.addComment(id, { text: value })
-      setComments(cs => cs.map(c => c.id === tmp.id ? saved : c))
-    } catch { showToast('Could not post comment') }
-    setBusy(false)
+      /* Row, counter and the emptying of the box all happen HERE, after the
+         server has accepted it. They used to happen first and never roll back,
+         so a refusal left a phantom comment in the thread, a comment count that
+         had counted it, and an empty box where the text had been. A moderation
+         400 turns that from a network-failure curiosity into a routine outcome.
+         (A HELD comment lands here too and is indistinguishable from a clean
+         one — CommentResponse carries no marker — which costs us nothing: the
+         server's read filter keeps showing an author their own held comment.)
+         Ledgering the id is what stops the counter drifting when the hold later
+         clears: the applier re-publishes the comment, and the author's own SSE
+         stream then delivers a COMMENT_CREATED for a row already on screen. The
+         row dedupes by id; the +1 next to it does not. */
+      seenC.current.add(saved.id)
+      setComments(cs => [...cs, saved])
+      setPost(p => p ? { ...p, comments: (p.comments || 0) + 1 } : p)
+      setText('')
+    } catch (e) {
+      if (isModerationError(e)) setCErr(e)         // draft stays in the box
+      else showToast('Could not post comment', 'err')
+    } finally { setBusy(false) }
   }
+
+  /* Only the author sees anything moderation-related about their own post:
+     everyone else either sees a published post or gets a 404 from this route. */
+  const iAmAuthor = !!me.id && !!post && post.author === me.id
+  const postModState = moderationState(post)
 
   return (
     <div className="main center">
@@ -354,15 +420,33 @@ export function PostPage() {
         <button className="back-btn" onClick={() => navigate(-1)}><Icon name="chevleft" className="sm"/>Back</button>
 
         {loading ? <Loader label="Loading post…"/>
-          : !post ? <EmptyState icon="feed" title="Post not found" sub="It may have been removed."/>
+          : !post ? (
+            loadErr && !isNotFound(loadErr)
+              ? <ErrorState message={errorText(loadErr, 'Could not load this post.')} traceId={traceRef(loadErr)} onRetry={() => setRetryTick(t => t + 1)}/>
+              : <EmptyState icon="feed" title="This post is no longer available" sub="It may have been removed, or the link is stale."/>
+          )
           : (
             <>
+              {/* The page-level explainer for the post's own author: what state
+                  it is in, who can see it, what happens next. GET /posts/{id}
+                  is the ONE endpoint that still serves a held post (author or
+                  admin, else 404), so this page is where an author who followed
+                  the composer's link actually finds their post — every list
+                  drops it. The badge itself rides on the card below, and the
+                  card also owns the re-check; it hands the cleared post up
+                  through onModerationCleared so this banner retires with it
+                  rather than polling the same id a second time. */}
+              {iAmAuthor && postModState !== 'live' && (
+                <ModerationNotice state={postModState} kind="post"/>
+              )}
+
               {/* `inlineComments={false}`: this page already renders the whole
                   thread below, so the card must not expand a second copy of it.
                   Its comment button (and "View all") jumps to the real one. */}
               <PostCard post={post} onLike={like} onSave={save} onShare={share}
                 inlineComments={false} onOpenComments={focusComments}
-                observeView={false} owner={!!me.id && post.author === me.id} onEdit={() => openComposeEdit(post)} onDelete={delPost}/>
+                observeView={false} owner={iAmAuthor} onEdit={() => openComposeEdit(post)} onDelete={delPost}
+                onModerationCleared={p => setPost(prev => (prev ? { ...prev, status: p.status } : prev))}/>
 
               <div className="card card-pad" ref={commentsBoxRef} style={{ marginTop:14 }}>
                 <h3 className="title">
@@ -373,9 +457,15 @@ export function PostPage() {
                 <div className="cmt-box" style={{ marginTop:0, marginBottom:8 }}>
                   <Avatar initials={me.initials} color={me.avc} size={32} src={me.profileImage}/>
                   <MentionBox className="field" placeholder="Write a thoughtful reply…" value={text}
-                    onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submit() }}/>
+                    onChange={e => { setCErr(null); setText(e.target.value) }} onKeyDown={e => { if (e.key==='Enter') submit() }}/>
                   <button className="icon-btn" disabled={busy || !text.trim()} onClick={submit}><Icon name="send" className="sm"/></button>
                 </div>
+                {/* Verbatim, undecorated, and attached to the box it belongs to.
+                    `onRetry` only ever renders for CONTENT_UNDER_REVIEW, which
+                    no post-module path throws today — a block gets no retry
+                    button, because resubmitting the same words can only fail the
+                    same way. */}
+                <ModerationAlert error={cErr} onRetry={submit} onDismiss={() => setCErr(null)}/>
 
                 {comments.map((c, i) => {
                   const cu = authorOf(c)
@@ -386,13 +476,16 @@ export function PostPage() {
                       <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(c.author)}><Avatar initials={cu.initials} color={cu.avc} size={32} src={cu.profileImage}/></span>
                       <div className="cmt-col">
                         {editing ? (
-                          <div className="cmt-box" style={{ marginTop:0 }}>
-                            <input className="field" value={editValue} autoFocus
-                              onChange={e => setEditValue(e.target.value)}
-                              onKeyDown={e => { if (e.key==='Enter') saveEdit(c.id); if (e.key==='Escape') setEditingId(null) }}/>
-                            <button className="icon-btn" disabled={!editValue.trim()} onClick={() => saveEdit(c.id)}><Icon name="check" className="sm"/></button>
-                            <button className="icon-btn" onClick={() => setEditingId(null)}><Icon name="close" className="sm"/></button>
-                          </div>
+                          <>
+                            <div className="cmt-box" style={{ marginTop:0 }}>
+                              <input className="field" value={editValue} autoFocus
+                                onChange={e => { setEditErr(null); setEditValue(e.target.value) }}
+                                onKeyDown={e => { if (e.key==='Enter') saveEdit(c.id); if (e.key==='Escape') cancelEdit() }}/>
+                              <button className="icon-btn" disabled={editBusy || !editValue.trim()} onClick={() => saveEdit(c.id)}><Icon name="check" className="sm"/></button>
+                              <button className="icon-btn" onClick={cancelEdit}><Icon name="close" className="sm"/></button>
+                            </div>
+                            <ModerationAlert error={editErr} onRetry={() => saveEdit(c.id)} onDismiss={() => setEditErr(null)}/>
+                          </>
                         ) : (
                           <div className="cmt-bubble">
                             <div className="cmt-name" role="button" style={{ cursor:'pointer' }} onClick={() => goUser(c.author)}><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}</div>
@@ -408,6 +501,7 @@ export function PostPage() {
                             setReplyTo(open ? null : c.id)
                             setReplyTarget(open ? null : { handle: cu.handle, userId: c.author, commentId: c.id })
                             setReplyText(open ? '' : `@${cu.handle} `)
+                            setReplyErr(null)      // the refusal belonged to the box we just left
                           }}>Reply</button>
                           {cOwner && !editing && <button onClick={() => startEdit(c)}>Edit</button>}
                           {cOwner && <button onClick={() => delComment(c.id)} style={{ color:'var(--rose)' }}>Delete</button>}
@@ -420,13 +514,16 @@ export function PostPage() {
                         </div>
 
                         {replyTo === c.id && (
-                          <div className="cmt-box" style={{ marginTop:8 }}>
-                            <Avatar initials={me.initials} color={me.avc} size={28} src={me.profileImage}/>
-                            <MentionBox className="field" autoFocus placeholder={replyTarget?.handle ? `Replying to @${replyTarget.handle}…` : `Reply to ${cu.full}…`} value={replyText}
-                              onChange={e => setReplyText(e.target.value)}
-                              onKeyDown={e => { if (e.key==='Enter') submitReply(c.id); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyTarget(null) } }}/>
-                            <button className="icon-btn" disabled={!replyText.trim()} onClick={() => submitReply(c.id)}><Icon name="send" className="sm"/></button>
-                          </div>
+                          <>
+                            <div className="cmt-box" style={{ marginTop:8 }}>
+                              <Avatar initials={me.initials} color={me.avc} size={28} src={me.profileImage}/>
+                              <MentionBox className="field" autoFocus placeholder={replyTarget?.handle ? `Replying to @${replyTarget.handle}…` : `Reply to ${cu.full}…`} value={replyText}
+                                onChange={e => { setReplyErr(null); setReplyText(e.target.value) }}
+                                onKeyDown={e => { if (e.key==='Enter') submitReply(c.id); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyTarget(null); setReplyErr(null) } }}/>
+                              <button className="icon-btn" disabled={replyBusy || !replyText.trim()} onClick={() => submitReply(c.id)}><Icon name="send" className="sm"/></button>
+                            </div>
+                            <ModerationAlert error={replyErr} onRetry={() => submitReply(c.id)} onDismiss={() => setReplyErr(null)}/>
+                          </>
                         )}
 
                         {(c.replyCount > 0 || repliesMap[c.id]?.length > 0) && (
@@ -446,13 +543,16 @@ export function PostPage() {
                               <span role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><Avatar initials={ru.initials} color={ru.avc} size={28} src={ru.profileImage}/></span>
                               <div className="cmt-col">
                                 {rEditing ? (
-                                  <div className="cmt-box" style={{ marginTop:0 }}>
-                                    <input className="field" value={editValue} autoFocus
-                                      onChange={e => setEditValue(e.target.value)}
-                                      onKeyDown={e => { if (e.key==='Enter') saveEdit(r.id, c.id); if (e.key==='Escape') setEditingId(null) }}/>
-                                    <button className="icon-btn" disabled={!editValue.trim()} onClick={() => saveEdit(r.id, c.id)}><Icon name="check" className="sm"/></button>
-                                    <button className="icon-btn" onClick={() => setEditingId(null)}><Icon name="close" className="sm"/></button>
-                                  </div>
+                                  <>
+                                    <div className="cmt-box" style={{ marginTop:0 }}>
+                                      <input className="field" value={editValue} autoFocus
+                                        onChange={e => { setEditErr(null); setEditValue(e.target.value) }}
+                                        onKeyDown={e => { if (e.key==='Enter') saveEdit(r.id, c.id); if (e.key==='Escape') cancelEdit() }}/>
+                                      <button className="icon-btn" disabled={editBusy || !editValue.trim()} onClick={() => saveEdit(r.id, c.id)}><Icon name="check" className="sm"/></button>
+                                      <button className="icon-btn" onClick={cancelEdit}><Icon name="close" className="sm"/></button>
+                                    </div>
+                                    <ModerationAlert error={editErr} onRetry={() => saveEdit(r.id, c.id)} onDismiss={() => setEditErr(null)}/>
+                                  </>
                                 ) : (
                                   <div className="cmt-bubble">
                                     <div className="cmt-name" role="button" style={{ cursor:'pointer' }} onClick={() => goUser(r.author)}><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}{replyHandle && <span className="muted text-xs"> · <Icon name="reply" className="xs"/>@{replyHandle}</span>}</div>
@@ -463,7 +563,7 @@ export function PostPage() {
                                   <button onClick={() => reactReply(c.id, r.id)} style={r.liked ? { color:'var(--rose)' } : undefined}>
                                     <Icon name="heart" className="xs" style={r.liked ? { fill:'var(--rose)', stroke:'var(--rose)' } : undefined}/>{r.likes || 0}
                                   </button>
-                                  <button onClick={() => { setReplyTo(c.id); setReplyTarget({ handle: ru.handle, userId: r.author, commentId: r.id }); setReplyText(`@${ru.handle} `) }}>Reply</button>
+                                  <button onClick={() => { setReplyTo(c.id); setReplyTarget({ handle: ru.handle, userId: r.author, commentId: r.id }); setReplyText(`@${ru.handle} `); setReplyErr(null) }}>Reply</button>
                                   {rOwner && !rEditing && <button onClick={() => startEdit(r)}>Edit</button>}
                                   {rOwner && <button onClick={() => delReply(c.id, r.id)} style={{ color:'var(--rose)' }}>Delete</button>}
                                   {!rOwner && r.id && !String(r.id).startsWith('tmp-') &&

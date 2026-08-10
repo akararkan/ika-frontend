@@ -559,6 +559,10 @@ img,video{max-width:100%;height:auto}
   .rv-progress{top:calc(58px + var(--safe-t));left:calc(14px + var(--safe-l));right:calc(14px + var(--safe-r))}
   .rv-meta .rvm-author button.rvm-follow{padding:6px 16px;font-size:13px;min-height:34px}
   .rv-mute{top:calc(60px + var(--safe-t));right:calc(14px + var(--safe-r))}
+  /* mixer rides under the mute button; the panel hangs below both and stays
+     clear of the caption + action rail */
+  .rv-mixbtn{top:calc(110px + var(--safe-t));right:calc(14px + var(--safe-r))}
+  .rv-mix{top:calc(160px + var(--safe-t));right:calc(14px + var(--safe-r));width:min(280px,calc(100vw - 28px))}
   /* segmented tabs sit a touch tighter on phones */
   .rv-segs .rv-tab{padding:8px 16px;font-size:13.5px;min-height:38px}
   .rv-segs .rv-tab.on{padding:8px 16px}

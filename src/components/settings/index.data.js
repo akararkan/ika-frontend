@@ -106,7 +106,13 @@ export const SETTINGS_INDEX = [
   { tab: 'data', anchor: 'export', card: 'Your data', title: 'Clear search history', keywords: ['erase searches', 'watch history', 'clear history'] },
   { tab: 'data', anchor: 'danger', card: 'Delete account', title: 'Delete your account', keywords: ['close account', 'deactivate', 'remove account', 'quit'] },
 
-  /* ---- safety ---- */
+  /* ---- safety ----
+     The moderation rows carry the words people type in anger or confusion
+     ("why was my post removed", "blocked", "under review") — nobody searches
+     for "automatic content checks". Two rows because they arrive from two
+     different places: the composer refusal and the notification bell. */
+  { tab: 'safety', anchor: 'moderation', card: 'Content & moderation', title: 'Automatic content checks', keywords: ['moderation', 'checking', 'under review', 'held', 'pending', 'not visible', 'why is my post hidden', 'community guidelines'] },
+  { tab: 'safety', anchor: 'moderation', card: 'Content & moderation', title: 'Blocked or removed content', keywords: ['blocked', 'removed', 'refused', 'rejected', 'appeal', 'why was my post removed', 'content violation', 'takedown'] },
   { tab: 'safety', anchor: 'reports', card: 'Safety Center', title: 'Reports you filed', keywords: ['report someone', 'abuse', 'appeal', 'moderation'] },
   { tab: 'safety', anchor: 'strikes', card: 'Account standing', title: 'Strikes', keywords: ['warnings', 'violations', 'standing', 'penalty'] },
 

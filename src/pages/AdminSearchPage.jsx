@@ -31,7 +31,7 @@
    ========================================================= */
 import React from 'react'
 import { Icon, showToast } from '../components/ui.jsx'
-import { Loader, EmptyState } from '../components/states.jsx'
+import { Loader, EmptyState, ResponseCaveat } from '../components/states.jsx'
 import { uiConfirm } from '../components/Dialog.jsx'
 import { api, REINDEX_CORPORA } from '../api/index.js'
 
@@ -143,7 +143,8 @@ function CorpusRow({ row, run, now, onRun }) {
                   A drop was requested but the server reports the index was not dropped — the mapping was NOT recreated, so a mapping repair did not happen.
                 </p>
               )}
-              {res.note && <p className="muted text-xs" style={{ marginTop: 4 }}>{res.note}</p>}
+              {/* Inline notes are part of the API contract (error guide §3). */}
+              <ResponseCaveat note={res.note}/>
             </>
           )}
 

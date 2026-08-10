@@ -31,6 +31,7 @@
        the question_views ledger).
    ========================================================= */
 import { page, paging, cursorPage, NO_CONTENT, mockError, agoIso } from '../util.js'
+import { fakeVerdict, blockedError } from './moderation.js'
 
 /* ---------- identity ---------- */
 
@@ -346,6 +347,10 @@ function makeAnswer(db, questionId, req, media, voice, prefix = 'a-new') {
   /* @NotBlank body — a media- or voice-only answer is rejected before the
      controller runs, exactly as it is against the real server. */
   const body = requireText(req.body, 'body', 'Answer body is required')
+  /* One choke point covers answers, the upload variant AND reanswers. Block-
+     only: a held answer is byte-identical on the wire (no marker), so `holdme`
+     deliberately does nothing observable here. */
+  if (fakeVerdict(body) === 'BLOCK') throw blockedError()
   const row = stampAuthor(db, {
     id: newId(prefix),
     questionId,
@@ -494,6 +499,9 @@ export const routes = [
       requireAnswer(db, answerId)
       const b = ctx.body || {}
       if (!b.sourceType) throw invalid('sourceType', 'Source type is required')
+      /* Source titles/citations are submitOrRefuse surfaces: ANY non-approved
+         verdict — including a merely borderline one — is a hard 400. */
+      if (fakeVerdict(b.title, b.citationText)) throw blockedError()
       const row = {
         id: newId('src'),
         answerId,
@@ -515,6 +523,7 @@ export const routes = [
       const row = sources(db).find(s => s.id === ctx.params[2])
       if (!row) throw notFound('Source', ctx.params[2])
       const b = ctx.body || {}
+      if (fakeVerdict(b.title, b.citationText)) throw blockedError()   // instant accept-or-refuse, no held state
       for (const k of ['title', 'citationText', 'url', 'isbn', 'sourceType', 'displayOrder']) {
         if (b[k] !== undefined) row[k] = b[k]
       }
@@ -545,6 +554,7 @@ export const routes = [
       const a = requireAnswer(db, ctx.params[1])
       const f = filePart(ctx.body, 'file')
       if (!f) throw mockError(400, 'VALIDATION_ERROR', 'A file is required')
+      if (fakeVerdict(ctx.query?.caption)) throw blockedError()   // caption is submitOrRefuse
       const at = {
         id: newId('att'),
         answerId: a.id,
@@ -570,6 +580,7 @@ export const routes = [
       const at = (a.attachments || []).find(x => x.id === ctx.params[2])
       if (!at) throw notFound('Attachment', ctx.params[2])
       const b = ctx.body || {}
+      if (fakeVerdict(b.caption)) throw blockedError()   // instant accept-or-refuse, no held state
       if (b.caption !== undefined) at.caption = b.caption
       if (b.displayOrder !== undefined) at.displayOrder = b.displayOrder
       return attachmentRes(at, a.id)
@@ -701,7 +712,9 @@ export const routes = [
     m: 'PATCH', p: /^\/api\/v1\/questions\/([^/]+)\/answers\/([^/]+)$/,
     fn: (db, ctx) => {
       const a = requireAnswer(db, ctx.params[1])
-      a.body = requireText((ctx.body || {}).body, 'body', 'Answer body is required')
+      const nextBody = requireText((ctx.body || {}).body, 'body', 'Answer body is required')
+      if (fakeVerdict(nextBody) === 'BLOCK') throw blockedError()   // refused edit → original stays
+      a.body = nextBody
       a.edited = true
       a.editedAt = agoIso(0)
       a.updatedAt = a.editedAt
@@ -790,6 +803,7 @@ export const routes = [
       const b = ctx.body || {}
       const title = requireText(b.title, 'title', 'Question title is required')
       const body = requireText(b.body, 'body', 'Question body is required')
+      if (fakeVerdict(title, body, b.keywords) === 'BLOCK') throw blockedError()
       const q = stampAuthor(db, {
         id: newId('q-new'),
         authorId: meId(db),
@@ -828,6 +842,8 @@ export const routes = [
     fn: (db, ctx) => {
       const q = requireQuestion(db, ctx.params[0])
       const b = ctx.body || {}
+      // A refused edit applies nothing — the approved wording stays live.
+      if (fakeVerdict(b.title, b.body, b.keywords) === 'BLOCK') throw blockedError()
       /* Every field is OPTIONAL here (null = leave alone), so a blank title or
          body reaches the service and gets ITS codes — EMPTY_TITLE / EMPTY_BODY —
          rather than the bean-validation envelope the create path returns. */

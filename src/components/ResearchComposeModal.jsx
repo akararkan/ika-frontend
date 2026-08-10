@@ -23,6 +23,27 @@
    reconcile contributors (PUT §11.2), cover (§8), video (§7) and
    media files (§9) only where they changed.
 
+   MODERATION (src/lib/moderation.js). CREATE is never scored — a
+   draft is private, so the classifier only runs where the text
+   would become public:
+     · PUBLISH  → 400 CONTENT_REJECTED (refused, paper stays a
+                  draft), 400 CONTENT_UNDER_REVIEW (a verdict on
+                  this exact text is still in flight — the ONE
+                  place in this modal where retrying is honest),
+                  or a 200 whose paper is STILL `status:"DRAFT"`,
+                  which is a HOLD, not a failure.
+     · EDIT of a live paper → refused (transaction rolled back,
+                  nothing changed) or held, in which case the
+                  paper drops back to DRAFT with its publishedAt
+                  intact and vanishes from readers until it clears.
+     · media captions / alt text / contributor notes → instant
+                  accept-or-refuse; these rows have no hidden
+                  state, so there is no held case to render.
+   All of it lands in the existing critical/step machinery below —
+   a refusal is just a step whose error is a moderation error, and
+   it is shown with the SERVER'S OWN WORDS and no Retry, because
+   resubmitting identical text can only be refused identically.
+
    Scholar / Researcher / Admin only.
    ========================================================= */
 import React from 'react'
@@ -31,7 +52,9 @@ import { Icon, Avatar, Verify, showToast, ChipInput } from './ui.jsx'
 import { AddSourceForm, SOURCE_LABEL } from './SourceForm.jsx'
 import { RichTextEditor } from './RichTextEditor.jsx'
 import { TagInput } from './TagInput.jsx'
+import { ModerationAlert, ModerationNotice } from './Moderation.jsx'
 import { renderMarkdown, renderPlain } from '../lib/richtext.js'
+import { isModerationError, isUnderReview, heldPublish } from '../lib/moderation.js'
 import { useAuth, hasRole } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 import { normalizeTags } from '../api/tags.js'
@@ -285,6 +308,12 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   const stepsRef = React.useRef({})
   const [steps, setSteps] = React.useState({})
   const [saveError, setSaveError] = React.useState(null)            // { critical: bool, message, updated? }
+  // A hold is a SUCCESS with a wait attached, so it gets its own overlay instead
+  // of the error one: { kind: 'publish' | 'edit', result }. Held publishes are
+  // detected inside the parallel loop, hence the ref — the tally below reads it
+  // in the same tick, long before a setState would have landed.
+  const [hold, setHold] = React.useState(null)
+  const publishHeldRef = React.useRef(false)
 
   const updateStep = React.useCallback((id, status, error = null) => {
     stepsRef.current = { ...stepsRef.current, [id]: { ...stepsRef.current[id], status, error } }
@@ -310,6 +339,20 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
 
   const buildContribReqs = () => contribs.map((c, i) => ({ userId: c.userId, role: c.role, displayOrder: i + 1, contributionNote: c.note?.trim() || undefined }))
 
+  /* The success tail, shared by an ordinary save and by the hold overlay's Done —
+     a hold has to hand the same result to the parent, it just says its piece
+     first. `held` rides along in the router state so the detail page we land on
+     can explain the draft the author is about to see instead of leaving them to
+     wonder why "Publish now" produced a draft. */
+  const finishSave = (result, held = false) => {
+    showToast(held
+      ? (isEdit ? 'Saved — your changes are being checked' : 'Saved — your paper is being checked')
+      : isEdit ? 'Research updated' : (scheduledAt ? 'Scheduled for publication' : publishNow ? 'Research published' : 'Draft saved'))
+    if (isEdit) onEdited?.(result); else onCreated?.(result)
+    onClose()
+    if (!isEdit && result?.id) navigate(`/research/${result.id}`, held ? { state: { moderationHeld: true } } : undefined)
+  }
+
   /* ===========================================================================
      submit — orchestrated update / create.
        1. Run the critical metadata op (PATCH for edit, multipart POST for create).
@@ -323,6 +366,10 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
        4. If every op succeeds → close + notify parent.
           If some fail → keep open, show what failed, "Retry failed"
           re-runs only those, "Close anyway" accepts the partial save.
+       5. Moderation rides on the same rails, with two twists: a refusal is a
+          failed step whose error is a moderation error, and it loses the Retry
+          button (identical text ⇒ identical refusal); a HOLD is not a failure at
+          all — it opens the held overlay and then completes the save normally.
   ============================================================================ */
   const submit = async () => {
     if (busyRef.current) return        // already saving → ignore the extra click (prevents duplicate research)
@@ -445,13 +492,19 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
         if (publishNow && !schedISO && created?.id) ops.push({
           id: 'publish', name: 'Publishing research',
           run: () => api.research.publish(created.id),
+          // §6.3 answers a HOLD with a plain 200 whose paper is still a DRAFT —
+          // the one surface on the platform whose hold is inferable without a
+          // marker (heldPublish). That is not a failed step: the paper is saved
+          // and goes public by itself the moment the check clears.
+          onSuccess: (res) => { if (heldPublish(res)) publishHeldRef.current = true },
         })
         return ops
       }
     }
 
     /* ---- Execute ---- */
-    busyRef.current = true; setBusy(true); setSaveError(null)   // claim the lock before the first await so a 2nd click can't get in
+    busyRef.current = true; setBusy(true); setSaveError(null); setHold(null)   // claim the lock before the first await so a 2nd click can't get in
+    publishHeldRef.current = false
     stepsRef.current = { [critical.id]: { name: critical.name, status: 'pending', error: null } }
     setSteps({ ...stepsRef.current })
 
@@ -464,10 +517,26 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
       critical.onSuccess?.(criticalResult)
     } catch (e) {
       updateStep(critical.id, 'failed', e)
-      setSaveError({ critical: true, message: e?.message || 'Could not save your changes' })
+      /* A moderation refusal is not "we couldn't save it" — the request was
+         perfectly well formed and the server persisted nothing on purpose. It
+         gets the server's own sentence and the appeal link (rendered by
+         <ModerationAlert/> in the overlay) rather than our generic copy, and the
+         form below stays exactly as the author left it. */
+      setSaveError(isModerationError(e)
+        ? { critical: true, error: e }
+        : { critical: true, message: e?.message || 'Could not save your changes' })
       setBusy(false); busyRef.current = false
       return
     }
+
+    /* A held EDIT of a live paper answers 200 with the paper knocked back to
+       DRAFT (publishedAt preserved). Anchoring on the status we opened WITH is
+       what keeps this honest: an ordinary draft edit also returns DRAFT, and
+       badging that as "checking" would invent a hold the wire never reported.
+       Only PUBLISHED → DRAFT across a PATCH means the checker took it. */
+    const editHeld = isEdit
+      && String(editResearch?.status || '').toUpperCase() === 'PUBLISHED'
+      && heldPublish(criticalResult)
 
     // 2) parallel — build now that the critical result is known
     const parallel = buildParallel(criticalResult)
@@ -486,15 +555,21 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
     // 3) tally + decide
     const failures = Object.values(stepsRef.current).filter(s => s.status === 'failed')
     if (failures.length) {
-      setSaveError({ critical: false, message: `${failures.length} step${failures.length > 1 ? 's' : ''} couldn’t finish.`, updated: criticalResult })
+      const refused = failures.filter(s => isModerationError(s.error)).length
+      setSaveError({
+        critical: false, updated: criticalResult,
+        /* Count refusals separately from breakages: "2 steps couldn't finish"
+           reads like a flaky upload, and a refusal is not an outage. */
+        message: refused === failures.length
+          ? `${refused === 1 ? 'One part' : `${refused} parts`} of this paper ${refused === 1 ? 'was' : 'were'} refused.`
+          : `${failures.length} step${failures.length > 1 ? 's' : ''} couldn’t finish.`,
+      })
       return
     }
 
-    // Full success — toast, notify, close (create: also navigate to detail)
-    showToast(isEdit ? 'Research updated' : (schedISO ? 'Scheduled for publication' : publishNow ? 'Research published' : 'Draft saved'))
-    if (isEdit) onEdited?.(criticalResult); else onCreated?.(criticalResult)
-    onClose()
-    if (!isEdit && criticalResult?.id) navigate(`/research/${criticalResult.id}`)
+    // Everything landed — but "landed" can still mean "waiting on a verdict".
+    if (publishHeldRef.current || editHeld) { setHold({ kind: editHeld ? 'edit' : 'publish', result: criticalResult }); return }
+    finishSave(criticalResult)
   }
 
   /* Accept whatever did save and leave the rest behind — close with the partial update applied. */
@@ -507,6 +582,19 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
   }
 
   const ctaLabel = busy ? 'Saving…' : isEdit ? 'Save changes' : scheduleMode === 'schedule' ? 'Schedule' : scheduleMode === 'now' ? 'Publish' : 'Create draft'
+
+  /* ---- the moderation view of whatever just failed ----
+     Read off the STEPS, not off `saveError`: a partial save can succeed at
+     everything and still have one caption refused, and the dialog must lead with
+     the refusal either way. Only the first one is rendered — every refusal on the
+     platform carries the same sentence, so a stack of them would say one thing
+     four times. */
+  const failedSteps = Object.entries(steps).filter(([, s]) => s.status === 'failed')
+  const modErr = failedSteps.map(([, s]) => s.error).find(isModerationError) || null
+  const modPending = isUnderReview(modErr)          // "not yet" — the only refusal worth retrying
+  const dialogTitle = modErr
+    ? (modPending ? 'Still being checked' : saveError?.critical ? 'Your changes were refused' : 'Part of this was refused')
+    : saveError?.critical ? 'Couldn’t save your changes' : 'Saved with issues'
 
   /* ---- left-rail scroll-spy + completion ---- */
   const scrollRef = React.useRef(null)
@@ -852,24 +940,66 @@ export function ResearchComposeModal({ onClose, onCreated, editResearch = null, 
           <div className="rm-scrim">
             <div className={'rm-dialog' + (saveError.critical ? ' critical' : ' partial')}>
               <div className="rm-dialog-hd">
-                <span className="rm-dialog-flag"><Icon name="flag"/></span>
-                <h3>{saveError.critical ? 'Couldn’t save your changes' : 'Saved with issues'}</h3>
+                <span className="rm-dialog-flag"><Icon name={modErr ? (modPending ? 'hourglass' : 'shield') : 'flag'}/></span>
+                <h3>{dialogTitle}</h3>
               </div>
-              <p className="rm-dialog-msg">{saveError.message}</p>
-              {!saveError.critical && <p className="rm-dialog-note">Your details are saved. Only the failing pieces need another try — your form values are kept intact.</p>}
+              {/* The server's own sentence, verbatim, with the appeal link beside
+                  it — never our paraphrase, never a hint at what tripped. */}
+              {modErr
+                ? <ModerationAlert error={modErr} onRetry={modPending ? submit : undefined}/>
+                : <p className="rm-dialog-msg">{saveError.message}</p>}
+              {!saveError.critical && (
+                <p className="rm-dialog-note">
+                  {modErr
+                    ? 'Everything else is saved and nothing you typed was lost. Edit the wording and save again — the step that was refused is listed below.'
+                    : 'Your details are saved. Only the failing pieces need another try — your form values are kept intact.'}
+                </p>
+              )}
               <ul className="rm-steps">
-                {Object.entries(steps).filter(([, s]) => s.status === 'failed').map(([id, s]) => (
+                {failedSteps.map(([id, s]) => (
                   <li key={id} className="rm-step failed">
-                    <span className="rm-step-ic"><Icon name="close" className="xs"/></span>
+                    <span className="rm-step-ic"><Icon name={isModerationError(s.error) ? 'shield' : 'close'} className="xs"/></span>
                     <span className="rm-step-nm">{s.name}</span>
-                    {s.error?.message && <span className="rm-step-err">{s.error.message}</span>}
+                    {/* A refusal's copy is already rendered once, in full, above.
+                        Repeating it here in 11px would truncate the only thing
+                        the author is allowed to be told. */}
+                    {s.error?.message && !isModerationError(s.error) && <span className="rm-step-err">{s.error.message}</span>}
                   </li>
                 ))}
               </ul>
               <div className="rm-dialog-acts">
-                <button type="button" className="rm-cta" onClick={submit}><Icon name="upload" className="xs"/>Retry{saveError.critical ? '' : ' failed steps'}</button>
+                {/* No Retry on a refusal: the identical text can only be refused
+                    identically, so the way forward is Dismiss → edit → save. A
+                    CONTENT_UNDER_REVIEW is the exception, and its retry lives
+                    inside <ModerationAlert/> above so there is only ever one. */}
+                {!modErr && <button type="button" className="rm-cta" onClick={submit}><Icon name="upload" className="xs"/>Retry{saveError.critical ? '' : ' failed steps'}</button>}
                 {!saveError.critical && <button type="button" className="rm-cancel" onClick={acceptPartial}>Close anyway</button>}
-                <button type="button" className="rm-dialog-dismiss" onClick={() => setSaveError(null)}>Dismiss</button>
+                <button type="button" className="rm-dialog-dismiss" onClick={() => setSaveError(null)}>{modErr ? 'Back to editing' : 'Dismiss'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ HELD OVERLAY ============ */}
+        {/* Not an error: the save landed, the verdict did not. Publish held → the
+            paper is still a draft and publishes itself when it clears; edit held →
+            a live paper has just left the readers' view, which is the single most
+            alarming thing this module can do silently. */}
+        {!busy && !saveError && hold && (
+          <div className="rm-scrim">
+            <div className="rm-dialog">
+              <div className="rm-dialog-hd">
+                <span className="rm-dialog-flag"><Icon name="hourglass"/></span>
+                <h3>{hold.kind === 'edit' ? 'Saved — your changes are being checked' : 'Saved — your paper is being checked'}</h3>
+              </div>
+              <ModerationNotice state="checking" kind="research paper"/>
+              <p className="rm-dialog-note">
+                {hold.kind === 'edit'
+                  ? 'Until it clears, the paper is back to Draft and readers can’t see it. It returns to Published — keeping its original publication date — on its own.'
+                  : 'It stays a draft until then and goes public by itself. You don’t need to press Publish again.'}
+              </p>
+              <div className="rm-dialog-acts">
+                <button type="button" className="rm-cta" onClick={() => finishSave(hold.result, true)}><Icon name="check" className="xs"/>Got it</button>
               </div>
             </div>
           </div>

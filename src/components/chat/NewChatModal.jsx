@@ -13,6 +13,8 @@
 import React from 'react'
 import { Icon, Avatar, Verify, showToast } from '../ui.jsx'
 import { Loader, EmptyState } from '../states.jsx'
+import { ModerationAlert } from '../Moderation.jsx'
+import { isModerationError } from '../../lib/moderation.js'
 import { useChat } from '../../context/ChatContext.jsx'
 import { chatError } from './chatErrors.js'
 import { api } from '../../api/index.js'
@@ -61,6 +63,13 @@ export function NewChatModal({ onClose, onCreated, mode = 'new', conversation })
   const [title, setTitle] = React.useState('')
   const [desc, setDesc] = React.useState('')
   const [busy, setBusy] = React.useState(false)
+  /* Name and description are scored before the group exists — as
+     `ModeratedEntityType.CHANNEL`, since there is no GROUP type — and the
+     create is @Transactional, so a refusal rolls back the members, the
+     GROUP_CREATED system message and the invites along with it. There is
+     nothing half-made to clean up and nothing to badge; the form simply stays
+     up with everything the author picked. */
+  const [refused, setRefused] = React.useState(null)
   const boxRef = React.useRef(null)
   const firstRef = React.useRef(null)
 
@@ -140,7 +149,13 @@ export function NewChatModal({ onClose, onCreated, mode = 'new', conversation })
     }
     if (!title.trim()) { showToast('Give the group a name.'); return }
     setBusy(true)
+    setRefused(null)
     try {
+      /* A HELD group is created and opens normally for its creator — the OWNER
+         is never redacted. What the wire does NOT say is that the members added
+         alongside it get the invite bell and the inbox row with `title: null`
+         until it clears. `ConversationResponse` has no moderation field, so
+         there is nothing here to detect it with and nothing honest to show. */
       onCreated?.(await createGroup({
         title: title.trim(),
         // Optional and ≤ 500 chars server-side; `undefined` (not '') so an
@@ -148,8 +163,10 @@ export function NewChatModal({ onClose, onCreated, mode = 'new', conversation })
         description: desc.trim() ? desc.trim().slice(0, 500) : undefined,
         memberIds: picked.map(p => p.id),
       }))
-    } catch (err) { showToast(humanError(err)) }
-    finally { setBusy(false) }
+    } catch (err) {
+      if (isModerationError(err)) { setRefused(err); return }
+      showToast(humanError(err))
+    } finally { setBusy(false) }
   }
 
   return (
@@ -192,6 +209,11 @@ export function NewChatModal({ onClose, onCreated, mode = 'new', conversation })
                   </label>
                   <textarea id="ch-gdesc" className="field" rows={2} value={desc} maxLength={500} dir="auto"
                     onChange={e => setDesc(e.target.value)} placeholder="Weekly readings & discussion"/>
+                  {/* Directly under the two fields it is about. Creation only
+                      ever refuses with CONTENT_REJECTED — a held create
+                      SUCCEEDS — so there is nothing to retry and no retry is
+                      offered. */}
+                  <ModerationAlert error={refused} onDismiss={() => setRefused(null)}/>
                 </>
               )}
               {picked.length > 0 && (

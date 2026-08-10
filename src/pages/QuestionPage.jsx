@@ -4,6 +4,25 @@
    inline sources & attachments, reactions, author-accept,
    answer & question edit-delete, lock / answer-limit, share-link,
    and a live SSE stream that patches every counter and list in place.
+
+   MODERATION (src/lib/moderation.js). Every text write on this page is scored
+   server-side, and Q&A is the module that tells the client the LEAST about it:
+
+     · Refused → 400 CONTENT_REJECTED, nothing persisted (the whole transaction
+       rolls back, including an answer's inline sources). The draft must survive
+       — that is the only way forward, since there is nothing to retry.
+     · Held → an entirely ordinary 201/200. QuestionResponse and
+       QuestionAnswerResponse carry NO moderation field; the entities have the
+       column, the wire does not. A held question or answer is byte-identical to
+       a clean one, so there is no badge to draw and we do not draw one. The
+       author keeps seeing their own row because the repository predicates carve
+       the author out; everyone else simply doesn't get it yet.
+     · Sources and attachment captions (§15/§16) go through the accept-or-refuse
+       path: a merely borderline value — or the classifier being unreachable —
+       returns the same 400 as a hard block, and there is no held state at all.
+
+   CONTENT_UNDER_REVIEW is never thrown anywhere in Q&A, so nothing on this page
+   offers a moderation retry.
    ========================================================= */
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -15,7 +34,10 @@ import { uiPrompt, uiConfirm } from '../components/Dialog.jsx'
 import { SourceRow } from '../components/Source.jsx'
 import { AddSourceForm } from '../components/SourceForm.jsx'
 import { VoicePlayer } from '../components/VoicePlayer.jsx'
-import { Loader, EmptyState } from '../components/states.jsx'
+import { Loader, EmptyState, ErrorState } from '../components/states.jsx'
+import { isNotFound, errorText, traceRef } from '../api/errors.js'
+import { ModerationAlert } from '../components/Moderation.jsx'
+import { isModerationError } from '../lib/moderation.js'
 import { authorOf } from '../lib/userView.js'
 import { answerFrom } from '../api/adapters.js'   // patch SSE-embedded answer DTOs in place (§9.1)
 import { useRealtime } from '../hooks/useRealtime.js'
@@ -40,7 +62,12 @@ function buildAnswerForm(req, media, voice) {
 }
 const fileForm = (file) => { const fd = new FormData(); fd.append('file', file); return fd }
 
-/* Map the QnA error envelope (§3) to a clear, accurate toast message. */
+/* Map the QnA error envelope (§3) to a clear, accurate toast message.
+   NOT for moderation refusals: those must be shown in the server's own words,
+   next to the draft that produced them, with the appeal link — none of which a
+   2.2-second toast can do, and paraphrasing them would leak exactly the detail
+   the backend withholds on purpose. Every catch below therefore asks
+   isModerationError() FIRST and only falls through to here for real failures. */
 function qnaError(e, fallback = 'Something went wrong') {
   const c = e?.code
   if (c === 'ANSWERS_LOCKED')     return 'Answers are locked for this question.'
@@ -59,6 +86,8 @@ export function QuestionPage() {
   const { user } = useAuth()
 
   const [q, setQ] = React.useState(null)
+  const [loadErr, setLoadErr] = React.useState(null)        // 404 → tombstone; anything else → retry + traceId (error guide §2.5)
+  const [retryTick, setRetryTick] = React.useState(0)
   const [answers, setAnswers] = React.useState([])
   const seenAns = React.useRef(new Set())   // answer ids ever shown → dedup the optimistic post vs the server's own-action SSE echo
   const seenRe = React.useRef(new Set())    // reanswer ids whose replyCount bump already ran (echo/replay exactly-once)
@@ -92,6 +121,15 @@ export function QuestionPage() {
   const [editSrcId, setEditSrcId] = React.useState(null); const [editSrcDraft, setEditSrcDraft] = React.useState({ title:'', citationText:'', ref:'' })
   const [editAttId, setEditAttId] = React.useState(null); const [editAttCaption, setEditAttCaption] = React.useState('')
   const attachRef = React.useRef(null); const attachForRef = React.useRef(null)
+  /* ---- moderation refusals, one per composer that can be open at once ----
+     Each is the raw ApiError: <ModerationAlert/> renders the server's sentence
+     verbatim, so nothing here stores or derives copy of its own. */
+  const [qErr, setQErr] = React.useState(null)            // question edit
+  const [ansErr, setAnsErr] = React.useState(null)        // answer composer (incl. a refused inline source)
+  const [editAErr, setEditAErr] = React.useState(null)    // answer edit — only one edit box opens at a time
+  const [replyErr, setReplyErr] = React.useState(null)    // reanswer composer
+  const [editRErr, setEditRErr] = React.useState(null)    // reanswer edit
+  const [manageErr, setManageErr] = React.useState(null)  // { aid, error } — sources / attachments panel of that answer
 
   const loadAnswers = React.useCallback(() => {
     api.qna.answers(id).then(list => { seenAns.current = new Set((list || []).map(a => a.id)); setAnswers(list || []) }).catch(() => {})
@@ -130,10 +168,11 @@ export function QuestionPage() {
     seenRe.current = new Set()
     seenDel.current = new Set()
     pendingRe.current = new Map()
-    api.qna.get(id).then(x => { if (alive) setQ(x) }).catch(() => { if (alive) setQ(false) }).finally(() => { if (alive) setLoading(false) })
+    setLoadErr(null)
+    api.qna.get(id).then(x => { if (alive) setQ(x) }).catch((e) => { if (alive) { setLoadErr(e); setQ(false) } }).finally(() => { if (alive) setLoading(false) })
     loadAnswers()
     return () => { alive = false }
-  }, [id, loadAnswers])
+  }, [id, loadAnswers, retryTick])
 
   // local object URL for an attached image preview
   const ansMediaUrl = React.useMemo(() => ansMedia && ansMedia.type.startsWith('image') ? URL.createObjectURL(ansMedia) : null, [ansMedia])
@@ -230,24 +269,36 @@ export function QuestionPage() {
     api.qna.save(id, coll || undefined).then(() => showToast(`Saved to ${coll || 'Default'}`)).catch(e => showToast(qnaError(e, 'Could not save')))
   }
   const share = () => openShare({ kind: 'question', id, title: q?.title || 'this question' })
-  const startEditQ = () => { setQTitle(q.title); setQBody(q.body); setQTags((q.tags || []).join(', ')); setEditingQ(true) }
+  const startEditQ = () => { setQErr(null); setQTitle(q.title); setQBody(q.body); setQTags((q.tags || []).join(', ')); setEditingQ(true) }
   const saveEditQ = async () => {
     const t = qTitle.trim(); if (!t) return
     const tags = qTags.split(',').map(s => s.trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
-    // Optimistic render so the form closes instantly.
-    setQ(p => ({ ...p, title:t, body:qBody, tags })); setEditingQ(false)
+    setQErr(null)
     try {
       // §6.3 tags = full replace. Re-fetch canonical so the UI shows the
       // server-normalized form (lowercased / deduped tags, re-extracted
       // hashtags in body, edited flag, updatedAt, etc.).
       await api.qna.edit(id, { title: t, body: qBody, tags })
+      /* Applied and closed only once the server has taken it. This used to be
+         optimistic — patched and closed BEFORE the await — which meant a refused
+         edit left the rejected wording on screen looking saved while the server
+         had rolled the row back to the old text, and the author's draft was gone
+         with the form. A question carries no version history, so there would
+         have been nothing to restore it from either. */
+      setQ(p => ({ ...p, title:t, body:qBody, tags })); setEditingQ(false)
       try {
         const fresh = await api.qna.get(id)
         setQ(fresh)
         // Notify list pages (QnaPage, search, etc.) so they reflect the edit too.
         window.dispatchEvent(new CustomEvent('ika:question-updated', { detail: fresh }))
       } catch { /* keep optimistic */ }
-    } catch (e) { showToast(qnaError(e, 'Could not save')) }
+    } catch (e) {
+      /* A held edit is invisible here — it answers 200 with an ordinary
+         QuestionResponse — so there is nothing to show for it and nothing to
+         re-check. Only the refusal has a shape. */
+      if (isModerationError(e)) { setQErr(e); return }   // form stays open, title/body/tags untouched
+      showToast(qnaError(e, 'Could not save'))
+    }
   }
   const deleteQ = async () => {
     const ok = await uiConfirm({ title:'Delete this question?', message:'This cannot be undone. All answers, replies and reactions are removed too.', confirmLabel:'Delete', danger:true, icon:'close' })
@@ -281,17 +332,23 @@ export function QuestionPage() {
   }
   const voiceTap = () => { if (recording) { try { recRef.current?.stop() } catch { /* ignore */ } setRecording(false) } else if (ansVoice) setAnsVoice(null); else startRec() }
   const resetComposer = () => { setText(''); setAnsMedia(null); setAnsVoice(null); setAnsSources([]); setSrcOpen(false) }
-  // create each MEDIA_FILE source, then upload its file (§16.1 + sources/{id}/file)
+  // create each MEDIA_FILE source, then upload its file (§16.1 + sources/{id}/file).
+  // Best-effort per file, as before — but a refusal is now reported instead of
+  // swallowed: §16.1 scores the source title/citation, and a silently vanished
+  // source is indistinguishable from one that never saved.
   const flushMediaFileSources = async (answerId, items) => {
+    let refusal = null
     for (const it of items) {
-      try { const src = await api.qna.addSource(id, answerId, it.req); await api.qna.uploadSourceFile(id, answerId, src.id, fileForm(it.file)) } catch { /* skip a single failed file */ }
+      try { const src = await api.qna.addSource(id, answerId, it.req); await api.qna.uploadSourceFile(id, answerId, src.id, fileForm(it.file)) }
+      catch (e) { if (isModerationError(e)) refusal = refusal || e; else showToast(qnaError(e, 'A source file could not be attached')) }
     }
+    return refusal
   }
 
   const postAnswer = async () => {
     const body = text.trim()
     if (!body && !ansMedia && !ansVoice) return
-    setPosting(true)
+    setPosting(true); setAnsErr(null)
     try {
       const citations = ansSources.filter(s => !s.file).map(s => s.req)   // URL / ISBN / MANUAL go inline
       const fileSources = ansSources.filter(s => s.file)                 // MEDIA_FILE → upload after create
@@ -299,15 +356,40 @@ export function QuestionPage() {
       const saved = (ansMedia || ansVoice)
         ? await api.qna.postAnswerUpload(id, buildAnswerForm(req, ansMedia, ansVoice))   // §11.3
         : await api.qna.postAnswer(id, req)                                              // §11.2
-      if (fileSources.length) { await flushMediaFileSources(saved.id, fileSources); try { saved.sources = await api.qna.listSources(id, saved.id) } catch { /* keep inline */ } }
+      let srcRefusal = null
+      if (fileSources.length) { srcRefusal = await flushMediaFileSources(saved.id, fileSources); try { saved.sources = await api.qna.listSources(id, saved.id) } catch { /* keep inline */ } }
       const isNew = upsertAnswer(saved)   // dedup: the server may have already echoed this answer over SSE
       setQ(p => { if (!p) return p; const n = (p.answers || 0) + (isNew ? 1 : 0); return { ...p, answers: n, acceptsNewAnswers: p.maxAnswers ? n < p.maxAnswers : p.acceptsNewAnswers } })
       resetComposer()
-    } catch (e) { showToast(qnaError(e, 'Could not post answer')) }
+      // The answer posted; one of its sources did not. The alert alone would be
+      // ambiguous under a now-empty composer, so the toast says which of the two
+      // landed — without touching the refusal's own wording.
+      if (srcRefusal) { setAnsErr(srcRefusal); showToast('Answer posted — one of its sources was not accepted', 'warn') }
+    } catch (e) {
+      /* The composer already kept its draft on failure (resetComposer only runs
+         on success) — the best-behaved path in this file. All that is added is
+         the refusal itself. A held answer, meanwhile, comes back as an ordinary
+         201 and is rendered like any other; the wire cannot tell us otherwise. */
+      if (isModerationError(e)) { setAnsErr(e); return }
+      showToast(qnaError(e, 'Could not post answer'))
+    }
     finally { setPosting(false) }
   }
-  const startEditA = (a) => { setEditAid(a.id); setEditText(a.body) }
-  const saveEditA = (a) => { const v = editText.trim(); if (!v) return; patchA(a.id, x => ({ ...x, body:v, edited:true })); setEditAid(null); api.qna.editAnswer(id, a.id, v).catch(e => showToast(qnaError(e, 'Could not edit'))) }
+  const startEditA = (a) => { setEditAErr(null); setEditAid(a.id); setEditText(a.body) }
+  const saveEditA = async (a) => {
+    const v = editText.trim(); if (!v) return
+    setEditAErr(null)
+    try {
+      await api.qna.editAnswer(id, a.id, v)
+      /* Patch + close only now. The optimistic version showed the rejected
+         wording as though it had saved and never reverted it, while the server
+         had rolled the answer back to its previous body. */
+      patchA(a.id, x => ({ ...x, body:v, edited:true })); setEditAid(null)
+    } catch (e) {
+      if (isModerationError(e)) { setEditAErr(e); return }   // box stays open with the text in it
+      showToast(qnaError(e, 'Could not edit'))
+    }
+  }
   const deleteA = async (a) => {
     const ok = await uiConfirm({ title:'Delete this answer?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
@@ -341,6 +423,7 @@ export function QuestionPage() {
     const v = replyText.trim(); const file = replyFile; const target = replyTarget
     if (!v && !file) return
     const targetId = target?.id || a.id                    // post to the ACTUAL answer/reply being replied to
+    setReplyErr(null)
     setReplyText(''); setReplyFile(null); setReplyTo(null); setReplyTarget(null); setOpenReplies(o => ({ ...o, [a.id]: true }))
     const tmp = { id:'tmp-'+(tmpSeq.current++), _author: authorOf({ id:user?.id, fullName:user?.full, username:user?.handle }), author:user?.id, body:v, time:'now', likes:0,
       replyToAnswerId: target?.id || null, replyToUserId: target?.userId || null, _replyToHandle: target?.handle || null }
@@ -367,19 +450,39 @@ export function QuestionPage() {
       pendingRe.current.set(a.id, Math.max(0, (pendingRe.current.get(a.id) || 0) - 1))
       setRepliesMap(m => ({ ...m, [a.id]: (m[a.id]||[]).filter(r => r.id !== tmp.id) }))   // roll back the optimistic reply
       patchA(a.id, x => ({ ...x, replyCount:Math.max(0,(x.replyCount||0)-1) }))
+      /* The row rolled back cleanly, but the TEXT went with it: the optimistic
+         path clears the box before the POST resolves. Put the draft back and
+         re-open the composer where it was — on a refusal that draft is the only
+         thing the author has left to work with. */
+      setReplyText(v); setReplyFile(file); setReplyTo(a.id); setReplyTarget(target)
+      if (isModerationError(e)) { setReplyErr(e); return }
       showToast(qnaError(e, 'Could not reply'))
     }
   }
   // reply to a REPLY → post to that reply's id; server hoists to a depth-1 sibling of the root but
   // records replyToAnswerId/replyToUserId so we can show "replying to @X" (§11.5 / E2)
-  const replyToReply = (a, r) => { setReplyTo(a.id); setReplyTarget({ id:r.id, handle:authorOf(r).handle, userId:r.author }); setReplyText(''); setOpenReplies(o => ({ ...o, [a.id]: true })) }
+  /* Retarget clears the refusal too — one `replyErr` serves whichever box is
+     open, so leaving it set would carry A's refusal to B's empty composer. */
+  const replyToReply = (a, r) => { setReplyErr(null); setReplyTo(a.id); setReplyTarget({ id:r.id, handle:authorOf(r).handle, userId:r.author }); setReplyText(''); setOpenReplies(o => ({ ...o, [a.id]: true })) }
   const reactReply = (aid, r) => {
     if (String(r.id).startsWith('tmp-')) return
     setRepliesMap(m => ({ ...m, [aid]: (m[aid]||[]).map(x => x.id===r.id ? { ...x, _liked:!x._liked, likes:Math.max(0, x.likes+(x._liked?-1:1)) } : x) }))
     ;(r._liked ? api.qna.unreact(id, r.id) : api.qna.react(id, r.id)).catch(() => { api.qna.reanswers(id, aid).then(list => setRepliesMap(m => ({ ...m, [aid]: list || [] }))).catch(() => {}) })   // §12 on the reanswer
   }
-  const startEditReply = (r) => { setEditRid(r.id); setEditRText(r.body) }
-  const saveEditReply = (aid, r) => { const v = editRText.trim(); if (!v) return; setRepliesMap(m => ({ ...m, [aid]: (m[aid]||[]).map(x => x.id===r.id ? { ...x, body:v, edited:true } : x) })); setEditRid(null); api.qna.editAnswer(id, r.id, v).catch(e => showToast(qnaError(e, 'Could not edit reply'))) }   // §11.7
+  const startEditReply = (r) => { setEditRErr(null); setEditRid(r.id); setEditRText(r.body) }
+  const saveEditReply = async (aid, r) => {                              // §11.7 — a reply IS an answer, same endpoint, same scoring
+    const v = editRText.trim(); if (!v) return
+    setEditRErr(null)
+    try {
+      await api.qna.editAnswer(id, r.id, v)
+      // Patched only after the server keeps it — the optimistic version never
+      // reverted, so a refused reply edit stayed on screen looking saved.
+      setRepliesMap(m => ({ ...m, [aid]: (m[aid]||[]).map(x => x.id===r.id ? { ...x, body:v, edited:true } : x) })); setEditRid(null)
+    } catch (e) {
+      if (isModerationError(e)) { setEditRErr(e); return }   // inline editor stays open with the text in it
+      showToast(qnaError(e, 'Could not edit reply'))
+    }
+  }
   const deleteReply = async (aid, r) => {
     const ok = await uiConfirm({ title:'Delete this reply?', confirmLabel:'Delete', danger:true, icon:'close' })
     if (!ok) return
@@ -391,25 +494,40 @@ export function QuestionPage() {
 
   /* ---- own-answer sources & attachments management (§15 / §16) ---- */
   const toggleManage = async (a) => {
-    const open = openManage[a.id]; setOpenManage(o => ({ ...o, [a.id]: !open })); setEditSrcId(null); setEditAttId(null)
+    const open = openManage[a.id]; setOpenManage(o => ({ ...o, [a.id]: !open })); setEditSrcId(null); setEditAttId(null); setManageErr(null)
     if (!open) {                                  // load fresh lists (§16.2 / §15.2)
       try { const [srcs, atts] = await Promise.all([api.qna.listSources(id, a.id), api.qna.listAttachments(id, a.id)]); patchA(a.id, x => ({ ...x, sources: srcs || [], attachments: atts || [] })) } catch { /* keep what we have */ }
     }
   }
-  const addManagedSource = (a, req, file) => {                                   // §16.1 (+ file upload for MEDIA_FILE)
-    api.qna.addSource(id, a.id, req).then(async saved => {
+  /* §15/§16 are accept-or-refuse: the source title/citation and the attachment
+     caption are scored, a borderline verdict OR the classifier being unreachable
+     refuses with the same code as a hard block, and none of these rows has a
+     hidden state, so a hold can never be represented. Handling is therefore
+     identical everywhere — show the server's words, change nothing else. */
+  const addManagedSource = async (a, req, file) => {                             // §16.1 (+ file upload for MEDIA_FILE)
+    setManageErr(null)
+    try {
+      let saved = await api.qna.addSource(id, a.id, req)
       if (file) { try { saved = await api.qna.uploadSourceFile(id, a.id, saved.id, fileForm(file)) } catch { showToast('Source added — file upload failed') } }
       patchA(a.id, x => ({ ...x, sources:[...(x.sources||[]), saved] }))
-    }).catch(e => showToast(qnaError(e, 'Could not add source')))
+    } catch (e) {
+      if (isModerationError(e)) { setManageErr({ aid: a.id, error: e }); return }
+      showToast(qnaError(e, 'Could not add source'))
+    }
   }
-  const startEditSrc = (s) => { setEditSrcId(s.id); setEditSrcDraft({ title:s.title||'', citationText:s.citationText||'', ref:s.url||s.isbn||'' }) }
-  const saveEditSrc = (a, s) => {
+  const startEditSrc = (s) => { setManageErr(null); setEditSrcId(s.id); setEditSrcDraft({ title:s.title||'', citationText:s.citationText||'', ref:s.url||s.isbn||'' }) }
+  const saveEditSrc = async (a, s) => {
     const req = { title: editSrcDraft.title.trim() || s.title, citationText: editSrcDraft.citationText.trim() }
     const r = editSrcDraft.ref.trim()
     if (r) { if (s.type === 'ISBN') req.isbn = r; else if (s.type === 'URL') req.url = r }
-    api.qna.editSource(id, a.id, s.id, req).then(saved => {   // §16.3
+    setManageErr(null)
+    try {
+      const saved = await api.qna.editSource(id, a.id, s.id, req)   // §16.3
       patchA(a.id, x => ({ ...x, sources:(x.sources||[]).map(o => o.id===s.id ? saved : o) })); setEditSrcId(null)
-    }).catch(e => showToast(qnaError(e, 'Could not save source')))
+    } catch (e) {
+      if (isModerationError(e)) { setManageErr({ aid: a.id, error: e }); return }   // the edit row stays open, draft intact
+      showToast(qnaError(e, 'Could not save source'))
+    }
   }
   const deleteSrc = (a, s) => {
     patchA(a.id, x => ({ ...x, sources:(x.sources||[]).filter(o => o.id!==s.id) }))
@@ -420,15 +538,24 @@ export function QuestionPage() {
     const f = e.target.files?.[0]; const aid = attachForRef.current; e.target.value = ''
     if (!f || !aid) return
     const fd = new FormData(); fd.append('file', f)
+    setManageErr(null)
     api.qna.addAttachment(id, aid, fd).then(saved => {   // §15.1
       patchA(aid, x => ({ ...x, attachments:[...(x.attachments||[]), saved] })); showToast('Attachment added')
-    }).catch(e => showToast(qnaError(e, 'Could not upload attachment')))
+    }).catch(e => {
+      if (isModerationError(e)) { setManageErr({ aid, error: e }); return }
+      showToast(qnaError(e, 'Could not upload attachment'))
+    })
   }
-  const startEditAtt = (at) => { setEditAttId(at.id); setEditAttCaption(at.caption || '') }
-  const saveEditAtt = (a, at) => {
-    api.qna.editAttachment(id, a.id, at.id, { caption: editAttCaption }).then(saved => {   // §15.3
+  const startEditAtt = (at) => { setManageErr(null); setEditAttId(at.id); setEditAttCaption(at.caption || '') }
+  const saveEditAtt = async (a, at) => {
+    setManageErr(null)
+    try {
+      const saved = await api.qna.editAttachment(id, a.id, at.id, { caption: editAttCaption })   // §15.3
       patchA(a.id, x => ({ ...x, attachments:(x.attachments||[]).map(o => o.id===at.id ? saved : o) })); setEditAttId(null)
-    }).catch(e => showToast(qnaError(e, 'Could not save attachment')))
+    } catch (e) {
+      if (isModerationError(e)) { setManageErr({ aid: a.id, error: e }); return }   // caption row stays open
+      showToast(qnaError(e, 'Could not save attachment'))
+    }
   }
   const deleteAtt = (a, at) => {
     patchA(a.id, x => ({ ...x, attachments:(x.attachments||[]).filter(o => o.id!==at.id) }))
@@ -436,7 +563,13 @@ export function QuestionPage() {
   }
 
   if (loading) return <div className="main center"><div className="col-main"><Loader label="Loading question…"/></div></div>
-  if (!q) return <div className="main center"><div className="col-main"><EmptyState icon="qna" title="Question not found"/></div></div>
+  if (!q) return (
+    <div className="main center"><div className="col-main">
+      {loadErr && !isNotFound(loadErr)
+        ? <ErrorState message={errorText(loadErr, 'Could not load this question.')} traceId={traceRef(loadErr)} onRetry={() => setRetryTick(t => t + 1)}/>
+        : <EmptyState icon="qna" title="This question is no longer available" sub="It may have been removed, or the link is stale."/>}
+    </div></div>
+  )
 
   const u = authorOf(q)
   return (
@@ -463,7 +596,10 @@ export function QuestionPage() {
               <input className="field lg" dir="auto" value={qTitle} onChange={e => setQTitle(e.target.value)} style={{ marginBottom:10 }}/>
               <textarea className="field" dir="auto" value={qBody} onChange={e => setQBody(e.target.value)}/>
               <input className="field" placeholder="Tags (comma-separated)" value={qTags} onChange={e => setQTags(e.target.value)} style={{ marginTop:10 }}/>
-              <div className="flex gap-8 mt-12"><button className="btn btn-primary btn-sm" onClick={saveEditQ}>Save</button><button className="btn btn-secondary btn-sm" onClick={() => setEditingQ(false)}>Cancel</button></div>
+              {/* Verbatim, beside the draft it refused — and no retry, because
+                  the same words can only be refused the same way. */}
+              {qErr && <ModerationAlert error={qErr} onDismiss={() => setQErr(null)}/>}
+              <div className="flex gap-8 mt-12"><button className="btn btn-primary btn-sm" onClick={saveEditQ}>Save</button><button className="btn btn-secondary btn-sm" onClick={() => { setEditingQ(false); setQErr(null) }}>Cancel</button></div>
             </div>
           ) : (
             <>
@@ -520,7 +656,8 @@ export function QuestionPage() {
               {editing ? (
                 <div className="ans-composer" style={{ marginTop:10 }}>
                   <textarea className="field" dir="auto" value={editText} onChange={e => setEditText(e.target.value)}/>
-                  <div className="flex gap-8 mt-12"><button className="btn btn-primary btn-sm" onClick={() => saveEditA(a)}>Save</button><button className="btn btn-secondary btn-sm" onClick={() => setEditAid(null)}>Cancel</button></div>
+                  {editAErr && <ModerationAlert error={editAErr} onDismiss={() => setEditAErr(null)}/>}
+                  <div className="flex gap-8 mt-12"><button className="btn btn-primary btn-sm" onClick={() => saveEditA(a)}>Save</button><button className="btn btn-secondary btn-sm" onClick={() => { setEditAid(null); setEditAErr(null) }}>Cancel</button></div>
                 </div>
               ) : (
                 <>
@@ -559,7 +696,7 @@ export function QuestionPage() {
 
               <div className="ans-actions">
                 <button className={'btn btn-secondary btn-sm ' + (a._liked ? 'on-rose' : '')} onClick={() => react(a)}><Icon name="heart" className="xs"/>{a.likes}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => { const open = replyTo === a.id; setReplyTo(open ? null : a.id); setReplyTarget(null) }}><Icon name="reply" className="xs"/>Reply{a.replyCount ? ` · ${a.replyCount}` : ''}</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { const open = replyTo === a.id; setReplyTo(open ? null : a.id); setReplyTarget(null); setReplyErr(null) }}><Icon name="reply" className="xs"/>Reply{a.replyCount ? ` · ${a.replyCount}` : ''}</button>
                 {own && !editing && <button className="btn btn-secondary btn-sm" onClick={() => startEditA(a)}><Icon name="compose" className="xs"/>Edit</button>}
                 {own && <button className={'btn btn-secondary btn-sm ' + (openManage[a.id] ? 'on-brass' : '')} onClick={() => toggleManage(a)}><Icon name="book" className="xs"/>Sources &amp; files</button>}
                 {own && <button className="btn btn-secondary btn-sm" style={{ color:'var(--rose)' }} onClick={() => deleteA(a)}><Icon name="close" className="xs"/>Delete</button>}
@@ -616,6 +753,10 @@ export function QuestionPage() {
                     )
                   ))}
                   <button className="btn btn-secondary btn-sm mt-12" onClick={() => pickAttach(a)}><Icon name="upload" className="xs"/>Upload attachment</button>
+                  {/* One slot for the whole panel: only one source/attachment
+                      form is ever open at a time, and every refusal here carries
+                      the same sentence anyway. */}
+                  {manageErr?.aid === a.id && <ModerationAlert error={manageErr.error} onDismiss={() => setManageErr(null)}/>}
                 </div>
               )}
 
@@ -624,12 +765,13 @@ export function QuestionPage() {
                 <div className="cmt-box" style={{ marginTop:10 }}>
                   <Avatar initials={(user?.full||'Y').slice(0,1)} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={28} src={user?.profileImage}/>
                   <MentionBox className="field" autoFocus placeholder={replyTarget ? `Replying to @${replyTarget.handle}…` : `Reply to ${au.full}…`} value={replyText}
-                    onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null) } }}/>
+                    onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') submitReply(a); if (e.key==='Escape') { setReplyTo(null); setReplyText(''); setReplyFile(null); setReplyTarget(null); setReplyErr(null) } }}/>
                   <input ref={replyFileRef} type="file" hidden accept="image/*,video/*,audio/*" onChange={e => { const f = e.target.files?.[0]; if (f) setReplyFile(f); e.target.value='' }}/>
                   <button className="icon-btn" title={replyFile ? replyFile.name : 'Attach media'} onClick={() => replyFileRef.current?.click()} style={replyFile ? { color:'var(--emerald)' } : undefined}><Icon name="paperclip" className="sm"/></button>
                   <button className="icon-btn" disabled={!replyText.trim() && !replyFile} onClick={() => submitReply(a)}><Icon name="send" className="sm"/></button>
                 </div>
               )}
+              {replyTo === a.id && replyErr && <ModerationAlert error={replyErr} onDismiss={() => setReplyErr(null)}/>}
               {(a.replyCount > 0 || repliesMap[a.id]?.length > 0) && (
                 <button onClick={() => toggleReplies(a)} style={{ marginTop:8, fontSize:'12.5px', color:'var(--emerald)', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}>
                   <Icon name={openReplies[a.id] ? 'chevup' : 'chevdown'} className="xs"/>
@@ -652,10 +794,13 @@ export function QuestionPage() {
                       <div className="cmt-bubble">
                         <div className="cmt-name"><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}{replyingTo && <span className="muted text-xs"> · <Icon name="reply" className="xs"/>@{replyingTo}</span>}{r.edited && <span className="muted text-xs"> · edited</span>}</div>
                         {rEditing ? (
-                          <div className="flex gap-8" style={{ marginTop:6 }}>
-                            <input className="field" autoFocus value={editRText} onChange={e => setEditRText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') saveEditReply(a.id, r); if (e.key==='Escape') setEditRid(null) }}/>
-                            <button className="icon-btn" onClick={() => saveEditReply(a.id, r)}><Icon name="check" className="sm"/></button>
-                          </div>
+                          <>
+                            <div className="flex gap-8" style={{ marginTop:6 }}>
+                              <input className="field" autoFocus value={editRText} onChange={e => setEditRText(e.target.value)} onKeyDown={e => { if (e.key==='Enter') saveEditReply(a.id, r); if (e.key==='Escape') { setEditRid(null); setEditRErr(null) } }}/>
+                              <button className="icon-btn" onClick={() => saveEditReply(a.id, r)}><Icon name="check" className="sm"/></button>
+                            </div>
+                            {editRErr && <ModerationAlert error={editRErr} onDismiss={() => setEditRErr(null)}/>}
+                          </>
                         ) : <p>{linkify(r.body)}</p>}
                         {!rEditing && r.mediaUrl && (r.mediaType === 'VIDEO'
                           ? <video src={r.mediaUrl} controls playsInline style={{ width:'100%', borderRadius:10, marginTop:8, background:'#000' }}/>
@@ -720,6 +865,11 @@ export function QuestionPage() {
                 <button className="btn btn-ghost btn-sm mt-12" onClick={() => setSrcOpen(false)}>Done adding sources</button>
               </div>
             )}
+
+            {/* Under the draft, above the button that sent it. Nothing is
+                cleared when this appears — the text, the attachment and the
+                sources are all still here to be edited. */}
+            {ansErr && <ModerationAlert error={ansErr} onDismiss={() => setAnsErr(null)}/>}
 
             <input ref={mediaRef} type="file" hidden accept="image/*,video/*" onChange={onPickMedia}/>
             <input ref={voiceFileRef} type="file" hidden accept="audio/*" onChange={onPickVoice}/>

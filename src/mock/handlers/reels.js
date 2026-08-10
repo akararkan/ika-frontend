@@ -32,6 +32,11 @@
    followed. Keep those eight ids in the following list.
    ========================================================= */
 import { page, paging, mockError, seeded } from '../util.js'
+/* Cyclic with ./moderation.js by design — that module screens story CREATE and
+   delegates the clean case back to the handler here, while this one settles the
+   hold on READ. Safe because neither side dereferences the other at module-init
+   time: both uses are inside functions that run per request. */
+import { settleHold, fakeVerdict, blockedError } from './moderation.js'
 
 /* ---------------------------------------------------------------
    Media. Four ~6 KB H.264 clips (180×320, 8 s, looping gradient) and
@@ -180,7 +185,11 @@ function feedItem(db, r) {
     postType: 'REEL',
     textPreview: r.caption,
     mediaUrl: poster(r.cover, r.id),      // cover / poster frame
-    videoUrl: clipUrl(r.clip),            // REEL-only: the playable video
+    /* A STILL reel (`still: true`) is a photo posted as a reel. The server
+       derives videoUrl from the canonical row's mediaTypes, so a reel with no
+       VIDEO in it answers null here and the cover IS the content — exactly the
+       shape the viewer's 30-second still player looks for. */
+    videoUrl: r.still ? null : clipUrl(r.clip),   // REEL-only: the playable video
     reactionCount: r.reactionCount || 0,
     commentCount: r.commentCount || 0,
     viewCount: r.viewCount || 0,
@@ -215,8 +224,8 @@ function postResponse(db, r) {
     locationLng: null,
     sharedPostId: null,
     shareLink: shareToken(r.id),
-    mediaUrls: [clipUrl(r.clip), poster(r.cover, r.id)],
-    mediaTypes: ['VIDEO', 'IMAGE'],
+    mediaUrls: r.still ? [poster(r.cover, r.id)] : [clipUrl(r.clip), poster(r.cover, r.id)],
+    mediaTypes: r.still ? ['IMAGE'] : ['VIDEO', 'IMAGE'],
     reactionCount: r.reactionCount || 0,
     commentCount: r.commentCount || 0,
     viewCount: r.viewCount || 0,
@@ -362,6 +371,14 @@ function storyMedia(s) {
 }
 
 function storyEntity(db, authorId, s) {
+  /* Stories are the ONE surface whose held state is visible on the wire, and
+     `by-author` is the read that serves an author their own held row. Settle the
+     fake hold on read and carry the marker through: without it the create
+     response says PENDING and the very first re-check says cleared, so the
+     "Checking…" badge would blink out after a second and never be seen.
+     Absent (not null) when clean — Spring omits nulls, and a client that reads
+     `moderationStatus === null` has to break here rather than in production. */
+  settleHold(s)
   return {
     authorId,
     createdAt: at(s.minsAgo),
@@ -371,6 +388,7 @@ function storyEntity(db, authorId, s) {
     ...storyMedia(s),
     textContent: s.textContent || null,
     expiresAt: at(s.minsAgo - (s.lifetimeHours || 24) * 60),
+    ...(s.moderationStatus ? { moderationStatus: s.moderationStatus } : null),
   }
 }
 
@@ -818,6 +836,9 @@ export const routes = [
     fn: (db, { params, body }) => {
       const found = findStory(db, params[0])
       if (!found) throw mockError(404, 'NOT_FOUND', 'Story not found')
+      /* Poll text is submitOrRefuse: no held state exists, so ANY non-approved
+         verdict — borderline included — is a hard 400 and nothing attaches. */
+      if (fakeVerdict(body?.question, body?.optionA, body?.optionB)) throw blockedError()
       found.story.poll = {
         pollId: `p-new-${Date.now().toString(36)}`,
         question: body?.question || '',
@@ -927,6 +948,8 @@ export const routes = [
   {
     m: 'POST', p: /^\/api\/v1\/highlights$/,
     fn: (db, { body }) => {
+      // Highlight titles are submitOrRefuse — instant accept or hard 400.
+      if (fakeVerdict(body?.title)) throw blockedError()
       const mine = ownerKey(db, meId(db), db.highlights || {})
       db.highlights = db.highlights || {}
       const list = db.highlights[mine] || (db.highlights[mine] = [])

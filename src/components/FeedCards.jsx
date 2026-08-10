@@ -14,6 +14,18 @@
    row (from message_counters), they just mean different things —
    views, FORWARDS and discussion comments — so that card renders
    them straight and never hydrates.
+
+   MODERATION — deliberately nothing here (contract: src/lib/moderation.js).
+   None of these three is a create or edit surface: they are read-only rows
+   that navigate away, so there is no refusal to catch. And none of them can
+   honestly wear a held badge either. A research paper that is waiting on a
+   verdict is still `status: "DRAFT"` and the feed only ever carries published
+   ones; a question and a channel post carry NO moderation field on the wire at
+   all, so the response of a held one is byte-identical to a clean one. A badge
+   here could therefore only be a guess, and guessing wrong marks clean rows as
+   "Checking…" in a stranger's feed. Held POSTS are the one row type that does
+   say so — `status: "PENDING_REVIEW"` — and they render through <PostCard>,
+   which owns the badge, the dimming and the re-check.
    ========================================================= */
 import React from 'react'
 import { Icon, Avatar, Verify, fmt, linkify } from './ui.jsx'

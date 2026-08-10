@@ -41,6 +41,13 @@ import './styles/warm/ika-messages-theme.css'
    `.cn-`/`.ch-` classes and must win on source order — and still BEFORE
    responsive.css, which keeps the last word on layout. */
 import './styles/warm/channels-pro.css'
+/* MODERATION — the author-facing held/blocked layer (.mod-) and the admin
+   review console (.mdq-). Both sit here, after every content surface they
+   decorate, because a "Checking…" badge has to win over the card styling it
+   overlays — and still before dark.css, which repairs the one colour pair
+   (the red wash) that exists only as a light literal. */
+import './styles/warm/moderation.css'
+import './styles/warm/moderation-admin.css'
 /* DARK MODE — the repair layer for `appearance.theme` (prefs.js sets
    data-theme="dark" on <html>). It must be LAST in the warm layer:
    every rule is scoped under :root[data-theme="dark"], so it is inert

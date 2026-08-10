@@ -203,6 +203,66 @@ time. A server-side cross-bucket cursor would simplify clients.
 
 ---
 
+### 13. The attached Sound is missing from every reel LIST response
+`FeedItemResponse` carries no audio field at all, so a reel row arrives with no
+way to know it even HAS an added sound — only `GET /posts/{id}` returns
+`audioTrackUrl` / `audioTrackName`. The reels viewer plays the added track
+alongside the clip's original audio (mixer, per-track levels), so it now issues
+one extra read per reel it lands on purely to learn the track.
+
+**Fix** — add `audioTrackUrl` + `audioTrackName` (or the whole `soundId` →
+title/artist/url triple) to `FeedItemResponse` for `postType: REEL`. The client
+already reads them off the feed row when present and skips the extra GET.
+
+---
+
+### 14. `soundId` on create is bookkeeping only — the sound is never attached
+`CassandraPostService.createPost` copies `audioTrackUrl` straight from the
+command and calls `soundService.recordPostUsage(soundId, …)`; nothing resolves
+the sound's own `audioUrl` onto the post. A post created with **only**
+`soundId` therefore comes back with `audioTrackUrl: null` and there is nothing
+for any client to play — the sound exists solely as a use-count.
+
+_Workaround:_ the composer now sends `soundId` **and** `audioTrackUrl` +
+`audioTrackName` (the sound's raw url and "Title · Artist"), so the post carries
+its own copy.
+
+**Fix** — when `soundId` is present and `audioTrackUrl` is blank, populate
+`audioTrackUrl` / `audioTrackName` from the Sound server-side. That also makes
+the two fields agree for clients that (correctly) send only the id.
+
+---
+
+### 15. Nothing records how long a still reel should play
+A reel whose media is an IMAGE is a legitimate post — `firstVideoUrl` falls back
+to the first url for the cover, `videoUrl` comes back null, and the row is
+otherwise a normal reel. But a photo has no duration, and no field on the post
+carries one, so **each client invents it** (this one plays a still for 30s).
+Two clients will disagree, and an author cannot choose.
+
+**Fix** — a nullable `durationSeconds` on the post (or on the media entry), set
+at create time and echoed on `PostResponse` / `FeedItemResponse`.
+
+---
+
+### 16. No field for a reel's audio balance
+A reel plays two tracks at once (its own recorded audio + the added sound), and
+the author sets the balance between them in the composer — but `PostResponse`
+has nowhere to keep it, so the numbers cannot be stored honestly.
+
+_Workaround:_ they ride in the **fragment** of `audioTrackUrl`
+(`…/track.mp3#mix=0.40,0.90` — original, then music). A fragment is never sent
+to the server on a media request and never changes which bytes are fetched, so
+a client that ignores it plays the same audio at its own default levels. It is
+still a workaround: the value is invisible to the API, unqueryable, and lost the
+moment anything normalises the URL.
+
+**Fix** — two nullable floats on the post (`audioOriginalGain`,
+`audioTrackGain`, 0–1), set at create time and echoed on `PostResponse` /
+`FeedItemResponse`.
+
+---
+
 ## ✅ Resolved since first review (verified 2026-05-27)
 
 - **Ranked / following reel feeds deployed** — `GET /api/v1/posts/reels/for-you`

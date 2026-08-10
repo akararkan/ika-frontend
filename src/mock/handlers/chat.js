@@ -21,6 +21,7 @@
    until the page is reloaded.
    ========================================================= */
 import { page, paging, mockError, agoIso, seeded, NO_CONTENT } from '../util.js'
+import { fakeVerdict, blockedError } from './moderation.js'
 
 /* The viewer the fixture was written around. If another slice of the
    fixture names a different signed-in user, the two ids are swapped
@@ -69,6 +70,47 @@ const nextId = (db) => String(355460000000090000n + BigInt(++db._chat.seq))
 
 const convo = (db, id) => (db.conversations || []).find(c => c.id === id) || null
 const channel = (db, id) => (db.channels || []).find(c => c.id === id) || null
+
+/** Drop a conversation row from the inbox, by id. */
+function dropConvo(db, id) {
+  const i = (db.conversations || []).findIndex(c => c.id === id)
+  if (i >= 0) db.conversations.splice(i, 1)
+}
+
+/* Leaving a channel and unsubscribing from it are ONE operation on the server
+   — `DELETE /channels/{id}/subscribe`, `POST /conversations/{id}/leave` and a
+   subscriber's `DELETE /conversations/{id}` all land here — so the mock keeps
+   one implementation too, or the three routes drift into three behaviours the
+   real backend does not have. The membership row is removed outright: no
+   `LEFT` status, no system message, and the chat does NOT come back on the
+   channel's next post. Idempotent. */
+function leaveChannel(db, ch) {
+  if (!ch) return NO_CONTENT
+  if (ch.myRole === 'OWNER') {
+    throw mockError(403, 'ACCESS_FORBIDDEN', 'The owner cannot leave their own channel — delete it or transfer it first.')
+  }
+  ch.subscribed = false
+  ch.pendingJoinRequest = false
+  ch.myRole = null
+  ch.subscriberCount = Math.max(0, (ch.subscriberCount || 1) - 1)
+  dropConvo(db, ch.id)
+  return NO_CONTENT
+}
+
+/* Owner-only, and for everyone: the channel leaves every inbox, discovery and
+   the by-handle index. The fixture has no other viewers, so "for everyone" is
+   simply "gone from the db" — what matters for the UI is that a subsequent
+   GET 404s, exactly as the real soft-delete makes it. */
+function deleteChannel(db, ch) {
+  if (!ch) throw mockError(404, 'CONVERSATION_NOT_FOUND', 'This channel no longer exists.')
+  if (ch.myRole !== 'OWNER') {
+    throw mockError(403, 'NOT_OWNER', 'Only the channel owner can delete it.')
+  }
+  const i = (db.channels || []).findIndex(c => c.id === ch.id)
+  if (i >= 0) db.channels.splice(i, 1)
+  dropConvo(db, ch.id)
+  return NO_CONTENT
+}
 
 /** The message log of a conversation. A CHANNEL's log is its posts. */
 function thread(db, id) {
@@ -638,6 +680,12 @@ export const routes = [
       if (c?.groupSettings?.sendMode === 'ADMINS_ONLY' && c.myRole === 'MEMBER') {
         throw mockError(403, 'SEND_NOT_ALLOWED', 'Only admins can post in this group.')
       }
+      /* Chat is screened like everything else. Only the REFUSAL is observable:
+         MessageResponse carries no moderation field, so a held message is
+         byte-identical to a clean one for its sender (recipients simply never
+         receive the row). Nothing is persisted on a block, and the clientNonce
+         is released, so retrying the same nonce is safe. */
+      if (fakeVerdict(body?.body) === 'BLOCK') throw blockedError()
       const type = body?.type || 'TEXT'
       const row = newRow(db, params[0], {
         type,
@@ -783,12 +831,16 @@ export const routes = [
       return NO_CONTENT
     },
   },
+  /* Group-only until the backend taught it channels: on a CHANNEL id this
+     endpoint now delegates to unsubscribe (and refuses the owner), which is
+     why the chat surfaces can offer one "Leave" for both kinds. */
   {
     m: 'POST', p: re('\\/conversations\\/([^/]+)\\/leave'),
     fn: (db, { params }) => {
       init(db)
-      const i = (db.conversations || []).findIndex(c => c.id === params[0])
-      if (i >= 0) db.conversations.splice(i, 1)
+      const ch = channel(db, params[0])
+      if (ch) return leaveChannel(db, ch)
+      dropConvo(db, params[0])
       return NO_CONTENT
     },
   },
@@ -973,14 +1025,18 @@ export const routes = [
       return convoDto(db, c, lang)
     },
   },
-  /* One call, two blast radii — the server picks from your role. Either way
-     the row leaves both lists here. */
+  /* One call, FOUR blast radii — the server picks from what you are:
+     group/channel owner deletes for everyone, a channel subscriber leaves for
+     good, and a DM/group member clears their own copy. The last case is the
+     only one that comes back on the next message; the fixture has no other
+     sender, so here they all end in the same disappearance. */
   {
     m: 'DELETE', p: re('\\/conversations\\/([^/]+)'),
     fn: (db, { params }) => {
       init(db)
-      const i = (db.conversations || []).findIndex(c => c.id === params[0])
-      if (i >= 0) db.conversations.splice(i, 1)
+      const ch = channel(db, params[0])
+      if (ch) return ch.myRole === 'OWNER' ? deleteChannel(db, ch) : leaveChannel(db, ch)
+      dropConvo(db, params[0])
       return NO_CONTENT
     },
   },
@@ -1027,6 +1083,10 @@ export const routes = [
       init(db)
       const hit = findMessage(db, params[0])
       if (!hit) throw mockError(404, 'MESSAGE_NOT_FOUND')
+      /* Screened BEFORE the write, exactly like MessageService.edit: a refused
+         edit must leave the stored body untouched, which is what lets the
+         client's revert be rehearsed rather than merely believed. */
+      if (fakeVerdict(body?.body) === 'BLOCK') throw blockedError()
       hit.m.body = body?.body || ''
       hit.m._editedAgo = 0
       hit.m.tags = hashtagsOf(hit.m.body)      // hashtags follow the body on an edit
@@ -1574,20 +1634,12 @@ export const routes = [
       return channelDto(db, ch)
     },
   },
+  /* Unsubscribe = leave; both spellings run the one implementation. */
   {
     m: 'DELETE', p: re('\\/channels\\/([^/]+)\\/subscribe'),
     fn: (db, { params }) => {
       init(db)
-      const ch = channel(db, params[0])
-      if (!ch) return NO_CONTENT
-      if (ch.myRole === 'OWNER') throw mockError(400, 'OWNER_CANNOT_LEAVE', 'The owner cannot unsubscribe from their own channel.')
-      ch.subscribed = false
-      ch.pendingJoinRequest = false
-      ch.myRole = null
-      ch.subscriberCount = Math.max(0, (ch.subscriberCount || 1) - 1)
-      const i = (db.conversations || []).findIndex(c => c.id === ch.id)
-      if (i >= 0) db.conversations.splice(i, 1)
-      return NO_CONTENT
+      return leaveChannel(db, channel(db, params[0]))
     },
   },
   {
@@ -1615,6 +1667,17 @@ export const routes = [
       const ch = channel(db, params[0])
       if (!ch) throw mockError(404, 'CHANNEL_NOT_FOUND', 'That channel does not exist.')
       return channelDto(db, ch)
+    },
+  },
+  /* Owner-only, for everyone. Declared AFTER the `…/subscribe`, `…/photo` and
+     `…/admins/{id}` DELETEs above: `re()` anchors both ends, so the bare-id
+     pattern cannot swallow them — but keeping the general form last matches
+     how the rest of this table is ordered and survives a looser regex. */
+  {
+    m: 'DELETE', p: re('\\/channels\\/([^/]+)'),
+    fn: (db, { params }) => {
+      init(db)
+      return deleteChannel(db, channel(db, params[0]))
     },
   },
   /* `settings` is a WHOLE-OBJECT replacement — every knob omitted is reset. */
