@@ -51,8 +51,29 @@ const DOMAIN = {
   researches: { base: '/api/v1/researches', events: RESEARCH_EVENTS },
 }
 
+/* =========================================================
+   The REALTIME MANAGER — one connection per entity, shared.
+
+   The naive shape is one EventSource per subscribing component;
+   two surfaces watching the same post then hold two sockets,
+   two watchdogs, and two slots of the per-user SSE cap of 5.
+   Instead every (domain, id) pair has ONE channel here, and
+   openStream() only ever adds a subscriber to it:
+
+        EventSource ──► channel ──► every subscriber's onEvent
+                                      │
+                                      └► state → React re-render
+
+   The channel dials on the first subscriber, fans each event to
+   all of them, and closes on the last unsubscribe. A late
+   joiner is told `connected` immediately from the channel's
+   cache, so its "live" affordance settles without waiting for
+   the server to say it again.
+   ========================================================= */
+const channels = new Map()   // "domain/id" → channel
+
 /**
- * Open an SSE stream for one entity.
+ * Subscribe to one entity's live stream.
  * @param {'posts'|'questions'|'researches'} domain
  * @param {string} id   entity UUID
  * @param {object} handlers { onEvent(evt), onConnected(data), onError(e) }
@@ -62,56 +83,101 @@ export function openStream(domain, id, handlers = {}) {
   const cfg = DOMAIN[domain]
   if (!cfg || !id) return () => {}
 
-  /* Mock mode: an EventSource never passes through request(), so there is
-     nothing for the fixture layer to intercept — opening one only produces a
-     reconnect loop against a server that is not running. Report connected (so
-     any "live" affordance settles) and send nothing. */
-  if (mockEnabled()) {
-    const t = setTimeout(() => handlers.onConnected?.({ mock: true }), 0)
-    return () => clearTimeout(t)
-  }
-
-  const parse = (e) => { try { return JSON.parse(e.data) } catch { return { raw: e.data } } }
-
-  let es = null
-  let lastBeat = Date.now()
-  let closed = false
-
-  const connect = () => {
-    if (closed) return
-    // Read the token (and rebuild the URL) on EVERY connect — the access token
-    // rotates ~hourly via the 401 refresh, and a long-lived page may reconnect
-    // after that. Capturing it once would re-dial with a dead token forever.
-    const token = session.getToken()
-    const url = `${API_BASE}${cfg.base}/${id}/stream` + (token ? `?token=${encodeURIComponent(token)}` : '')
-    es = new EventSource(url, { withCredentials: true })
-    const beat = () => { lastBeat = Date.now() }
-    es.addEventListener('connected', (e) => { beat(); handlers.onConnected?.(parse(e)) })
-    es.addEventListener('heartbeat', beat)
-    for (const name of cfg.events) {
-      es.addEventListener(name, (e) => { beat(); const data = parse(e); handlers.onEvent?.({ eventType: name, ...data }) })
+  const key = `${domain}/${id}`
+  let ch = channels.get(key)
+  if (!ch) {
+    ch = {
+      subs: new Set(),
+      es: null,
+      watchdog: 0,
+      lastBeat: Date.now(),
+      connected: null,           // the server's `connected` payload, cached for late joiners
+      mock: mockEnabled(),
     }
-    // generic fallback (events without an explicit `event:` line)
-    es.onmessage = (e) => { beat(); const data = parse(e); if (data?.eventType) handlers.onEvent?.(data) }
-    es.onerror = (err) => handlers.onError?.(err)   // browser auto-reconnects on transient errors
-  }
-  connect()
+    channels.set(key, ch)
 
-  // Heartbeat watchdog (REALTIME_FRONTEND_GUIDE §12): the server beats every
-  // ~15-25s; >60s of total silence means a wedged proxy the browser hasn't
-  // declared dead → force ONE fresh socket (close before reconnect, so we never
-  // hold two and trip the per-user SSE cap of 5).
-  const watchdog = setInterval(() => {
-    if (closed) return
-    if (Date.now() - lastBeat > 60000) {
-      try { es?.close() } catch { /* noop */ }
-      lastBeat = Date.now()
+    /* Handlers may unsubscribe from inside a callback — fan over a snapshot,
+       and never let one subscriber's throw starve the others. */
+    const fan = (fn, arg) => {
+      for (const s of [...ch.subs]) {
+        try { s[fn]?.(arg) } catch { /* a broken subscriber is its own problem */ }
+      }
+    }
+    ch.fan = fan
+
+    if (ch.mock) {
+      /* Mock mode: an EventSource never passes through request(), so there is
+         nothing for the fixture layer to intercept — opening one only produces
+         a reconnect loop against a server that is not running. The channel
+         still EXISTS (so pushMockEvent can drive it and every subscriber path
+         stays exercised); it just holds no socket. */
+      ch.connected = { mock: true }
+    } else {
+      const parse = (e) => { try { return JSON.parse(e.data) } catch { return { raw: e.data } } }
+      const connect = () => {
+        if (!channels.has(key)) return
+        // Read the token (and rebuild the URL) on EVERY connect — the access
+        // token rotates ~hourly via the 401 refresh, and a long-lived page may
+        // reconnect after that. Capturing it once would re-dial with a dead
+        // token forever.
+        const token = session.getToken()
+        const url = `${API_BASE}${cfg.base}/${id}/stream` + (token ? `?token=${encodeURIComponent(token)}` : '')
+        const es = new EventSource(url, { withCredentials: true })
+        ch.es = es
+        const beat = () => { ch.lastBeat = Date.now() }
+        es.addEventListener('connected', (e) => { beat(); ch.connected = parse(e); fan('onConnected', ch.connected) })
+        es.addEventListener('heartbeat', beat)
+        for (const name of cfg.events) {
+          es.addEventListener(name, (e) => { beat(); fan('onEvent', { eventType: name, ...parse(e) }) })
+        }
+        // generic fallback (events without an explicit `event:` line)
+        es.onmessage = (e) => { beat(); const data = parse(e); if (data?.eventType) fan('onEvent', data) }
+        es.onerror = (err) => fan('onError', err)   // browser auto-reconnects on transient errors
+      }
       connect()
-    }
-  }, 15000)
 
-  return () => { closed = true; clearInterval(watchdog); try { es?.close() } catch { /* noop */ } }
+      // Heartbeat watchdog (REALTIME_FRONTEND_GUIDE §12): the server beats
+      // every ~15-25s; >60s of total silence means a wedged proxy the browser
+      // hasn't declared dead → force ONE fresh socket (close before reconnect,
+      // so we never hold two and trip the per-user SSE cap of 5).
+      ch.watchdog = setInterval(() => {
+        if (!channels.has(key)) return
+        if (Date.now() - ch.lastBeat > 60000) {
+          try { ch.es?.close() } catch { /* noop */ }
+          ch.lastBeat = Date.now()
+          connect()
+        }
+      }, 15000)
+    }
+  }
+
+  ch.subs.add(handlers)
+  // Channel already live → settle this subscriber's "connected" now.
+  if (ch.connected) {
+    const mine = handlers
+    queueMicrotask(() => { if (ch.subs.has(mine)) mine.onConnected?.(ch.connected) })
+  }
+
+  return () => {
+    ch.subs.delete(handlers)
+    if (ch.subs.size === 0) {
+      channels.delete(key)
+      clearInterval(ch.watchdog)
+      try { ch.es?.close() } catch { /* noop */ }
+    }
+  }
 }
+
+/** Mock mode's stand-in for the server's push: drive a channel's subscribers
+ *  with a synthetic event (demo consoles, tests). No-op outside mock. */
+export function pushMockEvent(domain, id, evt = {}) {
+  if (!mockEnabled()) return false
+  const ch = channels.get(`${domain}/${id}`)
+  if (!ch) return false
+  ch.fan('onEvent', { eventType: evt.eventType || evt.type || 'UNKNOWN', ...evt })
+  return true
+}
+if (typeof window !== 'undefined') window.__ikaRealtimePush = pushMockEvent
 
 /* ---------------------------------------------------------
    POST counter deltas — events carry NO counts, so the client

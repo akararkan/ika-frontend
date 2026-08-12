@@ -12,6 +12,8 @@ import { uiConfirm } from '../Dialog.jsx'
 import { Loader, ErrorState } from '../states.jsx'
 import { api } from '../../api/index.js'
 import { saveBlob } from '../../api/http.js'
+import { errorText, cooldownSecondsFrom } from '../../api/errors.js'
+import { COUNTRIES, dialOf, flagOf } from '../../lib/dialCodes.js'
 import { SetCard, ControlRow, runStepUp, copyText, humanEnum } from './shared.jsx'
 
 /* ---------- security checkup ---------- */
@@ -118,10 +120,13 @@ function CodesReveal({ codes, onDone }) {
       </div>
       <div className="stx-note warn">
         <Icon name="alert"/>
-        {/* No endpoint redeems a recovery code today (RecoveryCodeService.consume
-            has no caller, and step-up accepts only a password or a live TOTP),
-            so the copy must not promise a way back in. */}
-        <span>These codes are shown only once. Save them somewhere safe — they are your backup if you lose access to your authenticator app.</span>
+        {/* These are redeemable for real now: POST /auth/login/2fa takes a
+            recovery code in the same field as the 6-digit code, so this copy
+            can promise the way back in that it always implied. */}
+        <span>
+          These codes are shown only once. Save them somewhere safe — if you lose your authenticator app,
+          each one signs you in once, in place of the 6-digit code.
+        </span>
       </div>
       <div className="set-actions">
         <button className="btn btn-secondary btn-sm" onClick={() => copyText(codes.join('\n'), 'Recovery codes copied')}><Icon name="copy" className="xs"/>Copy all</button>
@@ -133,13 +138,19 @@ function CodesReveal({ codes, onDone }) {
 }
 
 /* ---------- two-factor authentication ----------
-   Wire truth the copy in here has to respect: the LOGIN path never reads the
-   2FA flag (AuthServiceImpl.login goes authenticate → issueTokenPair), so a
-   password alone still yields a token pair. What the enrolment does buy today
-   is the step-up factor: POST /security/step-up accepts a TOTP `code`, and it
-   is what guards disable-2FA and regenerate-recovery-codes. The enrolment
-   itself is real — the secret and the recovery codes are stored properly — so
-   we keep the control and describe what it actually protects. */
+   Wire truth the copy in here has to respect: 2FA is now a real LOGIN gate. A
+   correct password on an enrolled account issues no session at all — /auth/login
+   answers with a 5-minute mfaToken and the client must redeem it at
+   /auth/login/2fa with a TOTP or recovery code (see pages/AuthPage.jsx). It is
+   still the step-up factor as well.
+
+   Two consequences for this panel:
+   · turning 2FA ON is itself step-up-guarded (POST /2fa/setup calls
+     requireRecentStepUp), so `begin` runs through runStepUp exactly like
+     disable and regenerate do. The global StepUpHost would also catch the 403,
+     but going through runStepUp keeps the prompt's copy specific to this card;
+   · the recovery codes shown at enrolment are the ONLY way back in without the
+     authenticator, so losing them and the phone means an admin reset. */
 
 export function TwoFactorPanel() {
   /* Hand-rolled label association rather than <Field>: the label sits above a
@@ -174,7 +185,11 @@ export function TwoFactorPanel() {
   const begin = async () => {
     setBusy(true)
     try {
-      const res = await api.security.twofa.setup()
+      /* Step-up guarded: 2FA is off here, so the prompt can only offer the
+         password route — a 6-digit "password" would be misrouted to the TOTP
+         branch, and there is no authenticator to read a code from yet. */
+      const res = await runStepUp(() => api.security.twofa.setup(), { twoFactor: false })
+      if (!res) return
       setCode('')
       setEnrol(res)
     } catch (e) {
@@ -227,7 +242,7 @@ export function TwoFactorPanel() {
   const turnOff = async () => {
     const yes = await uiConfirm({
       title: 'Turn off two-factor authentication?',
-      message: 'Sensitive changes will be confirmed by your password alone, and your recovery codes stop working.',
+      message: 'Signing in will need only your password, and your recovery codes stop working immediately.',
       confirmLabel: 'Turn off',
       danger: true,
       icon: 'lock',
@@ -244,7 +259,7 @@ export function TwoFactorPanel() {
 
   return (
     <SetCard id="two-factor" icon="lock" title="Two-factor authentication"
-      sub="A rotating 6-digit code from an authenticator app, used to confirm sensitive account changes.">
+      sub="A rotating 6-digit code from an authenticator app, asked for every time you sign in — and to confirm sensitive account changes.">
       {error ? (
         <ErrorState message="Could not load your 2FA status" onRetry={() => { setStatus(null); setTick(t => t + 1) }}/>
       ) : status === null ? (
@@ -271,11 +286,11 @@ export function TwoFactorPanel() {
         </div>
       ) : status.enabled ? (
         <>
-          <ControlRow title="Status" desc="Your authenticator code confirms sensitive actions, such as turning 2FA off or regenerating recovery codes.">
+          <ControlRow title="Status" desc="Signing in asks for your password and then a code from your authenticator app. The same code confirms sensitive actions, such as turning 2FA off.">
             <span className="stx-chip ok"><Icon name="check"/>On</span>
           </ControlRow>
           <ControlRow title="Recovery codes"
-            desc={`${status.recoveryCodesRemaining ?? 0} unused ${(status.recoveryCodesRemaining ?? 0) === 1 ? 'code' : 'codes'} left. Keep them somewhere safe as your account backup.`}>
+            desc={`${status.recoveryCodesRemaining ?? 0} unused ${(status.recoveryCodesRemaining ?? 0) === 1 ? 'code' : 'codes'} left. Each one signs you in once if your authenticator is unavailable — without them and the app, only an administrator can restore access.`}>
             <button className="btn btn-secondary btn-sm" onClick={regenerate}><Icon name="refresh" className="xs"/>Regenerate recovery codes</button>
           </ControlRow>
           {codes && <CodesReveal codes={codes} onDone={() => setCodes(null)}/>}
@@ -285,7 +300,11 @@ export function TwoFactorPanel() {
         </>
       ) : (
         <>
-          <p className="muted text-sm">Adds a second factor that guards changes to your security settings. Setup takes about a minute.</p>
+          <p className="muted text-sm">
+            Adds a second step to every sign-in: your password, then a 6-digit code from an
+            authenticator app (Google Authenticator, Authy, 1Password, Aegis). You’ll also get ten
+            single-use recovery codes for the day your phone isn’t to hand. Setup takes about a minute.
+          </p>
           {codes && <CodesReveal codes={codes} onDone={() => setCodes(null)}/>}
           <div className="set-actions">
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={begin}><Icon name="shield" className="xs"/>Turn on 2FA</button>
@@ -300,11 +319,29 @@ export function TwoFactorPanel() {
 
 export function PhonePanel() {
   const uid = React.useId()                              // label/control pairs — see the note in TwoFactorPanel
+  const [cc, setCc] = React.useState('IQ')           // picker country (iso2 — dials like +1 are shared)
   const [phone, setPhone] = React.useState('')
   const [code, setCode] = React.useState('')
   const [sent, setSent] = React.useState(false)
   const [bound, setBound] = React.useState(null)     // E.164 confirmed this session
   const [busy, setBusy] = React.useState(false)
+  const [cooldown, setCooldown] = React.useState(0)  // seconds until Send/Resend re-enables
+  /* The exact string the code was REQUESTED for. Verify must send the same
+     string (the guide's rule), and the challenge belongs to that number even
+     if the inputs are edited while the code screen is open. */
+  const requestedRef = React.useRef('')
+
+  /* Picker code + local part, OR the raw number when the user typed a full one
+     (+… / 00…) — never both glued together: prefixing +964 onto an input that
+     still carries its own prefix is exactly how the double-0 bug was made. The
+     trunk 0 is stripped from the local part; the server is the authority on
+     everything else. */
+  const assembled = () => {
+    const raw = phone.trim()
+    if (/^(\+|00)/.test(raw)) return raw
+    const local = raw.replace(/\D/g, '').replace(/^0/, '')
+    return local ? `+${dialOf(cc)}${local}` : ''
+  }
   /* Session-scoped ON PURPOSE. PhoneService writes phoneE164/phoneVerifiedAt on
      the User, but no response DTO exposes them (UserResponse has no phone key)
      and there is no GET on /security/phone — so a bound number is unreadable
@@ -312,19 +349,37 @@ export function PhonePanel() {
      payload would be wiped by the next me() refresh. */
   const current = bound
 
+  /* Sends are scarce (3 per number/hour, 10 per IP/hour), so the button sits
+     out a short cooldown after every send — a user hammering Resend would
+     otherwise burn the whole hourly budget from one screen. A 429 stretches
+     the same timer to the server's own retryAfterSeconds. */
+  React.useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setInterval(() => setCooldown(s => (s > 1 ? s - 1 : 0)), 1000)
+    return () => clearInterval(t)
+  }, [cooldown > 0])
+
   const send = async () => {
-    if (busy) return   // Enter bypasses the disabled button; resends are rate-limited
-    const p = phone.trim()
+    if (busy || cooldown > 0) return   // Enter bypasses the disabled button; resends are rate-limited
+    const p = assembled()
     if (!p) return
+    /* Light check only — the server is the authority on validity. */
+    if (p.replace(/\D/g, '').length < 8) { showToast('That doesn’t look like a valid phone number', 'err'); return }
     setBusy(true)
     try {
       await api.security.phone.request(p)
+      requestedRef.current = p
       setSent(true)
       setCode('')
-      showToast('Code sent if the number is valid')
+      setCooldown(30)
+      /* 202 means the code was GENERATED, not that an SMS arrived — with no
+         gateway configured it only reaches the server log, so don't promise
+         delivery the backend isn't making. */
+      showToast('Code requested — it expires in 5 minutes')
     } catch (e) {
-      if (e?.code === 'PHONE_INVALID') showToast('That doesn’t look like a valid phone number', 'err')
-      else if (e?.status !== 429) showToast('Could not send the code', 'err')
+      if (e?.code === 'PHONE_INVALID' || e?.code === 'PHONE_REQUIRED') showToast(errorText(e, 'That doesn’t look like a valid phone number'), 'err')
+      else if (e?.status === 429) setCooldown(cooldownSecondsFrom(e))   // http.js already toasted the "slow down" copy
+      else showToast('Could not send the code', 'err')
     } finally { setBusy(false) }
   }
 
@@ -334,27 +389,37 @@ export function PhonePanel() {
     if (!/^\d{6}$/.test(c)) { showToast('Enter the 6-digit code from the SMS', 'err'); return }
     setBusy(true)
     try {
-      const res = await api.security.phone.verify(phone.trim(), c)
-      setBound(res?.phone || phone.trim())
+      /* Show the CANONICAL number from the response, never what was typed —
+         res.phone is the E.164 form the server actually saved. */
+      const res = await api.security.phone.verify(requestedRef.current, c)
+      setBound(res?.phone || requestedRef.current)
       setSent(false)
       setPhone('')
       setCode('')
+      setCooldown(0)
       showToast('Phone number verified')
     } catch (e) {
-      if (e?.code === 'OTP_INVALID') showToast('That code is wrong or has expired', 'err')
+      /* One code covers wrong, expired AND already-used — only the server's
+         message says which, so surface it instead of a fixed guess. */
+      if (e?.code === 'OTP_INVALID') showToast(errorText(e, 'That code is wrong or has expired'), 'err')
+      /* One number, one account. Without this rule a single contact hash would
+         resolve to several accounts and every synced address book would surface
+         strangers — so the refusal is a feature, and it deserves its own copy
+         rather than the generic "could not verify". */
+      else if (e?.code === 'PHONE_ALREADY_BOUND') showToast('That number is already verified on another account', 'err')
       else if (e?.status !== 429) showToast('Could not verify the code', 'err')
     } finally { setBusy(false) }
   }
 
-  /* The card sub used to sell two uses the backend does not have:
-     OtpAuthController verifies a LOGIN code but mints no tokens (no account is
-     phone-primary), and contact matching joins on an IDENTITY hash of the EMAIL
-     only — ContactMatchService never touches phoneHmac, and
-     isDiscoverableBy(PHONE) has no caller. Verifying really does put the E.164
-     (and its keyed HMAC) on the User, so the control stays. */
+  /* Verifying a number now does something concrete: it writes the unkeyed
+     IDENTITY_PHONE hash that contact matching joins on, so people who have this
+     number saved can find the account (subject to the "Find me by phone number"
+     switch in Search & discovery). Signing in BY phone is still not a thing —
+     OtpAuthController verifies a LOGIN code but mints no session — so the copy
+     promises exactly one of the two. */
   return (
     <SetCard id="phone" icon="phone" title="Phone number"
-      sub="Confirm a number and we keep it on file for your account. Signing in by phone, and being found by your number, aren’t available yet.">
+      sub="Verify a number so people who already have it can find you. Signing in with your phone number isn’t available yet.">
       {current ? (
         <ControlRow title={current} desc="Verified phone on this account.">
           <span className="stx-chip ok"><Icon name="check"/>Verified</span>
@@ -363,15 +428,25 @@ export function PhonePanel() {
         <p className="muted text-sm">We can’t show a previously verified number here — verifying again simply replaces whatever is on file.</p>
       )}
       <label className="field-label" htmlFor={`${uid}-phone`} style={{ marginTop: 12 }}>{current ? 'New phone number' : 'Phone number'}</label>
-      <div className="flex gap-8">
-        <input className="field" id={`${uid}-phone`} style={{ flex: 1 }} type="tel" inputMode="tel" autoComplete="tel"
-          placeholder="+964 750 123 4567" value={phone}
+      <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+        <select className="field" aria-label="Country code" value={cc} style={{ flex: '0 1 auto', width: 'auto', maxWidth: 180 }}
+          onChange={e => setCc(e.target.value)}>
+          {COUNTRIES.map(c => (
+            <option key={c.iso2} value={c.iso2}>{flagOf(c.iso2)} {c.name} (+{c.dial})</option>
+          ))}
+        </select>
+        <input className="field" id={`${uid}-phone`} style={{ flex: 1, minWidth: 140 }} type="tel" inputMode="tel" autoComplete="tel"
+          placeholder="750 123 4567" value={phone}
           onChange={e => setPhone(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') send() }}/>
-        <button className="btn btn-secondary btn-sm" disabled={busy || !phone.trim()} onClick={send}>
-          <Icon name="send" className="xs"/>{sent ? 'Resend code' : 'Send code'}
+        <button className="btn btn-secondary btn-sm" disabled={busy || cooldown > 0 || !phone.trim()} onClick={send}>
+          <Icon name="send" className="xs"/>
+          {cooldown > 0 ? `Resend in ${cooldown}s` : sent ? 'Resend code' : 'Send code'}
         </button>
       </div>
+      <p className="muted text-xs" style={{ marginTop: 6 }}>
+        Typed a full number starting with + or 00? It’s sent exactly as you wrote it — the country picker is ignored.
+      </p>
       {sent && (
         <>
           <label className="field-label" htmlFor={`${uid}-otp`} style={{ marginTop: 12 }}>Verification code</label>
@@ -390,7 +465,7 @@ export function PhonePanel() {
       {bound && (
         <div className="stx-note ok">
           <Icon name="check"/>
-          <span>{bound} is now linked to your account.</span>
+          <span>{bound} is now linked to your account, and people with it in their contacts can find you — unless you turn “Find me by phone number” off in Search &amp; discovery.</span>
         </div>
       )}
     </SetCard>

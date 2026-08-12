@@ -141,27 +141,6 @@
 .rv-mute:hover{background:#1a2836}
 .rv-mute.off{background:rgba(156,58,51,.5);border-color:rgba(224,122,114,.35)}
 
-/* audio mixer — same outlined-dark family as the mute toggle above it */
-.rv-mixbtn{background:rgba(26,40,54,.6);border-color:#2b3b4e}
-.rv-mixbtn:hover{background:#1a2836}
-.rv-mixbtn.on{background:#fff;color:var(--ink);border-color:transparent}
-.rv-mixbtn.has-music::after{background:#b9d6f2;box-shadow:0 0 0 2px rgba(8,14,22,.75)}
-.rv-mix{background:rgba(8,14,22,.9);border-color:#2b3b4e;color:#e2eaf3;box-shadow:0 18px 48px rgba(0,0,0,.6)}
-.rv-mix-head b{color:#fff}
-.rv-mix-x{color:#a9c4de}
-.rv-mix-x:hover{background:#1a2836;color:#fff}
-.rv-mix-master{background:rgba(156,58,51,.42);color:#fff}
-.rv-mix-master:hover{background:rgba(156,58,51,.62)}
-.rv-mix-master .ico{color:#ffb4ae}
-.rv-mix-off{background:rgba(31,78,126,.55);color:#e2eaf3}
-.rv-mix-off:hover{background:rgba(31,78,126,.85);color:#fff}
-.rv-mix-off.on{background:rgba(156,58,51,.6);color:#fff}
-.rv-mix-name{color:#e2eaf3}
-.rv-mix-pct{font-family:var(--mono);color:#a9c4de;opacity:1}
-/* sky thumb/fill — the one accent in the panel, matching the seek bubble */
-.rv-mix-range{accent-color:#b9d6f2}
-.rv-mix-note{color:#a9c4de}
-
 /* =============== 4 · Foot — white author, outlined Follow, sound row === */
 .rv-meta{color:#fff}
 .rvm-time{font-variant-numeric:tabular-nums;color:rgba(242,240,240,.78);opacity:1}
@@ -173,48 +152,50 @@
 .rvm-sound{background:rgba(8,14,22,.55);box-shadow:inset 0 0 0 1px #2b3b4e;color:#e2eaf3}
 .rvm-sound .ico{color:#b9d6f2}
 
-/* =============== 5 · Action rail — 48px bubbles ===============
-   Must read clearly over ANY video frame (bright or dark). Solid,
-   near-opaque dark bubble + light hairline ring + strong shadow;
-   icons and counts are bright white with a drop-shadow so they never
-   sink into a light clip. */
+/* =============== 5 · Action rail — thin glass bubbles ===============
+   Light, not armoured: the bubble is a whisper of dark glass the clip shows
+   through, held by ONE thin hairline — no double rings, no heavy shadow
+   plate. Legibility over bright footage comes from the blur and the icon's
+   own drop-shadow, not from painting the bubble opaque. */
 .rvr{color:#fff;transition:color .15s ease}
 .rvr:hover{color:#fff}
 .rvr > span{
   width:48px;height:48px;
-  background:rgba(8,14,22,.9);
-  border:1px solid rgba(255,255,255,.28);
-  box-shadow:0 4px 16px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.35);
-  backdrop-filter:blur(6px) saturate(120%);
+  background:rgba(16,26,39,.38);
+  border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 2px 10px rgba(0,0,0,.22);
+  backdrop-filter:blur(12px) saturate(150%);
+  -webkit-backdrop-filter:blur(12px) saturate(150%);
 }
-.rvr > span .ico{filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+.rvr > span .ico{stroke-width:1.7;filter:drop-shadow(0 1px 2px rgba(0,0,0,.65))}
+.rvr:hover > span{background:rgba(26,40,58,.55);border-color:rgba(255,255,255,.4);transform:scale(1.06)}
+.rvr small{
+  font-size:12.5px;font-weight:600;letter-spacing:.2px;color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,.75);
+}
 /* re-assert the base small-phone sizing guards: this file loads after
    styles-responsive.css, so the unqualified 48px above would otherwise
    win over them at equal specificity and crowd the caption on tiny
    screens (base 46px @≤460, 44px @≤380) */
 @media(max-width:460px){.rvr > span{width:46px;height:46px}}
 @media(max-width:380px){.rvr > span{width:44px;height:44px}}
-.rvr:hover > span{background:rgba(15,25,38,.94);border-color:rgba(255,255,255,.42);transform:scale(1.06)}
-.rvr small{
-  font-size:12.5px;font-weight:700;letter-spacing:.2px;color:#fff;
-  text-shadow:0 1px 3px rgba(0,0,0,.75);
+/* LIKED — the HEART lights up; the bubble stays the same thin glass as its
+   neighbours. (A solid red disc read as an alert, and an opaque dark plate
+   read as armour — both rejected.) The glyph fills heart-red with a soft
+   glow, pops (base rvLike keyframes), and a one-shot ring pings outward. */
+.rvr.on{color:#fff}
+.rvr.on > span .ico{fill:#ff3b5c;stroke:#ff3b5c;filter:drop-shadow(0 2px 7px rgba(255,59,92,.55))}
+.rvr.on > span::after{
+  content:"";position:absolute;inset:-3px;border-radius:50%;pointer-events:none;
+  border:1.5px solid rgba(255,59,92,.6);
+  animation:w-reels-likering .5s ease-out forwards;   /* forwards → ends invisible */
 }
-/* liked = bright, filled warm red — unmistakable */
-.rvr.on{color:#ff6b62}
-.rvr.on > span{
-  background:rgba(176,52,45,.95);border-color:rgba(255,180,174,.75);
-  box-shadow:0 4px 18px rgba(176,52,45,.55),0 2px 8px rgba(0,0,0,.5);
-}
-.rvr.on > span .ico{fill:#fff;stroke:#fff}
-/* saved = bright sky */
-.rvr.sv{color:#b9d6f2}
-.rvr.sv > span{
-  background:rgba(31,78,126,.95);border-color:rgba(185,214,242,.8);
-  box-shadow:0 4px 18px rgba(127,168,206,.5),0 2px 8px rgba(0,0,0,.5);
-}
-.rvr.sv > span .ico{fill:#fff;stroke:#fff}
-/* comments panel open = sky ring */
-.rvr.cv > span{background:rgba(31,78,126,.92);border-color:rgba(185,214,242,.7)}
+@keyframes w-reels-likering{from{transform:scale(.55);opacity:1}to{transform:scale(1.3);opacity:0}}
+/* SAVED — same grammar: thin glass, sky-filled bookmark */
+.rvr.sv{color:#fff}
+.rvr.sv > span .ico{fill:#b9d6f2;stroke:#b9d6f2;filter:drop-shadow(0 2px 7px rgba(185,214,242,.45))}
+/* comments panel open — just a sky ring on the glass */
+.rvr.cv > span{border-color:rgba(185,214,242,.75)}
 
 /* prev/next — 44px outlined circles */
 .rv-nav button{
@@ -291,6 +272,38 @@
 .rvc-name b{font-weight:600}
 .rvc-name i{font-style:normal;font-size:11px;color:var(--muted)}
 .rvc-col p{font-size:14px;line-height:1.55;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
+/* ---- comment parity: like on the right edge, actions under the words ---- */
+.rvc-like{
+  flex:none;align-self:flex-start;display:flex;flex-direction:column;align-items:center;gap:1px;
+  min-width:30px;padding:3px 0 0;color:var(--muted);transition:color .14s ease,transform .14s ease;
+}
+.rvc-like:active{transform:scale(.86)}
+.rvc-like small{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.rvc-like.on{color:var(--rose)}
+.rvc-like.on .ico{fill:var(--rose);stroke:var(--rose)}
+.rvc-meta{display:flex;gap:14px;margin-top:3px}
+.rvc-meta button{font-size:12px;font-weight:600;color:var(--muted);transition:color .14s ease}
+.rvc-meta button:hover{color:var(--ink)}
+.rvc-meta .danger{color:var(--rose)}
+.rvc-toggle{
+  display:inline-flex;align-items:center;gap:7px;margin-top:7px;
+  font-size:12px;font-weight:700;color:var(--muted);
+}
+.rvc-toggle::before{content:"";width:22px;height:1px;background:var(--line)}
+.rvc-toggle:hover{color:var(--ink)}
+.rvc-editrow{display:flex;align-items:center;gap:6px;margin-top:4px}
+.rvc-editrow .rvc-field{flex:1;min-width:0}
+.rvc-send.is-ghost{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+.rvc-send.is-ghost:hover{color:var(--ink)}
+.rvc-row.rvc-reply{margin-top:9px;gap:8px}
+.rvc-row.rvc-reply p{font-size:13.5px}
+.rvc-replying{
+  display:flex;align-items:center;gap:7px;padding:7px 14px 0;
+  font-size:12px;font-weight:600;color:var(--muted);
+}
+.rvc-replying .ico{color:var(--blue)}
+.rvc-replying button{margin-inline-start:auto;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.rvc-replying button:hover{background:var(--card-2);color:var(--ink)}
 .rvc-empty{color:var(--muted);text-align:center;padding:30px 0;font-size:13.5px}
 .rvc-box{
   display:flex;align-items:center;gap:10px;flex:none;
@@ -376,7 +389,7 @@
 /* =============== 11 · Reduced motion =============== */
 @media(prefers-reduced-motion:reduce){
   .rv-track{transition:none}
-  .rvc,.rvc-scrim,.rv-seek-time,.rv-mix{animation:none}
+  .rvc,.rvc-scrim,.rv-seek-time{animation:none}
   .rv-soundcue{animation:none}
   .rv-flash .ico{animation-duration:.25s} /* must still end — JSX unmounts onAnimationEnd */
   .watched-card.plate-reel,.watched-card.plate-reel:hover{transform:none}

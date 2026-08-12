@@ -59,7 +59,11 @@ function ContactSync({ onSynced }) {
          consent event and enforces the 3-per-24h limit that stops the upload
          path being used to enumerate the user base. */
       const res = await api.settings.contactsSync.sync(hashes, APP_VERSION)
-      setResult({ ...res, skipped })
+      /* Two different skips, and both matter: ours (entries that were not an
+         email or a number, plus anything past the 5000 cap) and the server's
+         (`skipped` = submitted − stored, i.e. malformed or duplicate hashes it
+         refused). Overwriting one with the other hides half the story. */
+      setResult({ ...res, skipped: (res?.skipped || 0) + skipped })
       setText('')                                   // the raw list has done its job — drop it
       /* The recompute is async server-side, so re-reading immediately would
          return the PREVIOUS rows and look like the sync did nothing. Give it a
@@ -140,6 +144,17 @@ function ContactSync({ onSynced }) {
               </button>
             </div>
           </div>
+
+          {/* Both halves of the match are conditional, and saying so up front is
+              cheaper than explaining a disappointing `matched` afterwards: a
+              phone only matches someone who VERIFIED that number on their
+              account, and every match honours the other person's own "find me
+              by phone / by email" switches. */}
+          <p className="muted text-xs" style={{ marginTop: 8 }}>
+            An email matches anyone registered with it. A phone number matches only people who
+            verified that number on their account — and either way, only people whose discovery
+            settings allow being found that way.
+          </p>
 
           {result && (
             <p className="csync-result">

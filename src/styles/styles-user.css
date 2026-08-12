@@ -544,22 +544,72 @@ a.pa-fact:hover{text-decoration:underline;text-underline-offset:2px}
 .snd-chip-btn{flex:none;width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--ink-soft);transition:.14s}
 .snd-chip-btn:hover{background:var(--card)}
 
-/* the pre-publish balance */
-.snd-mix{margin-top:12px;padding:13px 14px 12px;border:1px solid var(--line);border-radius:14px}
-.snd-mix-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
-.snd-mix-head b{font-size:14px}
-.snd-mix-play{
-  display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
-  background:var(--ink);color:var(--paper);font-size:12.5px;font-weight:700;transition:.15s;
+/* =========================================================
+   Mix your audio — .amx-* (the reel's sound desk)
+   Facebook-shaped: the reel plays on top, and the dark sheet
+   below holds one THICK slider per track with its action on the
+   right (Mute / On / Edit) and the Add-voiceover button.
+   ========================================================= */
+.amx-wrap{
+  position:fixed;inset:0;z-index:150;display:flex;flex-direction:column;
+  background:#0a111a;color:#e2eaf3;padding-top:var(--safe-t);
 }
-.snd-mix-play:hover{opacity:.88}
-.snd-mix-play.on{background:var(--rose);color:#fff}
-.snd-mix-clip{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.snd-mix-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;margin-top:9px}
-.snd-mix-name{font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.snd-mix-pct{font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.snd-mix-row input[type=range]{grid-column:1 / -1;width:100%;height:18px;margin:0;accent-color:var(--blue);cursor:pointer;background:transparent}
-.snd-mix-note{margin-top:9px;font-size:12px;line-height:1.5;color:var(--muted)}
+.amx-stagewrap{flex:1;min-height:0;display:grid;place-items:center;padding:4px 16px 12px}
+.amx-stage{
+  position:relative;height:100%;max-height:100%;aspect-ratio:9/16;max-width:100%;
+  border-radius:18px;overflow:hidden;background:#000;cursor:pointer;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 18px 50px rgba(0,0,0,.55);
+}
+.amx-playcue{
+  position:absolute;inset:0;margin:auto;width:64px;height:64px;border-radius:50%;
+  background:rgba(8,14,22,.62);display:grid;place-items:center;color:#fff;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+}
+.amx-reccue{
+  position:absolute;left:50%;top:14px;transform:translateX(-50%);
+  display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;
+  background:rgba(176,52,45,.92);color:#fff;font-size:12.5px;font-weight:700;white-space:nowrap;
+}
+.amx-reccue i{width:8px;height:8px;border-radius:50%;background:#fff;animation:amxBlink 1s ease-in-out infinite}
+@keyframes amxBlink{50%{opacity:.25}}
+
+.amx-sheet{
+  flex:none;width:100%;max-width:560px;margin:0 auto;
+  background:#101c2a;border:1px solid rgba(255,255,255,.09);border-radius:20px 20px 0 0;
+  padding:16px 18px calc(16px + var(--safe-b));box-shadow:0 -14px 40px rgba(0,0,0,.45);
+}
+@media(min-width:721px){.amx-sheet{border-radius:20px;margin-bottom:16px}}
+.amx-head{display:flex;align-items:center;justify-content:center}
+.amx-head b{font-size:16.5px}
+.amx-sub{margin-top:6px;text-align:center;font-size:12px;line-height:1.5;color:#8fa9c4}
+.amx-row{display:grid;grid-template-columns:44px 1fr 68px;align-items:center;gap:14px;margin-top:18px}
+.amx-ic{
+  width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.08);
+  display:grid;place-items:center;color:#e2eaf3;overflow:hidden;flex:none;
+}
+.amx-ic img{width:100%;height:100%;object-fit:cover}
+.amx-act{justify-self:end;padding:8px 2px;color:#8ab8ff;font-size:14px;font-weight:700;transition:color .14s}
+.amx-act:hover{color:#fff}
+/* the thick slider: filled to the left of the thumb, big grabbable knob */
+.amx-range{
+  width:100%;height:12px;border-radius:999px;appearance:none;-webkit-appearance:none;cursor:pointer;outline:none;
+  background:linear-gradient(90deg,#3d7ee8 calc(var(--v)*1%),rgba(255,255,255,.16) calc(var(--v)*1%));
+}
+.amx-range::-webkit-slider-thumb{
+  appearance:none;-webkit-appearance:none;width:20px;height:26px;border-radius:8px;border:0;
+  background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.55);
+}
+.amx-range::-moz-range-thumb{width:20px;height:26px;border-radius:8px;border:0;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.55)}
+.amx-range:focus-visible{box-shadow:0 0 0 3px rgba(138,184,255,.4)}
+.amx-voicemenu{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+.amx-cta{
+  margin-top:18px;width:100%;min-height:48px;border-radius:12px;
+  background:#2f6fe4;color:#fff;font-size:15px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:background .15s;
+}
+.amx-cta:hover{background:#3d7ee8}
+.amx-cta.is-rec{background:#b0342d}
+.amx-cta.is-rec:hover{background:#c4453d}
 
 /* =========================================================
    Research composer — .rm-* (MIDAD studio · Jun 2026)
@@ -1068,3 +1118,127 @@ a.pa-fact:hover{text-decoration:underline;text-underline-offset:2px}
 .se-poll-card .field-label{display:block;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .se-poll-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .se-poll-actions{display:flex; align-items:center; gap:8px; margin-top:14px}
+
+/* =========================================================
+   Reel studio — .rs-* (text · emoji · moving stickers)
+   One centred composition on a dark surface: the stage is sized
+   off the surface HEIGHT (width follows from 9:16), and every
+   control lives in the bounded DOCK — beside the stage when the
+   window is wide, under it on phones. Nothing here is allowed
+   to span the window: monitor-wide sliders and stranded swatch
+   rows are exactly what this layout replaced.
+   ========================================================= */
+.rs-wrap{
+  position:fixed;inset:0;z-index:150;display:flex;flex-direction:column;
+  background:#0a111a;color:#e2eaf3;
+  padding-top:var(--safe-t);padding-bottom:var(--safe-b);
+}
+.rs-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;max-width:1020px;margin:0 auto;padding:10px 16px 6px}
+.rs-ghost{min-height:44px;padding:0 14px;border-radius:10px;color:#a9c4de;font-size:14px;font-weight:600}
+.rs-ghost:hover{background:rgba(255,255,255,.08);color:#fff}
+.rs-count{font-size:12px;color:#7fa8ce;font-variant-numeric:tabular-nums}
+
+/* ---- stage + dock, side by side when there is room ---- */
+.rs-main{flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;gap:22px;width:100%;max-width:1020px;margin:0 auto;padding:4px 16px 10px}
+.rs-stagecol{flex:none;min-height:0;max-width:100%;display:grid;place-items:center}
+/* height-driven: the stage can NEVER overflow into the bar or the tools,
+   whatever the dock is showing — its width simply follows the 9:16 ratio */
+.rs-stage{
+  position:relative;height:100%;max-height:100%;aspect-ratio:9/16;max-width:100%;
+  border-radius:18px;overflow:hidden;background:#000;touch-action:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 18px 50px rgba(0,0,0,.55);
+}
+.rs-media{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* the viewer's own gradient, so bottom-placed text is judged honestly */
+.rs-scrim{
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(8,14,22,.55) 0%,rgba(8,14,22,.18) 12%,transparent 26%,
+    transparent 48%,rgba(8,14,22,.22) 66%,rgba(8,14,22,.58) 84%,rgba(8,14,22,.9) 100%);
+}
+.rs-fit{position:absolute}
+.rs-hint{
+  position:absolute;left:14px;right:14px;bottom:16px;text-align:center;
+  font-size:12.5px;color:rgba(226,234,243,.75);text-shadow:0 1px 6px rgba(0,0,0,.7);
+}
+.rs-item{
+  position:absolute;display:inline-block;max-width:88%;white-space:pre-wrap;word-break:break-word;
+  line-height:1.15;cursor:grab;touch-action:none;user-select:none;
+  text-shadow:0 2px 8px rgba(0,0,0,.45);
+}
+.rs-item:active{cursor:grabbing}
+.rs-item.is-glyph{text-shadow:0 3px 10px rgba(0,0,0,.4)}
+.rs-item.has-bg{background:rgba(8,14,22,.62);padding:.18em .42em;border-radius:.3em;text-shadow:none}
+.rs-item.on{outline:2px dashed rgba(185,214,242,.85);outline-offset:6px;border-radius:4px}
+
+/* ---- the dock: one occupant at a time — tray, controls, or a hint ---- */
+.rs-dock{
+  flex:none;width:330px;max-width:100%;align-self:center;max-height:100%;
+  display:flex;flex-direction:column;gap:16px;overflow-y:auto;overscroll-behavior:contain;
+  background:#0f1a27;border:1px solid rgba(255,255,255,.09);border-radius:18px;
+  padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.4);
+}
+.rs-sec{display:flex;flex-direction:column;gap:9px}
+.rs-sec h5{font-size:10.5px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;color:#7fa8ce}
+.rs-row{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:10px}
+.rs-lab{font-size:12.5px;font-weight:600;color:#cfe0ef}
+.rs-val{font-size:11.5px;color:#7fa8ce;text-align:end;font-variant-numeric:tabular-nums}
+.rs-row input[type=range]{width:100%;height:20px;accent-color:#b9d6f2;cursor:pointer}
+.rs-swatches{display:flex;gap:9px;flex-wrap:wrap}
+.rs-sw{width:28px;height:28px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);transition:transform .12s ease}
+.rs-sw:hover{transform:scale(1.1)}
+.rs-sw.on{outline:2px solid #b9d6f2;outline-offset:3px}
+.rs-chips{display:flex;gap:7px;flex-wrap:wrap}
+.rs-chip{
+  min-height:34px;padding:0 14px;border-radius:999px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+  color:#cfe0ef;font-size:12.5px;font-weight:600;transition:.14s;
+}
+.rs-chip:hover{background:rgba(255,255,255,.15);color:#fff}
+.rs-chip.on{background:#e8f0f8;border-color:transparent;color:#0b131d}
+.rs-del{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;border-radius:11px;
+  background:rgba(176,52,45,.16);border:1px solid rgba(224,122,114,.4);color:#ffb4ae;
+  font-size:13px;font-weight:700;transition:.15s;
+}
+.rs-del:hover{background:rgba(176,52,45,.9);border-color:transparent;color:#fff}
+.rs-tray{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:4px;overflow-y:auto;overscroll-behavior:contain}
+.rs-glyph{height:52px;border-radius:12px;font-size:26px;line-height:1;display:grid;place-items:center;transition:background .14s}
+.rs-glyph:hover{background:rgba(255,255,255,.12)}
+.rs-tips{display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.55;color:#a9c4de}
+.rs-tips b{color:#e2eaf3}
+
+.rs-tools{flex:none;display:flex;justify-content:center;gap:8px;padding:2px 14px 12px}
+.rs-tools button{
+  min-width:104px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);color:#a9c4de;transition:.14s;
+}
+.rs-tools button.on,.rs-tools button:hover{background:rgba(255,255,255,.14);color:#fff}
+.rs-tools small{font-size:11px;font-weight:600}
+
+.rs-type{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px;background:rgba(8,14,22,.86);backdrop-filter:blur(8px)}
+.rs-type textarea{
+  width:100%;max-width:560px;margin:0 auto;min-height:120px;resize:none;border:0;outline:none;background:transparent;
+  color:#fff;font:600 26px/1.25 var(--sans,system-ui,sans-serif);text-align:center;
+}
+.rs-type textarea::placeholder{color:rgba(255,255,255,.45)}
+.rs-type .btn{align-self:center}
+
+/* phones / narrow: the dock drops under the stage; a hint isn't worth the room */
+@media(max-width:880px){
+  .rs-main{flex-direction:column;align-items:center;gap:12px}
+  .rs-stagecol{flex:1;min-height:0;width:100%}
+  .rs-dock{width:100%;max-width:560px;max-height:36dvh}
+  .rs-dock:has(.rs-tips){display:none}
+  .rs-tools button{flex:1;min-width:0}
+}
+
+/* the studio entry chip in the composer */
+.cm-studio{
+  display:flex;align-items:center;gap:11px;margin-top:12px;padding:11px 13px;
+  border:1px solid var(--line);border-radius:14px;background:var(--card-2);width:100%;text-align:start;
+}
+.cm-studio:hover{border-color:var(--blue)}
+.cm-studio-ic{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--blue-wash);color:var(--blue)}
+.cm-studio-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.cm-studio-meta b{font-size:14px}
+.cm-studio-meta small{font-size:12px;color:var(--muted)}

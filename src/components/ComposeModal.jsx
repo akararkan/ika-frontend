@@ -10,10 +10,12 @@ import React from 'react'
 import { Icon, Avatar, showToast } from './ui.jsx'
 import { MentionBox } from './MentionBox.jsx'
 import { SoundPicker } from './SoundPicker.jsx'
-import { SoundMix } from './SoundMix.jsx'
+import { AudioMixSheet } from './AudioMixSheet.jsx'
 import { DEFAULT_MIX, withMix, soundLabel } from '../lib/soundMix.js'
 import { TagInput } from './TagInput.jsx'
 import { StoryEditor } from './StoryEditor.jsx'
+import { ReelStudio } from './ReelStudio.jsx'
+import { overlayFile, overlayText } from '../lib/reelOverlay.js'
 import { ModerationAlert } from './Moderation.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
@@ -119,6 +121,10 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const [files, setFiles] = React.useState([])
   const [sound, setSound] = React.useState(null)
   const [mix, setMix] = React.useState(DEFAULT_MIX)      // authored balance, set before publishing
+  const [overlay, setOverlay] = React.useState(null)     // REEL: text / emoji / sticker layer
+  const [studio, setStudio] = React.useState(false)
+  const [voiceover, setVoiceover] = React.useState(null) // REEL: narration recorded in the mix sheet
+  const [mixSheet, setMixSheet] = React.useState(false)
   const [recording, setRecording] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [cooldown, startCooldown] = useCooldown()       // 429 countdown — draft kept, Publish disabled for the hint
@@ -135,6 +141,10 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const [modErr, setModErr] = React.useState(null)
 
   const fileRef = React.useRef(null)
+  /* The preview tile stays the composer's audible copy of the clip — hover
+     previews silently, a tap plays it out loud at the authored level. The full
+     mixing surface is the "Mix your audio" sheet, which owns its own preview. */
+  const clipRef = React.useRef(null)
   const recRef = React.useRef(null)
   const chunksRef = React.useRef([])
   const visOptions = tab === 'STORY' ? [...VIS, { key:'CLOSE_FRIENDS', icon:'users', label:'Close friends' }] : VIS
@@ -142,7 +152,7 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   const heading = isEdit ? 'Edit post' : tab === 'QUESTION' ? 'Ask a question' : tab === 'STORY' ? 'Add to your story' : 'Create'
 
   // reset attachments when switching tabs
-  React.useEffect(() => { setFiles([]); setRecording(false); setSound(null); setMix(DEFAULT_MIX); if (vis === 'CLOSE_FRIENDS' && tab !== 'STORY') setVis('PUBLIC') }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { setFiles([]); setRecording(false); setSound(null); setMix(DEFAULT_MIX); setOverlay(null); setVoiceover(null); if (vis === 'CLOSE_FRIENDS' && tab !== 'STORY') setVis('PUBLIC') }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // live media thumbnails — images, videos AND audio get object URLs so the
   // gallery can show the real media (revoked on change/unmount)
@@ -353,7 +363,12 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         const fd = new FormData()
         fd.append('postType', tab)               // PostType enum (§4)
         fd.append('visibility', vis)             // PostVisibility enum (§4)
-        if (text) fd.append('textContent', text)
+        /* Words placed ON the reel are words the reel says, so they go into the
+           text the server scores. overlay.json is opaque binary to moderation;
+           without this, a sticker would be an unmoderated text channel. */
+        const onFrame = tab === 'REEL' ? overlayText(overlay) : ''
+        const body = [text, onFrame].filter(Boolean).join('\n')
+        if (body) fd.append('textContent', body)
         // VOICE_POST carries a display label for the audio track (§5 / §6.1).
         if (tab === 'VOICE_POST') fd.append('audioTrackName', (files[0].name || 'Voice note').replace(/\.[^./\\]+$/, ''))
         /* A picked Sound needs BOTH halves. `soundId` is bookkeeping — it
@@ -365,12 +380,22 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
         if (sound) {
           fd.append('soundId', sound.id)
           const url = sound.audioUrlRaw || sound.audioUrl
-          // …#mix=orig,music — the authored balance (see SoundMix.jsx)
+          // …#mix=orig,music,voice — the authored balance (see lib/soundMix.js)
           if (url) fd.append('audioTrackUrl', tab === 'REEL' ? withMix(url, mix) : url)
           fd.append('audioTrackName', soundLabel(sound))
         }
         files.forEach(f => fd.append('files', f)) // §6.2 accepts files/media/file/video/image
+        /* AFTER the clip, always: the server takes mediaUrls in part order and
+           the first entry is what every cover, repost and share preview uses.
+           The voiceover is an ordinary audio part — classifyMedia types it
+           AUDIO and the adapters lift it back out as `voiceoverUrl`. */
+        if (tab === 'REEL' && voiceover) fd.append('files', voiceover)
+        const ovFile = tab === 'REEL' && overlay ? overlayFile(overlay) : null
+        if (ovFile) fd.append('files', ovFile)
         const created = await api.posts.createMultipart(fd)
+        /* A dropped overlay part is invisible otherwise — the create still
+           answers 200 and the author would only find out by opening the reel. */
+        if (ovFile && !created?.overlayUrl) showToast('Your reel is up, but the text and stickers could not be attached', 'warn')
         onPublished?.(created); announce(created)
 
       } else {
@@ -414,6 +439,30 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
   // Footer affordances append to the body text (the @ / # then trigger the
   // usual tag/mention flows as the user keeps typing).
   const insertToken = (ch) => { setModErr(null); setText(t => { const s = t || ''; return (s && !/\s$/.test(s) ? s + ' ' : s) + ch }) }
+
+  /* Full-screen surfaces REPLACE the modal while open (the drafts live in
+     this component's state, so nothing is lost by unmounting it). */
+  if (mixSheet && files[0]) {
+    return (
+      <AudioMixSheet
+        file={files[0]} sound={sound} mix={mix} voiceover={voiceover}
+        onClose={(result) => {
+          if (result) { setMix(result.mix); setVoiceover(result.voiceover) }
+          setMixSheet(false)
+        }}
+      />
+    )
+  }
+  if (studio && files[0]) {
+    return (
+      <ReelStudio
+        file={files[0]}
+        initial={overlay}
+        onCancel={() => setStudio(false)}
+        onSave={(doc) => { setOverlay(doc); setStudio(false) }}
+      />
+    )
+  }
 
   // Story editor is a separate full-screen surface; render it instead of the
   // compose modal while it's open so the canvas gets the whole viewport.
@@ -512,11 +561,25 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
                 <div key={i} className={'cm-prev' + (i === 0 && tab === 'EMBEDDED' && previews.length > 1 ? ' lead' : '') + (p.isAudio ? ' is-audio' : '')}>
                   {p.isImage && <img src={p.url} alt=""/>}
                   {p.isVideo && (
+                    /* THE audible copy of the clip. It used to be hard-muted,
+                       which meant an author could not hear their own video
+                       before publishing it — and the sound panel below drives
+                       THIS element rather than mounting a second one, because
+                       two copies of the same file playing at once is exactly
+                       the doubled, out-of-phase audio nobody can mix against.
+                       Hover still previews silently; a tap plays it out loud. */
                     <video
-                      src={p.url} muted playsInline loop preload="metadata"
-                      onMouseEnter={e => e.currentTarget.play().catch(() => {})}
-                      onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
-                      onClick={e => { const v = e.currentTarget; if (v.paused) v.play().catch(() => {}); else v.pause() }}
+                      ref={i === 0 ? clipRef : null}
+                      src={p.url} playsInline loop preload="metadata"
+                      onMouseEnter={e => { const v = e.currentTarget; if (v.paused) { v.muted = true; v.play().catch(() => {}) } }}
+                      onMouseLeave={e => { const v = e.currentTarget; if (v.muted) { v.pause(); v.currentTime = 0 } }}
+                      onClick={e => {
+                        const v = e.currentTarget
+                        if (!v.paused && !v.muted) { v.pause(); return }
+                        v.muted = false
+                        v.volume = mix.orig
+                        v.play().catch(() => {})
+                      }}
                     />
                   )}
                   {p.isAudio && (
@@ -575,7 +638,7 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
             <p className="muted text-sm" style={{ marginTop: 10 }}>
               <Icon name="clock" className="xs"/>{' '}
               This photo plays for {STILL_SECS} seconds.{' '}
-              {sound ? 'Your chosen sound plays over it.' : 'Add a sound below, or it goes out silent.'}
+              {sound || voiceover ? 'Your chosen audio plays over it.' : 'Add a sound or record a voiceover below, or it goes out silent.'}
             </p>
           )}
           {!isEdit && tab === 'VOICE_POST' && (
@@ -592,12 +655,25 @@ export function ComposeModal({ type = 'TEXT', editPost = null, onClose, onPublis
           {!isEdit && (tab === 'TEXT' || tab === 'EMBEDDED' || tab === 'REEL') && (
             <SoundPicker value={sound} onChange={setSound}/>
           )}
-          {/* The balance is authored HERE, where the sound was chosen and while
-              the clip is still a local file that can be played instantly — not
-              left to whoever watches it later. Reels only: nothing else on the
-              platform plays a post's added sound. */}
-          {!isEdit && tab === 'REEL' && sound && (
-            <SoundMix sound={sound} mix={mix} onChange={setMix} file={files[0] || null}/>
+          {/* The sound desk. The balance is authored HERE and only here — the
+              reels viewer has no sliders, so what this sheet sets is what
+              every viewer hears (they can mute, nothing more). Also where a
+              VOICEOVER is recorded, so it exists for photo reels too. */}
+          {!isEdit && tab === 'REEL' && !!files.length && (
+            <button className="cm-studio" onClick={() => setMixSheet(true)}>
+              <span className="cm-studio-ic"><Icon name="volume"/></span>
+              <span className="cm-studio-meta">
+                <b>Mix your audio</b>
+                <small>
+                  {[
+                    files[0].type.startsWith('video') ? `video ${Math.round(mix.orig * 100)}%` : null,
+                    sound ? `sound ${Math.round(mix.music * 100)}%` : null,
+                    voiceover ? `voiceover ${Math.round(mix.voice * 100)}%` : null,
+                  ].filter(Boolean).join(' · ') || 'Set the levels, or record a voiceover'}
+                </small>
+              </span>
+              <Icon name="chevright" className="sm"/>
+            </button>
           )}
 
           {!isEdit && tab === 'QUESTION' && (

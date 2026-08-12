@@ -3,19 +3,45 @@
    Sessions & devices, TOTP 2FA + recovery codes, login
    history, step-up re-auth, phone binding, public OTP.
 
-   Step-up contract: guarded actions (disable 2FA, regenerate
-   recovery codes) answer 403 with errorCode STEP_UP_REQUIRED
-   when the short-lived marker isn't armed. Arm it with
-   security.stepUp({password}) or ({code}), then retry —
+   Step-up contract: guarded actions (ENABLE 2FA, disable 2FA,
+   regenerate recovery codes) answer 403 with errorCode
+   STEP_UP_REQUIRED when the short-lived marker isn't armed. Arm
+   it with security.stepUp({password}) or ({code}), then retry —
    `withStepUp` below packages that dance for the panels.
+   `/2fa/setup` joined that list deliberately: binding a new
+   authenticator is as sensitive as removing one, so a stolen
+   session cannot enrol its own device and lock the owner out.
 
-   What this surface does NOT do yet, so no caller promises it:
-   login never challenges for a TOTP code (AuthServiceImpl.login
-   goes authenticate → issueTokenPair and never reads the 2FA
-   flag), nothing redeems a recovery code, and nothing writes a
-   login-history row. 2FA is real as a STEP-UP factor only.
+   2FA IS NOW A LOGIN GATE, not just a step-up factor. A correct
+   password on a 2FA account issues nothing and returns an
+   mfaToken — see api/auth.js `login` / `loginTwoFactor` for the
+   two-leg contract, and note the consequences here:
+     · recovery codes are REDEEMABLE (at leg 2, in the same field
+       as the TOTP code), so the "save these" copy is a promise
+       the backend now keeps;
+     · login_events is written for real on both success and
+       failure paths, so login-history is a live audit trail
+       rather than a permanently empty page.
    ========================================================= */
 import { http } from './http.js'
+
+/* login_events.method / .outcome — the exact strings AuthServiceImpl writes
+   (`method` is varchar(20), which is why the recovery value is PASSWORD+RECOVERY
+   and not …+RECOVERY_CODE). PASSWORD+RECOVERY is the row worth surfacing
+   loudly: someone signed in without the authenticator. */
+export const LOGIN_METHOD_LABELS = {
+  PASSWORD: 'Password',
+  'PASSWORD+TOTP': 'Password + authenticator',
+  'PASSWORD+RECOVERY': 'Password + recovery code',
+  'PASSWORD+2FA': 'Password + second factor',
+}
+export const LOGIN_OUTCOME_LABELS = {
+  SUCCESS: 'Signed in',
+  FAILED: 'Failed',
+  MFA_REQUIRED: 'Awaiting second factor',
+}
+/** Sign-ins that deserve the user's attention in the history list. */
+export const NOTEWORTHY_LOGIN_METHODS = new Set(['PASSWORD+RECOVERY'])
 
 const page = (res, map = (x) => x) => ({
   items: (res?.content || res || []).map(map),
@@ -39,16 +65,18 @@ export const security = {
 
   /* ---- two-factor (RFC 6238 TOTP) ---- */
   twofa: {
-    setup() { return http.post('/api/v1/security/2fa/setup') },                 // {provisioningUri, secret} — shown ONCE; 409 TWO_FA_ALREADY_ON
+    setup() { return http.post('/api/v1/security/2fa/setup') },                 // {provisioningUri, secret} — shown ONCE; STEP-UP REQUIRED; 409 TWO_FA_ALREADY_ON
     verify(code) { return http.post('/api/v1/security/2fa/verify', { code }) }, // {codes:[…10]} on first enable, [] on re-verify
-    disable() { return http.post('/api/v1/security/2fa/disable') },             // 204 — STEP-UP REQUIRED
+    disable() { return http.post('/api/v1/security/2fa/disable') },             // 204 — STEP-UP REQUIRED; also clears recovery codes
     status() { return http.get('/api/v1/security/2fa/status') },                // {enabled, recoveryCodesRemaining}
-    regenerateRecovery() { return http.post('/api/v1/security/recovery-codes/regenerate') },  // {codes} — STEP-UP REQUIRED; nothing redeems a code yet
+    regenerateRecovery() { return http.post('/api/v1/security/recovery-codes/regenerate') },  // {codes} — STEP-UP REQUIRED; invalidates the previous set
   },
 
   /* ---- login history (Spring Page, ts DESC) ----
-     Read-only in practice: LoginEventService.record() has no caller, so the
-     page is empty even straight after a sign-in. */
+     Live: every attempt is recorded, and the FAILED rows land for real (they
+     are written in their own transaction — with ordinary propagation the row
+     was rolled back by the very exception it documented). Rows carry
+     {ip, userAgent, method, outcome, ts} — see LOGIN_METHOD_LABELS above. */
   async loginHistory(opts) {
     return page(await http.get('/api/v1/security/login-history', opts))         // [{ip,userAgent,method,outcome,ts}]
   },
@@ -84,12 +112,21 @@ export const security = {
   },
 
   /* ---- phone binding (logged-in) ----
-     Write-only: verify stores phoneE164/phoneVerifiedAt on the User, but no
-     response DTO exposes them and there is no GET here — a bound number cannot
-     be read back, so panels can only show what they verified this session. */
+     Write-only for reads: verify stores phoneE164/phoneVerifiedAt on the User,
+     but no response DTO exposes them and there is no GET here — a bound number
+     cannot be read back, so panels can only show what they verified this
+     session.
+
+     What verifying now BUYS, which it did not before: clearing OTP writes the
+     unkeyed IDENTITY_PHONE hash (sha256 of the E.164 without the '+'), which is
+     what makes the account matchable by people who have the number in their
+     address book. `users.phone_hmac` is a keyed HMAC and is NOT what matching
+     joins on — a client hashes locally and can never reproduce a pepper.
+     One number, one account: a number already verified elsewhere is refused
+     with 409 PHONE_ALREADY_BOUND. */
   phone: {
     request(phone) { return http.post('/api/v1/security/phone/request', { phone }) },          // 202; 400 PHONE_INVALID; 429
-    verify(phone, code) { return http.post('/api/v1/security/phone/verify', { phone, code }) },// {verified:true, phone:E.164}; 400 OTP_INVALID
+    verify(phone, code) { return http.post('/api/v1/security/phone/verify', { phone, code }) },// {verified:true, phone:E.164}; 400 OTP_INVALID; 409 PHONE_ALREADY_BOUND
   },
 
   /* ---- public OTP (/api/v1/auth/otp, permitAll) ---- */

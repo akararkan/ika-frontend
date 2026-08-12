@@ -49,13 +49,29 @@ export function AuthProvider({ children }) {
     return () => { window.removeEventListener('ika:auth-expired', onExpired); clearTimeout(refreshTimer.current) }
   }, [])
 
-  const login = async (fields) => { const { user, expiresIn } = await api.auth.login(fields); setUser(user || adapters.meFrom(session.getUser())); scheduleRefresh(expiresIn) }
+  const adopt = (user, expiresIn) => { setUser(user || adapters.meFrom(session.getUser())); scheduleRefresh(expiresIn) }
+
+  /* Returns the MFA challenge instead of a session when the account has 2FA on
+     (the response carries mfaRequired + a short-lived mfaToken and no tokens at
+     all). The caller shows a code screen and finishes with completeTwoFactor —
+     signedIn stays false in between, which is the honest state. */
+  const login = async (fields) => {
+    const res = await api.auth.login(fields)
+    if (res?.mfaRequired) return res
+    adopt(res.user, res.expiresIn)
+    return res
+  }
+  /** Redeem the challenge with a TOTP or recovery code → real session. */
+  const completeTwoFactor = async ({ mfaToken, code }) => {
+    const { user, expiresIn } = await api.auth.loginTwoFactor({ mfaToken, code })
+    adopt(user, expiresIn)
+  }
   const register = async (fields) => { const { user, expiresIn } = await api.auth.register(fields); setUser(user || adapters.meFrom(session.getUser())); scheduleRefresh(expiresIn) }
   const logout = async () => { clearTimeout(refreshTimer.current); await api.auth.logout(); setUser(null) }
   const logoutEverywhere = async () => { clearTimeout(refreshTimer.current); await api.auth.logoutAll(); setUser(null) }            // §8.5
   const refreshUser = async () => { try { const u = await api.auth.me(); if (u) setUser(u) } catch { /* keep current */ } }
 
-  const value = { user, ready, signedIn: session.isAuthed(), login, register, logout, logoutEverywhere, refreshUser, setUser }
+  const value = { user, ready, signedIn: session.isAuthed(), login, completeTwoFactor, register, logout, logoutEverywhere, refreshUser, setUser }
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }
 

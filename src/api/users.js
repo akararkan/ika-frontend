@@ -150,6 +150,11 @@ export const users = {
        · sync and clear both trigger an async suggestion recompute, so the
          caller re-reads suggestions after a beat rather than expecting them
          in the response. */
+  /* DEPRECATED — use `api.settings.contactsSync` (/api/v1/contacts). These two
+     routes still work and now behave identically, but they used to bypass BOTH
+     the 3-per-24h rate limit and the consent record, which turned `matched`
+     into an unmetered membership oracle. Kept only so an old caller does not
+     break; do not wire anything new to them. */
   contacts: {
     /** @param hashes hex SHA-256 strings from lib/contactHash → { stored, matched } */
     async sync(hashes) {

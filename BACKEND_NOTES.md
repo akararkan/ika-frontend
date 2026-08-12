@@ -257,9 +257,17 @@ a client that ignores it plays the same audio at its own default levels. It is
 still a workaround: the value is invisible to the API, unqueryable, and lost the
 moment anything normalises the URL.
 
-**Fix** — two nullable floats on the post (`audioOriginalGain`,
-`audioTrackGain`, 0–1), set at create time and echoed on `PostResponse` /
-`FeedItemResponse`.
+**Fix** — three nullable floats on the post (`audioOriginalGain`,
+`audioTrackGain`, `audioVoiceoverGain`, 0–1), set at create time and echoed on
+`PostResponse` / `FeedItemResponse`.
+
+*Addendum — voiceover:* a reel can now carry a narration the author records in
+the composer. It uploads as an ordinary audio part (classifyMedia → AUDIO in
+`mediaUrls`; the client lifts it out as `voiceoverUrl`). Two consequences of
+the missing fields: the voiceover's own gain rides as the THIRD number in the
+`#mix=` fragment, and a reel with a voiceover but NO library sound has no
+`audioTrackUrl` to carry any fragment at all — it plays at defaults. A real
+`voiceoverUrl` column plus the gain fields fixes both.
 
 ---
 
@@ -286,3 +294,50 @@ curl -sD- -o/dev/null -H "Range: bytes=0-1023" "$B$U" | grep -iE '^HTTP/|accept-
 # CORS (expect a single ACAO):
 curl -sD- -o/dev/null -H "Origin: http://localhost:5173" "$B$U" | grep -i access-control-allow-origin
 ```
+
+### 17. No field for a reel's text / sticker overlay
+Reels can carry an author-placed layer — text, emoji and moving stickers, the
+way stories do. It cannot be baked into the media (a photo would freeze every
+sticker; a video would need a full browser-side re-encode), so it has to be
+stored as data, and `PostResponse` has nowhere to put it.
+
+_Workaround:_ the composer uploads `overlay.json` as a second multipart part.
+`classifyMedia()` types it **OTHER**, so it comes back in `mediaUrls` /
+`mediaTypes` beside the clip; the client lifts it out into `post.overlayUrl`
+and never shows it as media. It works, but it means an overlay is a media entry
+to every other consumer (feeds, admin tooling, exports) and there is no way to
+replace or remove one without deleting the whole post.
+
+**Fix** — a nullable `overlay` text column on the post (a small JSON document,
+under 32KB), echoed on `PostResponse`, settable at create and on `PATCH
+/posts/{id}` so an author can fix a typo and a moderator can strip an overlay
+without taking the reel down. Note also that overlay text is currently scored
+only because the client folds it into `textContent`; a real field should be fed
+to the moderation pipeline server-side.
+
+---
+
+### 18. `GET /admin/users/{id}/discovery` ships a `knownSeam` note that is no longer true
+The payload carries `knownSeam: "QR-resolve does not yet consult discover.byQr
+— a rotated flag does not invalidate resolves; rotation (below) does."`, but
+`QrDiscoveryController.resolve` **does** call
+`discoverabilityService.isDiscoverableBy(targetId, Method.QR)` and throws
+`ResourceNotFoundException` when the flag is off (404, deliberately
+indistinguishable from an unknown token).
+
+Verified against a live server on 2026-08-11: the enforcement is real, the note
+is stale. It matters more than a comment would, because it is *served to
+operators* — an admin reading it concludes a privacy control is inert while it
+is in fact enforcing, and may go looking for another way to retire a leaked QR
+code.
+
+**Fix** — drop the constant (`AdminContentMessages.WARN_QR_RESOLVE_SEAM`) from
+that response, or reword it to describe what actually remains: turning `byQr`
+off stops resolution immediately and reversibly, rotation retires a specific
+printed code permanently.
+
+_Client workaround (in place):_ the admin dashboard (`ikh-admin`,
+`src/pages/discovery/DiscoveryPage.jsx`) suppresses the stale note and states
+the real behaviour instead. It previously carried a hand-written `Warn` saying
+the same wrong thing, which is the worse failure: an operator told a working
+privacy control is broken reaches for the irreversible rotate instead.

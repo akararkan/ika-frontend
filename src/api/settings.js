@@ -225,9 +225,18 @@ export const settings = {
     state(scope) { return http.get(`/api/v1/settings/consent/${scope}`) },         // {scope,granted} — never 404
   },
 
-  /* ---- contact sync alias (/api/v1/contacts) — 3/24h rate limit ---- */
+  /* ---- contact sync (/api/v1/contacts) — 3/24h rate limit ----
+     Use THIS, never the deprecated /api/v1/users/contacts/sync alias: the old
+     route bypassed both the rate limit and the consent record, which made the
+     advertised anti-enumeration ceiling meaningless (post one hash, read
+     `matched`, repeat). Both now funnel through one service, but only this path
+     is documented to stay. */
   contactsSync: {
-    sync(hashes, appVersion) { return http.post('/api/v1/contacts/sync', { hashes: hashes || [], appVersion }) },  // {stored,matched}
+    /** @returns {stored, skipped, matched} — `skipped` is submitted−stored, i.e.
+     *  hashes the server refused as malformed or duplicate. Distinguishing it
+     *  from `matched: 0` is the difference between "my batch was trimmed" and
+     *  "nobody I know is here". */
+    sync(hashes, appVersion) { return http.post('/api/v1/contacts/sync', { hashes: hashes || [], appVersion }) },
     clear() { return http.del('/api/v1/contacts/sync') },                          // 204 + consent revocation
   },
 

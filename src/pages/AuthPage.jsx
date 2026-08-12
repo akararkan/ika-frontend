@@ -6,7 +6,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Icon, BrandMark } from '../components/ui.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
-import { fieldErrorMap, duplicateField } from '../api/errors.js'
+import { fieldErrorMap, duplicateField, isMfaCodeInvalid, isMfaChallengeDead } from '../api/errors.js'
 
 /* The documents the consent line covers, named in the order it names them.
    These are PolicyService's keys verbatim — "Code of Conduct" (the old label)
@@ -138,8 +138,117 @@ function Field({ id, label, icon, error, hint, children }) {
   )
 }
 
+/* ---------- second factor (two-factor-authentication.md §3) ----------
+   Shown when /auth/login answers `mfaRequired` instead of a session. Three
+   properties of the challenge drive everything in here:
+
+   · it is a CREDENTIAL — held in this component's state, never in
+     localStorage/sessionStorage, and dropped the moment the leg finishes;
+   · it EXPIRES (the response's own expiresIn, 5 min by default), so the screen
+     runs the countdown itself rather than letting the user type into a token
+     that died two minutes ago;
+   · it BURNS after 5 wrong codes, and a burned/expired challenge can only be
+     replaced by re-entering the password — so those errors return to the
+     password step instead of leaving a dead input on screen.
+
+   One field takes both factors. The server tries TOTP and then a recovery
+   code, so the toggle below only changes the input's shape and copy — it never
+   changes what is sent, and a pasted recovery code works even in TOTP mode. */
+function TwoFactorStep({ challenge, onCancel, onDone }) {
+  const codeId = React.useId()
+  const [code, setCode] = React.useState('')
+  const [recovery, setRecovery] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState('')
+  const [left, setLeft] = React.useState(() => Math.max(0, Math.round((challenge.deadline - Date.now()) / 1000)))
+  const inputRef = React.useRef(null)
+
+  React.useEffect(() => { inputRef.current?.focus() }, [recovery])
+
+  // Tick the challenge's own TTL. At zero the token is worthless server-side,
+  // so the screen closes itself rather than inviting a doomed submit.
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      const secs = Math.max(0, Math.round((challenge.deadline - Date.now()) / 1000))
+      setLeft(secs)
+      if (secs === 0) onCancel('This sign-in request expired. Please enter your password again.')
+    }, 1000)
+    return () => clearInterval(id)
+  }, [challenge.deadline, onCancel])
+
+  const ready = recovery ? code.trim().length >= 6 : /^\d{6}$/.test(code.trim())
+
+  const submit = async ev => {
+    ev.preventDefault()
+    if (busy || !ready) return
+    setBusy(true); setError('')
+    try {
+      await onDone(code.trim())
+    } catch (err) {
+      if (isMfaChallengeDead(err)) { onCancel(err?.message || 'This sign-in request expired. Please enter your password again.'); return }
+      setCode('')
+      inputRef.current?.focus()
+      /* Probed against the server: a TOTP code is single-use (the accepted step
+         index is stored), so the code visible in the app right after enrolment —
+         or after a step-up — is rejected until the 30-second window rolls. That
+         reads as "the app is broken" unless we say it, and it is by far the most
+         common rejection after plain clock drift. */
+      setError(isMfaCodeInvalid(err)
+        ? (recovery
+          ? 'That recovery code is not valid, or it has already been used.'
+          : (err?.message || 'That code is not valid.') + ' Each code works only once — if you just used this one, wait for the next.')
+        : err?.message || 'Could not verify that code. Please try again.')
+    } finally { setBusy(false) }
+  }
+
+  const mm = String(Math.floor(left / 60))
+  const ss = String(left % 60).padStart(2, '0')
+
+  return (
+    <form onSubmit={submit} noValidate>
+      <div className="af-pane">
+        <h2 className="auth-title">Two-step verification</h2>
+        <p className="auth-lede">
+          {recovery
+            ? 'Enter one of the recovery codes you saved when you turned on two-factor authentication.'
+            : 'Enter the 6-digit code from your authenticator app to finish signing in.'}
+        </p>
+
+        <Field id={codeId} label={recovery ? 'Recovery code' : 'Authentication code'} icon="lock"
+          hint={left > 0 ? `This request expires in ${mm}:${ss}.` : undefined}>
+          <input ref={inputRef} id={codeId} className="field lg"
+            /* numeric keypad + OS autofill for the TOTP case only — a recovery
+               code is alphanumeric and would be mangled by both. */
+            inputMode={recovery ? 'text' : 'numeric'}
+            autoComplete={recovery ? 'off' : 'one-time-code'}
+            maxLength={recovery ? 32 : 6}
+            autoCapitalize="none" spellCheck={false}
+            placeholder={recovery ? 'xxxx-xxxx' : '000000'}
+            value={code}
+            onChange={e => setCode(recovery ? e.target.value.trim() : e.target.value.replace(/\D/g, ''))}/>
+        </Field>
+
+        {error && <div className="auth-alert" role="alert"><Icon name="alert" className="sm"/><span>{error}</span></div>}
+
+        <button type="submit" className="btn btn-primary btn-lg btn-block mt-16" disabled={busy || !ready}>
+          {busy && <span className="auth-spin" aria-hidden="true"/>}
+          {busy ? 'Verifying…' : 'Verify and sign in'}
+        </button>
+
+        <div className="auth-switch">
+          <a onClick={() => { setRecovery(r => !r); setCode(''); setError('') }}>
+            {recovery ? 'Use your authenticator app instead' : 'Use a recovery code instead'}
+          </a>
+          {' · '}
+          <a onClick={() => onCancel('')}>Back to sign in</a>
+        </div>
+      </div>
+    </form>
+  )
+}
+
 export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
-  const { login, register } = useAuth()
+  const { login, completeTwoFactor, register } = useAuth()
   const navigate = useNavigate()
   const loc = useLocation()
   const [mode, setMode] = React.useState(initialMode)
@@ -152,6 +261,10 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
   const [showPw, setShowPw] = React.useState(false)
   const [caps, setCaps] = React.useState(false)
   const [agree, setAgree] = React.useState(false)
+  /* The pending 2FA challenge, in memory only: {token, deadline}. Never
+     persisted — it is a credential, and one that survives a reload would
+     outlive the password entry that earned it. */
+  const [challenge, setChallenge] = React.useState(null)
   const handleTouched = React.useRef(false)
   const firstRef = React.useRef(null)
   const mounted = React.useRef(false)
@@ -211,8 +324,17 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
     if (Object.keys(e).length) return
     setBusy(true)
     try {
-      if (signIn) await login(fields)
-      else {
+      if (signIn) {
+        const res = await login(fields)
+        if (res?.mfaRequired) {
+          /* Password accepted, no session issued. Drop it from state before
+             rendering the code screen — the first factor is spent, and there is
+             no path from here that resubmits it. */
+          setFields(f => ({ ...f, password: '' }))
+          setChallenge({ token: res.mfaToken, deadline: Date.now() + (Number(res.expiresIn) || 300) * 1000 })
+          return
+        }
+      } else {
         await register(fields)
         /* register() stores the session (api/auth.js), so the authenticated
            POST /app/policies/{key}/accept is callable from here — and only
@@ -234,6 +356,22 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
       setBusy(false)
     }
   }
+
+  /* Leg 2. Errors are thrown back to TwoFactorStep, which owns the retry /
+     restart decision — this only handles the success side. */
+  const finishTwoFactor = async (code) => {
+    await completeTwoFactor({ mfaToken: challenge.token, code })
+    setChallenge(null)
+    navigate(loc.state?.from?.pathname || '/', { replace: true })
+  }
+
+  // Challenge burned, expired, or abandoned → back to the password step. The
+  // token is dropped here, so nothing can retry with it.
+  const abandonTwoFactor = React.useCallback((why) => {
+    setChallenge(null)
+    setError(why || '')
+    setErrs({})
+  }, [])
 
   return (
     <div className="auth-page">
@@ -259,6 +397,13 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
 
       <div className="auth-right">
         <div className="auth-card">
+          {/* Mid-sign-in: the tabs and the switcher are gone on purpose. Both
+              legs belong to one attempt, and offering "Create account" here
+              would silently abandon a challenge the user cannot get back. */}
+          {challenge ? (
+            <TwoFactorStep challenge={challenge} onCancel={abandonTwoFactor} onDone={finishTwoFactor}/>
+          ) : (
+          <>
           <div className="auth-tabs" role="tablist" aria-label="Sign in or create account">
             <span className={'auth-thumb' + (signIn ? '' : ' alt')} aria-hidden="true"/>
             <button type="button" role="tab" aria-selected={signIn} className={'auth-tab ' + (signIn ? 'on' : '')} onClick={() => switchMode('SIGN_IN')}>Sign in</button>
@@ -356,6 +501,8 @@ export function AuthPage({ mode: initialMode = 'SIGN_IN' }) {
               ? <>New here? <a onClick={() => switchMode('SIGN_UP')}>Create an account</a></>
               : <>Already have an account? <a onClick={() => switchMode('SIGN_IN')}>Sign in</a></>}
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

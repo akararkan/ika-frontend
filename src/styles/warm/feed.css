@@ -217,14 +217,33 @@
 .cm-modal{border-radius:18px}
 .cm-top h3{color:var(--navy)}
 .cm-cancel:hover{color:var(--navy)}
+
+/* Top chrome, sized to be HIT, not just read. CANCEL was an 11px label with no
+   padding — a ~17px tap target next to a 38px button, on the row people reach
+   for first. Everything here is ≥44px tall now; this file loads after
+   styles-responsive.css, so these are the values that actually apply. */
+.cm-top{padding:12px 14px;gap:10px}
+.cm-cancel{
+  display:inline-flex;align-items:center;min-height:44px;padding:0 12px;
+  margin-inline-start:-12px;border-radius:10px;
+  font-size:13px;letter-spacing:1.2px;
+}
+.cm-cancel:active{background:var(--card-2)}
+.cm-headwrap{gap:2px}
+.cm-kicker{font-size:10.5px;letter-spacing:2px}
+.cm-top h3{font-size:19px}
+.cm-publish{height:44px;padding:0 22px;font-size:15px}
+.cm-publish .ico{width:18px;height:18px}
+
 /* tabs: filled pills, never underline */
 .cm-tabs{gap:8px;padding:12px 18px;border-bottom:1px solid var(--line-soft)}
 .cm-tab{
-  padding:7px 14px;margin-bottom:0;
+  padding:0 16px;min-height:42px;margin-bottom:0;
   border:1px solid var(--line);border-radius:999px;background:var(--card);
-  font-size:12.5px;font-weight:600;letter-spacing:.2px;text-transform:none;
+  font-size:14px;font-weight:600;letter-spacing:.2px;text-transform:none;
   color:var(--ink-soft);
 }
+.cm-tab .ico{width:17px;height:17px}
 .cm-tab:hover{border-color:var(--blue);color:var(--navy)}
 .cm-tab.on{background:var(--navy);border-color:var(--navy);color:#f2f0f0}
 .cm-tab.on .ico{color:#f2f0f0}

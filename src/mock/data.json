@@ -4471,7 +4471,14 @@
    "id": "r-01",
    "authorId": "u-amina",
    "soundId": "snd-05",
-   "clip": 1,
+   "overlay": {
+    "v": 1,
+    "fit": "cover",
+    "items": [
+     { "k": "t", "text": "Read the margin notes", "x": 0.5, "y": 0.24, "r": -3, "s": 0.075, "f": 1, "c": 0, "a": 1, "m": 0, "bg": 1 },
+     { "k": "s", "text": "\u2728", "x": 0.79, "y": 0.36, "r": 0, "s": 0.16, "f": 0, "c": 0, "a": 1, "m": 7, "bg": 0 }
+    ]
+   },   "clip": 1,
    "cover": 1,
    "durationSeconds": 42,
    "minsAgo": 95,

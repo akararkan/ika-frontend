@@ -359,6 +359,8 @@ export function postFromFeedItem(dto) {
        stops happening. */
     soundUrl: !isVoice && dto.audioTrackUrl ? assetUrl(dto.audioTrackUrl) : null,
     soundName: !isVoice && dto.audioTrackName ? dto.audioTrackName : '',
+    // feed rows carry one media slot, so an overlay only appears on the full read
+    overlayUrl: null,
     sharedPostId: dto.sharedPostId || null,   // feed items omit it → RepostEmbed fetches the full post
     likes: dto.reactionCount || 0,
     comments: dto.commentCount || 0,
@@ -497,10 +499,31 @@ export function feedItemFrom(dto) {
 /** PostResponse (full) → view post. */
 export function postFromResponse(dto) {
   const a = authorFrom(dto.author, dto.authorId)
-  const media = dto.postType === 'VOICE_POST'
+  const all = dto.postType === 'VOICE_POST'
     ? [{ type: 'AUDIO', label: dto.audioTrackName || 'voice note', duration: '0:00' }]
     : mediaFromUrls(dto.mediaUrls, dto.mediaTypes)
+  /* A REEL can carry an overlay document (text / emoji / moving stickers) as a
+     second part. The backend types any non image/video/audio upload as OTHER,
+     so that is the slot it comes back in — lifted out here so it can never
+     reach a media renderer as a stray empty tile, and so the hydrate paths
+     that replace `media` wholesale cannot lose it. */
+  /* Typed OTHER is the whole signal: nothing else on this platform uploads a
+     non image/video/audio part, and a blob: url (the mock, and any client that
+     previews locally) has no extension to check. Whatever it is, it is fetched
+     and validated before a single item is drawn, and anything unparseable is
+     dropped silently — so a wrong guess costs one failed request, never a
+     broken frame. */
+  const overlay = all.find(m => m.type === 'OTHER' && m.url)
+  /* A REEL's VOICEOVER travels the same way: recorded in the composer,
+     uploaded as an audio part, typed AUDIO by classifyMedia. Lifted out for
+     the same reasons as the overlay — an AUDIO entry inside a reel's `media`
+     would render as a stray tile, and the hydrate paths would lose it.
+     VOICE_POST is untouched: there the audio IS the post. */
+  const voice = dto.postType === 'REEL' ? all.find(m => m.type === 'AUDIO' && m.url) : null
+  const media = all.filter(m => m !== overlay && m !== voice)
   return {
+    overlayUrl: overlay?.url || null,
+    voiceoverUrl: voice?.url || null,
     id: dto.id,
     author: a.id,
     _author: a,

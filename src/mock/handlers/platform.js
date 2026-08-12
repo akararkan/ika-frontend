@@ -1282,7 +1282,12 @@ export const routes = [
     m: 'POST', p: /^\/api\/v1\/security\/phone\/verify$/,
     fn: (db, { body }) => {
       if (!/^\d{6}$/.test(String(body?.code || ''))) throw mockError(400, 'OTP_INVALID', 'That code is not valid')
-      const e164 = String(body?.phone || '').replace(/[\s-]/g, '')
+      /* Mirror PhoneNormalizer: strip separators, fold 00→+, default bare
+         numbers to +964 dropping the trunk 0 — so mock mode exercises the
+         "display the canonical E.164, not what was typed" contract. */
+      let e164 = String(body?.phone || '').replace(/[\s\-.()]/g, '').replace(/^00/, '+')
+      if (!e164.startsWith('+')) e164 = '+964' + e164.replace(/^0/, '')
+      else e164 = '+' + e164.slice(1).replace(/^9640/, '964')
       securityOf(db).phone = { verified: true, e164 }
       return { verified: true, phone: e164 }
     },

@@ -788,7 +788,7 @@ export const routes = [
     },
   },
   {
-    m: 'PATCH', p: /^\/api\/v1\/posts\/comments\/([^/]+)$/,
+    m: 'PATCH', p: /^\/api\/v1\/posts\/comments\/(?!r[cr]-)([^/]+)$/,
     fn: (db, ctx) => {
       const hit = findComment(db, ctx.params[0])
       if (!hit) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')
@@ -803,7 +803,7 @@ export const routes = [
     },
   },
   {
-    m: 'DELETE', p: /^\/api\/v1\/posts\/comments\/([^/]+)$/,
+    m: 'DELETE', p: /^\/api\/v1\/posts\/comments\/(?!r[cr]-)([^/]+)$/,
     fn: (db, ctx) => {
       const hit = findComment(db, ctx.params[0])
       if (!hit) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')

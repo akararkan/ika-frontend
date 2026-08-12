@@ -3,6 +3,26 @@
    Dual-channel tokens: the backend sets HttpOnly cookies AND
    returns accessToken/refreshToken in the body. We keep the
    accessToken for the Bearer header + SSE ?token= fallback.
+
+   LOGIN IS TWO LEGS when the account has 2FA on:
+
+     POST /auth/login       → {mfaRequired:true, mfaToken, expiresIn}
+                              …and NOTHING else. No session, no
+                              cookies, not even the user object.
+     POST /auth/login/2fa   → {mfaToken, code} → the ordinary pair.
+
+   `mfaRequired` is omitted entirely (never false) on an ordinary
+   login, so presence is the branch. `code` takes EITHER the
+   6-digit authenticator code or a single-use recovery code — the
+   server tries TOTP first, then recovery, and the client must not
+   pre-classify what was typed.
+
+   The mfaToken is a credential: it lives in memory for the length
+   of the sign-in and is never written to storage. It also cannot
+   authenticate anything (the JWT filter rejects MFA_CHALLENGE),
+   is single-use, and burns after 5 attempts — so a challenge that
+   comes back MFA_CHALLENGE_INVALID / MFA_TOO_MANY_ATTEMPTS is
+   gone for good and the user restarts from the password screen.
    ========================================================= */
 import { http } from './http.js'
 import { session } from './config.js'
@@ -18,6 +38,28 @@ export const auth = {
   async login({ identifier, username, email, password }) {
     const loginId = (identifier || username || email || '').trim()
     const res = await http.post('/api/v1/auth/login', { username: loginId, password })
+    /* Second factor owed: nothing to store. Hand the challenge back so the
+       caller can collect a code — storeAuth here would persist a null token
+       and leave the app half-signed-in. */
+    if (res?.mfaRequired) {
+      return { mfaRequired: true, mfaToken: res.mfaToken || '', expiresIn: res.expiresIn ?? 300, token: '', user: null }
+    }
+    return storeAuth(res)
+  },
+
+  /**
+   * Second leg of a 2FA login (§3 of two-factor-authentication.md).
+   * @param code the 6-digit authenticator code **or** a recovery code — send it
+   *             as typed; the server decides which it is.
+   * Throws with `code` MFA_CODE_INVALID (retryable, challenge survives),
+   * MFA_TOO_MANY_ATTEMPTS / MFA_CHALLENGE_INVALID (challenge gone → password
+   * screen). All three arrive as 401s, and http.js never refresh-retries an
+   * /api/v1/auth/ path, so they surface here intact.
+   */
+  async loginTwoFactor({ mfaToken, code }) {
+    const res = await http.post('/api/v1/auth/login/2fa', {
+      mfaToken, code: String(code || '').trim(),
+    })
     return storeAuth(res)
   },
 

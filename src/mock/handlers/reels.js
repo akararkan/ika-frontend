@@ -224,8 +224,14 @@ function postResponse(db, r) {
     locationLng: null,
     sharedPostId: null,
     shareLink: shareToken(r.id),
-    mediaUrls: r.still ? [poster(r.cover, r.id)] : [clipUrl(r.clip), poster(r.cover, r.id)],
-    mediaTypes: r.still ? ['IMAGE'] : ['VIDEO', 'IMAGE'],
+    /* `overlay` (text / emoji / moving stickers) is a second part typed OTHER
+       by classifyMedia — exactly what the real multipart create produces when
+       the composer uploads overlay.json beside the clip. */
+    mediaUrls: [
+      ...(r.still ? [poster(r.cover, r.id)] : [clipUrl(r.clip), poster(r.cover, r.id)]),
+      ...(r.overlay ? ['data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(r.overlay))] : []),
+    ],
+    mediaTypes: [...(r.still ? ['IMAGE'] : ['VIDEO', 'IMAGE']), ...(r.overlay ? ['OTHER'] : [])],
     reactionCount: r.reactionCount || 0,
     commentCount: r.commentCount || 0,
     viewCount: r.viewCount || 0,
@@ -294,12 +300,17 @@ function replyResponse(db, rp, parentId, postId) {
   }
 }
 
-/** Locate a comment (and the reel it hangs under) by comment id. */
+/** Locate a comment OR a reply (and the reel it hangs under) by id. Replies
+ *  matter here: like/edit/delete address them by their own id, exactly as the
+ *  real backend does — a reel is an ordinary post. */
 function findComment(db, commentId) {
   const map = db.reelComments || {}
   for (const postId of Object.keys(map)) {
-    const c = (map[postId] || []).find(x => String(x.id) === String(commentId))
-    if (c) return { postId, comment: c }
+    for (const c of map[postId] || []) {
+      if (String(c.id) === String(commentId)) return { postId, comment: c, parent: null }
+      const rp = (c.replies || []).find(x => String(x.id) === String(commentId))
+      if (rp) return { postId, comment: rp, parent: c }
+    }
   }
   return null
 }
@@ -632,6 +643,37 @@ export const routes = [
       const reel = reelById(db, found.postId)
       if (reel) reel.commentCount = (reel.commentCount || 0) + 1
       return replyResponse(db, rp, found.comment.id, found.postId)
+    },
+  },
+  {
+    /* Author edit — 204, refused edits leave the wording untouched (the same
+       PATCH posts.js rehearses; reel comment ids are rc-/rr- so the posts
+       route never sees them). */
+    m: 'PATCH', p: /^\/api\/v1\/posts\/comments\/(r[cr]-[^/]+)$/,
+    fn: (db, { params, body }) => {
+      const found = findComment(db, params[0])
+      if (!found) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')
+      if (fakeVerdict(body?.text) === 'BLOCK') throw blockedError()
+      found.comment.text = String(body?.text ?? found.comment.text)
+      return null                                   // 204
+    },
+  },
+  {
+    m: 'DELETE', p: /^\/api\/v1\/posts\/comments\/(r[cr]-[^/]+)$/,
+    fn: (db, { params }) => {
+      const found = findComment(db, params[0])
+      if (!found) throw mockError(404, 'COMMENT_NOT_FOUND', 'Comment not found')
+      const reel = reelById(db, found.postId)
+      if (found.parent) {
+        found.parent.replies = (found.parent.replies || []).filter(x => x.id !== found.comment.id)
+        if (reel) reel.commentCount = Math.max(0, (reel.commentCount || 0) - 1)
+      } else {
+        const list = (db.reelComments || {})[found.postId] || []
+        const gone = 1 + (found.comment.replies || []).length   // a thread dies whole
+        db.reelComments[found.postId] = list.filter(x => x.id !== found.comment.id)
+        if (reel) reel.commentCount = Math.max(0, (reel.commentCount || 0) - gone)
+      }
+      return null                                   // 204
     },
   },
   {

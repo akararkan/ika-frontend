@@ -239,19 +239,24 @@ export function PresencePanel() {
 
 /* ---------- search & discovery + QR ---------- */
 
+/* The fallbacks are the SERVER's defaults, not a house style: byPhone/byEmail
+   default ON (matching WhatsApp/Telegram/Signal, and because enforcing the old
+   off-defaults the day the flags went live would have switched contact
+   discovery off for everybody). A wrong fallback here shows the wrong switch
+   position for the one frame before the GET lands. */
 const DISCOVERY_ROWS = [
   ['byUsername', true, 'Find me by username',
     'People can find your profile by searching for your exact username.'],
-  ['byPhone', false, 'Find me by phone number',
-    'People who already have your number can find you. Only works once a phone number is verified in Security.'],
-  ['byEmail', false, 'Find me by email',
-    'People who already have your email address can find you.'],
-  /* Do NOT promise that this blocks scans: resolving a QR token does not check
-     this flag on the backend, so a code already out in the world keeps working.
-     Only Rotate invalidates one. Keep the copy to what is actually enforced —
-     what this switch does do is hide the code below. */
+  ['byPhone', true, 'Find me by phone number',
+    'People who have your number saved in their contacts can find you. Needs a phone number verified in Security — without one there is nothing to match against.'],
+  ['byEmail', true, 'Find me by email',
+    'People who have your email address saved in their contacts can find you.'],
+  /* This one IS enforced now — QrDiscoveryController checks isDiscoverableBy
+     before resolving, and answers 404 (not 403) so the response cannot be used
+     to probe the setting. A printed code stops working while it is off; only
+     Rotate invalidates one permanently. */
   ['byQr', true, 'Offer my QR code for sharing',
-    'When off, your code is hidden here and anywhere IKA would offer it. A code you already shared or printed keeps opening your profile — rotating it is what stops that.'],
+    'When off, your code is hidden here and stops opening your profile — including codes you already shared or printed. Rotating is what retires an old code for good.'],
   ['indexable', true, 'Allow search engines to index my public profile',
     'When off, search engines are asked not to list your profile. Existing results can take a while to disappear.'],
 ]
@@ -312,17 +317,19 @@ export function DiscoveryPanel() {
             status={statusOf(key)}
             onToggle={() => toggle(key, fallback)}/>
         ))}
-        {/* Honest about the seam: DiscoverabilityService exposes isDiscoverableBy
-            / isIndexable, but nothing outside the settings package calls either
-            yet (search, contact matching and QR resolve all ignore them), so
-            these are stored choices rather than live filters. The QR switch is
-            the exception — this app honours it on the card below. */}
+        {/* isDiscoverableBy is now called from inside the contact-match join and
+            from QR resolution, so phone/email/QR are live filters rather than
+            stored preferences. `indexable` is still the odd one out: it is not
+            denormalised into the search document yet, so it is honoured by the
+            profile's robots directives and nothing else. Say so specifically —
+            the previous blanket "none of this is enforced yet" note is now the
+            opposite kind of lie. */}
         <div className="stx-note info">
           <Icon name="info"/>
           <span>
-            These choices are saved to your account and will apply as each way of finding
-            people starts reading them. Today the one that already changes something is the
-            QR switch, which hides your code below.
+            Phone, email and QR take effect immediately — turning one off removes you from
+            that way of being found, including for people who already have your details.
+            Search-engine indexing is a request to crawlers, so existing results can linger.
           </span>
         </div>
       </SetCard>

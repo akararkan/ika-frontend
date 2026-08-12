@@ -19,6 +19,7 @@ import { Icon, showToast } from '../ui.jsx'
 import { uiConfirm } from '../Dialog.jsx'
 import { EmptyState, ErrorState } from '../states.jsx'
 import { api, session } from '../../api/index.js'
+import { LOGIN_METHOD_LABELS, LOGIN_OUTCOME_LABELS, NOTEWORTHY_LOGIN_METHODS } from '../../api/security.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { SetCard, Skeleton, fmtWhen } from './shared.jsx'
 
@@ -190,9 +191,11 @@ export function SessionsPanel() {
 }
 
 const PAGE_SIZE = 15
-const METHOD_LABELS = { PASSWORD: 'Password', OTP: 'OTP', REFRESH: 'Refresh', TWO_FA: '2FA' }
-const OUTCOME_CHIP = { SUCCESS: 'ok', FAILED: 'err', LOCKED: 'warn' }
-const OUTCOME_LABELS = { SUCCESS: 'Success', FAILED: 'Failed', LOCKED: 'Locked' }
+/* The label maps used to be invented (OTP / REFRESH / TWO_FA — values nothing
+   writes) and were missing every value the backend actually stores, so a real
+   row rendered as a raw enum. api/security.js now exports the writer's own
+   vocabulary; import it rather than keeping a second copy that can drift. */
+const OUTCOME_CHIP = { SUCCESS: 'ok', FAILED: 'err', MFA_REQUIRED: 'warn', LOCKED: 'warn' }
 
 export function LoginHistoryPanel() {
   const [items, setItems] = React.useState(null)
@@ -221,11 +224,12 @@ export function LoginHistoryPanel() {
       .finally(() => setBusy(false))
   }
 
-  /* The read path is real and paged, but nothing writes rows yet —
-     LoginEventService.record()/recordSuccessAndAlertIfNew() have no callers, so
-     the login itself records nothing and no new-location alert is sent. Neither
-     the sub nor the empty state may imply otherwise. */
-  const sub = 'Recent sign-ins to your account.'
+  /* Rows are written for real now, on both the success and the failure paths
+     (AuthServiceImpl records PASSWORD/FAILED, PASSWORD/MFA_REQUIRED,
+     PASSWORD+TOTP, PASSWORD+RECOVERY, PASSWORD+2FA/FAILED), and a success from
+     an unseen IP raises a security alert that bypasses DND. So the sub can now
+     say what the table is for. */
+  const sub = 'Every sign-in and failed attempt on your account. A sign-in from a new location also alerts you.'
 
   return (
     <SetCard id="login-history" icon="clock" title="Login history" sub={sub}>
@@ -246,13 +250,20 @@ export function LoginHistoryPanel() {
                 {items.map((row, i) => {
                   const ua = row.userAgent || ''
                   const shortUa = ua.length > 40 ? ua.slice(0, 40) + '…' : ua
+                  /* A recovery-code sign-in means somebody got in without the
+                     authenticator — the one row in this table a user should be
+                     asked to look twice at. */
+                  const notable = NOTEWORTHY_LOGIN_METHODS.has(row.method) && row.outcome === 'SUCCESS'
                   return (
                     <tr key={i}>
                       <td>{fmtWhen(row.ts)}</td>
-                      <td>{METHOD_LABELS[row.method] || row.method || '—'}</td>
+                      <td>
+                        {LOGIN_METHOD_LABELS[row.method] || row.method || '—'}
+                        {notable && <span className="stx-chip warn" style={{ marginInlineStart: 6 }} title="A recovery code was used instead of your authenticator app.">Recovery</span>}
+                      </td>
                       <td>
                         <span className={'stx-chip ' + (OUTCOME_CHIP[row.outcome] || 'plain')}>
-                          {OUTCOME_LABELS[row.outcome] || row.outcome || '—'}
+                          {LOGIN_OUTCOME_LABELS[row.outcome] || row.outcome || '—'}
                         </span>
                       </td>
                       <td>{row.ip || '—'}</td>

@@ -92,14 +92,14 @@ export const SETTINGS_INDEX = [
   /* ---- security ---- */
   { tab: 'security', anchor: 'security-score', card: 'Security checkup', title: 'Security checkup', keywords: ['score', 'how secure', 'recommendations'] },
   { tab: 'security', anchor: 'two-factor', card: 'Two-factor', title: 'Two-factor authentication', keywords: ['2fa', 'totp', 'authenticator', 'otp', 'mfa'] },
-  { tab: 'security', anchor: 'two-factor', card: 'Two-factor', title: 'Recovery codes', keywords: ['backup codes', 'lost phone', 'regenerate'] },
+  { tab: 'security', anchor: 'two-factor', card: 'Two-factor', title: 'Recovery codes', keywords: ['backup codes', 'lost phone', 'regenerate', 'cant sign in', 'locked out', 'authenticator not working', 'code not accepted'] },
   { tab: 'security', anchor: 'password', card: 'Password', title: 'Change password', keywords: ['new password', 'reset password', 'update password'] },
   { tab: 'security', anchor: 'password', card: 'Password', title: 'Sign out everywhere', keywords: ['log out all', 'revoke all devices'] },
-  { tab: 'security', anchor: 'phone', card: 'Phone number', title: 'Verify a phone number', keywords: ['sms', 'mobile number', 'otp code'] },
+  { tab: 'security', anchor: 'phone', card: 'Phone number', title: 'Verify a phone number', keywords: ['sms', 'mobile number', 'otp code', 'find me by phone', 'contact matching'] },
 
   /* ---- sessions ---- */
   { tab: 'sessions', anchor: 'sessions', card: 'Devices', title: 'Active sessions', keywords: ['devices', 'where am i signed in', 'sign out device', 'trust device'] },
-  { tab: 'sessions', anchor: 'login-history', card: 'Login history', title: 'Login history', keywords: ['sign-in history', 'who logged in', 'suspicious login'] },
+  { tab: 'sessions', anchor: 'login-history', card: 'Login history', title: 'Login history', keywords: ['sign-in history', 'who logged in', 'suspicious login', 'failed login', 'recovery code used'] },
 
   /* ---- your data ---- */
   { tab: 'data', anchor: 'export', card: 'Your data', title: 'Download your data', keywords: ['export', 'archive', 'copy of my data', 'zip', 'gdpr'] },

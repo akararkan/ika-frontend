@@ -49,6 +49,24 @@ export function isRateLimited(e) { return e?.status === 429 }
  *  globally (arm → replay), so most callers never see it. */
 export function isStepUp(e) { return e?.status === 403 && codeOf(e) === 'STEP_UP_REQUIRED' }
 
+/* ---------- second factor at login (two-factor-authentication.md §8) ----------
+   All three arrive as 401s from POST /auth/login/2fa, and they split into two
+   recoveries that must not be confused:
+
+     MFA_CODE_INVALID      → the CHALLENGE SURVIVES. Keep the code screen open,
+                             clear the field, let them try again (5 total).
+     MFA_TOO_MANY_ATTEMPTS → ceiling hit, challenge burned.
+     MFA_CHALLENGE_INVALID → expired, already used, or the store is unreachable.
+
+   The last two are terminal: the mfaToken in hand is worthless, so the only
+   way forward is the password screen. Retrying with it produces the same 401
+   for ever — which is exactly the loop this pair of helpers exists to stop. */
+export function isMfaCodeInvalid(e) { return codeOf(e) === 'MFA_CODE_INVALID' }
+
+const MFA_DEAD_CODES = new Set(['MFA_CHALLENGE_INVALID', 'MFA_TOO_MANY_ATTEMPTS'])
+/** true when the challenge is gone — send the user back to the password step. */
+export function isMfaChallengeDead(e) { return MFA_DEAD_CODES.has(codeOf(e)) }
+
 /** 503s that are transient BY CONTRACT (§2.9) — the datastore / object storage
  *  didn't answer. "Temporary problem, try again"; one delayed automatic retry
  *  is reasonable for reads. */

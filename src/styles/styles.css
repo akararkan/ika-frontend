@@ -574,3 +574,7 @@ textarea.field{height:auto;min-height:120px;padding:10px 2px;resize:vertical;lin
   color:rgba(13,21,32,.55);letter-spacing:.3px;
   background:rgba(255,255,255,.7);padding:2px 7px;border-radius:5px;
 }
+
+/* Announced, never shown — e.g. the words an author placed ON a reel, which
+   render in an aria-hidden layer so a screen reader hears them once, in place. */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}

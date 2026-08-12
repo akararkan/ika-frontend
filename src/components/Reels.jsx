@@ -35,10 +35,11 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { api, applyPostDelta } from '../api/index.js'
 import { useRealtime } from '../hooks/useRealtime.js'
 import { PlayableVideo } from './PlayableVideo.jsx'
-import { ReelMixer } from './ReelMixer.jsx'
 import { useReelAudio } from '../hooks/useReelAudio.js'
 import { StillClock } from '../lib/stillClock.js'
 import { readMix as readAuthoredMix } from '../lib/soundMix.js'
+import { ReelOverlay } from './ReelOverlay.jsx'
+import { overlaySpoken, parseOverlay } from '../lib/reelOverlay.js'
 
 /* How long a PHOTO reel plays before it loops. A still has no duration of its
    own, so the viewer supplies one — and it has to match what the composer
@@ -61,7 +62,6 @@ export function Reels({ onClose, initialId }) {
   const [progress, setProgress] = React.useState(0) // 0..1 of the active clip
   const [capOpen, setCapOpen] = React.useState(false) // caption expanded?
   const [burst, setBurst] = React.useState(null)    // {x,y,key} double-tap heart
-  const [mixOpen, setMixOpen] = React.useState(false)  // audio mixer panel
   const videoRef = React.useRef(null)
 
   // Load the list for the active tab. Prefer the dedicated ranked / following
@@ -125,53 +125,94 @@ export function Reels({ onClose, initialId }) {
   const [stillReady, setStillReady] = React.useState(0)
   const patchById = (id, fn) => setReels(rs => rs.map(r => (r.id === id ? fn(r) : r)))
 
-  /* ---- The reel's ADDED sound (§19) ----------------------------------
-     A reel keeps its own recorded audio in the video file; a sound picked at
-     compose time is a SECOND track, carried as `audioTrackUrl`. No list
-     endpoint returns it — FeedItemResponse has no audio field at all — so the
-     only place it can come from is the reel's own GET /posts/{id}. That read
-     is made once per reel, for the ACTIVE clip only, and cached by id so
-     swiping back does not repeat it. The 200ms wait keeps a fast flick
-     through ten reels from firing ten reads for clips nobody stopped on. */
-  const [tracks, setTracks] = React.useState({})   // reelId → {url,name} | null (null = looked, none)
+  /* ---- What the feed row does not carry --------------------------------
+     A reel row is thin: no added sound (FeedItemResponse has no audio field at
+     all) and no overlay. Both live on the reel's own GET /posts/{id}, so that
+     read happens ONCE per reel and both answers come out of it — two effects
+     each calling it would double every request, and piggybacking one on the
+     other would skip whichever rows the first effect short-circuits.
+
+     The active reel is read after 200ms (a fast flick through ten reels should
+     not fire ten reads), and the NEXT one is warmed while this one plays, so
+     its text and stickers are already there when it arrives instead of popping
+     in half a second late. */
+  const [full, setFull] = React.useState({})     // reelId → {track, overlay} | null
+  const inflight = React.useRef(new Set())
+  const hydrate = React.useCallback((row) => {
+    const id = row?.id
+    if (!id || inflight.current.has(id)) return
+    inflight.current.add(id)
+    const own = row.soundUrl ? { url: row.soundUrl, name: row.soundName || '' } : null
+    api.posts.get(id)
+      .then(async (post) => {
+        const track = own || (post?.soundUrl ? { url: post.soundUrl, name: post.soundName || '' } : null)
+        let overlay = null
+        // Fail open, always: an overlay that 404s or will not parse costs one
+        // request and the reel plays exactly as it would have.
+        if (post?.overlayUrl) {
+          try { overlay = parseOverlay(await fetch(post.overlayUrl).then(r => (r.ok ? r.json() : null))) } catch { overlay = null }
+        }
+        setFull(f => ({ ...f, [id]: { track, overlay, voice: post?.voiceoverUrl || null } }))
+        /* The full read also settles what the reel IS. A row the feed could not
+           classify (no `videoUrl`, no extension on the cover) is optimistically
+           played as video; if the canonical post holds only a photo, say so now
+           rather than waiting for the <video> to fail. */
+        const media = post?.media || []
+        if (!media.some(m => m.type === 'VIDEO' && m.url)) {
+          const img = media.find(m => m.type === 'IMAGE' && m.url)
+          if (img) patchById(id, r => (r.media?.[0]?.type === 'IMAGE' ? r : { ...r, media: [img] }))
+        }
+      })
+      .catch(() => setFull(f => ({ ...f, [id]: { track: own, overlay: null, voice: null } })))
+  }, [])
+
+  React.useEffect(() => {
+    if (!reel?.id || full[reel.id] !== undefined) return
+    const t = setTimeout(() => hydrate(reel), 200)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reel?.id, full[reel?.id] !== undefined])
+
+  React.useEffect(() => {
+    if (!nextReel?.id || full[nextReel.id] !== undefined) return
+    const t = setTimeout(() => hydrate(nextReel), 600)   // after the active read
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextReel?.id, full[nextReel?.id] !== undefined])
+
   const ownTrack = reel?.soundUrl ? { url: reel.soundUrl, name: reel.soundName || '' } : null
-  const track = ownTrack || tracks[reel?.id] || null
+  const track = ownTrack || full[reel?.id]?.track || null
+  const overlay = full[reel?.id]?.overlay || null
+  const voiceUrl = full[reel?.id]?.voice || null
   /* `…#mix=orig,music` — the levels the author set in the composer. A url
      fragment, because the API has no field for them (BACKEND_NOTES #16); it
      never reaches the server and older reels simply carry none. */
   const authoredMix = React.useMemo(() => readAuthoredMix(track?.url), [track?.url])
-  React.useEffect(() => {
-    if (!reel || (!videoUrl && !stillUrl) || ownTrack || tracks[reel.id] !== undefined) return
-    let alive = true
-    const t = setTimeout(() => {
-      api.posts.get(reel.id)
-        .then(full => {
-          if (!alive) return
-          setTracks(s => ({ ...s, [reel.id]: full?.soundUrl ? { url: full.soundUrl, name: full.soundName || '' } : null }))
-          /* The same read settles what the reel IS. A row whose media the feed
-             could not classify (no `videoUrl`, no extension on the cover) is
-             optimistically played as video; if the canonical post turns out to
-             hold only a photo, it is a still reel — say so now rather than
-             waiting for the <video> to fail. */
-          const media = full?.media || []
-          if (!media.some(m => m.type === 'VIDEO' && m.url)) {
-            const img = media.find(m => m.type === 'IMAGE' && m.url)
-            if (img) patchById(reel.id, r => (r.media?.[0]?.type === 'IMAGE' ? r : { ...r, media: [img] }))
-          }
-        })
-        .catch(() => { if (alive) setTracks(s => ({ ...s, [reel.id]: null })) })
-    }, 200)
-    return () => { alive = false; clearTimeout(t) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reel?.id, videoUrl, stillUrl])
 
-  /* Both tracks play together and are balanced independently; the hook owns
-     every write to either element's volume/muted (see hooks/useReelAudio.js).
-     For a still reel the "clip" is a StillClock — same interface, no audio of
-     its own — so the added track rides the still's 30 seconds unchanged. */
+  /* The media's intrinsic size — the overlay is anchored to the PICTURE, not
+     to the card, so it needs to know how big the picture actually is. Read
+     through a ref callback as well as the load event: a cached image is
+     already `complete` by the time React attaches a handler, and the event
+     never comes — which silently falls the overlay back to the whole card and
+     puts stickers on the letterbox instead of on the photo. */
+  const [mediaSize, setMediaSize] = React.useState({ w: 0, h: 0 })
+  React.useEffect(() => { setMediaSize({ w: 0, h: 0 }) }, [reel?.id])
+  const readIntrinsics = React.useCallback((el) => {
+    if (!el) return
+    const w = el.naturalWidth || el.videoWidth || 0
+    const h = el.naturalHeight || el.videoHeight || 0
+    if (w && h) setMediaSize(m => (m.w === w && m.h === h ? m : { w, h }))
+  }, [])
+
+  /* Both tracks play together, at the levels the AUTHOR set in the composer;
+     the hook owns every write to either element's volume/muted (see
+     hooks/useReelAudio.js). For a still reel the "clip" is a StillClock — same
+     interface, no audio of its own — so the added track rides the still's 30
+     seconds unchanged. */
   const audio = useReelAudio({
     videoRef,
     trackUrl: track?.url || null,
+    voiceUrl,
     /* Three things re-key the mirror, because all three swap what videoRef
        points at: the reel itself; a clip that DIES (its <video> unmounts
        without the reel changing, and the track must not play on over a dead
@@ -209,7 +250,7 @@ export function Reels({ onClose, initialId }) {
   const seenAt = React.useRef(0)
   React.useEffect(() => {
     seenAt.current = Date.now()
-    setVideoErr(false); setPlaying(true); setProgress(0); setBuffering(false); setCapOpen(false); setBurst(null); setMixOpen(false)
+    setVideoErr(false); setPlaying(true); setProgress(0); setBuffering(false); setCapOpen(false); setBurst(null)
     if (reel) api.posts.recordView(reel.id).catch(() => {})   // counts the view (§11) — watch ≠ view
     return () => {
       if (reel) {
@@ -220,11 +261,10 @@ export function Reels({ onClose, initialId }) {
   }, [reel?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* The element's muted/volume are set imperatively (React's `muted` attr is
-     flaky) — but by useReelAudio, which is the single writer of both: master
-     mute, the per-track mute and the per-track level all resolve there, and
-     it re-asserts them on every reel change. A second effect writing
-     `video.muted = muted` here would silently undo the "original sound off,
-     added track on" case. */
+     flaky) — but by useReelAudio, which is the single writer of both: the
+     master mute and the authored levels resolve there, and it re-asserts them
+     on every reel change. A second effect writing `video.muted = muted` here
+     would silently undo an author's music-only balance. */
 
   // Sound ON by default: try to autoplay WITH audio. Browsers block unmuted
   // autoplay until a user gesture, so on rejection we fall back to muted
@@ -249,17 +289,15 @@ export function Reels({ onClose, initialId }) {
     if (!needsSound) return
     const enable = () => {
       const v = videoRef.current
-      // NOT plain `muted = false`: a listener who silenced the original track
-      // in the mixer asked for exactly that, gesture or no gesture.
-      if (v) { v.muted = audio.mix.origOff; v.play().catch(() => {}) }
+      if (v) { v.muted = false; v.play().catch(() => {}) }
       setMuted(false); setNeedsSound(false)
       audio.resume()          // the added track was blocked by the same policy
     }
     window.addEventListener('pointerdown', enable, { once: true })
     return () => window.removeEventListener('pointerdown', enable)
     // `audio` is a fresh object every render; listing it would re-arm this
-    // one-shot listener continuously. Only `mix.origOff` is read from the
-    // closure — resume() reads the live levels through the hook's own refs.
+    // one-shot listener continuously — and resume() reads the live levels
+    // through the hook's own refs, so nothing here goes stale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsSound])
 
@@ -451,7 +489,6 @@ export function Reels({ onClose, initialId }) {
   const wheelLock = React.useRef(0)
   const wheelLast = React.useRef(0)
   const onWheel = (e) => {
-    if (e.target.closest?.('.rv-mix')) return       // scrolling inside the mixer is not paging
     const now = Date.now()
     const sinceLast = now - wheelLast.current
     wheelLast.current = now
@@ -476,6 +513,17 @@ export function Reels({ onClose, initialId }) {
   const [cText, setCText] = React.useState('')
   const [cBusy, setCBusy] = React.useState(false)
   const [cErr, setCErr] = React.useState(null)          // a refused comment, shown inside the sheet
+  /* Comment PARITY with PostPage — a reel is a post, so its comments carry the
+     full contract: like (toggleCommentReaction), threaded replies, delete for
+     the owner, report for everyone else. The sheet used to render bare rows,
+     which read as "reels comments are less real" — they are the same rows. */
+  const [repliesMap, setRepliesMap] = React.useState({})   // commentId → [reply views]
+  const [openReplies, setOpenReplies] = React.useState({}) // commentId → expanded?
+  const [replyTo, setReplyTo] = React.useState(null)       // {commentId, handle} — the ONE composer switches target
+  const [editingId, setEditingId] = React.useState(null)   // comment/reply being edited in place
+  const [editValue, setEditValue] = React.useState('')
+  const [editBusy, setEditBusy] = React.useState(false)
+  const [editErr, setEditErr] = React.useState(null)       // a refused edit — shown beside its own input
 
   React.useEffect(() => {
     const onKey = (e) => {
@@ -503,19 +551,28 @@ export function Reels({ onClose, initialId }) {
   const touchY = React.useRef(null)
   const trackRef = React.useRef(null)
   const rafId = React.useRef(0)
+  const dragMoved = React.useRef(false)
   const [dragging, setDragging] = React.useState(false)
   // write the settled transform directly so the DOM and React's next render agree
   const settleTrack = (targetIdx) => { if (trackRef.current) trackRef.current.style.transform = `translateY(${targetIdx * -100}%)` }
   const onTouchStart = (e) => {
-    // expanded caption scrolls natively; the mixer's sliders must not page the
-    // feed out from under the finger that is dragging one
-    if (scrubbing.current || e.target.closest?.('.rvm-caption.open, .rv-mix')) return
+    if (scrubbing.current || e.target.closest?.('.rvm-caption.open')) return   // expanded caption scrolls natively
     touchY.current = e.touches[0]?.clientY ?? null
-    setDragging(true)
+    /* NO setState here. Most touches are TAPS — on the rail hearts above all —
+       and a state flip on touchstart re-renders this whole tree (fifty cells,
+       a playing video, six backdrop-filters) BEFORE the tap's click event even
+       fires. That render is exactly the lag a like feels. `dragging` flips
+       only once the finger has actually moved. */
+    dragMoved.current = false
   }
   const onTouchMove = (e) => {
     if (scrubbing.current || touchY.current == null) return
     let dy = (e.touches[0]?.clientY ?? touchY.current) - touchY.current
+    if (!dragMoved.current) {
+      if (Math.abs(dy) <= 6) return                     // still a tap — do not wake the track
+      dragMoved.current = true
+      setDragging(true)
+    }
     if ((idx === 0 && dy > 0) || (idx === reels.length - 1 && dy < 0)) dy *= .35
     cancelAnimationFrame(rafId.current)                 // imperative drag: zero React re-renders per frame
     rafId.current = requestAnimationFrame(() => {
@@ -523,12 +580,15 @@ export function Reels({ onClose, initialId }) {
     })
   }
   const endDrag = (e) => {
-    setDragging(false)
     cancelAnimationFrame(rafId.current)
+    const moved = dragMoved.current
+    dragMoved.current = false
+    if (moved) setDragging(false)
     if (touchY.current == null) return
     const endY = e?.changedTouches?.[0]?.clientY ?? touchY.current
     const dy = endY - touchY.current
     touchY.current = null
+    if (!moved) return                                  // a tap wrote no transform — nothing to settle
     const target = dy < -60 ? Math.min(idx + 1, reels.length - 1) : dy > 60 ? Math.max(idx - 1, 0) : idx
     settleTrack(target)
     if (target !== idx) setIdx(target)
@@ -539,9 +599,9 @@ export function Reels({ onClose, initialId }) {
   /* Something is on screen and running (a clip, or a photo on its clock) → the
      scrim, the pause glyph and the seek bar all belong to it. */
   const hasFrame = (!!videoUrl && !videoErr) || !!stillUrl
-  /* Something can be HEARD: a clip always can (its own recording), a photo only
-     if a sound was attached. */
-  const hasAudio = hasFrame && (!stillUrl || !!track)
+  /* Something can be HEARD: a clip always can (its own recording), a photo
+     only if a sound or a voiceover was attached. */
+  const hasAudio = hasFrame && (!stillUrl || !!track || !!voiceUrl)
 
   /* Held reel — see the head note: this can only be my own, and only because I
      arrived by deep link. `status` is "PENDING_REVIEW" for both PENDING and
@@ -573,26 +633,45 @@ export function Reels({ onClose, initialId }) {
   }
 
   // ---- In-place comments sheet (state hoisted above the keydown effect) ----
-  React.useEffect(() => { setCmtOpen(false); setCmtFor(null); cmtForRef.current = null; setCmts(null); setCText(''); setCErr(null); setProgress(0); setBuffered(0); setDuration(0) }, [reel?.id])
-  /* Live sheet: while comments are OPEN, the reel's post stream keeps them
-     moving — someone else's comment appears in place, deletions vanish, and
-     the reel's counters ride the deltas. A closed sheet holds no socket: a
-     swipe-heavy surface must not churn one connection per reel. Pinned to
-     `cmtFor` (the reel the sheet was OPENED for), not the current reel — a
-     swipe with the sheet open renders one frame where reel has advanced but
-     cmtOpen hasn't reset yet, and keying on reel.id would dial a throwaway
-     socket to the new reel (and let a late old-stream event patch it). The
-     handler double-checks the pin for the same one-frame reason. The server
-     filters our own echoes; the ledgers make replayed deliveries count
-     exactly once (rows were already deduped by id — counters must match). */
-  useRealtime('posts', cmtOpen && cmtFor ? cmtFor : null, {
+  React.useEffect(() => { setCmtOpen(false); setCmtFor(null); cmtForRef.current = null; setCmts(null); setCText(''); setCErr(null); setRepliesMap({}); setOpenReplies({}); setReplyTo(null); setEditingId(null); setEditErr(null); setProgress(0); setBuffered(0); setDuration(0) }, [reel?.id])
+  /* LIVE WHILE WATCHING — realtime event → state → re-render, on the reel
+     that is actually on screen. The rail's counts move as other people react
+     (REACTION_ADDED and friends land as ±1 deltas via applyPostDelta), not
+     only while the comments sheet is open. Two disciplines keep it cheap and
+     correct on a swipe-heavy surface:
+
+       · DEBOUNCE, not per-reel churn: the channel dials only after a reel has
+         held the screen for a moment — a fast flick through ten reels opens
+         nothing. Opening the sheet subscribes immediately (that is intent),
+         and the realtime MANAGER dedupes the two paths onto one socket.
+       · PINNED, not current: everything applies by the SUBSCRIBED id
+         (patchById), never "whatever reel is on screen" — a swipe renders one
+         frame where `reel` has advanced but the channel hasn't, and a late
+         event must not patch the wrong row.
+
+     The server filters our own echoes; the ledgers make replayed deliveries
+     count exactly once (rows were already deduped by id — counters must
+     match). */
+  const [liveId, setLiveId] = React.useState(null)
+  React.useEffect(() => {
+    setLiveId(null)
+    const id = reel?.id
+    if (!id) return
+    const t = setTimeout(() => setLiveId(id), 1200)
+    return () => clearTimeout(t)
+  }, [reel?.id])
+  const liveFor = cmtOpen && cmtFor ? cmtFor : liveId
+  useRealtime('posts', liveFor, {
     onEvent: (evt) => {
-      if (!reel || reel.id !== cmtFor) return
+      const chan = cmtOpen && cmtFor ? cmtFor : liveId
+      if (!chan) return
+      const sheetLive = cmtOpen && cmtFor === chan && reel?.id === chan
       const t = evt.eventType
       if (t === 'COMMENT_CREATED' && evt.commentId) {
         if (seenCR.current.has(evt.commentId)) return
         seenCR.current.add(evt.commentId)
-        patch(r => ({ ...r, comments: (r.comments || 0) + 1 }))
+        patchById(chan, r => ({ ...r, comments: (r.comments || 0) + 1 }))
+        if (!sheetLive) return               // counter moved; rows belong to an open sheet
         setCmts(cs => !cs || cs.some(c => c.id === evt.commentId) ? cs : [...cs, {
           id: evt.commentId,
           _author: { full: evt.actorUsername || 'Someone', handle: evt.actorUsername || 'member',
@@ -602,13 +681,14 @@ export function Reels({ onClose, initialId }) {
       } else if (t === 'COMMENT_DELETED' && evt.commentId) {
         if (delCR.current.has(evt.commentId)) return
         delCR.current.add(evt.commentId)
-        patch(r => ({ ...r, comments: Math.max(0, (r.comments || 0) - 1) }))
-        setCmts(cs => cs ? cs.filter(c => c.id !== evt.commentId) : cs)
+        patchById(chan, r => ({ ...r, comments: Math.max(0, (r.comments || 0) - 1) }))
+        if (sheetLive) setCmts(cs => cs ? cs.filter(c => c.id !== evt.commentId) : cs)
       } else if (t !== 'REPLY_CREATED') {
-        // REPLY_CREATED is deliberately counter-only-skipped too (the sheet
-        // renders no reply threads and a replayed +1 could never be audited);
-        // everything else — reactions, views, shares — rides the delta helper.
-        patch(r => applyPostDelta(r, evt))
+        // REPLY_CREATED is deliberately counter-only-skipped too (this surface
+        // does not bump the reel counter for replies anywhere, and a replayed
+        // +1 could never be audited); everything else — reactions, views,
+        // shares — rides the delta helper.
+        patchById(chan, r => applyPostDelta(r, evt))
       }
     },
   })
@@ -651,6 +731,28 @@ export function Reels({ onClose, initialId }) {
     const v = cText.trim(); if (!v || cBusy) return
     setCBusy(true); setCErr(null)
     const tmp = { id: 'tmp-' + performance.now(), _author: user, author: user?.id, body: v, time: 'now' }
+    const target = replyTo
+    if (target) {
+      /* A REPLY: threads under its parent, bumps the parent's replyCount, and
+         deliberately does NOT touch the reel's comment counter — the sheet's
+         SSE handler skips REPLY_CREATED for the same reason, so the two paths
+         must agree or the counter drifts on our own replies. */
+      setRepliesMap(m => ({ ...m, [target.commentId]: [...(m[target.commentId] || []), tmp] }))
+      setOpenReplies(o => ({ ...o, [target.commentId]: true }))
+      api.posts.addReply(target.commentId, { text: v })
+        .then(saved => {
+          setCText(''); setReplyTo(null)
+          if (saved?.id) setRepliesMap(m => ({ ...m, [target.commentId]: (m[target.commentId] || []).map(x => x.id === tmp.id ? saved : x) }))
+          setCmts(cs => cs ? cs.map(x => x.id === target.commentId ? { ...x, replyCount: (x.replyCount || 0) + 1 } : x) : cs)
+        })
+        .catch(e => {
+          setRepliesMap(m => ({ ...m, [target.commentId]: (m[target.commentId] || []).filter(x => x.id !== tmp.id) }))
+          if (isModerationError(e)) setCErr(e)
+          else showToast('Could not post reply')
+        })
+        .finally(() => setCBusy(false))
+      return
+    }
     setCmts(cs => [...(cs || []), tmp])
     patch(r => ({ ...r, comments: (r.comments || 0) + 1 }))
     api.posts.addComment(reel.id, { text: v })
@@ -668,6 +770,61 @@ export function Reels({ onClose, initialId }) {
         else showToast('Could not post comment')
       })
       .finally(() => setCBusy(false))
+  }
+
+  /* Like / unlike a comment or reply — optimistic, PostPage's exact pattern:
+     one flip applied now, the same flip re-applied to revert on failure. */
+  const flipLike = (rows, cid) => rows.map(x => x.id === cid
+    ? { ...x, liked: !x.liked, likes: Math.max(0, (x.likes || 0) + (x.liked ? -1 : 1)) } : x)
+  const likeCmt = (cid, parentId = null) => {
+    if (!cid || String(cid).startsWith('tmp-')) return
+    const apply = () => parentId
+      ? setRepliesMap(m => ({ ...m, [parentId]: flipLike(m[parentId] || [], cid) }))
+      : setCmts(cs => (cs ? flipLike(cs, cid) : cs))
+    apply()
+    api.posts.toggleCommentReaction(reel.id, cid).catch(apply)
+  }
+  const toggleReplies = async (cid) => {
+    const open = !openReplies[cid]
+    setOpenReplies(o => ({ ...o, [cid]: open }))
+    if (open && !repliesMap[cid]) {
+      try { const list = await api.posts.replies(cid); setRepliesMap(m => ({ ...m, [cid]: list || [] })) }
+      catch { setRepliesMap(m => ({ ...m, [cid]: [] })) }
+    }
+  }
+  const startReply = (cid, handle) => {
+    setReplyTo({ commentId: cid, handle })
+    setCErr(null)
+    setCText(t => (t.trim() ? t : `@${handle} `))
+  }
+  const delCmt = (cid) => {
+    delCR.current.add(cid)     // our own delete — a replayed SSE echo must not double-decrement
+    setCmts(cs => (cs ? cs.filter(x => x.id !== cid) : cs))
+    patch(r => ({ ...r, comments: Math.max(0, (r.comments || 0) - 1) }))
+    api.posts.deleteComment(cid).catch(() => showToast('Could not delete comment'))
+  }
+  /* Inline edit — PostPage's exact contract: the input replaces the words,
+     Enter saves (PATCH), Escape walks away, and a refused edit is shown beside
+     the input it belongs to with the draft intact. */
+  const startEdit = (row) => { setEditingId(row.id); setEditValue(row.body || ''); setEditErr(null) }
+  const cancelEdit = () => { setEditingId(null); setEditValue(''); setEditErr(null) }
+  const saveEdit = (cid, parentId = null) => {
+    const v = editValue.trim(); if (!v || editBusy) return
+    setEditBusy(true); setEditErr(null)
+    api.posts.editComment(cid, v)
+      .then(() => {
+        const put = (rows) => rows.map(x => (x.id === cid ? { ...x, body: v } : x))
+        if (parentId) setRepliesMap(m => ({ ...m, [parentId]: put(m[parentId] || []) }))
+        else setCmts(cs => (cs ? put(cs) : cs))
+        cancelEdit()
+      })
+      .catch(e => { if (isModerationError(e)) setEditErr(e); else showToast('Could not save the edit') })
+      .finally(() => setEditBusy(false))
+  }
+  const delReply = (cid, rid) => {
+    setRepliesMap(m => ({ ...m, [cid]: (m[cid] || []).filter(x => x.id !== rid) }))
+    setCmts(cs => (cs ? cs.map(x => x.id === cid ? { ...x, replyCount: Math.max(0, (x.replyCount || 0) - 1) } : x) : cs))
+    api.posts.deleteComment(rid).catch(() => showToast('Could not delete reply'))
   }
 
   return (
@@ -737,11 +894,12 @@ export function Reels({ onClose, initialId }) {
                   muted={muted}
                   preload="auto"
                   onError={onVideoError}
-                  onCanPlay={() => { setBuffering(false) }}
+                  onCanPlay={(e) => { setBuffering(false); readIntrinsics(e.currentTarget) }}
                   onWaiting={() => setBuffering(true)}
                   onPlaying={() => setBuffering(false)}
                   style={{ borderRadius:0 }}
                 />
+                {overlay && <ReelOverlay doc={overlay} media={mediaSize} playing={playing && !buffering}/>}
               </div>
             ) : stillUrl ? (
               /* PHOTO REEL — the same stage as a clip: ambient letterbox glow,
@@ -752,7 +910,11 @@ export function Reels({ onClose, initialId }) {
               <div className="rv-video-wrap" onClick={onTap}>
                 <div className="rv-ambient" aria-hidden="true" style={{ backgroundImage: `url(${stillUrl})` }}/>
                 <img className={'rv-video rv-still' + (playing ? ' is-live' : '')} src={stillUrl}
-                  alt={reel.body ? reel.body.slice(0, 120) : 'Photo reel'} draggable={false}/>
+                  alt={reel.body ? reel.body.slice(0, 120) : 'Photo reel'} draggable={false}
+                  ref={readIntrinsics} onLoad={e => readIntrinsics(e.currentTarget)}/>
+                {/* `drift`: the photo pans slowly for 30s, so the layer takes the
+                    same animation or the two would separate by ~8% of the frame. */}
+                {overlay && <ReelOverlay doc={overlay} media={mediaSize} playing={playing} drift/>}
               </div>
             ) : (
               <>
@@ -797,29 +959,16 @@ export function Reels({ onClose, initialId }) {
               </button>
             )}
 
-            {/* Mute toggle — master: it silences BOTH tracks at once. A photo
-                reel with no sound attached has nothing to silence, so neither
-                control is drawn for it. */}
+            {/* The viewer's ONE audio control: mute, or don't. How loud the
+                clip is against its added track was decided by the person who
+                posted it (composer → `#mix=`), the same way it works on every
+                other reels surface — watching is not the place to re-mix
+                somebody's work. A photo reel with no sound has nothing to
+                silence, so the button is not drawn for it at all. */}
             {hasAudio && (
               <button className={'rv-mute' + (muted ? ' off' : '')} onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'} aria-label={muted ? 'Unmute' : 'Mute'}>
                 <Icon name={muted ? 'mute' : 'volume'} className="sm"/>
               </button>
-            )}
-
-            {/* audio mixer — the two tracks, balanced separately */}
-            {hasAudio && (
-              <button className={'rv-mixbtn' + (mixOpen ? ' on' : '') + (track ? ' has-music' : '')}
-                onClick={() => setMixOpen(o => !o)} aria-expanded={mixOpen}
-                title={track ? 'Audio mixer' : 'Volume'} aria-label={track ? 'Audio mixer' : 'Volume'}>
-                <Icon name={track ? 'music' : 'volumelow'} className="sm"/>
-              </button>
-            )}
-            {hasAudio && mixOpen && (
-              <ReelMixer audio={audio} muted={muted} onUnmute={toggleMute}
-                /* A still has no recorded audio of its own — the mixer must not
-                   offer a level for a track that does not exist. */
-                hasOriginal={!!videoUrl && !videoErr}
-                trackName={track?.name || ''} onClose={() => setMixOpen(false)}/>
             )}
 
             <div className="rv-meta">
@@ -854,14 +1003,23 @@ export function Reels({ onClose, initialId }) {
               {/* The attached sound, named only once it is actually known —
                   the feed row carries no audio metadata, so this appears when
                   the reel's own read lands (see `tracks` above) and never as a
-                  guessed "Original audio" label. Tapping it opens the mixer,
-                  which is where the two tracks are balanced. */}
+                  guessed "Original audio" label. A label, not a control.
+                  `audio.failed` is the one thing worth saying out loud here:
+                  the sound is named on the reel, so if it will not load the
+                  name is a promise the page cannot keep, and the viewer is
+                  owed the reason rather than silence. */}
+              {/* The layer itself is aria-hidden; its words are announced once,
+                  here, where the caption already is. */}
+              {overlay && overlaySpoken(overlay) && (
+                <p className="sr-only">On the reel: {overlaySpoken(overlay)}</p>
+              )}
               {track && (
-                <button className="rvm-sound" onClick={() => setMixOpen(o => !o)}
-                  title="Audio mixer" aria-label={`Audio mixer — ${track.name || 'added sound'}`}>
+                <span className="rvm-sound">
                   <Icon name="music" className="xs"/>
-                  <span className="rvm-marquee">{track.name || 'Added sound'}</span>
-                </button>
+                  <span className="rvm-marquee">
+                    {audio.failed ? 'Sound unavailable' : (track.name || 'Added sound')}
+                  </span>
+                </span>
               )}
             </div>
 
@@ -932,30 +1090,108 @@ export function Reels({ onClose, initialId }) {
                 : !cmts.length ? <div className="rvc-empty">No comments yet — be the first.</div>
                 : cmts.map(c => {
                     const cu = authorOf(c)
+                    /* Live-synthesized rows carry no author id (the thin wire
+                       has no actorId) — never navigate to /u/undefined, never
+                       show owner/report actions we cannot honestly resolve. */
+                    const real = !!c.id && !String(c.id).startsWith('tmp-')
+                    const mine = real && !!user?.id && String(c.author) === String(user.id)
                     return (
                       <div key={c.id} className="rvc-row">
-                        {/* Live-synthesized rows carry no author id (the thin
-                            wire has no actorId) — never navigate to /u/undefined. */}
                         <span role={c.author ? 'button' : undefined}
                           style={c.author ? { cursor:'pointer' } : undefined}
                           onClick={() => c.author && navigate(`/u/${c.author}`)}>
                           <Avatar initials={cu.initials} color={cu.avc} size={30} src={cu.profileImage}/>
                         </span>
                         <div className="rvc-col">
-                          <div className="rvc-name"><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}<i>{c.time}</i>
-                            {/* Same synthesized-row caveat as the avatar above: without an
-                                author id we cannot tell whose comment it is, and a live row
-                                may carry no server id for moderators to resolve. */}
-                            {c.id && c.author && c.author !== user?.id && (
-                              <button type="button" title="Report comment" aria-label="Report comment"
-                                onClick={() => openReport({ targetType:'COMMENT', targetId:c.id, targetLabel:'this comment', subject:c.body })}
-                                style={{ marginInlineStart:'auto', background:'none', border:0, padding:2, color:'var(--muted)', cursor:'pointer' }}>
-                                <Icon name="flag" className="xs"/>
-                              </button>
-                            )}
-                          </div>
-                          <p dir="auto">{linkify(c.body)}</p>
+                          <div className="rvc-name"><b>{cu.full}</b>{cu.verified && <Verify scholar={cu.role==='SCHOLAR'}/>}<i>{c.time}</i></div>
+                          {editingId === c.id ? (
+                            <>
+                              <div className="rvc-editrow">
+                                <input className="rvc-field" dir="auto" value={editValue} autoFocus
+                                  onChange={e => { setEditErr(null); setEditValue(e.target.value) }}
+                                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(c.id); if (e.key === 'Escape') cancelEdit() }}/>
+                                <button className="rvc-send" disabled={editBusy || !editValue.trim()} onClick={() => saveEdit(c.id)} aria-label="Save edit"><Icon name="check" className="sm"/></button>
+                                <button className="rvc-send is-ghost" onClick={cancelEdit} aria-label="Cancel edit"><Icon name="close" className="sm"/></button>
+                              </div>
+                              {editErr && <ModerationAlert error={editErr} onRetry={() => saveEdit(c.id)} onDismiss={() => setEditErr(null)}/>}
+                            </>
+                          ) : (
+                            <p dir="auto">{linkify(c.body)}</p>
+                          )}
+                          {/* Post-comment PARITY: the same actions PostPage
+                              gives every comment — reply, edit + delete for
+                              its owner, report for everyone else. */}
+                          {real && editingId !== c.id && (
+                            <div className="rvc-meta">
+                              <button onClick={() => startReply(c.id, cu.handle)}>Reply</button>
+                              {mine && <button onClick={() => startEdit(c)}>Edit</button>}
+                              {mine && <button className="danger" onClick={() => delCmt(c.id)}>Delete</button>}
+                              {!mine && c.author && (
+                                <button onClick={() => openReport({ targetType:'COMMENT', targetId:c.id, targetLabel:'this comment', subject:c.body })}>Report</button>
+                              )}
+                            </div>
+                          )}
+                          {real && (c.replyCount > 0 || repliesMap[c.id]?.length > 0) && (
+                            <button className="rvc-toggle" onClick={() => toggleReplies(c.id)}>
+                              {openReplies[c.id] ? 'Hide replies'
+                                : `View ${c.replyCount || repliesMap[c.id]?.length || 0} ${(c.replyCount || repliesMap[c.id]?.length) === 1 ? 'reply' : 'replies'}`}
+                            </button>
+                          )}
+                          {openReplies[c.id] && (repliesMap[c.id] || []).map((r, ri) => {
+                            const ru = authorOf(r)
+                            const rReal = !!r.id && !String(r.id).startsWith('tmp-')
+                            const rMine = rReal && !!user?.id && String(r.author) === String(user.id)
+                            return (
+                              <div key={r.id || ri} className="rvc-row rvc-reply">
+                                <span role={r.author ? 'button' : undefined}
+                                  style={r.author ? { cursor:'pointer' } : undefined}
+                                  onClick={() => r.author && navigate(`/u/${r.author}`)}>
+                                  <Avatar initials={ru.initials} color={ru.avc} size={24} src={ru.profileImage}/>
+                                </span>
+                                <div className="rvc-col">
+                                  <div className="rvc-name"><b>{ru.full}</b>{ru.verified && <Verify scholar={ru.role==='SCHOLAR'}/>}<i>{r.time}</i></div>
+                                  {editingId === r.id ? (
+                                    <>
+                                      <div className="rvc-editrow">
+                                        <input className="rvc-field" dir="auto" value={editValue} autoFocus
+                                          onChange={e => { setEditErr(null); setEditValue(e.target.value) }}
+                                          onKeyDown={e => { if (e.key === 'Enter') saveEdit(r.id, c.id); if (e.key === 'Escape') cancelEdit() }}/>
+                                        <button className="rvc-send" disabled={editBusy || !editValue.trim()} onClick={() => saveEdit(r.id, c.id)} aria-label="Save edit"><Icon name="check" className="sm"/></button>
+                                        <button className="rvc-send is-ghost" onClick={cancelEdit} aria-label="Cancel edit"><Icon name="close" className="sm"/></button>
+                                      </div>
+                                      {editErr && <ModerationAlert error={editErr} onRetry={() => saveEdit(r.id, c.id)} onDismiss={() => setEditErr(null)}/>}
+                                    </>
+                                  ) : (
+                                    <p dir="auto">{linkify(r.body)}</p>
+                                  )}
+                                  {rReal && editingId !== r.id && (
+                                    <div className="rvc-meta">
+                                      <button onClick={() => startReply(c.id, ru.handle)}>Reply</button>
+                                      {rMine && <button onClick={() => startEdit(r)}>Edit</button>}
+                                      {rMine && <button className="danger" onClick={() => delReply(c.id, r.id)}>Delete</button>}
+                                      {!rMine && r.author && (
+                                        <button onClick={() => openReport({ targetType:'COMMENT', targetId:r.id, targetLabel:'this reply', subject:r.body })}>Report</button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {rReal && (
+                                  <button className={'rvc-like' + (r.liked ? ' on' : '')} onClick={() => likeCmt(r.id, c.id)}
+                                    aria-pressed={!!r.liked} aria-label={r.liked ? 'Unlike reply' : 'Like reply'}>
+                                    <Icon name="heart" className="xs"/><small>{r.likes ? fmt(r.likes) : ''}</small>
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
+                        {/* The heart rides the row's right edge, Instagram-style. */}
+                        {real && (
+                          <button className={'rvc-like' + (c.liked ? ' on' : '')} onClick={() => likeCmt(c.id)}
+                            aria-pressed={!!c.liked} aria-label={c.liked ? 'Unlike comment' : 'Like comment'}>
+                            <Icon name="heart" className="xs"/><small>{c.likes ? fmt(c.likes) : ''}</small>
+                          </button>
+                        )}
                       </div>
                     )
                   })}
@@ -965,12 +1201,20 @@ export function Reels({ onClose, initialId }) {
                 <ModerationAlert error={cErr} onDismiss={() => setCErr(null)}/>
               </div>
             )}
+            {/* One composer, two targets: a banner says which. Cancelling the
+                reply keeps whatever was typed — the words are the user's. */}
+            {replyTo && (
+              <div className="rvc-replying">
+                <Icon name="reply" className="xs"/>Replying to @{replyTo.handle}
+                <button onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="close" className="xs"/></button>
+              </div>
+            )}
             <div className="rvc-box">
               <Avatar initials={(user?.full || 'Y').slice(0,1).toUpperCase()} color="linear-gradient(135deg,#1f4e7e,#00172f)" size={30} src={user?.profileImage}/>
-              <input className="rvc-field" dir="auto" placeholder="Add a comment…" value={cText}
+              <input className="rvc-field" dir="auto" placeholder={replyTo ? `Reply to @${replyTo.handle}…` : 'Add a comment…'} value={cText}
                 onChange={e => { setCText(e.target.value); if (cErr) setCErr(null) }}   // the refusal was about the OLD text
                 onKeyDown={e => { if (e.key === 'Enter') postCmt() }}/>
-              <button className="rvc-send" disabled={cBusy || !cText.trim()} onClick={postCmt} aria-label="Post comment"><Icon name="send" className="sm"/></button>
+              <button className="rvc-send" disabled={cBusy || !cText.trim()} onClick={postCmt} aria-label={replyTo ? 'Post reply' : 'Post comment'}><Icon name="send" className="sm"/></button>
             </div>
           </aside>
         </div>

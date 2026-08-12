@@ -17,9 +17,10 @@
    which every client renders as text under the reel.
    ========================================================= */
 
-/** Original at full, added track a shade under it: an added sound is a bed,
- *  and speech in the clip has to stay intelligible over it. */
-export const DEFAULT_MIX = { orig: 1, music: .7 }
+/** Original at full, added track a shade under it (an added sound is a bed,
+ *  and speech in the clip has to stay intelligible over it), voiceover at
+ *  full — someone recorded it to be HEARD. */
+export const DEFAULT_MIX = { orig: 1, music: .7, voice: 1 }
 
 export const clamp01 = (n) => Math.min(1, Math.max(0, Number(n) || 0))
 
@@ -27,12 +28,15 @@ export const clamp01 = (n) => Math.min(1, Math.max(0, Number(n) || 0))
  *  the post stores as its track label. */
 export const soundLabel = (s) => [s?.title, s?.artist].filter(Boolean).join(' · ') || 'Added sound'
 
-/** Append the authored balance to a track url. */
+/** Append the authored balance to a track url — original, music, voiceover.
+ *  (The voiceover file itself uploads as an AUDIO media part; its URL is
+ *  minted by the server, so the fragment can only ride on the track url. A
+ *  voiceover-only reel therefore plays at defaults — noted in BACKEND_NOTES.) */
 export function withMix(url, mix) {
   if (!url) return url
   const base = String(url).split('#')[0]
   const m = mix || DEFAULT_MIX
-  return `${base}#mix=${clamp01(m.orig).toFixed(2)},${clamp01(m.music).toFixed(2)}`
+  return `${base}#mix=${clamp01(m.orig).toFixed(2)},${clamp01(m.music).toFixed(2)},${clamp01(m.voice ?? 1).toFixed(2)}`
 }
 
 /** Read it back. null when the reel carries none — every reel posted before
@@ -40,7 +44,8 @@ export function withMix(url, mix) {
 export function readMix(url) {
   const frag = String(url || '').split('#')[1]
   if (!frag) return null
-  const m = /(?:^|&)mix=([0-9.]+),([0-9.]+)/.exec(frag)
+  // two floats (pre-voiceover reels) or three — both are valid documents
+  const m = /(?:^|&)mix=([0-9.]+),([0-9.]+)(?:,([0-9.]+))?/.exec(frag)
   if (!m) return null
-  return { orig: clamp01(m[1]), music: clamp01(m[2]) }
+  return { orig: clamp01(m[1]), music: clamp01(m[2]), voice: m[3] != null ? clamp01(m[3]) : 1 }
 }
